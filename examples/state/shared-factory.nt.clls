@@ -1,0 +1,44 @@
+
+type ISharedObjectMenu (S,A) {
+	recv ~S;
+	offer of {
+	| #Use: send affine A; recv ~affine A; send S; close
+	| #Share: recv S; S
+	| #Free: wait
+	}
+};;
+
+type ISharedObject (A) {
+	sendty S;
+	send S;
+	! ISharedObjectMenu (S,A) 
+};;
+
+proc SharedObjectMenu<A> (me: !ISharedObjectMenu(state A,A))
+{
+	! me(c: ISharedObjectMenu (state A,A));
+	recv c(s);
+	case c of {
+	| #Use: 	
+		take s (rep);
+	    	send c (rep); 
+		recv c (repn);
+		put s (repn);
+		send c (s);
+		close c
+	| #Share: 
+		recv c (s0);
+		share s { fwd s c || fwd s s0 }
+	| #Free: 
+		wait c;
+		release s
+	}
+};;
+
+proc SharedObjectFactory<A> (c: ISharedObject(A), v:~affine A)
+{
+	sendty c (state A);
+	send c (m. cell m (v));
+	SharedObjectMenu<A>(c)
+};;
+

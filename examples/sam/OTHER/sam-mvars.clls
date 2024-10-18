@@ -1,0 +1,83 @@
+
+proc mv0(){
+    cut{
+	cell s (2)
+	|s:usage ~lint |
+	release s
+   }
+};;
+
+
+proc mv1(){
+    cut{
+	cell s (2)
+	|s:usage ~lint |
+	take s(x);
+	put s(x+1);
+	take s(y);
+	put s(y+1);
+	release s
+   }
+};;
+
+
+proc mv2(){
+    cut {
+	cell s (2)
+	|s:usage ~lint |
+	take s(x);
+	put s(x+1);
+	take s(y);
+	println(y*2);
+	put s(0);
+	release s
+   }
+};;
+
+proc mv3(){
+    cut {
+	cell s (2)
+	|s:usage ~!lint |
+	take s(x);
+	println(x);
+	put s(x);
+	release s
+   }
+};;
+
+proc mv4(){
+    cut {
+	cell s (2)
+	|s:usage ~!lint |
+	share s {
+	      release s
+	      ||
+	      share s {
+	      	    release s
+	      	    ||
+	      	    release s
+   	      }
+   	}
+   }
+};;
+
+proc threadt(s: usage ~!lint; msg:~lstring) {
+     take s(x);
+     println(msg+":"+x);
+     put s(x+1);
+     release s
+};;
+
+proc mv5() {
+    cut {
+	cell s (2)
+	|s:usage ~!lint |
+	share s {
+	      threadt(s;"HERE 1")
+	      ||
+	      threadt(s;"HERE 2")
+	      ||
+	      threadt(s;"HERE 3")
+   	}
+   }
+};;

@@ -1,0 +1,25 @@
+
+type rec List(T) {
+  choice of {
+    | #Nil: close
+    | #Cons: send T; List(T)
+  }
+};;
+
+type ListI {
+	List(!lint)
+};;
+
+proc rec lenB(l: ~ListI, n: !lint) {
+	case l of {
+    |#Nil: wait l; let! n 0
+    |#Cons: recv l(val);
+            cut {
+              lenB(l, res)
+              | res: ~!lint |
+		  ?res;
+              let! n res+1
+            }
+	}
+};;
+

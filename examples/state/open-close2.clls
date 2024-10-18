@@ -1,0 +1,169 @@
+
+type rec List {
+	send Resource;
+	choice of {
+	| #Next: Node
+	| #Null: close
+	}
+} and AList {
+	affine List
+} and Node {
+	state List
+} and Resource {
+	affine
+	choice of {
+	| #Res: affine lint
+	| #Taken: close
+	| #Wait: affine ~send affine lint;~Node
+} 
+};;
+
+/*
+proc rec go2(ni:~Node, p: send lint; Node)
+{
+	take ni(i);	
+	recv i(r);
+	case i of {
+	| #Null: wait i;
+			case r of {
+			| #Res:
+				send p (r); //send lint back
+				put ni (o. 
+					affine o;
+					send o (v. 
+		    				affine v;
+						#Taken v; close v);
+					#Null o; close o);
+				fwd p ni // send node back
+			| #Taken: 
+				send p (x.affine x; let x 0);
+				put ni (o.
+					affine o;
+					send o (v. 
+		    				affine v;
+						#Taken v;
+						close v);
+					#Null o; close o);
+				wait r;
+				fwd p ni
+//			 | #Wait: () // never happens 
+			}
+	| #Next: cut {
+		    		go2(i,o1)
+		    		| o1: ~ send lint; Node |
+				recv o1(v);
+				cut {
+					affine o;
+		    			send o(r);
+		    			#Next o;
+		    			fwd o o1
+				|o:~AList|
+		    			put ni(o);
+					send p(v);
+					fwd p ni
+				}
+		    	}
+	}
+};;
+*/
+
+proc rec go22(ni:~Node, p:affine lint, no:coaffine send affine lint;~Node)
+{
+	take ni(i);	
+	recv i(r);
+	case i of {
+	| #Null: wait i;
+			case r of {
+			| #Res:
+				put ni (o. 
+					affine o;
+					send o (v. 
+		    				affine v;
+						#Taken v; close v);
+					#Null o; close o);
+				par { discard no || fwd r p } // HERE give back ni ??
+			| #Taken: 
+				put ni (o.
+					affine o;
+					send o (v. 
+		    				affine v;
+						#Wait v;
+						fwd v no);
+					#Null o; close o);
+				wait r;
+				par { affine p; let p 0  || release ni }
+		 	 | #Wait: // never happens
+				put ni (o. 
+					affine o;
+					send o (v. 
+		    				affine v;
+						#Wait v; fwd v r);
+					#Null o; close o);
+				par { affine p;let p 0  || send no(x.affine x; let x 0);fwd ni no}
+			}
+	| #Next: 
+				share i {
+					put ni(o.
+						affine o;
+		    				send o(r);
+		    				#Next o;
+		    				fwd o i);
+					release ni
+					||
+		   			go22(i,p,no)
+				}
+	}
+};;
+
+proc rec go23(ni:~Node, p:~affine lint, no: Node)
+{
+	take ni(i);	
+	recv i(r);
+	case i of {
+	| #Null: wait i;
+			case r of {
+			| #Res: // never happens
+				println r;
+				put ni (o. 
+					affine o;
+					send o (v. 
+		    				affine v;
+						#Res v; affine v;let v 0);
+					#Null o; close o);
+				par { fwd ni no || discard p }
+			| #Taken: 
+				put ni (o.
+					affine o;
+					send o (v. 
+		    				affine v;
+						#Res v;
+						fwd v p);
+					#Null o; close o);
+				wait r;
+				fwd ni no 
+		 	 | #Wait: // never happens
+				put ni (o. 
+					affine o;
+					send o (v. 
+		    				affine v;
+						#Taken v; close v);
+					#Null o; close o);
+				send r(p); fwd r no
+			}
+	| #Next: 
+				share i {
+					put ni(o.
+						affine o;
+		    				send o(r);
+		    				#Next o;
+		    				fwd o i);
+					fwd ni no
+					||
+		    			cut {
+						go23(i,p,n1)
+		    				| n1: ~ Node|
+						release n1
+					}
+				}
+	}
+};;

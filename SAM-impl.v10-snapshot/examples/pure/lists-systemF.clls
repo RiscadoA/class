@@ -1,0 +1,309 @@
+/*
+    We implement lists and some operations following the System F encoding of recursive types.
+    These definition will
+    then be instantiated when defining the concurrent shareable stacks and queues.
+*/
+
+
+type fun(a,b) { recv ~ a; b };;
+
+/*
+    Terms of type list(tA) receive a type variable tX, a value n:tX (which corresponds to nil), a server
+    c:!tcons(tA,tX) (which corresponds to cons) and produce a value of type tX, which is obtained by calling the server
+    'c' a finite (possibly zero) number of times on the inputted value n.
+
+    The type of lists 'list(tA)' is parametric on 'tA', the type of things which are putted together in a list.
+*/
+type tcons(tA,tB){ recv ~tA;recv~tB;tB};;
+
+type list(tA){ recvty tX; recv ~tX; recv ~!tcons(tA,tX); tX };;
+
+/*
+    Process nil<tA>(l:list(tA)) implements the empty list on session l. Notice that it simply forwards the inputted
+     'n' (nil) without ever calling the inputted server 'c' (cons).
+*/
+proc nil<tA>(l:list(tA)){
+     recvty l (tX);
+     recv l (n: ~tX);
+     recv l (c: ~!tcons(tA,tX));
+     ?c;
+     fwd l n 
+};;
+
+proc nilB<tA>(l:!list(!tA)){
+     !l(l0:list(!tA));
+     recvty l0 (tX);
+     recv l0 (n: ~tX);
+     recv l0 (c: ~!tcons(!tA,tX));
+     ?c;
+     fwd l0 n 
+};;
+
+/*
+    Process cons<tA>(a:~tA, tl:~list(tA), l:list(tA)) prepends an element 'a:~tA' to the list 'tl:~list(tA)' (tail),
+    producing its result on session 'l:list(tA)'.
+
+    It sends to 'tl' the inputted type variables 'tX' and the inputted sessions 'n' and 'c'. Then, it calls the server
+    'c' once more on the element 'a' and the output produced by 'tl'.
+*/
+proc cons<tA>( a:~tA, tl:~list(tA), l:list(tA))
+{
+     recvty l (tX);
+     recv l (n: ~tX);
+     recv l (c: ~!tcons(tA, tX));
+     ?c;
+     sendty tl (tX);
+     send tl (nd: tX. fwd n nd);
+     send tl (c2: !tcons(tA, tX).
+     	     	  !c2(c20:tcons(tA,tX));
+		          call c(c0:~tcons(tA,tX));
+		          fwd c0 c20);
+     call c(c0:~tcons(tA, tX));
+     send c0(ad: tA. fwd a ad);
+     send c0(tl2: tX. fwd tl tl2);
+     fwd c0 l
+};;
+
+proc consB<tA>(a : ~!tA, tl:~!list(!tA), l:!list(!tA))
+{
+     ?a;
+     ?tl;
+     !l(l0:list(!tA));
+     call tl(tl0:~list(!tA));
+     cut{
+     !a00(v0:tA); call a(a0:~tA); fwd a0 v0
+     |a00:~!tA|
+     cons<!tA>(a00, tl0, l0)
+     }
+};;
+
+/*
+    Process printListOfInt(l:~list(!lint)) prints a list of persistent elements.
+*/
+proc printListOfInt(l:~list(!lint)){
+    sendty l(close);
+    print("[ ");
+    send l(n:   close.
+                close n);
+    send l(c:   !tcons(!lint,close).
+                !c(c0:tcons(!lint,close));
+                recv c0(n:~!lint);
+                recv c0(t:~close);
+                ?n;
+                print(n + " ");
+                wait t;
+                close c0
+           );
+    wait l;
+    println("]");
+    ()
+};;
+
+
+/*
+    We now implement processes 'in<tA>(v:~tout(tA), l:list(tA))' and 'out<tA>(l:~list(tA), v:tout(tA))' that witness the
+    isomorphism between the datatypes 'list(tA)' and 'tout(tA)'.
+
+    An element of type 'tout(tA)' chooses either '#None' and closes the session or chooses '#Some', in which case it
+    sends an element of type 'tA' and continues as list of 'tA's.
+*/
+type tout(tA){
+     choice of {
+        |#None: close
+        |#Some: send tA;list(tA)
+     }
+};;
+
+proc inX<tA>(v:~tout(tA), l:list(tA)){
+     case v of {
+        |#None: wait v;
+                nil<tA>(l)
+	|#Some: recv v (a:~tA);
+	            cons<tA>(a,v,l)
+     }
+};;
+
+proc out<tA>(l:~list(tA), v:tout(tA)){
+     sendty l(tout(tA));
+     send l (n: tout(tA).
+                #None n;
+                close n);
+     send l (c: !tcons(tA, tout(tA)).
+     	    	!c(x:tcons(tA, tout(tA)));
+		        recv x (a:~tA);
+		        recv x (t:~tout(tA));
+		        #Some x;
+		        send x (ad:tA. fwd a ad);
+		        inX<tA>(t,x));
+     fwd l v 
+};;
+
+type toutB(tA){
+     choice of {
+        |#None: close
+        |#Some: send !tA;!list(!tA)
+     }
+};;
+
+proc inB<tA>(v:?~toutB(tA), l:!list(!tA)){
+     ?v;
+     call v(v0:~toutB(tA));
+     case v0 of {
+        |#None: wait v0;
+                nilB<tA>(l)
+	|#Some: recv v0 (a:~!tA);
+	            consB<tA>(a,v0,l)
+     }
+};;
+
+type list(tA){ recvty tX; recv ~tX; recv ~!tcons(tA,tX); tX };;
+
+
+proc outB<tA>(l:~!list(!tA), v:!toutB(tA)){
+     ?l;
+     call l(l0:~list(!tA));
+     sendty l0(!toutB(tA));
+     send l0 (n: !toutB(tA).!n(n0:toutB(tA));#None n0;close n0);
+     send l0 (c: !tcons(!tA, !toutB(tA)).
+     	    	!c(x:tcons(!tA, !toutB(tA)));
+		        recv x (a:~!tA);
+		        recv x (t:~!toutB(tA));
+			?a;
+			?t;
+		        !x(x0:toutB(tA));
+			#Some x0;
+		        send x0 (ad:!tA. !ad(a0:tA);call a(a1:~tA);fwd a1 a0);
+			cut {
+			!t00(u:toutB(tA));call t(t0:~toutB(tA));fwd t0 u
+			|t00:~!toutB(tA)|
+		        inB<tA>(t00,x0)
+			}
+			);
+     fwd l0 v 
+};;
+
+
+/*
+    Process 'append<tA>(a:~tA, l:~list(tA), nl:list(tA))' appends the element 'a' to the tail of list 'l', producing
+    the new obtained list on session 'nl'.
+*/
+proc append<tA>(a:~tA, l:~list(tA), nl:list(tA)){
+    recvty nl(tX);
+    recv nl(n: ~tX);
+    recv nl (c: ~!tcons(tA,tX));
+    ?c;
+    sendty l(tX);
+    send l(n2:  tX.
+                call c(c0:~tcons(tA,tX));
+                send c0(ad:tA. fwd a ad);
+                send c0(nd:tX. fwd n nd); 
+                fwd c0 n2);
+    send l(cc:  !tcons(tA,tX).
+                !cc(cc0:tcons(tA,tX));
+                call c(c0:~tcons(tA, tX));
+                fwd cc0 c0);
+    fwd l nl
+};;
+
+/*
+    We implement list reversing using an accumulator. Process reverseAux<tA>(x:~list(tA), y:fun(list(tA), list(tA)))
+    takes a list x as input and produces a function on session y, which takes a list z as input and produces x^-1 ++ z
+    as output, i.e. the list resultant by concatenating the reverse of x with z.
+
+    Then, to reverse a list x we just have to compose reverseAux(x,y) with a process that, on y, outputs the empty list.
+    That is precisely what process reverse<tA>(x:~list(tA), y:list(tA)) does.
+*/
+proc reverseAux<tA>(x:~list(tA), y:fun(list(tA), list(tA))){
+     sendty x(fun(list(tA),list(tA)));
+     send x (n: fun(list(tA),list(tA)).
+		        recv n(l:~list(tA));
+		        fwd n l );
+     send x (c: !tcons(tA,fun(list(tA),list(tA))).
+                !c(r:tcons(tA,fun(list(tA),list(tA))));
+	            recv r (a:~tA);
+	            recv r (t:~fun(list(tA),list(tA)));
+	            recv r(l:~list(tA));
+	            send t(l2:list(tA). cons<tA>(a, l, l2));
+	            fwd t r);
+     fwd x y 
+};;
+
+
+proc reverse<tA>(x:~list(tA), y:list(tA)){
+     cut {
+            reverseAux<tA>(x,z)
+            |z:~fun(list(tA),list(tA))|
+            send z(n:   list(tA).
+                        nil<tA>(n));
+            fwd z y
+	     }
+};;
+
+/*
+    We now define a series of processes that only work on lists of persistent elements.
+
+    We start with process dis<tA>(l:~list(!tA)), which discards all elements - one by one - of list l.
+*/
+
+proc dis<tA>(l:~list(!tA)){
+     sendty l (close);
+     send l (n:close. close n);
+     send l (c: !tcons(!tA, close).
+                !c(x:tcons(!tA, close));
+                recv x (a:~!tA);
+                recv x (t:~close);
+                ?a;
+                fwd x t);
+     wait l;
+     ()
+};;
+
+include "maybe.clls";;
+
+
+/*
+    Process head<tA>(l:~list(!tA), h:maybe(!tA)) produces the head of list l on session h.
+
+    This head might be a #Nothing if the list is empty or a #Just followed by the actual head element otherwise. Notice
+    that in this latter case we discard the tail.
+*/
+proc head<tA0>(l:~list(!tA0), h:maybe(!tA0)){
+     cut {
+            out<!tA0>(l,x)
+            |x:~tout(!tA0)|
+            case x of {
+     	 	     |#None:    wait x;
+			     	        #Nothing  h;
+				            close h
+	             |#Some:    recv x (a:~!tA0);
+			      	        #Just h;
+			      	        par { dis<tA0>(x) || fwd h a}
+			}
+	}
+};;
+
+
+/*
+    Process tail<tA>(l:~list(!tA), tl:list(!tA)) produces on tl the tail of list l. If the list is empty, it outputs
+    the empty list.
+*/
+proc tail<tA0>(l:~list(!tA0), tl:list(!tA0)){
+     cut {
+            out<!tA0>(l,x)
+            |x:~tout(!tA0)|
+            case x of {
+     	 	 |#None:    wait x;
+			     	    nil<!tA0>(tl)
+		     |#Some:    recv x (a:~!tA0);
+			      	    ?a;
+				        fwd tl x
+			}
+	 }
+};;
+
+
+
+
+
+
+

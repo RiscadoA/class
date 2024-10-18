@@ -1,0 +1,62 @@
+type rec List(A){
+    choice of {
+        |#Nil
+        |#Cons; send A; send List(A)
+    }
+};;
+
+proc nil<A>(l:List(A)){
+    #Nil l
+};;
+
+proc cons<A>(a:~A, l:~List(A), nl:List(A)){
+    nl <- #Cons a l 
+};;
+
+proc rec dispose<A>(l:~List(!A)){
+    case <-l{
+        |#Nil
+        |#Cons;
+        a =<- l; // a is of type ? so it can be weakened 
+        dispose<A>(l) // dispose tail 
+    }
+};;
+
+type maybe(A){
+    choice of {
+        |#Nothing
+        |#Just; send A 
+    }
+};; 
+
+proc head<A>(l:~List(!A), a:maybe(!A)){
+    case <-l{
+        |#Nil;
+        a <- #Nothing 
+        |#Cons;
+        b =<- l;  
+        a <- #Just b; 
+        dispose<A>(l) 
+    }
+};;
+
+proc tail<A>(l:~List(!A), tl: maybe(List(!A))){
+    case <-l{
+        |#Nil;
+        tl <- #Nothing 
+        |#Cons;
+        a =<- l; 
+        tl <- #Just l
+    }
+};;
+
+proc rec append<A>(l:~List(A),a:~A, nl:List(A)){
+    case <-l{
+        |#Nil;
+        l <- #Cons a #Nil 
+        |#Cons;
+        b =<-l; 
+        fork x <- append<A>(l,a,x);
+        nl <- #Cons b x 
+    }
+};;

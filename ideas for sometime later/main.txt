@@ -1,0 +1,154 @@
+The goal: 
+
+Give the user the ability to define how a coaffine session should be discarded. 
+
+
+# Experiment 1
+---------------
+Expose affine as an external choice 
+    /\ A = &{#use: A, #discard: _|_} 
+
+Then, affine, discard and use are just syntactic sugar:
+
+    discard a = #discard a; close a 
+    use a; P = #use a; P 
+    affine_{c^, a^} a;P = case a {#use: P, #discard: release c^ || discard a^}
+
+
+## Example 1: Pairs 
+
+type Pair{
+    affine{
+        send lint; 
+        send lint; 
+        close
+    }
+};; 
+
+proc pair(n:colint, m:colint, x:Pair){
+    case x of {
+        |#use: 
+        send x(n);
+        send x(m);
+        close x
+
+        |#discard: 
+        wait x; 
+        println("disposing a Pair of integers (" + n + ", " + m + ")...");
+        ()
+    }
+};; 
+
+
+## Example 2: a counter 
+
+proc alint(n:colint, m:affine lint){
+    case m of {
+        |#use:
+        let m n
+
+        |#discard: 
+        println("discarding integer " + n);
+        ()
+    }
+};; 
+
+proc main(){
+    cut{
+        let n 42
+        |n|
+        cell c(m. alint(n,m))
+        |c|
+        take c(m);
+        #use m;                     // this operation can be inferred 
+        put c(r. alint(m,r+1));     // put redefines how the session will be discarded 
+        release c 
+    }
+};; 
+
+## Taking stock 
+    It accomplishes the goal by wrapping a session A in an external choice 
+    &{#use: A, #discard: _|_}. It's a nice generalisation and "explanation"
+    of affine sessions. 
+    But there's a lot of wrapping involved and I don't know if 
+    it's desirable to redefine the discarding behaviour 
+    after every use of an affine session. 
+    
+# Experiment 2 (associate the discarding behaviour with the type)
+-------------------------------------------------------------------
+
+type affine A { // A = B 
+    B 
+} with dispose(x:~B){
+    .... 
+};; 
+
+P |-_Si De, x:A ; Ga        affine A {  B } with dispose(x){...} in Si  
+-----------------------------------------------------------------------
+cell c(x. P) |-_Si De, x:Sf A ; Ga 
+
+cell c(x. P) |c| release c -> P |x| dispose(x)
+
+
+## Example 1: Pairs 
+
+type affine Pair {
+    send lint; 
+    send lint; 
+    close 
+} with dispose(x: recv colint; recv colint; wait){
+    recv x(n);
+    recv x(m);
+    wait x; 
+    println("disposing a Pair of integers (" + n + ", " + m + ")...");
+    ()
+};; 
+
+proc pair(n:colint, m:colint, x:Pair){
+    send x(n);
+    send x(m);
+    close x 
+};; 
+
+## Example 2: a counter 
+
+type affine Alint {
+    lint 
+} with 
+dispose(n:colint){
+     println("discarding integer " + n);
+     ()
+};;
+ 
+
+proc main(){
+    cut{
+        cell c(n: Alint. let n 42) // no affine annotations needed 
+        |c|
+        take c(n);
+        put c(m. let m n+1);     
+        release c 
+    }
+};; 
+
+
+## Explaining "old" affine sessions 
+
+type affine Aff(A){
+    B
+} and 
+B {
+    case of {
+        |#use:      A 
+        |#discard: _|_
+    }
+} with 
+dispose(x:~B){
+    #discard x;
+    close x 
+};; 
+
+discard a = dispose(a)
+use a; P = #use a; P 
+affine_{c^, a^} a;P = case a {#use: P, #discard: release c^ || discard a^}
+

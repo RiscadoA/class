@@ -1,0 +1,74 @@
+type corec Off {
+    offer of {
+        |#turnOn: On
+    }
+} and On {
+    offer of {
+        |#turnOff: affine Off
+    }
+};;
+
+type ToggleI {
+     state Off
+};;
+
+proc rec off(t:Off) {
+    case t of {
+        |#turnOn:
+	println("ON");
+	on(t)
+    }
+} and on(t:On){
+    case t of {
+        |#turnOff:
+	println("OFF");
+	affine t;
+	off(t)
+    }
+};;
+
+proc client1(c:~state Off){
+    take c(t);
+    #turnOn t; #turnOff t;
+    put c(t);
+    release c
+};;
+
+proc client2(c:~state Off){
+    take c(t);
+    #turnOn t; #turnOff t;
+    #turnOn t; #turnOff t;
+    put c(t);
+    release c
+};;
+
+proc toggle(t:ToggleI)
+{
+    cell t(v. affine v; off(v))
+};;
+
+proc main(){
+    cut{
+	toggle(c)
+        |c:~state Off|
+        share c {
+            client1(c)
+            ||
+            client2(c)
+        }
+    }
+};;
+
+TA LEFT
+ 
+Henrique Guerra 1T
+
+Tomás Almeida 2T
+
+Gonçalo Pattenden 2T
+
+/*
+
+include "examples/state/toggle.clls";;
+
+*/

@@ -1,0 +1,88 @@
+type corec AIntStream {
+     affine send !lint; AIntStream
+ };;
+ 
+proc rec intsfm(nk: AIntStream; k:~lint)
+ {
+     affine nk; send nk(k); intsfm(nk;k+1)
+ };;
+
+proc intsfm2(n2: AIntStream)
+ {
+     intsfm(n2;2)
+ };;
+ 
+proc rec filter (outsf:AIntStream, insf:~AIntStream;nf:~lint)
+ {
+    recv insf (v); 
+     if  ((v / nf)*nf==v)
+     	 { filter(outsf,insf;nf) }
+     	 { affine outsf; send outsf (v); filter(outsf, insf;nf) }
+ };;
+
+proc rec sieve(outss:AIntStream, inss:~AIntStream)
+ {
+    recv inss (p);
+    affine outss;
+    send outss(p);
+    cut  {
+    filter(outp,inss;p)
+    |outp:~AIntStream|
+    sieve(outss,outp)
+    }
+ };;
+
+proc primesN(primes:AIntStream)
+ {
+ cut  {
+      intsfm2(nn)
+      |nn:~AIntStream|
+      sieve(primes,nn)
+}
+};;
+
+proc unsafe_rec printfirst(il:~AIntStream;k:~lint)
+{
+   if(k==0)
+     	 {
+	 println("discard il");	 
+	 discard il
+	 }
+     	 {
+	 use il;
+	 recv il(n);
+	 print(n);
+	 print(" ");
+	 printfirst(il;k-1)
+	}
+};;
+
+proc main_sa()
+{
+ cut  {
+       primesN(primes)
+       |primes:~AIntStream|
+       printfirst(primes;500)
+      }
+ };;
+
+proc primesNC(primes:AIntStream)
+{
+ ccut  {
+      intsfm2(ni)
+      |ni:~AIntStream|
+      sieve(primes,ni)
+}
+};;
+
+
+proc mainc()
+{
+ ccut  {
+       primesNC(primes)
+       |primes:~AIntStream|
+       printfirst(primes;2)
+      }
+ };;
+
+// sam main_sa();;

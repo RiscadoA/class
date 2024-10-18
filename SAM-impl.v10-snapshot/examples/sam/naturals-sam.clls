@@ -1,0 +1,364 @@
+
+type rec Nat{
+    choice of {
+        |#Z: close      //zero
+        |#S: Nat        //successor
+    }
+};;
+	
+
+//Encoding of naturals zero, one and two
+
+proc zero(n:Nat){ #Z n; close n };;
+
+proc one(n:Nat){ #S n; #Z n; close n };;
+
+proc two(n:Nat){#S n; #S n; #Z n; close n};;
+
+proc rec add(n:~Nat, m:~Nat, r:Nat)
+{
+   case n of {
+    |#Z: wait n;
+         fwd m r
+    |#S: #S r;
+         add(n,m,r)
+   }
+};;
+
+//Computes the successor of n on m
+proc succ(n:~Nat, m:Nat){ #S m; fwd n m};;
+
+//The natural three is the sucessor of two
+proc three(m:Nat){
+    cut{
+        two(n)
+        |n:~Nat|
+        succ(n,m)
+    }
+};;
+
+//Computes the double of on on m
+proc rec double(n:~Nat, m:Nat)
+{
+    case n of {
+        |#Z: wait n; zero(m)
+        |#S: cut{
+                double(n,k)             //spawns a recursive call
+                |k:~Nat|
+                #S m; #S m; fwd m k
+                }
+    }
+};;
+
+
+
+
+proc rec mul(n:~Nat, m:?~Nat, r:Nat)
+{
+   case n of {
+   |#Z: ?m;wait n; #Z r; close r
+   |#S: ?m;
+	cut {
+	!m1(v:Nat);call m(m1:~Nat);fwd m1 v
+	|m1:?~Nat|
+   	mul(n,m1,r0)
+	|r0:~Nat|
+ 	call m(m2:~Nat);
+	add(m2,r0,r)
+	}
+   } 
+};;
+
+proc rec dispose(n:~Nat, x:close) {
+    case n of {
+        |#Z: wait n; close x
+        |#S: cut{ dispose(n, y) |y:wait| wait y; close x}
+    }
+};;
+
+proc rec nat2lint(n:~Nat, m:lint){
+    case n of {
+        |#Z: wait n; let m 0
+        |#S: cut{ nat2lint(n, k) |k:colint| let m k+1}
+    }
+};;
+
+proc unsafe_rec lint2nat(m:Nat;n:colint){
+    if(n==0 or n <0){
+        zero(m)
+    }{
+       cut{
+        lint2nat(x;n-1)
+        |x:~Nat|
+        #S m; fwd m x
+    }
+    }
+};;
+
+proc embedd(n:~Nat, m:lint){
+    nat2lint(n,m)
+};;
+
+proc pred(n:~Nat, m:Nat){
+    case n of {
+        |#Z: wait n; zero(m)
+        |#S: fwd n m
+    }
+};;
+
+proc predB(m:!Nat;n:~Nat){
+    !m(m0:Nat);
+    call n(n0:~Nat);
+    pred(n0,m0)
+};;
+
+/*
+    Promotes a natural to an affine natural.
+*/
+proc rec affNat(n:~Nat, m:affine Nat){
+    case n of {
+        |#Z: wait n; affine m; zero(m)
+        |#S: cut{ affNat(n,k) |k:coaffine ~Nat| affine m; #S m; use k; fwd k m }
+
+    }
+};;
+
+/*
+    Gives a mutually recursive definition of
+        even(n,b) which outputs true in b if the natural n is even, false otherwise
+        and
+        odd(n,b) which outputs true in b if the natural n is odd, false otherwise.
+*/
+
+proc rec even(n:~Nat, b:lbool){
+    case n of {
+        |#Z:    wait n;
+                let b true
+        |#S:    odd(n,b)
+    }
+}
+and
+odd(n:~Nat, b:lbool){
+    case n of {
+        |#Z:    wait n;
+                let b false
+        |#S:    even(n,b)
+    }
+};;
+
+proc rec toStr(n:~Nat, s: lstring){
+    case n of {
+        |#Z: wait n; let s "Z"
+        |#S: cut{
+                toStr(n,x)
+                |x:~lstring|
+                let s "S "+x
+                }
+    }
+};;
+
+proc rec dorec(n:~Nat){
+    case n of {
+        |#Z: wait n; println("#Z");()
+        |#S: println("#S");dorec(n)
+    }
+};;
+
+proc testx0(){
+        cut{
+            three(n)
+            |n:~Nat|
+            dorec(n)
+        } 
+};;
+
+proc rec fdoublel(n:~Nat,r:Nat)
+{
+   case n of {
+     |#Z: wait n; #Z r; close r
+     |#S: #S r; #S r; fdoublel(n,r)
+   }
+};;
+
+proc fdouble(n:!recv ~Nat;Nat) 
+{
+	!n(f);
+	recv f(x);fdoublel(x,f)
+};;
+
+proc rec printChurch(n:~Nat){
+    case n of {
+        |#Z: wait n; println("#Z");()
+        |#S: print("#S");printChurch(n)
+    }
+};;
+
+proc main()
+{
+	cut {
+	fdouble(f)
+	|f:~!recv ~Nat; Nat|
+	par {
+	     call f(c); send c (n.one(n)); println("t1"); printChurch(c)
+	     ||
+	     call f(c); send c (n.two(n)); println("t2"); printChurch(c)
+	}
+	}
+};;
+
+main();;
+
+//some tests
+
+proc test00(){
+cut{
+    three(n)
+    |n:~Nat|
+    toStr(n,s)
+    |s:~lstring|
+    println(s);
+    ()
+}
+};;
+
+
+
+proc test0(){
+cut{
+    three(n)
+    |n:~Nat|
+    double(n,m)
+    |m:~Nat|
+    toStr(m,s)
+    |s:~lstring|
+    println(s);
+    ()
+}
+};;
+
+
+proc test1(){
+cut{
+    three(n)
+    |n:~Nat|
+    println("Disposing 3...");
+    dispose(n,x)
+    |x:wait|
+    wait x;
+    println("... end.");
+    ()
+}
+};;
+
+proc test2(){
+cut{
+    three(n)
+    |n:~Nat|
+    three(m) 
+    |m:~Nat|
+    add(m,n,r)
+    |r:~Nat|
+    embedd(r, k)
+    |k:colint|
+    println("3+3 = " + k);
+    ()
+}
+};;
+
+proc test3(){
+cut{
+    !n3(v:Nat);three(v)
+    |n3:?~Nat|
+    three(m)
+    |m:~Nat|
+    mul(m,n3,r)
+    |r:~Nat|
+    embedd(r,k)
+    |k:colint|
+    println("3*3 = " + k);
+    ()
+}
+};;
+
+proc test4a(){
+        cut{
+            one(n)
+            |n:~Nat|
+            even(n,b)
+            |b:~lbool|
+            println("is 3 even? " + b);
+            ()
+        } 
+};;
+
+proc test5() {
+        cut{
+            zero(z)
+	    |z:~Nat|
+	    fwd z n
+            |n:~Nat|
+	    nat2lint(n,p)
+	    |p:~lint|
+            println("NUM=" +p);
+            ()
+        } 
+} ;;
+
+proc test4(){
+par{
+	println("0 mix even");
+        cut{
+            zero(n)
+            |n:~Nat|
+            even(n,b)
+            |b:~lbool|
+            println("is 0 even? " + b);
+            ()
+        }
+        ||
+	println("0 mix odd");
+        cut{
+            zero(n)
+            |n:~Nat|
+            odd(n,b)
+            |b:~lbool|
+            println("is 0 odd? " + b);
+            ()
+        }
+      || 
+	println("3 mix even");
+        cut{
+            three(n)
+            |n:~Nat|
+            even(n,b)
+            |b:~lbool|
+            println("is 3 even? " + b);
+            ()
+        } 
+        ||
+	println("3 mix odd");
+        cut{
+            three(n)
+            |n:~Nat|
+            odd(n,b)
+            |b:~lbool|
+            println("is 3 odd? " + b);
+            ()
+        }
+	
+}
+};;
+
+sam testx0();;
+sam test00();;
+sam test0();;
+sam test1();;
+sam test2();;
+sam test3();;
+sam test4a();;
+sam test4();;
+sam test5();;
+
+
+println("NATURALS...");();;
+

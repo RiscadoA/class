@@ -1,0 +1,122 @@
+
+type rec SList(A){
+    state {
+        List(A)
+    }
+} and List(A) {
+    choice of {
+        |#Null: close
+        |#Next: send {affine A}; affine SList(A)
+    }
+};;
+
+type UList(A) {
+    state {
+        List(A)
+    }
+  };;
+    
+proc single<A>(a:coaffine ~A, n:affine List(A)) {
+    affine n;
+    #Next n;
+    clltype n;
+    clltype a;
+    send n(xa.fwd xa a);
+//    send n(a);
+    affine n;
+    cell n(x. affine x; #Null x; close x)
+};;
+
+proc nil<A>(ln: affine List (A))
+{
+    affine ln;
+    #Null ln;
+    close ln
+};;
+
+proc cnext<A>(a:coaffine ~A, c:~UList(A), lx: affine List(A))
+{
+   affine lx;
+   #Next lx;
+   send lx(a0. fwd a0 a);
+   affine lx;
+   unfold lx; // 
+   fwd lx c
+};;
+
+proc rec append<A>(c:~SList(A), l2:~ affine List(A), c2:SList(A)) {
+    take c(l);
+    case l of {
+        |#Null: wait l;
+                put c(l88. fwd l88 l2);
+		unfold c2;
+                fwd c c2
+
+        |#Next: recv l(a);
+                cut{
+		    use l;
+                    append<A>(l,l2,x)
+                    |x:~SList(A)|
+		    unfold x;
+                    put c(y. cnext<A>(a,x,y));
+		    unfold c2;
+                    fwd c c2
+                }
+    }
+};;
+
+
+proc insertElemBeginning<A>(a:coaffine ~A,l:~SList(A), nl: SList(A)){
+    take l(n);
+    cut{
+        cell ll(c99. fwd c99 n)
+        |ll:~SList(A)|
+        put l(nn. cnext<A>(a,ll,nn));
+	unfold nl;
+        fwd l nl
+    }
+};;
+
+proc rec insertElemEnd<A>(l:~SList(A),a:coaffine ~A, nl: SList(A)){
+    cut{
+        single<A>(a,n)
+        |n:coaffine ~List(A)|
+        append<A>(l, n, nl)
+    }
+};;
+
+
+proc rec printSListInt(l:~SList(!lint), nl:SList(!lint)){
+    take l(n);
+    case n of {
+        |#Null: wait n;
+                put l(n. nil<!lint>(n));
+                println("");
+		unfold nl;
+                fwd l nl
+        |#Next: recv n(k:coaffine ?colint);
+                print(k + " ");
+                cut{
+		    use n;
+                    printSListInt(n, x)
+                    |x:~SList(!lint)|
+                    put l(nn. cnext<!lint>(k,x,nn));
+		    unfold nl;
+                    fwd l nl
+                }
+    }
+};;
+
+
+proc unsafe_rec SListNto1(l:SList(!lint);a:colint){
+    if(a == 0){
+        cell l(x. nil<!lint>(x))
+    }
+    {
+        cut{
+            SListNto1(x;a-1)
+            |x:~SList(!lint)|
+            cell l(y. cnext<!lint>(a,x,y))
+        }
+    }
+};;

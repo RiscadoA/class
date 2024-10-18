@@ -1,0 +1,78 @@
+
+
+include "server.clls";;
+
+
+proc sCfree<tA,tX>(s:~tX ; m:~MenuS(tA,tX)){
+       call m(c:~MenuS(tA,tX));
+       send c(s0:tX. fwd s0 s);
+       #Free c;
+       wait c;
+       ()
+};;
+
+proc sCshare<tA, tX>(s:~tX, s1:tX, s2:tX ; m:~MenuS(tA,tX)){
+     call m(c:~MenuS(tA,tX));
+     send c(s0:tX. fwd s0 s);
+     #Share c;
+     send c(s1d:~tX. fwd s1d s1);
+     send c(s2d:~tX. fwd s2d s2);
+     close c
+};;
+
+
+proc sCsend<tA,tX>(x: recv ~tX; recv coaffine ?~tA; send tX; close; m:~MenuS(tA,tX)){
+     recv x (s: ~tX);
+     recv x(a:coaffine ?~tA);
+     call m(c:~MenuS(tA,tX));
+     send c(sPu:tX. fwd sPu s);
+     #Send c;
+     send c(a0:affine !tA. fwd a0 a);
+     recv c(os:~tX);
+     wait c;
+     send x (k:tX. fwd k os);
+    close x
+};;
+
+
+proc rCfree<tA,tX>(s:~tX ; m:~MenuR(tA,tX)){
+       call m(c:~MenuR(tA,tX));
+       send c(s0:tX. fwd s0 s);
+       #Free c;
+       wait c;
+       ()
+};;
+
+proc rCshare<tA, tX>(s:~tX, s1:tX, s2:tX ; m:~MenuR(tA,tX)){
+     call m(c:~MenuR(tA,tX));
+     send c(s0:tX. fwd s0 s);
+     #Share c;
+     send c(s1d:~tX. fwd s1d s1);
+     send c(s2d:~tX. fwd s2d s2);
+     close c
+};;
+
+proc rCdup<tA, tX>(s:~tX, s1:tX, s2:tX ; m:~MenuR(tA,tX)){
+     call m(c:~MenuR(tA,tX));
+     send c(s0:tX. fwd s0 s);
+     #Dup c;
+     send c(s1d:~tX. fwd s1d s1);
+     send c(s2d:~tX. fwd s2d s2);
+     close c
+};;
+
+proc rCrecv<tA,tX>(x:recv ~tX; send maybe(affine !tA); send tX; close ;m:~MenuR(tA,tX)){
+     recv x (s: ~tX);
+     call m(c:~MenuR(tA,tX));
+     send c(sPo:tX. fwd sPo s);
+     #Recv c;
+     recv c(oh: ~maybe(affine !tA));
+     recv c(os:~tX);
+     wait c;
+     send x(ohd:maybe(affine !tA). fwd ohd oh);
+     send x(osd:tX. fwd osd os);
+     close x
+};;
+
+
+

@@ -1,0 +1,64 @@
+type tmenu {
+    offer of {
+        |#Neg:  recv ~lint; send lint; close 
+        |#Add:  recv ~lint; recv ~lint; send lint; close
+    }
+};;
+
+// java like 
+/*
+  interface tmenu {
+     int neg(int)
+	int add(int,int)
+  }
+*/
+
+proc server(s:!tmenu) {
+    !s(c);
+    case c of {
+        |#Neg:  recv c(n);
+                send c(-n);
+                close c
+        |#Add:  recv c(n1);
+                recv c(n2);
+                send c(n1 + n2);
+                close c
+    }
+};;
+
+proc client1( ; s:~tmenu){
+    call s(c);
+    #Neg c;
+    send c (2);
+    recv c(m);
+    wait c;
+    sleep 100;
+    println("CLIENT1 GOT NEG 2 = " + m);
+    ()
+};;
+
+
+proc client2( ; s:~tmenu){
+    call s(c);
+    #Add c;
+    send c(2);
+    send c(3);
+    recv c(m);
+    wait c;
+    println("CLIENT2 GOT ADD 2 3 =  " + m);
+    ()
+};;
+
+proc system_bss(){
+    cut{
+        server(s)
+	
+        |s:?~tmenu|
+	
+        par {
+            client1(;s)  || client2(;s)
+        }
+    }
+};;
+
+

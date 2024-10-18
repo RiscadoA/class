@@ -1,0 +1,67 @@
+/*
+    This example defines the client side operations on the  (2-views) shared queue ADT.
+*/
+
+
+include "server.clls";;
+
+
+proc eCfree<tA,tX>(s:~tX ; m:~evMenuT(tA,tX)){
+       call m(c:~evMenuT(tA,tX));
+       send c(s0:tX. fwd s0 s);
+       #Free c;
+       wait c;
+       ()
+};;
+
+proc eCenq<tA,tX>(si: recv ~tX;close, a:~!tA, ns:send tX;wait ; m:~evMenuT(tA,tX)){
+     recv si (s: ~tX);
+     call m(c:~evMenuT(tA,tX));
+     send c(sPu:tX. fwd sPu s);
+     #Enq c;
+     send c(a0:!tA. fwd a0 a);
+     recv c(os:~tX);
+     wait c;
+     send ns (k:tX. fwd k os);
+     wait ns;
+     close si
+};;
+
+proc eCshare<tA, tX>(s:~tX, s1:tX, s2:tX ; m:~evMenuT(tA,tX)){
+     call m(c:~evMenuT(tA,tX));
+     send c(s0:tX. fwd s0 s);
+     #Share c;
+     send c(s1d:~tX. fwd s1d s1);
+     send c(s2d:~tX. fwd s2d s2);
+     close c
+};;
+
+
+
+proc dCfree<tA,tX>(s:~tX ; m:~dvMenuT(tA,tX)){
+       call m(c:~dvMenuT(tA,tX));
+       send c(s0:tX. fwd s0 s);
+       #Free c;
+       wait c;
+       ()
+};;
+
+
+proc dCdeq<tA,tX>(si:recv ~tX;close, h:maybe(!tA),  ns:send tX;wait ; m:~dvMenuT(tA,tX)){
+     recv si (s: ~tX);
+     call m(c:~dvMenuT(tA,tX));
+     send c(sPo:tX. fwd sPo s);
+     #Deq c;
+     recv c(oh: ~maybe(!tA));
+     recv c(os:~tX);
+     wait c;
+     par{ fwd h oh ||
+     	  send ns (k:tX. fwd k os);
+     	  wait ns;
+     	  close si
+     }
+};;
+
+
+
+

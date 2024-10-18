@@ -1,0 +1,317 @@
+include "client.clls";;
+
+proc unsafe_rec doNRecv<tX>(s:~tX, ns:tX;m:~MenuR(lint,tX), n:~lint){
+    if(n == 0)
+    {
+        fwd s ns
+    }
+    {
+       cut{
+            rCrecv<lint, tX>(x;m)
+            |x:send tX; recv ~maybe(affine !lint);recv ~tX; wait|
+            send x(sd:tX. fwd sd s);
+            recv x(h:~maybe(affine !lint));
+            recv x(os:~tX);
+            wait x;
+            case h of {
+                |#Nothing:  wait h;
+                            println ("RECV: None.");
+                            ?k;
+                            doNRecv<tX>(os,ns;m,k)
+
+                |#Just:     use h;
+                            ?h;
+                            println("RECV Just: " + h);
+                            ?k;
+                            doNRecv<tX>(os, ns; m, k)
+            }
+            |k:!lint|
+            let! k n-1
+       }
+    }
+};;
+
+
+proc unsafe_rec doNSendAux<tX>(s:~tX, ns:tX; m:~MenuS(lint,tX), n:~lint, a:~lint) {
+    if(n == 0)
+    {
+        fwd s ns
+    }
+    {
+        cut{
+            sCsend<lint,tX>(x;m)
+            |x:send tX; send affine !lint; recv ~tX; wait|
+            send x(sd:tX. fwd sd s);
+            send x(ad:affine !lint. affine ad; let! ad a);
+            recv x(os:~tX);
+            wait x;
+            println ("ENQ " + a);
+            cut{
+                ?b;
+                ?k;
+                doNSendAux<tX>(os,ns;m, k, b)
+                |b:!lint|
+                let! b a+1
+               }
+               |k:!lint|
+               let! k n-1
+        }
+    }
+};;
+
+proc doNSend<tX> (s:~tX, ns:tX; m:~MenuS(lint,tX), n:~lint) {
+    cut{
+        ?a;
+        doNSendAux<tX>(s,ns;m,n,a)
+        |a:!lint|
+        let! a 1
+    }
+};;
+
+
+
+proc clientPar(d:~BChan(lint);n:~lint){
+    println("");
+    println("
+            **********************************************
+            CONCURRENT TEST Buffered Channel with Multicast:
+            We send the integers from 1 to " + n + "
+            Concurrently, we receive " + n + " elements.
+            ***********************************************"
+            );
+   cut {
+		recvty e(tX);
+		recv e(m:~!MenuS(lint,tX));
+		?m;
+		cut{
+			doNSend<tX>(e, ne ; m, n)
+			|ne:~tX|
+			sCfree<lint,tX>(ne; m)
+		   }
+    |e:SendT(lint)|
+    send d(ef:~SendT(lint). fwd e ef);
+    recvty d(tX);
+    recv d(m:~!MenuR(lint,tX));
+    ?m;
+    cut {
+		doNRecv<tX>(d, nd ; m, n)
+		|nd:~tX|
+        	rCfree<lint,tX>(nd ; m)
+	}
+	}
+};;
+
+
+proc clientPar2(d:~BChan(lint);n:~lint){
+    println("");
+    println("
+            **********************************************
+            CONCURRENT TEST Buffered Channel with Multicast:
+            Two concurrent producers send the integers from 1 to " + n + " each.
+            Concurrently, two concurrent consumers  receive " + n + " elements each,
+            sharing the same view. 
+            ***********************************************"
+            );
+   cut {
+		recvty e(tX);
+		recv e(m:~!MenuS(lint,tX));
+		?m;
+		cut{
+		    cut{
+            sCshare<lint, tX>(e, e1, e2 ; m)
+            |e1:~tX|
+            cut{
+			    doNSend<tX>(e1, ne1 ; m, n)
+			    |ne1:~tX|
+			    sCfree<lint,tX>(ne1; m)
+			}}
+			|e2:~tX|
+            cut{
+			    doNSend<tX>(e2, ne2 ; m, n)
+			    |ne2:~tX|
+			    sCfree<lint,tX>(ne2; m)
+			}
+		   }
+    |e:SendT(lint)|
+    send d(ef:~SendT(lint). fwd e ef);
+    recvty d(tX);
+    recv d(m:~!MenuR(lint,tX));
+    ?m;
+		cut{
+		    cut{
+            rCshare<lint, tX>(d, d1, d2 ; m)
+            |d1:~tX|
+            cut{
+			    doNRecv<tX>(d1, nd1 ; m, n)
+			    |nd1:~tX|
+			    rCfree<lint,tX>(nd1; m)
+			}}
+			|d2:~tX|
+            cut{
+			    doNRecv<tX>(d2, nd2 ; m, n)
+			    |nd2:~tX|
+			    rCfree<lint,tX>(nd2; m)
+			}
+		   }
+	}
+};;
+
+proc clientPar3(d:~BChan(lint);n:~lint){
+    println("");
+    println("
+            **********************************************
+            CONCURRENT TEST Buffered Channel with Multicast:
+            One producer sends the integers from 1 to " + n + " each.
+            Concurrently, two concurrent consumers  receive " + n + " elements each,
+            sharing the same view.
+            ***********************************************"
+            );
+   cut {
+		recvty e(tX);
+		recv e(m:~!MenuS(lint,tX));
+		?m;
+		cut{
+		    doNSend<tX>(e,ne ;m, n)
+		    |ne:~tX|
+		    sCfree<lint, tX>(ne;m)
+		   }
+    |e:SendT(lint)|
+    send d(ef:~SendT(lint). fwd e ef);
+    recvty d(tX);
+    recv d(m:~!MenuR(lint,tX));
+    ?m;
+		cut{
+		    cut{
+            rCshare<lint, tX>(d, d1, d2 ; m)
+            |d1:~tX|
+            cut{
+			    doNRecv<tX>(d1, nd1 ; m, n)
+			    |nd1:~tX|
+			    rCfree<lint,tX>(nd1; m)
+			}}
+			|d2:~tX|
+            cut{
+			    doNRecv<tX>(d2, nd2 ; m, n)
+			    |nd2:~tX|
+			    rCfree<lint,tX>(nd2; m)
+			}
+		   }
+	}
+};;
+
+proc clientPar4(d:~BChan(lint);n:~lint){
+    println("");
+    println("
+            **********************************************
+            CONCURRENT TEST Buffered Channel with Multicast:
+            One producer sends the integers from 1 to " + n + " each.
+            Concurrently, two concurrent consumers  receive " + n + " elements each,
+            with duplicated views.
+            ***********************************************"
+            );
+   cut {
+		recvty e(tX);
+		recv e(m:~!MenuS(lint,tX));
+		?m;
+		cut{
+		    doNSend<tX>(e,ne ;m, n)
+		    |ne:~tX|
+		    sCfree<lint, tX>(ne;m)
+		   }
+    |e:SendT(lint)|
+    send d(ef:~SendT(lint). fwd e ef);
+    recvty d(tX);
+    recv d(m:~!MenuR(lint,tX));
+    ?m;
+		cut{
+		    cut{
+            rCdup<lint, tX>(d, d1, d2 ; m)
+            |d1:~tX|
+            cut{
+			    doNRecv<tX>(d1, nd1 ; m, n)
+			    |nd1:~tX|
+			    rCfree<lint,tX>(nd1; m)
+			}}
+			|d2:~tX|
+            cut{
+			    doNRecv<tX>(d2, nd2 ; m, n)
+			    |nd2:~tX|
+			    rCfree<lint,tX>(nd2; m)
+			}
+		   }
+	}
+};;
+
+
+
+
+proc systemParN(n:?colint){
+    cut{
+        bchan<lint>(s)
+        |s:~BChan(lint)|
+        ?n;
+        clientPar(s ; n)
+    }
+};;
+
+proc systemParN2(n:?colint){
+    cut{
+        bchan<lint>(s)
+        |s:~BChan(lint)|
+        ?n;
+        clientPar2(s ; n)
+    }
+};;
+
+proc systemParN3(n:?colint){
+    cut{
+        bchan<lint>(s)
+        |s:~BChan(lint)|
+        ?n;
+        clientPar3(s ; n)
+    }
+};;
+
+proc systemParN4(n:?colint){
+    cut{
+        bchan<lint>(s)
+        |s:~BChan(lint)|
+        ?n;
+        clientPar4(s ; n)
+    }
+};;
+
+proc systemPar(){
+    cut{
+        let! n 50
+        |n:~!lint|
+        systemParN(n)
+    }
+};;
+
+proc systemPar2(){
+    cut{
+        let! n 10
+        |n:~!lint|
+        systemParN2(n)
+    }
+};;
+
+proc systemPar3(){
+    cut{
+        let! n 10
+        |n:~!lint|
+        systemParN3(n)
+    }
+};;
+
+proc systemPar4(){
+    cut{
+        let! n 10
+        |n:~!lint|
+        systemParN4(n)
+    }
+};;
+
+
+

@@ -1,0 +1,299 @@
+
+
+type bool{
+    choice of {
+        |#F: close
+        |#T: close
+    }
+};;
+
+proc false_(bf:bool){
+     #F bf;
+     close bf
+};;
+
+proc true_(bt:bool){
+     #T bt;
+     close bt
+};;
+
+sam cut {false_(s)
+	|s: ~bool|
+	case s of {
+	|#F: wait s; () 
+	|#T: wait s; () 
+	}
+};;
+
+proc clib(b:~bool) {
+	case b of {
+	|#F: wait b; () 
+	|#T: wait b; () 
+	}
+
+};;
+
+sam cut {false_(s)
+	|s: ~bool|
+	clib(s)
+};;
+
+sam cut {true_(s)
+	|s: ~bool|
+	clib(s)
+};;
+
+sam cut {
+    recv a(x); wait a; clib(x)
+    |a:send bool; close|
+    send a(p:bool.true_(p));close a
+};;
+
+proc not(x:~bool, y:bool){
+     case x of {
+        |#F:    wait x;
+                true_(y)
+       |#T:    wait x;
+              false_(y)
+     } 
+};;
+
+sam cut {
+     recv n (z:~bool); wait n; clib(z)
+     | n: send bool; close |
+    send n (q. false_(q)); close n
+};;
+
+
+sam cut {
+     send n (y:bool. true_(y)); recv n (z:~bool); wait n; clib(z)
+     | n: recv ~bool; send bool; close |
+     recv n (v); send n(q. true_(q)); par { clib(v) || close n }
+};;
+
+
+sam cut {
+     send n (y:bool. true_(y)); recv n (z:~bool); wait n; clib(z)
+     | n: recv ~bool; send bool; close |
+     recv n (v); send n(q. fwd v q); par {() || close n }
+};;
+
+
+sam cut {
+     send n (y:bool. true_(y)); recv n (z:~bool); wait n; clib(z)
+     | n: recv ~bool; send bool; close |
+     recv n (v); cut {
+     	  not (v,nv) | nv: ~bool | send n(q. fwd q nv); close n
+     }
+};;
+
+sam cut {
+    recv a(x); wait a; case x of {
+	|#F: wait x; () 
+	|#T: wait x; () 
+	}
+    |a:send bool; close|
+    send a(p:bool. #T p;
+     close p);close a
+};;
+
+
+sam cut {
+    recv a(x); wait a; clib(x)
+    |a:send bool; close|
+    send a(p:bool.true_(p));close a
+};;
+
+
+proc cli1(a:send close;close, c:wait)
+{
+	send a(p.close p);wait c; close a
+};;
+
+proc srv1(a:recv wait; wait, b:recv wait;wait)
+{
+		recv b(y); recv a(x); wait x;wait y; wait a;wait b; ()  
+};;
+
+
+sam cut { 
+         cut {
+	 	 close c
+		|c:wait|
+		cli1(a,c)
+	}
+	|a:recv wait; wait|
+	srv1(a,b)
+ 	|b:send close; close|
+        send b(q.close q);close b
+};;
+
+proc srv12(a1:wait, a2:wait) {
+     wait a1; wait a2; ()
+};;
+
+proc srv112(y:wait, a:recv wait; wait, b:wait)
+{
+	recv a(x); wait x;wait y; srv12(a,b) // 1,1
+};;
+
+
+
+proc srv11(a:recv wait; wait, b:recv wait;wait)
+{
+	recv b(y); srv112(y,a,b)  // 0,0,1
+};;
+
+
+sam cut { 
+         cut {
+	 	 close c
+		|c:wait|
+		cli1(a,c)
+	}
+	|a:recv wait; wait|
+	srv11(a,b)   //0,0
+ 	|b:send close; close|
+        send b(q.close q);close b
+};;
+
+proc not(x:~bool, y:bool){
+     case x of {
+        |#F:    wait x;
+                true_(y)
+       |#T:    wait x;
+              false_(y)
+     } 
+};;
+
+sam cut {
+     send n (y:bool. true_(y)); recv n (z:~bool); wait n; clib(z)
+     | n: recv ~bool; send bool; close |
+     recv n (v); cut {
+     	  not (v,nv)
+	  
+
+	  | nv: ~bool | send n(q. fwd q nv); close n
+	  }
+};;
+      
+
+
+sam cut {
+    true_(y) |y:~bool| not (y,z) |z:~bool| clib(z)
+    };;
+
+sam cut { close a |a:wait| fwd a b | b:wait| wait b;() };;
+
+sam cut { wait a;() |a:close| fwd a b | b:close| close b };; 
+
+sam cut { close a |a:wait| fwd a b | b:wait| fwd b c | c:wait| wait c;() };;
+
+sam cut { close a |a:wait| fwd a b | b:wait| fwd b c | c:wait| fwd c d |d:wait| wait d;() };;
+
+sam cut { close a |a:wait| wait a;close c |c:wait| fwd c b |b:wait| wait b;() };;
+
+sam cut { close a |a:wait| wait a;wait c;() |c:close| fwd c b |b:close| close b };;
+
+
+sam cut { recv a(x);wait x;close a  |a:send close; wait|
+          send a(p.close p);fwd a c | c:wait | wait c; ()
+};; 
+
+sam cut { recv a(x);wait x;wait a;()  |a:send close; close|
+          send a(p.close p);fwd a c | c:close | close c
+};; 
+
+sam cut { recv a(x);wait x;recv a(u); wait a; wait u;  ()  |a:send close; send close; close|
+          send a(p.close p);fwd a c | c:send close; close | send c(x.close x);close c
+};; 
+
+sam cut { recv a(x);wait x;recv a(u);wait u;close a |a:send close; send close; wait|
+          send a(p.close p);fwd a c | c:send close; wait |
+	       send c(x.close x); // saved continuation on c-session lost ??
+	       wait c; ()
+};; 
+
+sam cut { cut { recv a(x);wait x; fwd a z |z:close| close z } // HERE a will be pointing to 0 slot of z rec
+          |a:send close; wait|
+          send a(p.close p);fwd a c // HERE c will be pointing to 1 slot of a rec
+	  | c:wait |
+	  wait c; ()
+};;
+
+
+sam cut {
+     send n (y:bool. true_(y)); recv n (z:~bool); wait n;
+     case z of {
+	|#F: wait z; () 
+	|#T: wait z; () 
+	}
+     | n: recv ~bool; send bool; close |
+     recv n (v); cut {
+     	  not (v,nv) | nv: ~bool | send n(q. fwd q nv); close n
+	  }
+};;
+
+sam cut {
+     send n (y:bool. true_(y)); recv n (z:~bool); wait n; clib(z)
+     | n: recv ~bool; send bool; close |
+     fwd n m
+     | m: recv ~bool; send bool; close |
+     recv m (v); cut {
+     	  not (v,nv) | nv: ~bool | send m(q. fwd q nv); close m
+	  }
+};;
+
+     	  
+sam cut {
+     send n (y:bool. true_(y)); recv n (z:~bool); wait n; clib(z)
+     | n: recv ~bool; send bool; close |
+     fwd n m
+     | m: recv ~bool; send bool; close |
+     recv m (v); cut {
+     	  not (v,nv) | nv: ~bool | fwd m f
+	  | f:send bool; close | send f(q. fwd q nv); close f
+	  }
+};;
+	
+
+
+sam cut {
+    send a(b. true_(b)); !a(b:wait); wait b; ()
+    |a: recv ~ bool; ?close|
+    recv a(x); ?a; clib(x)
+};;
+
+sam cut {
+    send a(b.close b); !a(b:wait); wait b; ()
+    |a: recv wait; ?close|
+    recv a(x); ?a;
+    call a(y:close);
+    wait x;
+    close y
+};;
+
+sam cut {
+    send a(b.close b); !a(b:wait); wait b; ()
+    |a: recv wait; ?close|
+    recv a(x); ?a;
+    call a(y:close);
+    wait x;
+    call a(z:close);
+    par { close y || close z }
+};;
+
+
+sam cut {
+    send a(b.close b); !a(b:wait); wait b; ()
+    |a: recv wait; ?close|
+    recv a(x); ?a;
+    par { call a(y:close);close y || wait x;call a(z:close);close z }
+};;
+
+sam cut {
+    sendty a (close); send a(p. wait p;()); send a (q. close q); close a
+    |a: recvty X; recv X; recv ~X; wait |
+    recvty a (X); recv a(x); recv a(y);wait a; fwd x y 
+};;
+

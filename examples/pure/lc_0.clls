@@ -1,0 +1,220 @@
+// example luis xu
+
+proc test0() {
+ println("hello world!");
+ ()
+
+};;
+
+type int2int {
+	recv ~lint; send lint; close
+};;
+
+type intint2int {
+	recv ~lint; recv ~lint; send lint; close
+};;
+
+proc double(f:int2int) {
+	recv f (x);
+     send f(x*2);
+     close f 
+};;
+
+proc increment(f:int2int) {
+	recv f (x);
+     send f(x+1);
+     close f 
+};;
+
+proc client(f:~int2int){
+    send f (100);
+    recv f(ret); 
+    println (ret);
+    wait f;
+	()
+};;
+
+
+proc test1() {
+
+   cut {
+
+	double (f)
+
+    | f: ~int2int | 
+
+	client(f)
+
+  }
+
+};;
+
+proc test9() {
+
+   cut {
+
+	recv f(x);let f x+1
+
+    | f: ~recv ~lint;lint | 
+
+	send f (10); 
+	println (f);
+	()
+
+  }
+
+};;
+
+proc test10() {
+
+   cut {
+
+	let n 42
+
+    | n: ~lint | 
+
+	println (n*2); ()
+
+  }
+
+};;
+
+proc test11() {
+
+   cut {
+
+	close n
+
+    | n:wait | 
+
+	wait n; println("done"); ()
+
+  }
+
+};;
+
+
+type tcalcserver {
+    offer of {
+        |#Neg:  int2int 
+        |#Add:  intint2int
+    }
+};;
+
+type tcalcclient {
+    choice of {
+        |#Neg:  ~int2int 
+        |#Add:  ~intint2int
+    }
+};;
+
+
+proc calc(c : tcalcserver) {
+    case c of {
+        |#Add: recv c (n1);
+			   recv c (n2);
+			   send c (n1+n2);
+			   println("done add!");
+			   close c
+        |#Neg: recv c (n1);
+			   send c (-n1);
+			   println("done neg!");
+			   close c
+    }
+};;
+
+
+proc clicalc( c: tcalcclient ) {
+	#Add c;
+	println ("#Add selected.");
+	send c(10); send c(20);
+	recv c(res);
+	println ("got "+res);
+	wait c;
+	()
+};;
+
+proc main1() {
+
+   cut {
+
+	clicalc (c)
+
+    | c: tcalcserver | 
+
+	calc(c)
+
+  }
+
+};;
+
+
+
+type rec tcalcserverR {
+    offer of {
+        |#Neg:  recv ~lint; send lint; tcalcserverR
+        |#Add:  recv ~lint; recv ~lint; send lint; tcalcserverR
+        |#End:  close
+    }
+};;
+
+type tcalcclientR { ~ tcalcserverR };;
+
+
+proc unsafe_rec calcR(c : tcalcserverR) {
+    case c of {
+        |#Add: recv c (n1);
+			   recv c (n2);
+			   send c (n1+n2);
+			   println("done add!");
+			   calcR (c)
+        |#Neg: recv c (n1);
+			   send c (-n1);
+			   println("done neg!");
+			   calcR (c)
+        |#End: println("server terminated.");
+			   close c
+   }
+};;
+
+
+proc clicalc0R( c: tcalcclientR ) {
+	#Add c;
+	println ("#Add selected.");
+	send c(10); send c(20);
+	recv c(res);
+	println ("got "+res);
+	#End c;
+	wait c;
+	()
+};;
+
+proc clicalc1R( c: tcalcclientR ) {
+	#Neg c;
+	println ("#Neg selected.");
+	send c(10); 
+	recv c(res);
+	#Add c;
+	send c(res);
+	send c(10);
+	recv c(res2);
+	println ("got "+res2);
+	#End c;
+	wait c;
+	()
+};;
+
+
+proc main2() {
+
+   cut {
+
+	clicalc1R (c)
+
+    | c: tcalcserverR | 
+
+	calcR(c)
+
+  }
+
+};;

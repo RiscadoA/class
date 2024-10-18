@@ -1,0 +1,216 @@
+/*
+    Lists all examples.
+*/
+
+
+/*
+        Queue implemented using a single list:
+        enqueueing is implemented by appending the element to the end of the list,
+        whereas dequeueing is implemented by removing (if any) the head element.
+
+*/
+include "1queue/client.clls";;
+include "1queue/server.clls";;
+include "1queue/tests.clls";;
+
+
+/*
+    Code for queue implemented using two lists,
+    which has O(1) amortised time for enqueueing and dequeueing.
+*/
+include "2queue/client.clls";;
+include "2queue/server.clls";;
+include "2queue/tests.clls";;
+
+
+
+/*
+    A fine-grained variant of the functional queue defined in 2queue/.
+*/
+include "2queueA/client.clls";;
+include "2queueA/server.clls";;
+include "2queueA/tests.clls";;
+
+
+/*
+   Composes a reference cells storing a natural with three concurrent threads:
+   one increments, the other doubles and the third gets the natural and prints it.
+
+   The goal is to show how the outcome of the printing thread depends on the interleaving
+   of the three atomic actions. In the metatheoretical model of CLASS we can expose all
+   the possible outcomes (with nondeterministic sums)
+   by reducing the system with a couple of simple algebraic-like manipulations.
+
+*/
+include "algebraic-reasoning.clls";;
+
+
+/*
+    Illustrates the use of higher-order store by giving an (inefficient) array implementation.
+*/
+include "arrays.clls";;
+
+
+
+/*
+  Defines a decentralised bank account ADT.
+  Server code in bank-account/server.clls
+  Client code and a simple test in bank-account/client.clls.
+*/
+include "bank-account/client.clls";;
+include "bank-account/server.clls";;
+
+
+/*
+    Defines an imperative binary search tree
+    and some tests.
+*/
+include "binary-search-trees.clls";;
+
+
+/*
+    Shows how exponential cells (cells storing exponential sessions) can be implemented
+    using the affine-storing reference cells of CLASS.
+    In exponential-cells.clls we consider just read and write operations.
+    In cells-with-exponentials-and-locks we extend the encoding to accommodate locks.
+
+*/
+include "exponential-cells-and-locks.clls";;
+include "exponential-cells.clls";;
+
+
+/*
+    Defines a shared counter ADT and some tests.
+    Tests in  tests/counter.clls.
+*/
+include "counter/server.clls";;
+include "counter/client.clls";;
+include "counter/tests.clls";;
+
+
+/*
+    Implements the dining philosophers and defines some tests.
+*/
+include "dining-philosophers.clls";;
+
+
+/*
+    Shows with a simple example that cells are first class objects
+    which can be communicated along session channels.
+*/
+include "first-class-cells.clls";;
+
+
+/*
+Defines an efficient O(1) time imperative queue,
+implemented using a linked list with two pointers:
+one to the head (for dequeueing) and other to the tail (for enqueueing).
+
+*/
+include "imperative-queue/client.clls";;
+include "imperative-queue/server.clls";;
+include "imperative-queue/tests.clls";;
+
+
+/*
+    A variant of the imperative queue defined in imperative-queue/,
+    but where the elements stored are persistent,
+    therefore the view for dequeueing can be duplicated.
+*/
+include "imperative-queue-B/client.clls";;
+include "imperative-queue-B/server.clls";;
+include "imperative-queue-B/tests.clls";;
+
+/*
+    Defines linked lists, some operations and tests.
+*/
+include "linked-lists.clls";;
+
+
+/*
+    A simple example with mutable pairs, some operations and tests.
+*/
+include "mutable-pairs.clls";;
+
+
+/*
+    Defines a simple example to illustrate how races naturally happen in CLASS.
+*/
+include "simple-counter.clls";;
+
+/*
+    Implements a stack.
+*/
+include "stack/client.clls";;
+include "stack/server.clls";;
+include "stack/tests.clls";;
+
+/*
+Inspired by exponential-isomorphisms.clls, we try to find and code
+some remarkable morphisms
+associated with the state modalities.
+*/
+include "state-isomorphisms.clls";;
+
+
+/*
+    Defines a simple latch ADT.
+*/
+include "latch/client.clls";;
+include "latch/server.clls";;
+include "latch/tests.clls";;
+
+
+/*
+    Implements a fork-join.
+*/
+include "fork-join.clls";;
+
+/*
+    Implements a barrier.
+*/
+include "barrier.clls";;
+
+/*
+    Implements a counter with typestates.
+*/
+include "behavioralstate.clls";;
+
+
+/*
+    Defines a shared factory for general corecursive processes.
+*/
+include "behavioralstate-shared.clls";;
+
+/*
+ Implements arrays using linked lists.
+*/
+include "rarrays.clls";;
+
+/*
+    Implements some examples based on Rust language library documentation.
+*/
+include "rust1.clls";;
+include "rust2.clls";;
+
+/*
+    Implements strong updates.
+*/
+include "strongupdates.clls";;
+
+/*
+    Implementes a simple toggle.
+*/
+include "toggle.clls";;
+
+/*
+    Implements a counter with typestates.
+*/
+include "typestate.clls";;
+include "typestate-shared.clls";;
+include "typestates-counter.clls";;
+
+/*
+    Examples of POPL23
+*/
+include "popl23.clls";;

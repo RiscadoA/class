@@ -1,0 +1,88 @@
+CHANGES:
+ASTPList()
+
+            public  Env<EnvEntry> definemany(Env<ASTType> ed, Env<ASTType> eg, Env<EnvEntry> ep, boolean unsafe) throws Exception {
+		for (ASTProcDef d: ld) {
+		    ProcEntry pee =    new ProcEntry(d);
+		    ep=ep.assoc(d.id,pee);
+		    // d.setEnv(ep);  <=== 
+
+ASTProcdef()
+	    // SAM
+	    //argtype = argtype.unfoldType(ep);
+	    //argtype.SetOffsets(0,ep);
+	    //ed = ed.assoc(param, argtype);
+	    ed = ed.assoc(param, argtype.unfoldType(ep));
+
+
+ASTAdd.java			ASTSelect.java*
+ASTAffine.java			ASTSend.java*
+ASTAffineT.java			ASTSendT.java
+ASTAnd.java			ASTSendTT.java
+ASTBang.java			ASTSendTy.java
+ASTBangT.java			ASTShare.java
+ASTBasicType.java		ASTShareL.java
+ASTBool.java			ASTShareR.java
+ASTBotT.java			ASTSleep.java
+ASTCall.java			ASTString.java
+ASTCase.java			ASTSub.java
+ASTCaseT.java			ASTTake.java
+ASTCell.java			ASTType.java
+ASTCellBLT.java			ASTTypeDef.java
+ASTCellBT.java			ASTUnfold.java
+ASTCellLT.java			ASTUnlock.java
+ASTCellT.java			ASTUsageBLT.java
+ASTClose.java			ASTUsageBT.java
+ASTCoAffineT.java		ASTUsageLT.java
+ASTCoBasicType.java		ASTUsageT.java
+ASTCoClose.java			ASTUse.java
+ASTCoExpr.java			ASTVId.java
+ASTCoLBasicType.java		ASTWhy.java
+ASTCoLboolT.java		ASTWhyT.java
+ASTCoLstringT.java		ASTWrt.java
+ASTCoRecT.java			ASTintT.java
+ASTCointT.java			CHANGES-critical-24Jun23.txt
+ASTCut.java			CLLSj.j
+ASTDList.java			CLLSj.java
+ASTDiscard.java			CLLSjConstants.java
+ASTDiv.java			CLLSjTokenManager.java
+ASTEmpty.java			Cell.java
+ASTEmptyCell.java		Channel.java
+ASTEq.java			Env.java
+ASTExpr.java			EnvEntry.java
+ASTFwd.java			IndexedSessionRef.java
+ASTFwdB.java			KindError.java
+ASTGt.java			LabelSet.java
+ASTId.java			LinSession.java
+ASTIdT.java			Pair.java
+ASTIf.java			ParseException.java
+ASTInclude.java			PolarizedSessionRef.class
+ASTInt.java			PolarizedSessionRef.java
+ASTLCointT.java			ProcEntry.java
+ASTLboolT.java			RVarEntry.java
+ASTLintT.java			RunProcError.java
+ASTLock.java			SAMError.java
+ASTLstringT.java		Server.java
+ASTLt.java			Session.java
+ASTMix.java			SessionClosure.java
+ASTMul.java			SessionField.class
+ASTNEq.java			SessionField.java
+ASTNode.java			SessionFieldClose.java
+ASTNot.java			SessionRecord.class
+ASTNotT.java			SessionRecord.java
+ASTOfferT.java			SessionValue.java
+ASTOneT.java			SimpleCharStream.java
+ASTOr.java			SyntaxError.java
+ASTPList.java			Token.java
+ASTPrintLn.java			TokenMgrError.java
+ASTProcDef.java			Trail.java
+ASTPromoCoExpr.java		TypeClosure.java
+ASTPut.java			TypeDefEntry.java
+ASTRead.java			TypeEntry.java
+ASTRecT.java			TypeError.java
+ASTRecv.java			VBool.java
+ASTRecvT.java			VInt.java
+ASTRecvTT.java			VString.java
+ASTRecvTy.java			Value.java
+ASTRelease.java			javacc
+ASTSam.java			lib

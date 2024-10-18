@@ -1,0 +1,37 @@
+include "behavioralstate.clls";;
+include "shared-factory.clls";;
+
+type ISharedCounterADTB { ISharedObject(CounterNL) };;
+
+proc SharedCounterObj(c: ISharedCounterADTB) {
+	cut {
+	counterObj(lc)
+	| lc: ~ CounterN |
+	SharedObjectFactory <CounterNL>(c,lc)
+	}
+};;
+
+proc mainSharedB()
+{
+	cut {
+	SharedCounterObj(c)
+	|c:~ ISharedCounterADTB |
+	recvty c (S);
+	recv c (s:~S);
+	?c;
+	call c(u:~ ISharedObjectMenu(S, CounterNL));
+	send u (s0:S. fwd s0 s);
+	#Use u;
+	recv u (ci:~ CounterN);
+	use ci;
+	#Inc ci;
+	#Dec ci;
+	send u (co:CounterN. fwd ci co);
+	recv u (s:~S);
+	wait u;
+	call c(u:~ ISharedObjectMenu(S, CounterNL));
+	send u (s0:S. fwd s0 s);
+	#Free u;
+	close u	
+	}
+};;

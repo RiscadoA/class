@@ -1,0 +1,115 @@
+/*
+    ******************************************************************************
+    Definitions
+    ******************************************************************************
+*/
+
+
+proc cellB<A>(y:?~A, c:state !A){
+    ?y;
+    cell c(x:affine !A.
+                affine x;
+                fwdE<A>(x;y))
+};;
+
+
+proc read<A>(c:usage ?~A, r:!A,  nc:state !A){
+    take c(y:coaffine ?~A);
+    use y;
+    ?y;
+    put c(x:affine !A.
+            affine x;
+            fwdE<A>(x ; y));
+    par{ fwdE<A>(r ; y) || fwd c nc }
+};;
+
+proc write<A>(c:usage ?~A, w:?~A, nc:state !A){
+    take c(y:coaffine ?~A);
+    use y;                                      //optionally, we could simply discard y
+    ?y;
+    ?w;
+    put c(x:affine !A.
+            affine x;
+            fwdE<A>(x ; w));
+    fwd c nc
+};;
+
+/*
+    ******************************************************************************
+    Example 1
+    ******************************************************************************
+*/
+
+
+proc client1(c: usage ?~lint){
+    share c{
+        cut{
+            ?r1;
+            println("Read1 GOT " + r1);
+            ()
+            |r1:!lint|
+            read<lint>(c, r1, nc)
+            |nc:usage ?~lint|
+            release nc
+         }
+        ||
+        cut{
+            ?r2;
+            println("Read2 GOT " + r2);
+            ()
+            |r2:!lint|
+            read<lint>(c, r2, nc)
+            |nc:usage ?~lint|
+            release nc
+         }
+    }
+};;
+
+proc system1(){
+    cut{
+        let! n 42
+        |n:?~lint|
+        cellB<lint>(n, c)
+        |c:usage ?~lint|
+        client1(c)
+    }
+};;
+
+/*
+    ******************************************************************************
+    Example 2
+    ******************************************************************************
+*/
+
+
+proc client2(c: usage ?~lint){
+    share c{
+        cut{
+            ?r1;
+            println("Read1 GOT " + r1);
+            ()
+            |r1:!lint|
+            read<lint>(c, r1, nc)
+            |nc:usage ?~lint|
+            release nc
+         }
+        ||
+        cut{
+            let! w 0
+            |w:?~lint|
+            write<lint>(c, w, nc)
+            |nc:usage ?~lint|
+            release nc
+         }
+    }
+};;
+
+proc system2(){
+    cut{
+        let! n 42
+        |n:?~lint|
+        cellB<lint>(n, c)
+        |c:usage ?~lint|
+        client2(c)
+    }
+};;

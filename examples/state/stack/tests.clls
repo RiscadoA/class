@@ -1,0 +1,228 @@
+/*
+    We define some tests on the stack ADT.
+
+    To run them, invoke
+        * `systemSeq()` --  which composes a stack with a client
+                            that first pushes the integers from
+                            1 to n and then pops n elements.
+
+        * `systemPar()` --  which composes a stack with a client
+                            that pushes the integers from 1 to n,
+                            and, concurrently, pops n elements.
+
+        * `systemPa2r()` --  which composes a stack with three clients
+                            one pushes the integers from 1 to n,
+                            and, concurrently, the two other clients
+			    pop n/2 elements each.
+*/
+
+
+include "client.clls";;
+
+
+proc cpopNprint<tX>(si:recv ~tX;close, ns:send tX; wait ; m:~tMenu(lint,tX)){
+     recv si(s:~tX);
+     call m(c:~tMenu(lint,tX));
+     send c(sd:tX. fwd sd s);
+     #Pop c;
+     recv c(h: ~maybe(!lint));
+     recv c(os:~tX);
+     wait c;
+     case h of{
+        |#Nothing:  wait h;
+                    println("POP : Nothing");
+                    send ns(osd:tX. fwd os osd);
+                    wait ns;
+                    close si
+
+        |#Just:     ?h;
+                    println("POP: Just " + h);
+                    send ns(osd:tX. fwd os osd);
+                    wait ns;
+                    close si
+     }
+};;
+
+
+type stept(tX) {
+  send tX; send !lint; close
+};;
+
+proc doNPush<tX> (s:~tX, ns:tX ; m:~tMenu(lint,tX), a:~lint) {
+	cut {
+		!body(step:recv ~stept(tX);send stept(tX); close);
+			recv step (p0:~stept(tX));
+			recv p0 (spre: ~tX);
+			recv p0 (vp: ?colint);
+			wait p0;
+			?vp;
+			cut { let! v vp+1
+			    |v:~!lint|
+			    ?v;
+			    cut {
+			    send e (e0: tX. fwd e0 spre);
+			    wait e; ()
+			    |e: recv ~tX; close |
+				cut { let! vx v |vx:~!lint| cpush<lint,tX>(e, vx, es ; m) }
+			    |es: recv ~tX;close |
+			    recv es (nv0:~tX);
+			    println "PUSH "+v;
+			    send step (p1:stept(tX).
+						send p1 (spost:tX. fwd nv0 spost);
+						send p1 (vn:!lint. let! vn v);
+						close p1);
+			    par { close step  || close es }
+			    }
+			}
+		|body: ? send stept(tX);recv ~stept(tX); wait|
+		?body;
+	        cut {
+		send s0 (p:tX. fwd s p); send s0 (i:!lint. let! i 0); close s0
+		|s0:~stept(tX)|
+		iters<stept(tX)>(nsf,s0;body,a)
+		|nsf:~stept(tX)|
+		recv nsf (ns1:~tX); recv nsf (fv:~!lint); ?fv; wait nsf; fwd ns1 ns
+		}
+	}
+};;
+
+proc doNPop<tX> (s:~tX, ns:tX ; m:~tMenu(lint,tX), a:~lint) {
+	cut {
+		!body(step:recv ~tX;send tX; close);
+			recv step (spre:~tX);
+		          cut {
+			    send e (e0: tX. fwd e0 spre);
+			    wait e; ()
+			    |e: recv ~tX; close |
+     		            cpopNprint<tX>(e, es ; m)
+			    |es: recv ~tX;close |
+			    recv es (nv0:~tX);
+			    send step (nv1:tX. fwd nv0 nv1);
+			    par { close step || close es }
+			   }
+
+		|body: ? send tX;recv ~tX; wait|
+		?body;
+		iters<tX>(ns,s;body,a)
+	}
+};;
+
+
+proc clientSeq(s:~tStack(lint); n:~lint){
+    println("");
+    println("
+            **********************************************
+            SEQUENTIAL TEST STACK:
+            We first push the integers from " + n + " to 1.
+            Then, we pop " + n + " elements.
+            ***********************************************"
+            );
+    recvty s(tX);
+    recv s(m:~!tMenu(lint, tX));
+    ?m;
+    cut{
+        doNPush<tX>(s, ns ; m, n)
+        |ns:~tX|
+        doNPop<tX> (ns, nss ; m, n)
+        |nss:~tX|
+        cfree<lint, tX>(nss ; m)
+    }
+};;
+
+proc clientPar(s:~tStack(lint); n:~lint){
+    println("");
+    println("
+            **********************************************
+            CONCURRENT TEST STACK:
+            We push the integers from " + n + " to 1.
+            Concurrently, we pop " + n + " elements.
+            ***********************************************"
+            );
+    recvty s(tX);
+    recv s(m:~!tMenu(lint, tX));
+    ?m;
+    cut{
+        cut{
+            doNPush<tX>(s1, ns1 ; m, n)
+            |ns1:~tX|
+            cfree<lint,tX>(ns1 ; m)
+        }
+        |s1:tX|
+        cshare<lint,tX>(s,s1,s2;m)
+        |s2:~tX|
+        doNPop<tX> (s2, ns2 ; m, n)
+        |ns2:~tX|
+        cfree<lint, tX>(ns2 ; m)
+    }
+};;
+
+proc clientPar2(s:~tStack(lint); n:~lint){
+    println("");
+    println("
+            ********************************************************
+            CONCURRENT TEST STACK:
+            We push the integers from " + n + " to 1.
+            Concurrently, two clients pop " + n/2 + " elements each.
+            ********************************************************"
+            );
+    cut { let! n2 n/2 |n2 : ~!lint|
+    ?n2;
+    recvty s(tX);
+    recv s(m:~!tMenu(lint, tX));
+    ?m;
+    cut{
+        cut{
+            doNPush<tX>(s1, ns1 ; m, n)
+            |ns1:~tX|
+            cfree<lint,tX>(ns1 ; m)
+        }
+        |s1:tX|
+        cshare<lint,tX>(s,s1,s2;m)
+        |s2:~tX|
+ 	   cut {
+	   	doNPop<tX> (s3, ns3 ; m, n2)
+        	|ns3:~tX|
+        	cfree<lint, tX>(ns3 ; m)
+	   }
+        |s3:tX|
+	   cshare<lint,tX>(s2,s3,s4;m)
+        |s4:~tX|
+	   doNPop<tX> (s4, ns4 ; m, n2)
+        |ns4:~tX|
+        cfree<lint, tX>(ns4 ; m)
+    }
+    }
+};;
+
+proc systemSeq(){
+    cut{
+        let! n 50
+        |n:~!lint|
+        stack<lint>(s)
+        |s:~tStack(lint)|
+        ?n;
+        clientSeq(s ; n)
+    }
+};;
+
+proc systemPar(){
+    cut{
+        let! n 50
+        |n:~!lint|
+        stack<lint>(s)
+        |s:~tStack(lint)|
+        ?n;
+        clientPar(s ; n)
+    }
+};;
+
+proc systemPar2(){
+    cut{
+        let! n 50
+        |n:~!lint|
+        stack<lint>(s)
+        |s:~tStack(lint)|
+        ?n;
+        clientPar2(s ; n)
+    }
+};;

@@ -1,0 +1,43 @@
+type Menu {
+    offer of {
+        |#Neg; recv ~lint; send lint 
+        |#Add;  recv ~lint; recv ~lint; send lint
+    }
+};;
+
+proc server(c:Menu) {
+    case c of {
+        |#Neg;
+        n =<- c; 
+        c <- -n 
+        |#Add;
+        n1 n2 =<- c; 
+        c <- n1 + n2 
+    }
+};;
+
+proc client1(c:~Menu){ //client1 uses the menu once 
+    c <- #Neg 2; 
+    n =<- c; 
+    println("CLIENT1 GOT NEG 2 = " + m)
+};;
+
+
+proc client2(c:?~Menu){ //client2 uses the menu twice 
+    c <- #Add 2 3; //c : recv colint  
+    m =<- c; // c: ?~Menu 
+    c <- #Neg m 
+    n =<- n; 
+    println("CLIENT2 GOT NEG (ADD 2 3) =  " + n)
+};;
+
+proc client3(c:?~Menu){ //client3 does not use the menu at all 
+    println("CLIENT3 DID NOTHING") 
+};;
+
+proc system(){
+    func c <- server(c); 
+    fork client1(c);
+    fork client2(c);
+    client3(c)
+};;

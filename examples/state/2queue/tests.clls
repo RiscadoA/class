@@ -1,0 +1,134 @@
+include "client.clls";;
+
+proc pDEQ(h:~maybe(!lint))
+{
+    case h of {
+	|#Nothing:
+	wait h;println("DEQ: None: ");()
+	|#Just:
+	?h;println("DEQ Just: " + h);()
+    }
+};;
+
+type stept(tX) {
+  send tX; send !lint; close
+};;
+
+proc doNEnq<tX> (s:~tX, ns:tX ; m:~evMenuT(lint,tX), a:~lint) {
+	cut {
+		!body(step:recv ~stept(tX);send stept(tX); close);
+			recv step (p0:~stept(tX));
+			recv p0 (spre: ~tX);
+			recv p0 (vp: ?colint);
+			wait p0;
+			?vp;
+			cut { let! v vp+1
+			    |v:~!lint|
+			    ?v;
+			    cut {
+			    send e (e0: tX. fwd e0 spre);
+			    wait e; ()
+			    |e: recv ~tX; close |	
+				cut { let! vx v |vx:~!lint| eCenq<lint,tX>(e, vx, es ; m) }
+			    |es: recv ~tX;close |			    
+			    recv es (nv0:~tX);
+			    println ("ENQ "+v);
+			    send step (p1:stept(tX). 
+						send p1 (spost:tX. fwd nv0 spost);
+						send p1 (vn:!lint. let! vn v);
+						close p1);			
+			    par { close step  || close es }
+			    }
+			}
+		|body: ? send stept(tX);recv ~stept(tX); wait|
+		?body;
+	        cut {
+		send s0 (p:tX. fwd s p); send s0 (i:!lint. let! i 0); close s0
+		|s0:~stept(tX)|
+		iters<stept(tX)>(nsf,s0;body,a)
+		|nsf:~stept(tX)|
+		recv nsf (ns1:~tX); recv nsf (fv:~!lint); ?fv; wait nsf; fwd ns1 ns
+		}
+	}
+};;
+
+proc doNDeq<tX> (s:~tX, ns:tX ; m:~dvMenuT(lint,tX), a:~lint) {
+	cut {
+		!body(step:recv ~tX;send tX; close);
+			recv step (spre:~tX);
+			cut {
+		          cut {
+			    send e (e0: tX. fwd e0 spre);
+			    wait e; ()
+			    |e: recv ~tX; close |			    
+     		            dCdeq<lint,tX>(e, v, es ; m)
+			    |es: recv ~tX;close |			    
+			    recv es (nv0:~tX);
+			    send step (nv1:tX. fwd nv0 nv1);
+			    par { close step || close es }
+			   }
+			    |v:~maybe(!lint)|
+			    pDEQ(v)
+			}
+		|body: ? send tX;recv ~tX; wait|
+		?body;
+		iters<tX>(ns,s;body,a)
+	}
+};;
+
+proc clientPar(d:~tqueue(lint);n:~lint){
+    println("");
+    println("
+            **********************************************
+            CONCURRENT TEST (2-VIEWS) QUEUE:
+            We enqueue the integers from 1 to " + n +"
+            Concurrently, we dequeue " + n + " elements.
+	    QUEUE uses two stacks (lists) in the queue
+	    representation (see paper).
+            ***********************************************"
+            );
+   cut {
+		recvty e(tX);
+		recv e(m:~!evMenuT(lint,tX));
+		?m;
+		cut{
+			doNEnq<tX>(e, ne ; m, n)
+			|ne:~tX|
+			eCfree<lint,tX>(ne; m)
+		   }
+    |e:teview(lint)|
+    send d(ef:~teview(lint). fwd e ef);
+    recvty d(tX);
+    recv d(m:~!dvMenuT(lint,tX));
+    ?m;
+    cut {
+		doNDeq<tX>(d, nd ; m, n)
+		|nd:~tX|
+        	dCfree<lint,tX>(nd ; m)
+	}
+	}
+};;
+
+
+proc systemParN(n:?colint){
+    cut{
+        queue<lint>(s)
+        |s:~tqueue(lint)|
+        ?n;
+        clientPar(s ; n)
+    }
+};;
+
+proc systemPar(){
+    cut{
+        let! n 50
+        |n:~!lint|
+        queue<lint>(s)
+        |s:~tqueue(lint)|
+        ?n;
+        clientPar(s ; n)
+    }
+};;
+
+
+

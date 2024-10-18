@@ -1,0 +1,239 @@
+/*
+    Implements a buffered channel in which receives blocks if the channel is empty.
+    The implementation exposes two views: one for sending, another for receiving. 
+    Only the view for sending can be shared. 
+*/ 
+include "../pure/maybe.clls";; 
+include "../pure/lists.clls";; 
+
+type rec Node(A,B){ //A linked list of A's with a base case B  
+    choice of {
+        |#Null: affine B
+        |#Next: send affine A; LList(A,B)
+    }
+} and LList(A,B){
+    state Node(A,B)
+};;
+
+
+type rec RecvT(A){
+    choice of {
+        |#Recv:      Cont(A)
+        |#Release:   close
+    }
+} and Cont(A){
+    affine{recv coaffine ~A; RecvT(A)}
+};; 
+
+proc rec mrecv<A>(x:~RecvT(A), c:usage ~LList(A, maybe(Cont(A)))){
+case x of {
+    |#Recv: 
+    take c(l);
+    take l(n);
+    case n of {
+        |#Null:
+        par{
+            discard n //there's no continuation, so n shound be #Nothing 
+            ||
+            println("mrecv: waiting"); 
+            put l(nn.   affine nn;
+                        #Null nn;
+                        affine nn;
+                        #Just nn;
+                        fwd nn x);
+            put c(l);
+            release c 
+        }
+        |#Next:
+        par{
+            recv n(a:coaffine ~A);
+            put c(n);
+            send x(a);
+            mrecv<A>(x,c)
+            ||
+            put l(nn.   affine nn;
+                        #Null nn;
+                        affine nn;
+                        #Nothing nn;
+                        close nn);
+            release l 
+        } 
+    }
+
+    |#Release:
+    wait x; 
+    release c 
+}
+};;
+
+
+type rec SendT(A){
+    choice of {
+        |#Send:     send affine A; SendT(A)  
+        |#Release:  close 
+        |#Share:    send SendT(A); SendT(A)
+    }
+};; 
+
+proc rec msend<A>(x:~SendT(A), c:~state LList(A, maybe(Cont(A)))){
+case x of { 
+    |#Send:    
+    take c(l); 
+    take l(n); 
+    recv x(a); 
+    case n of {
+        |#Null: 
+        case n of {
+            |#Nothing: 
+            wait n; 
+            cut{
+                cell l0(n0. affine n0;
+                            #Null n0;
+                            affine n0; 
+                            #Nothing n0; 
+                            close n0)
+                |l0:~LList(A, maybe(Cont(A)))|
+                share l0{
+                   put c(l0);
+                   msend<A>(x,c)
+                   ||
+                   put l(n. affine n;
+                            #Next n;
+                            send n(a);
+                            fwd n l0);
+                    release l 
+                }
+            }
+            |#Just: 
+            send n(a);
+            put l(nn.   affine nn;
+                        #Null nn;
+                        affine nn;
+                        #Nothing nn;
+                        close nn); 
+            share l{
+                put c(l);
+                msend<A>(x,c)
+                ||
+                cut{
+                    cell c2(ld. affine ld; fwd ld l) //TODO: issue: if we just write cell c2(l) type system complains
+                    |c2:~state LList(A, maybe(RecvT(A)))|
+                    mrecv<A>(n,c2)
+                }
+            }
+        }
+        |#Next: 
+            recv n(b);
+            put l(nn.   affine nn;
+                        #Next nn;
+                        send nn(b);
+                        fwd nn n); 
+            put c(nl.   affine nl;
+                        cell nl(nn. affine nn;
+                                    #Next nn;
+                                    send nn(a);
+                                    fwd nn l)); 
+            msend<A>(x, c)
+    }
+
+    |#Release: 
+    wait x; 
+    release c 
+
+    |#Share: 
+    recv x(y);
+    share c{
+        msend<A>(x,c)
+        ||
+        msend<A>(y,c)
+    }
+}
+};; 
+
+proc rec sendList<A>(l:~List(affine A), x:SendT(A)){
+    case l of {
+        |#Nil: 
+        wait l;
+        #Release x; 
+        close x 
+
+        |#Cons: 
+        recv l(a);
+        sleep 10;
+        println("SEND: sending element"); 
+        #Send x;
+        send x(a);
+        sendList<A>(l,x)
+    }
+};;
+
+proc sendOddN(x:SendT(lint);n:colint){
+    cut{
+        !f(f0);
+        recv f0(a);
+        affine f0;
+        let f0 a+2 
+        |f:?send affine lint;coaffine colint|
+        genList<affine lint>(l;1,f,n)
+        |l:~List(affine lint)|
+        sendList<lint>(l, x)
+    }
+};;
+
+
+proc sendEvenN(x:SendT(lint);n:colint){
+    cut{
+        !f(f0);
+        recv f0(a);
+        affine f0;
+        let f0 a+2 
+        |f:?send affine lint;coaffine colint|
+        genList<affine lint>(l;0,f,n)
+        |l:~List(affine lint)|
+        sendList<lint>(l, x)
+    }
+};;
+
+proc unsafe_rec recvAndPrintN(x:RecvT(lint);n:colint){
+    if (n == 0){
+        #Release x;
+        close x
+    }{
+        #Recv x; 
+        affine x; 
+        recv x(a);
+        println("RECV: got " + a);
+        recvAndPrintN(x;n-1)
+    }
+};;
+
+
+proc main(){  
+    cut{
+        cell l(n.   affine n;
+                    #Null n;
+                    affine n;
+                    #Nothing n;
+                    close n)
+        |l:~LList(lint, maybe(cont(lint)))|
+        share l{
+            cut{
+                cell c(ld. affine ld; fwd ld l) //TODO: issue: if we just write cell c1(l) type system complains
+                |c:~state LList(lint, maybe(cont(lint)))|
+                mrecv<lint>(x,c)
+                |x:RecvT(lint)|
+                recvAndPrintN(x;20)
+            }
+            ||
+            cut{
+                cell c(ld. affine ld; fwd ld l) //TODO: issue: if we just write cell c1(l) type system complains
+                |c:~state LList(lint, maybe(cont(lint)))|
+                msend<lint>(x,c)
+                |x:SendT(lint)|
+                #Share x;
+                send x(y. sendOddN(y;10));
+                sendEvenN(x;10)
+            }       
+        }
+    }
+};; 

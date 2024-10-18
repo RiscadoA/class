@@ -1,0 +1,118 @@
+type rec List(T) {
+  choice of {
+    | #Nil: close
+    | #Cons: send T; List(T)
+  }
+};;
+
+type ListI {
+	List(lint)
+};;
+
+proc nil<T>(l: List(T)) {
+  #Nil l; close l
+};;
+
+proc cons<T>(l: ~List(T), val: ~T, ret: List(T)) {
+  #Cons ret; 
+  send ret(ad: T. fwd ad val);
+  fwd ret l
+};;
+
+proc rec push_back<T>(l: ~List(T), val: ~T, ret: List(T)) {
+  case l of {
+    |#Nil: wait l; cut { nil<T>(ll) | ll: ~List(T) | cons<T>(ll, val, ret) }
+    |#Cons: recv l(b:~T); cut { push_back<T>(l, val, z) | z: ~List(T) | cons<T>(z, b, ret) }
+  }
+};;
+
+proc rec len<T>(l: ~List(!T), n: lint) {
+	case l of {
+    |#Nil: wait l; let n 0
+    |#Cons: recv l(val: ?~T);
+      cut {
+        len<T>(l, res)
+        
+        | res: ~lint |
+        
+        let n res+1
+      }
+	}
+};;
+
+proc rec concat<T>(l1: ~List(T), l2: ~List(T), ret: List(T)) {
+  case l1 of {
+    |#Nil: wait l1; fwd l2 ret
+    |#Cons: recv l1(val: ~T); cut { concat<T>(l1, l2, z) | z: ~List(T) | cons<T>(z, val, ret) }
+  }
+};;
+
+/* Has issues 
+proc rec printList<T>(l: ~List(T)) {
+	case l of {
+		|#Nil: wait l; println("]"); ()
+		|#Cons: recv l(val: ~T); print(val + " "); printList<T>(l)
+	}
+};;
+*/
+
+/* Has issues */
+proc rec extractMax<T>(l: ~List(T), handling: ~T, ret: List(T), min: T) {
+  case l of {
+		| #Nil: wait l; nil(ret); fwd handling min
+		| #Cons: recv l(val: ~T);
+              if (val > handling) { cut { extractMax<T>(l, val, z, min)       | z: ~List(T); min: ~T | cons<T>(z, handling, ret) }  }
+                                  { cut { extractMax<T>(l, handling, z, min)  | z: ~List(T); min: ~T | cons<T>(z, val, ret)      }  }
+	}
+};;
+
+/* Has issues */
+proc selectionSort<T>(l: ~List(T), ret: List(T)) {
+  case l of {
+		| #Nil: wait l; nil(ret)
+		| #Cons: recv l(val: ~T);
+              cut {
+                extractMin<T>(l, val, newList, theMax)
+                
+                | newList: ~List(T) ; theMax: ~T |
+
+                cut {
+                  selectionSort<T>(newList, ll)
+
+                  | ll: ~List(T) |
+
+                  cons(ll, theMax, ret)
+                }
+              }                      
+	}	 
+}
+
+/* Has issues */
+proc unsafe_rec mklist<T>(n: ~!lint, ret: List(T)) {
+	if (n == 0) {
+		nil<T>(ret)
+	} {
+		cut {
+			mklist<T>(n-1, lr)
+		  
+      | lr: ~List(T) |
+			
+      cons<T>(lr, n, ret)
+	  }
+	}
+};;
+
+proc main() {
+ cut {
+    mklist<lint>(10, l)
+
+    | l: ~List(lint) |
+    
+    selectionSort<lint>(l, sl)
+
+    | sl: ~List(lint) |
+
+    print("[");
+    printList(sl)
+	}
+};;

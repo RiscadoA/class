@@ -1,0 +1,66 @@
+/*
+   In this example we share a reference cell storing the natural 3 with
+   three concurrent threads:
+    A increments the natural stored in the cell and releases;
+    B doubles the natural stored in the cell and releases;
+    C gets the natural stored in the cell and prints it.
+
+    The natural sent by thread (X) will depend on the interleaving of
+    operations A, B and C:
+          A, B, C     8
+          A, C, B     4
+          B, A, C     7
+          B, C, A     6
+          C, A, B     3
+          C, B, A     3
+    where on the left column we show the interleaving and on the column on the right
+    the corresponding printed natural.
+
+*/
+
+
+// full cell initialised with integer 3
+proc init(c:state lint){
+    cell c(n: affine lint. affine n; let n 3)
+};;
+
+//thread A
+proc threadA(c:usage colint){
+    take c(n:coaffine colint);
+    put c(m:affine lint. affine m; use n; let m n+1);
+    release c
+};;
+
+//thread B
+proc threadB(c:usage colint){
+    take c(n:coaffine colint);
+    put c(m:affine lint. affine m; use n; let m 2*n);
+    release c
+};;
+
+//thread C
+proc threadC(c:usage colint){
+    take c(n:coaffine colint);
+    use n;
+    println("GOT: " + n);
+    put c(m:affine lint. affine m; let m 0); // puts a dummy natural 0
+    release c
+};;
+
+//composes everything together with cut and share
+proc system(){
+    cut{
+        init(c) |c:usage colint|
+        share c{
+            threadA(c)
+            ||
+        share c{
+            threadB(c)
+            ||
+            threadC(c)
+        }}
+    }
+};;
+
+//uncomment the following line to run system() 100 times
+//repeat 100 system();;

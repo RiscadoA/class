@@ -1,0 +1,44 @@
+include "server.clls";;
+
+proc inc<ct>(si:~ct, so:ct; m:~cellproto(ct))
+{
+	call m(p:~cellproto(ct));
+	#Inc p;
+	send p (s:ct. fwd s si);
+	fwd p so
+};;
+
+proc dec<ct>(si:~ct, so:ct; m:~cellproto(ct))
+{
+	call m(p:~cellproto(ct));
+	#Dec p;
+	send p (s:ct. fwd s si);
+	fwd p so
+};;
+
+proc get<ct>(si:~ct, r:!lint, so:ct; m:~cellproto(ct))
+{
+	call m(p:~cellproto(ct));
+	#Get p;
+	send p (s:ct. fwd s si);
+	recv p (x:?colint);
+	par { fwd x r || fwd p so }
+};;
+
+proc shhare<ct>(si:~ct, s1:ct, s2: ct; m:~cellproto(ct))
+{
+	call m(p:~cellproto(ct));
+	#Share p;
+	send p (s:ct. fwd si s);
+	send p (s:~ct. fwd s1 s);
+	fwd p s2
+};;
+
+proc dispose<ct>(si:~ct; m:~cellproto(ct))
+{
+	call m(p:~cellproto(ct));
+	#Free p;
+	send p (s:ct. fwd s si);
+	close p
+};;
+

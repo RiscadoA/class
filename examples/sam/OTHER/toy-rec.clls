@@ -1,0 +1,468 @@
+type rec Nat{
+    choice of {
+        |#Z: close    
+        |#S: Nat        
+    }
+};;
+
+proc zero(n:Nat){ #Z n; close n };;
+
+proc one(n:Nat){ #S n; #Z n; close n };;
+
+proc two(n:Nat){  #S n;  #S n; #Z n; close n};;
+
+proc succ(n:~Nat,m:Nat){
+     #S m; fwd m n
+};;
+
+proc three(n:Nat){
+         #S n; two(n)
+};;
+
+proc four(n:Nat){
+         #S n; three(n)
+};;
+
+proc five(n:Nat){
+         #S n; four(n)
+};;
+
+proc six(n:Nat){
+         #S n; five(n)
+};;
+
+proc threex(m:Nat){ //OK
+     cut {
+     two (n)
+     | n:~Nat|
+     #S m;  fwd m n
+     }
+};;
+
+
+proc onebad(n:Nat){ // BAD !!!
+     cut {
+         #S n2; one(n2)
+         |n2:~Nat|
+         fwd n2 n
+         }
+};;
+
+
+proc rec toStr(n0:~Nat, s: lstring){
+    case n0 of {
+        |#Z: wait n0; let s "Z"
+        |#S: cut{
+                toStr(n0,x)
+                |x:~lstring|
+                let s "S "+x
+                }
+    }
+};;
+
+
+proc printNat(n:~Nat) {
+   cut {
+     toStr(n,s)
+     | s:~lstring|
+     println(s); ()
+     }
+};;
+
+proc rec toInt(n0:~Nat, s: lint){
+    case n0 of {
+        |#Z: wait n0; let s 0
+        |#S: cut{
+                toInt(n0,x)
+                |x:~lint|
+                let s x+1
+                }
+    }
+};;
+
+
+proc printInt(n:~Nat) {
+   cut {
+     toInt(n,s)
+     | s:~lint|
+     println(s); ()
+     }
+};;
+
+//some tests
+
+proc testzero(){
+cut{
+    zero(n)
+    |n:~Nat|
+    toStr(n,s)
+    |s:~lstring|
+    println(s);
+    ()
+}
+};;
+
+proc testzerof0(){
+cut{
+    zero(n)
+    |n:~Nat|
+    #S m;#S m;#S m;fwd n m
+    |m:~Nat|
+   toStr(m,s)
+    |s:~lstring|
+    println(s);
+    ()
+}
+};;
+
+proc testzerof1(){
+cut{
+    one(n)
+    |n:~Nat|
+    #S m; fwd n m
+    |m:~Nat|
+   toStr(m,s)
+    |s:~lstring|
+    println(s);
+    ()
+}
+};;
+
+proc testzerof3w(){
+cut{
+    #S n; one(n)
+    |n:~Nat|
+    #S m; fwd n m
+    |m:~Nat|
+   toStr(m,s)
+    |s:~lstring|
+    println(s);
+    ()
+}
+};;
+
+
+proc testzerof4w(){
+cut{
+    #S n; one(n)
+    |n:~Nat|
+    #S m; fwd m n // <-- symmetric
+    |m:~Nat|
+   toStr(m,s)
+    |s:~lstring|
+    println(s);
+    ()
+}
+};;
+
+proc testzerof2w(){
+cut{
+    #S n; one(n)
+    |n:~Nat|
+    #S m; fwd n m
+    |m:~Nat|
+   toStr(m,s)
+    |s:~lstring|
+    println(s);
+    ()
+}
+};;
+
+proc testone(){
+cut{
+    one(n)
+    |n:~Nat|
+    toStr(n,s)
+    |s:~lstring|
+    println(s);
+    ()
+}
+};;
+
+//sam testzero();;
+
+//sam testone();;
+
+
+proc testrfwd2(){
+cut{
+    zero(m)
+    |m:~Nat|
+    send p (k.#S k; #S k; #S k; fwd k m); close p
+    |p:~send Nat; close|
+    recv p(v);wait p;
+    cut { toStr(v,s)
+    |s:~lstring|
+    println(s);
+    ()
+    }
+}
+};;
+
+proc testrfwd2x(){
+cut{
+    zero(m)
+    |m:~Nat|
+    send p (k.#S k; #S k; fwd k m); close p
+    |p:~send Nat; close|
+    recv p(v);wait p;
+        send q (w. #S w;  #S w; fwd w v); close q
+    |q:~send Nat; close|
+    recv q(u);wait q;
+    cut { toStr(u,s)
+    |s:~lstring|
+    println(s);
+    ()
+    }
+}
+};;
+
+
+proc testrfwd4(){ // OK
+cut{
+    one(m)
+    |m:~Nat|
+    send p (k:Nat.fwd m k); close p
+    |p:~send Nat; close|
+    recv p(v);wait p;
+    cut { toStr(v,s)
+    |s:~lstring|
+     println(s);
+    ()
+    }
+}
+};;
+
+proc testrfwd5(){ // OK
+cut{
+    two(m)
+    |m:~Nat|
+    send p (k:Nat.fwd m k); close p
+    |p:~send Nat; close|
+    recv p(v);wait p;
+    cut { toStr(v,s)
+    |s:~lstring|
+     println(s);
+    ()
+    }
+}
+};;
+
+
+// HERE
+
+proc testrfwd20(){
+cut{
+    send p (k.two(k)); close p
+    |p:~send Nat; close|
+    recv p(v);wait p;
+    cut { toStr(v,s)
+    |s:~lstring|
+    println(s);
+    ()
+    }
+}
+};;
+
+
+proc testrfwd2(){
+cut{
+    zero(m)
+    |m:~Nat|
+    send p (k.#S k; fwd k m); close p
+    |p:~send Nat; close|
+    recv p(v);wait p;
+    cut { toStr(v,s)
+    |s:~lstring|
+    println(s);
+    ()
+    }
+}
+};;
+
+proc testrfwd21(){
+cut{
+    send p (k.#S k; zero(k)); close p
+    |p:~send Nat; close|
+    recv p(v);wait p;
+    cut { toStr(v,s)
+    |s:~lstring|
+    println(s);
+    ()
+    }
+}
+};;
+
+proc testrfwd(){
+cut{
+    two(n)
+    |n:~Nat|
+    fwd n m
+    |m:~Nat|
+    send p (k.#S k; fwd m k); close p
+    |p:~send Nat; close|
+    recv p(v);wait p;
+    cut { toStr(v,s)
+    |s:~lstring|
+    println(s);
+    ()
+    }
+}
+};;
+
+proc testrfwd3(){ // OK
+cut{
+    zero(m)
+    |m:~Nat|
+    send p (k:Nat.fwd m k); close p
+    |p:~send Nat; close|
+    recv p(v);wait p;
+    cut { toStr(v,s)
+    |s:~lstring|
+     println(s);
+    ()
+    }
+}
+};;
+
+proc rec add(n:~Nat, m:~Nat, r:Nat)
+{
+   case n of {
+    |#Z: wait n;
+         fwd m r
+    |#S: #S r;
+         add(n,m,r)
+   }
+};;
+
+
+proc testadd2(){
+cut{
+    three(n)
+    |n:~Nat|
+    one(m) 
+    |m:~Nat|
+    add(m,n,r)
+    |r:~Nat|
+    printNat(r)
+    }
+};;
+
+proc rec mul(n:~Nat, m:?~Nat, r:Nat)
+{
+   case n of {
+   |#Z: wait n; #Z r; close r
+   |#S: cut {
+	!m1(v:Nat);call m(m1:~Nat);fwd m1 v
+	|m1:?~Nat|
+   	mul(n,m1,r0)
+	|r0:~Nat|
+ 	call m(m2:~Nat);
+	add(m2,r0,r)
+	}
+   } 
+};;
+
+proc testmul2(){
+cut{
+    !n3(v:Nat);three(v)
+    |n3:?~Nat|
+    three(m)
+    |m:~Nat|
+    mul(m,n3,r)
+    |r:~Nat|
+    printNat(r)
+}
+};;
+
+
+proc succone(){
+     cut {
+     	  one(n)
+	  |n:~Nat|
+	  succ(n,m)
+	  |m:~Nat|
+	  succ(m,k)
+	  |k:~Nat|
+	  toStr(k,s)
+	  |s:~lstring|
+	  println(s); ()
+	 }
+};;
+
+proc two2(){
+     cut {
+     	  onebad(n)
+	  |n:~Nat|
+	  toStr(n,s)
+	  |s:~lstring|
+	  println(s); ()
+	 }
+};;
+
+proc succonex(){
+     cut {
+     	  #S n; #Z n; close n
+	  |n:~Nat| // SessionRecord@6f539caf
+	  #S m; fwd m n
+	  |m:~Nat| // SessionRecord@3f91beef
+	  #S k; fwd k m
+	  |k:~Nat| // SessionRecord@531d72ca
+	  toStr(k,s)
+	  |s:~lstring|
+	  println(s); ()
+	 }
+};;
+
+// sam testadd2();;
+
+// sam testmul2();;
+
+// sam succonex();;
+
+type rec CoNat{
+    recv ~!lint;
+    choice of {
+        |#Stop: wait    
+        |#More: CoNat   
+    }
+};;
+
+proc rec loop(n:~CoNat;v:~lint) {
+    send n(v);
+    case n of {
+    | #More: loop(n;v+1)
+    | #Stop: close n
+    }
+}
+;;
+
+proc client1 (n:CoNat) {
+  recv n(x);
+  println(x);
+  #More n;
+  recv n(y);
+  println(y);
+  #Stop n;
+  wait n;
+  ()
+}
+;;
+
+proc client2 (n:CoNat) {
+  recv n(y);
+  println(y);
+  #Stop n;
+  wait n;
+  ()
+}
+;;
+
+proc main() {
+  cut  {
+  loop(n;0)
+  |n:CoNat|
+  client2(n)
+}
+}
+;;

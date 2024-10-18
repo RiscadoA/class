@@ -1,0 +1,105 @@
+
+type corec Intstream {
+     offer of   {
+     	   |#next: send !lint; Intstream
+	   |#stop: close
+ 	   }	   	   
+ };;
+ 
+proc rec intsfm(n: Intstream; k:~lint)
+ {
+    //unfold n;
+    case n of    {
+      	   |#next:  send n(k); intsfm(n;k+1)
+	   |#stop: close n
+ 	   }	   	   
+ };;
+
+proc intsfm2(n: Intstream)
+ {
+     intsfm(n;2)
+ };;
+ 
+proc rec filter (fouts:Intstream, fins:~Intstream;n:~lint)
+ {
+    unfold fins;
+    #next fins;
+     recv fins (v); 
+     if  ((v / n)*n==v)
+     	 { filter(fouts,fins;n) }
+     	 {  // unfold fouts;
+	    case fouts of { 
+	    |#next:  send fouts (v);  filter(fouts, fins;n) 
+	    |#stop: //unfold fins;
+	    #stop fins; wait fins; close fouts
+	 }
+	 }
+ };;
+
+proc rec sieve(souts:Intstream, sins:~Intstream)
+ {
+      //unfold sins;
+      #next sins;
+      recv sins (p);
+      //unfold souts;
+      case souts of { 
+  	  |#next:     
+   	  	      send souts(p);
+		      cut  {
+		      sieve(souts,outp)
+		      |outp:Intstream|
+		      filter(outp,sins;p)
+		      }
+	|#stop:  //unfold sins;
+	#stop sins; wait sins; close souts
+	}
+ };;
+
+proc primesN(primes:Intstream)
+ {
+ cut  {
+      intsfm2(n)
+      |n:~Intstream|
+      sieve(primes,n)
+}
+ };;
+
+proc unsafe_rec printfirst(il:~Intstream;k:~lint)
+{
+   if(k==0)
+     	 {
+	 // unfold il;
+	 #stop il; wait il;() }
+     	 {
+	 //unfold il;
+	 #next il; recv il(n);
+	 println(n);
+	 print(" ");
+	 printfirst(il;k-1)
+	}
+};;
+
+proc main()
+{
+ cut  {
+      primesN(primes)
+      |primes:~Intstream|
+      printfirst(primes;10)
+      }
+ };;
+
+proc main1()
+{
+ cut  {
+      primesN(prime)
+      |prime:~Intstream|
+      //unfold prime;
+      #next prime;
+      recv prime(p);
+      println(p);
+      //unfold prime;
+      #stop prime;
+      wait prime;
+      ()
+      }
+ };;

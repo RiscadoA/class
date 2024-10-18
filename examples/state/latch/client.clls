@@ -1,0 +1,27 @@
+include "server.clls";;
+
+
+proc cnotifyAll<X>(c:~X ; m:~MenuN(X)){
+    call m(m0:~MenuN(X));
+    send m0(cd: X. fwd cd c);
+    wait m0;
+    ()
+};;
+
+proc cshare<X>(c:~X, c1:X, c2:X ; m:~MenuW(X)){
+    call m(m0:~MenuW(X));
+    #share m0;
+    send m0(cd: X. fwd cd c);
+    send m0(c1d: ~X. fwd c1d c1);
+    send m0(c2d: ~X. fwd c2d c2);
+    close m0
+};;
+
+proc cawait<X>(c:~X, done:close ; m:~MenuW(X)){
+    call m (m0:~MenuW(X));
+    #await m0;
+    send m0(cd: X. fwd cd c);
+    wait m0;
+    close done
+};;
+

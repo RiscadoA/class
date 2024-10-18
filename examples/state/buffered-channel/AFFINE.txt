@@ -1,0 +1,96 @@
+NOTAS TALK:
+
+
+
+
+Slide 9: Five Main Contributions.
+
+Já falamos em colocar os bullets,
+apens algumas sugestões de pontos a salientar nos bullets
+
+excellence 
+	Regular Publication in topmost venues in all areas of research
+     (e.g. PLDI, SOSP, ICSE, IJCAI, CHI, <algo de energia>, ...)
+	Impact on Big Tech (e.g., Apple, Google, Microsoft, ... )
+	Many Awards (e.g., many best paper awards)
+     ...
+
+International projects and collaborations
+     31 EU funded projects (main coordinator of 5) in 2000-2000
+	Partnership Projects (e.g., CMU Portugal)
+     Large international network ( top universities and companies worlwide ... )
+
+Networks
+	Artificial Intelligence (e.g, CLAIRE, ELLIS, ..)
+	Sustainable Electronics (e.g., GREEN-CHIPS, ...)
+	Bioinformatics (e.g., ELIXIR )
+
+Collaborative research
+
+	healthcare, digital, mobility,
+     agri-food, industry, media, energy
+	
+     industry, central / local government, hospitals, start-ups, ...
+	
+     PRRs (e.g. AI, Blockchain, ....)
+
+Policy:
+
+   Advisors to national and international bodies (e.g, ...)
+   Contribution to public policy (AI, Web2, CyberSecurity,...)
+   Esteem and Recognition (e.g., ... )
+   Social Responsibility (e.g, gender balance, education, ..)
+   Intense Media Presence
+   
+
+Outras coisas gerais:
+
+  Falar algures dos alunos de Phd e suas colocações, acho que não 
+  se toda no assunto e é muito importante. Não sei bem onde.
+
+No plano estratégico:
+
+  Os slides estão muito iguais e não se lê bem.
+
+  Talvez em cada um selecionar os 2 ou 3 grandes objetivos 
+
+  Ou então encurtar as frases
+
+Frases finais (estou de acordo com a sugestão do Luis, algumas ideias+):
+
+“INESC-ID is a leading research institute in computer 
+
+   We are proud of:
+
+   research results published at the very top venues
+
+   being recognized actors in the worldwide research communities   
+
+   our vital role in local social, economical and educational development 
+
+   the committment of researchers, students and staff to excellence and ethics
+ 
+   our flexible, supportive and inclusive environment
+
+We project our future in our ambitious XXXX-XXXX program"
+
+PORMENORES:
+
+Slide 2:
+
+O comentário sobre darmos muitas aulas (não salientava com "overload" pois parece desculpa):
+
+Sugiro passar a mensagem pela positiva, sem deixar de passar
+a informação. um bla bla algo assim a puxar dos galões
+
+... Most of INESCID researchers are also regular faculty
+at Técnico Universidade de Lisboa, the most
+prestigious engineering school
+in Portugal, and teach at the undergraduate, master and
+phd level, with a teaching load of 6 to 9 hours week. 
+
+Slide 6:
+
+Retirava "Nationalities" e colocava como titulo a frase que lá está
+"INESC-ID attracts ...." numa fonte maior e mais legivel.
+     

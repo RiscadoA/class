@@ -1,0 +1,139 @@
+type corec 
+ICounter(N,NZ) {
+	affine
+	LCounter(N,NZ)
+}
+and
+LCounter(N,NZ) {
+	offer of {
+	| #Inc: recv ~N;
+		send NZ;
+		ICounter(N,NZ)
+	| #Dec: recv ~NZ;
+		send N;
+		ICounter(N,NZ)
+	| #Lift: recv ~NZ;
+		send N;
+		ICounter(N,NZ)
+	| #Free: recv ~N;
+		wait 
+	| #Pack: recv ~N;
+		affine 
+		send N;
+		ICounter(N,NZ)
+	}
+}
+;;
+
+
+type ICounterINV(N,NZ) {
+	affine
+	send N;
+	ICounter(N,NZ)	
+};;
+
+type ICounterADT {   
+	sendty N;
+	sendty NZ;
+	ICounterINV(N,NZ)	
+};;
+
+type ICounterRep {
+	ICounter(state lint,state lint)
+};;
+
+
+proc rec counterObjOps(c: ICounterRep) {
+	affine c;
+	case c of {
+	| #Inc:  recv c (s:~state lint); // move back
+			println "INC";
+			take s (n:~ affine lint);
+			put s (n0:affine lint. affine n0; use n; let n0 n+1);
+			send c (s0:state lint. fwd s s0);
+			counterObjOps(c)
+	| #Dec:  recv c (s:~state lint);
+			println "DEC";
+			take s (n:~ affine lint);
+			put s (n0:affine lint. affine n0; use n;let n0 n-1);
+			send c (s0:state lint. fwd s s0);
+			counterObjOps(c)
+	| #Lift: recv c (s:~state lint);
+			send c (s0:state lint. fwd s s0);
+			counterObjOps(c)
+	| #Free: recv c (s:~state lint);
+			wait c; 
+			release s
+	| #Pack: recv c (s:~state lint);
+			affine c;
+			send c (s0: state lint. fwd s0 s);
+			counterObjOps(c)
+	}
+};;
+
+proc counterObj(c:ICounterADT) {
+	sendty c (state lint);
+	sendty c (state lint);
+	affine c;
+	send c (m:state lint.
+		cell m (v:affine lint. affine v;let v 0));
+	counterObjOps(c) 
+};;
+
+type LICounterINV(N,NZ) {
+	send N;
+	ICounter(N,NZ)	
+};;
+
+proc sampleusage<N,NZ>( s: ~N, c: ~ICounter(N,NZ), co: send N;ICounter(N,NZ))
+{
+	use c;
+	#Inc c;
+		send c (s0:N.fwd s s0);
+		recv c (si:~NZ);
+	use c;
+	#Dec c;
+		send c (s0:NZ.fwd si s0);
+		recv c (si:~N);
+	use c;
+	#Inc c;
+		send c (s0:N.fwd si s0);
+		recv c (si:~NZ);
+	use c;
+	#Lift c;
+		send c (s0:NZ.fwd si s0);
+		recv c (si:~N);
+	send co (sii: N. fwd si sii);
+	fwd c co
+};;
+
+proc mainLinear()
+{
+	cut {
+		counterObj(c)
+		|c:~ ICounterADT |
+		recvty c (N);
+		recvty c (NZ);
+		use c;
+		recv c (s:~N);
+	  cut {
+		sampleusage<N,NZ>(s, c, co)
+		| co: ~send N;ICounter(N,NZ)|
+		recv co (si: ~N);
+		use co;
+		#Free co;
+		send co (s0:N.fwd si s0);
+		close co
+	  }
+	}
+};;
+
+
+
+
+
+
+
+
+
+

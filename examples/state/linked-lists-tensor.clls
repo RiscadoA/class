@@ -1,0 +1,382 @@
+/*
+
+	affinity
+	affine(T) <= T == affine T';
+	affine(struct { #l:T }) <= all Tj. affine(Tj);
+	affine(state T)
+
+        
+	
+*/
+
+
+type rec SList(A){
+    state {
+        List(A)
+    }
+} and List(A) {
+    choice of {
+        |#Null: close
+        |#Next: affine
+		struct {
+		  #val: affine A,
+		  #next:SList(A),
+		  }
+    }
+};;
+
+proc single<A>(a:coaffine ~A, n:affine List(A)) {
+    affine n;
+    #Next n;
+    n.#val <- a;
+    n.#next <- { n.cell n(x.affine x; #Null x; close x) };
+    close n
+};;
+
+
+proc nil<A>(l: affine List (A)){
+    affine l; #Null l; close l
+};;
+
+proc cnext<A>(a:coaffine ~A, c:~SList(A), l: affine List(A)){
+   affine l;
+   #Next l;
+   l.#val <- a;
+   l.#next <- c;
+   close l
+};;
+
+proc rec append<A>(c:~SList(A), l2:~ affine List(A), c2:SList(A)) {
+    take c(l); // l := c;
+    case l of {
+        |#Null: wait l;
+                put c(l2); // c := l2;
+                fwd c c2 // return c c2
+	|#Next: {
+		 n <- l.#next;
+		 cut {
+		   append<A>(n,l2,x)
+                    |x:~SList(A)|
+                    a <- l.#val;
+		    put c(y. affine y;  // c := NODE y { affine y; y.#next <- x; y.#val <- a}
+		     	  #Next y;
+			  y.#next <- x;
+			  y.#val <- a;
+			  close y);
+		 wait l;
+		 fwd c c2
+		 }
+		 
+    }
+}};;
+
+
+/*
+
+proc rec append0<A>(c:~SList(A), l2:~ affine List(A), c2:SList(A)) {
+    take c(l); // l := c;
+    case l of {
+        |#Null: wait l;
+                put c(l2); // c := l2;
+                fwd c c2 // return c c2
+	|#Next: {
+		 n <- l.#next;
+		 cut {
+		   append0<A>(n,l2,x)
+                    |x:~SList(A)|
+                    a <- l.#val;
+		    put c(y. affine y;  // c := NODE y { affine y; y.#next <- x; y.#val <- a }
+		     	  #Next y;
+			  y.#next <- x;
+			  y.#val <- a;
+			  close y);
+		 wait l;
+		 fwd c c2
+		 }
+		 
+    }
+}};;
+
+
+proc rec append1<A>(c:~SList(A), l2:~ affine List(A), c2:SList(A)) {
+    take c(l); // l := c;
+    case l of {
+        |#Null: wait l;
+                put c(l2); // c := l2;
+                fwd c c2 // return c c2
+	|#Next: {
+		 n <- l.#next;
+		 letc x:SList(A) {
+		   append1<A>(n,l2,x)
+		   }
+   		   {
+                    a <- l.#val;
+		    put c(y. affine y;  // c := NODE y { affine y; y.#next <- x; y.#val <- a}
+		     	  #Next y;
+			  y.#next <- x;
+			  y.#val <- a;
+			  close y);
+		 wait l;
+		 fwd c c2
+		 }
+		 }
+		 
+    }
+};;
+/*
+
+proc rec append<A>(c:SList(A), l2:affine List(A) returns (c2:SList(A)) {
+    l := c;
+    case l of {
+        |#Null: c := l2;
+                return c c2
+	|#Next:  n <- l.#next;
+		 letc x { append<A>(n,l2,x) }
+		 {
+                   a <- l.#val;
+		   c := NODE y { affine y; y.#next <- x; y.#val <- a};
+		   return c c2
+		  }
+		 
+    }
+}};;
+
+*/
+
+proc rec append2<A>(c:~SList(A), l2:~ affine List(A), c2:SList(A)) {
+    take c(l);
+    case l of {
+        |#Null: wait l;
+                put c(l2);
+                fwd c c2
+
+        |#Next: a <- l.#val;
+		n <- l.#next;
+		wait l;
+                cut{
+                    append2<A>(n,l2,x)
+                    |x:~SList(A)|
+                    put c(y. cnext<A>(a,x,y));
+                    fwd c c2
+                }
+    }
+};;
+
+proc insertElemBeginning<A>(a:coaffine ~A, l:~SList(A), nl: SList(A)){
+    take l(n);
+    cut{
+        cell ll(n)
+        |ll:~SList(A)|
+        put l(nn. cnext<A>(a,ll,nn));
+        fwd l nl
+    }
+};;
+
+proc insertElemEnd<A>(l:~SList(A),a:coaffine ~A, nl: SList(A)){
+    cut{
+        single<A>(a,n)
+        |n:coaffine ~List(A)|
+        append<A>(l, n, nl)
+    }
+};;
+
+
+proc unsafe_rec SListNto1(l:SList(!lint);a:colint){
+    if(a == 0){
+        cell l(x. nil<!lint>(x))
+    }
+    {
+        cut{
+            SListNto1(x;a-1)
+            |x:~SList(!lint)|
+            cell l(y. cnext<!lint>(a,x,y))
+        }
+    }
+};;
+
+
+
+proc rec printSListInt(l:~SList(!lint), nl:SList(!lint)){
+    take l(n);
+    case n of {
+        |#Null:
+		wait n;
+                put l(n. nil<!lint>(n));
+		println();
+                fwd l nl
+        |#Next: 
+		k1 <- n.#val;
+                print(k1 + " ");
+		co <- n.#next;
+		wait n;
+                cut{
+                    printSListInt(co, x)
+                    |x:~SList(!lint)|
+                    put l(nn. cnext<!lint>(k1,x,nn));
+                    fwd l nl
+                }
+    }
+};;
+
+
+
+proc unsafe_rec SListNto1(l:SList(!lint);a:colint){
+    if(a == 0){
+        cell l(x. nil<!lint>(x))
+    }
+    {
+        cut{
+            SListNto1(x;a-1)
+            |x:~SList(!lint)|
+            cell l(y. cnext<!lint>(a,x,y))
+        }
+    }
+};;
+
+proc test1(){
+    cut{
+        SListNto1(l0;2)
+        |l0:~SList(!lint)|
+        insertElemEnd<!lint>(l0,5,l1)
+        |l1:~SList(!lint)|
+        printSListInt(l1, l2)
+        |l2:~SList(!lint)|
+        release l2
+    }
+};;
+
+proc test4(){
+    cut{
+        SListNto1(l0;4)
+        |l0:~SList(!lint)|
+	release l0
+    }
+};;
+
+
+
+proc rec insert(l:~SList(!lint), nn: affine List(!lint); a:colint){
+    take l(n);
+    case n of {
+        |#Null: wait n;
+                put l(x. nil<!lint>(x));
+                cnext<!lint>(a,l,nn)
+
+        |#Next: b <- n.#val;
+		nx <- n.#next;
+		wait n;
+                if(a < b)
+                {
+                    put l(x.  cnext<!lint>(b,nx,x));
+                    cnext<!lint>(a,l,nn)
+
+                }
+                {
+                    put l(x. insert(nx,x;a));
+                    cnext<!lint>(b,l,nn)
+                }
+    }
+};;
+
+
+proc rec insertionSort(l:~SList(!lint), nl:SList(!lint)){
+    take l(n);
+    case n of {
+        |#Null: wait n;
+                put l(n. nil<!lint>(n));
+                fwd l nl
+
+        |#Next: a<-n.#val;
+                cut{
+		    nx <- n.#next;
+		    wait n;
+                    insertionSort(nx,x)
+                    |x:~SList(!lint)|
+                    put l(nn. insert(x,nn;a));
+                    fwd l nl
+                }
+    }
+};;
+
+
+proc test0(){
+    cut{
+        SListNto1(l0;10)
+        |l0:~SList(!lint)|
+        printSListInt(l0,l1)
+        |l1:~SList(!lint)|
+        insertionSort(l1, l2)
+        |l2:~SList(!lint)|
+        printSListInt(l2,l3)
+        |l3:~SList(!lint)|
+        release l3
+    }
+};;
+
+proc test1(){
+    cut{
+        SListNto1(l0;2)
+        |l0:~SList(!lint)|
+        insertElemEnd<!lint>(l0,5,l1)
+        |l1:~SList(!lint)|
+        printSListInt(l1, l2)
+        |l2:~SList(!lint)|
+        release l2
+    }
+};;
+
+
+/*
+    Concurrent sorted linked list
+*/
+
+/*
+proc contains(l:~SList(!lint), x:send SList(!lint);send lbool;  close; k:colint){
+    take l(n:coaffine ~List(!lint));
+    use n;
+    case n of {
+        |#Null: wait n;
+                put l(nn: affine nn.
+                          nil<!lint>(nn));
+                send x (nl:SList(!lint). fwd nl l);
+                send x(b:lbool. let b false);
+                close x
+
+        |#Next: recv n(a:coaffine ?colint);
+                use a;
+                ?a;
+                if(a < k)
+                {
+                    cut{
+                        recv y(nl:~SList(!lint));
+                        put l(nn:   affine List(!lint).
+                                    cnext<!lint>(
+                        recv
+                        contains(n, y;k)
+                    }
+                }
+                {
+                    put l(nn:   affine List(!lint).
+                                cnext<!lint>(a, n;nn));
+                    send x(ld:SList(!lint). fwd ld l);
+                    if(k < a)
+                    {
+                     send x(b:lbool. let b false);
+                     close x
+                    }
+                    {// a == k
+                        send x(b:lbool. let b true);
+                        close x
+                    }
+                }
+
+
+                cut{
+                    recv y(
+                    |y:send SList(!lint); send lbool; close|
+                    contains(n, y;k)
+                }
+
+    }
+};;
+*/

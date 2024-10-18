@@ -1,0 +1,127 @@
+include "../pure/naturals.clls";;
+
+type Repr {
+        choice of {
+            |#Z:    close
+            |#NZ:   !Nat
+        }
+};;
+
+type Counter {
+    state Repr
+};;
+
+type MenuZ{
+    offer of {
+        |#inc:      send Counter; close
+        |#share:    recv Counter; recv Counter; wait
+        |#release:  close
+    }
+};;
+
+type MenuNZ{
+    offer of {
+        |#dec:      send Counter; close
+        |#inc:      send Counter; close
+        |#get:      send !Nat; send Counter; close
+        |#share:    recv Counter; recv Counter; wait
+        |#release:  close
+    }
+};;
+
+type Menu{
+    recv ~Counter;
+    choice of {
+        |#Z:    MenuZ
+        |#NZ:   MenuNZ
+    }
+};;
+
+proc menuZ(c:usagel ~Repr, x:MenuZ){
+    case x of {
+        |#inc:      put c(n: affine Repr.   affine n;
+                                            #NZ n;
+                                            !n(n0:Nat);
+                                            one(n0));
+                    send x(cd:Counter. fwd cd c);
+                    close x
+
+        |#share:    recv x(c1:Counter);
+                    recv x(c2:Counter);
+                    put c(n:affine Repr.    affine n;
+                                            #Z n;
+                                            close n);
+                    wait x;
+                    share c{ fwd c c1 || fwd c c2}
+
+        |#release:  put c(n:affine Repr.    affine n;
+                                            #Z n;
+                                            close n);
+                    par{ release c || close x}
+    }
+};;
+
+
+
+proc menuNZ(c:usagel ~Repr, x:MenuNZ; n:~Nat){
+    case x of {
+        |#dec:      cut{
+                        predB(m;n)
+                        |m:?~Nat|
+                        ?m;
+                        call m(m0:~Nat);
+                        case m0 of {
+                            |#Z:    wait m0;
+                                    put c(m:affine Repr.    affine m;
+                                                            #Z m;
+                                                            close m);
+                                    send x(cd:Counter. fwd cd c);
+                                    close x
+
+                            |#S:    par{
+                                        put c(k:affine Repr.    affine k;
+                                                                 #NZ k;
+                                                                 fwdE<Nat>(k;m));
+                                        send x(cd: Counter. fwd cd c);
+                                        close x
+                                        ||
+                                        cut{
+                                            dispose(m0, y)
+                                            |y:wait|
+                                            wait y;
+                                            ()
+                                        }
+                        }
+                     }}
+
+        |#inc:          put c(m:affine Repr.    affine m;
+                                                #NZ m;
+                                                !m(m0:Nat);
+                                                call n(n0:~Nat);
+                                                succ(n0,m0));
+                        send x(cd:Counter. fwd cd c);
+                        close x
+
+        |#get:          put c(m:affine Repr.    affine m;
+                                                #NZ m;
+                                                fwdE<Nat>(m;n));
+                        send x(k:!Nat. fwdE<Nat>(k;n));
+                        send x(cd:Counter. fwd cd c);
+                        close x
+
+
+        |#share:        put c(m:affine Repr.    affine m;
+                                                #NZ m;
+                                                fwdE<Nat>(m;n));
+                        recv x(c1:Counter);
+                        recv x(c2:Counter);
+                        wait x;
+                        share c{ fwd c c1 || fwd c c2}
+
+        |#release:      put c(m:affine Repr.    affine m;
+                                                #NZ m;
+                                                fwdE<Nat>(m;n));
+                        par{ close x || release c}
+    }
+};;
+

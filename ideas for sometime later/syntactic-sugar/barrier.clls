@@ -1,0 +1,64 @@
+include "../pure/lists.clls";;
+
+type ThreadC {
+affine wait
+}
+
+type ThreadList {
+List(ThreadC)
+};;
+
+type BState{
+    #Count: int; #WaitQueue: affine ThreadList
+};;
+
+type Barrier{
+    mut BState
+};;
+
+proc init(x:drop BState){
+    x <- #Count: 10 #WaitQueue: nil<ThreadC>()
+    x <-  #Count: n;  n <- 10;  #WaitQueue: n; nil<ThreadC>(n)
+};;
+
+
+c := 
+
+proc rec awakeAll(ws:~ThreadList){
+    case ws of {
+        |#Nil : wait ws;()
+        |#Cons: w <- ws; {  end w || awakeAll(ws) }
+    }
+};;
+
+proc thread (c:~Barrier, w:~ThreadC; id:colint) {
+ws := c;
+#Count: n #WaitQueue: wq <- ws;
+println("thread " + id + ": waiting.");
+if (n==1) {
+      end w || awakeAll(wq) || c := nws:init(nws); drop c
+} else {
+c := #Count: n-1 #WaitQueue: cons<ThreadC>(w,ws); drop c
+c := x. #Count: x; x<- n-1; #WaitQueue: x; cons<ThreadC>(w,ws,x); 
+drop c
+
+     }
+};;
+
+proc unsafe_rec spawnall(c:~Barrier; i:colint, n:colint) {
+if (n == 0) {
+    drop c
+} else {
+    letc |w:ThreadC| {
+           wait w; println("thread " + id + ":finished."); () }
+    in thread(c,w;i)
+    ||
+    spawnall(c;i+1,n-1)
+   }
+};;
+
+proc main ()
+{
+   letc |c| cell c(x. init(x))
+   in spawnall(c;0,100)
+};;

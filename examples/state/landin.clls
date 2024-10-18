@@ -1,0 +1,80 @@
+/** about not typing landn's knot
+
+type fun(X,Y) {
+	recv ~X; send Y; close
+};;
+
+type fun(X,Y)  {
+	X -o Y * 1
+};;
+
+proc drop(n:~statel fun(lint,lint)) {
+		put n (f. affine f; recv f(x);send f(x); close f);
+		release n
+};;
+
+proc drop(n:~mute fun(lint,lint)) {
+     n := { affine fun (x);return x;close }
+     drop n
+};;
+
+proc landin0() {
+     letc n:mut fun(lint,lint) = cell ( affine (x);<x+1> )
+     g = *n
+     ret = g(2) // type sensitive syntax g:send so 2 expr!
+     print (ret)
+     drop(n)
+};;
+
+proc landin0() {
+
+		letc n:state fun(lint,lint) {
+		cell n (f. affine f; recv f(x);send f(x+1); close f)
+		} {
+		take n(g);
+		send g(2);
+		recv g(ret);
+		print (ret);
+		wait g;
+		drop(n)
+	}
+};;
+
+proc landin1() {
+
+		letc n:state fun(lint,lint) {
+		cell n (f. affine f; recv f(x);send f(x+1); close f)
+		} {
+		  take n(g);
+		  send g(2);
+	  	  recv g(ret);
+		  print (ret);
+		  wait g;
+		  // put n(f. ???)
+		  //*  not available in ??, cannot tie knot !! //
+		  drop(n)
+		}
+};;
+
+proc landin2() {
+
+	letc n:state fun(lint,lint) {
+		cell n (f. affine f; recv f(x);send f(x+1); close f)
+	} {
+	  letc f1:affine fun(lint,lint) {
+			     affine f1; 
+			     recv f1(x);
+			     take n(g);
+			     send g(x); recv g(y); wait g;
+			     send f1 (y);
+			     par { drop (n) || close f1 }
+	} {
+	  //* n not available here, cannot tie knot !! *///
+	  send f1( 3);
+	  recv f1( x);
+	  print (x);
+	  wait f1; ()
+	}
+};;
+
+*/

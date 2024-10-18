@@ -1,0 +1,230 @@
+type corec Init(A){
+    offer of {
+        |#init: recv coaffine ~A; recv coaffine A; Full(A)
+    }
+} and Full(A){
+    offer of {
+        |#take: send {affine A};Empty(A)
+        |#share: recv Full(A); Full(A)
+        |#release: wait
+    }
+}    and Empty(A) { //we can also have options to share, but right now we opt not for simplicity
+        offer of {
+            |#put: recv coaffine ~A; Full(A)
+    }
+};;
+
+type rec SS(A){
+state Rep(A)
+} and Rep(A){
+    send !lint; //number of processes sharing the cell
+    send affine A; //stored value
+    affine ~A // finaliser
+};;
+
+
+proc rec mtake<A>(x:Full(A), c:usage ~Rep(A);dum:coaffine{recv coaffine ~A; coaffine A}){
+    case x of {
+        |#release:
+        wait x;
+        take c(fi);
+        recv fi(n);
+        recv fi(v);
+        if(n == 1){
+            par{
+                call dum(dummy);
+                put c(a.    affine a;
+                            send a(0);
+                            fwd a dummy);
+                release c
+                ||
+                fwd v fi
+            }
+        }{
+            put c(a. affine a;
+                     send a(n-1);
+                     send a(v);
+                     fwd a fi);
+            release c
+        }
+
+        |#share:
+        recv x(y);
+        take c(fi);
+        recv fi(n);
+        recv fi(v);
+        put c(a. affine a;
+                 send a (n+1);
+                 send a(v);
+                 fwd a fi);
+        share c{
+            mtake<A>(y,c;dum)
+            ||
+            mtake<A>(x,c;dum)
+        }
+
+        |#take:
+        take c(fi);
+        recv fi(n);
+        recv fi(v);
+        send x(v);
+        mput<A>(x, fi, c; dum,n)
+    }
+} and mput<A>(x:Empty(A), fi:coaffine A, c:usagel ~Rep(A); dum:coaffine{recv coaffine ~A; coaffine A}, n:colint){
+    case x of {
+        |#put:
+        recv x(v);
+        put c(a. affine a;
+                 send a(n);
+                 send a(v);
+                 fwd a fi);
+        mtake<A>(x,c;dum)
+    }
+};;
+
+proc minit<A>(x:Init(A);dum:coaffine{recv coaffine ~A; coaffine A}){
+    case x of {
+        |#init:
+        recv x(ini);
+        recv x(fi);
+        cut{
+            cell c(a. affine a;
+                      send a(1);
+                      send a(ini);
+                      fwd a fi)
+            |c:~SS(A)|
+            mtake<A>(x,c; dum)
+        }
+    }
+};;
+
+
+
+proc test0(){
+    cut{
+        !dum(dum0);
+        affine dum0;
+        send dum0(n. affine n;
+                    let n 0);
+        affine dum0;
+        println("dum0 = " + dum0);
+        ()
+        |dum:?coaffine{recv coaffine colint; coaffine lint}|
+        minit<lint>(x;dum)
+        |x:~Init(lint)|
+        #init x;
+        send x(ini. affine ini;
+                    let ini 0);
+        send x(fi.  affine fi;
+                    println("Final value is " + fi);
+                    ());
+        #release x;
+        close x
+    }
+};;
+
+proc test1(){
+    cut{
+        !dum(dum0);
+        affine dum0;
+        send dum0(n. affine n;
+                    let n 0);
+        affine dum0;
+        println("dum0 = " + dum0);
+        ()
+        |dum:?coaffine{recv coaffine colint; coaffine lint}|
+        minit<lint>(x;dum)
+        |x:~Init(lint)|
+        #init x;
+        send x(ini. affine ini;
+                    let ini 0);
+        send x(fi.  affine fi;
+                    println("Final value is " + fi);
+                    ());
+        #take x;
+        recv x(n);
+        #put x;
+        send x(n+2);
+        #release x;
+        close x
+    }
+};;
+
+proc test2(){
+    cut{
+        !dum(dum0);
+        affine dum0;
+        send dum0(n. affine n;
+                    let n 0);
+        affine dum0;
+        println("dum0 = " + dum0);
+        ()
+        |dum:?coaffine{recv coaffine colint; coaffine lint}|
+        minit<lint>(x;dum)
+        |x:~Init(lint)|
+        #init x;
+        send x(ini. affine ini;
+                    let ini 0);
+        send x(fi.  affine fi;
+                    println("Final value is " + fi);
+                    ());
+        #take x;
+        recv x(n);
+        #put x;
+        send x(n-2);
+        #take x;
+        recv x(n);
+        #put x;
+        send x(2*n);
+        #release x;
+        close x
+    }
+};;
+
+proc test3(){
+    cut{
+        !dum(dum0);
+        affine dum0;
+        send dum0(n. affine n;
+                    let n 0);
+        affine dum0;
+        println("dum0 = " + dum0);
+        ()
+        |dum:?coaffine{recv coaffine colint; coaffine lint}|
+        minit<lint>(x;dum)
+        |x:~Init(lint)|
+        #init x;
+        send x(ini. affine ini;
+                    let ini 0);
+        send x(fi.  affine fi;
+                    println("Final value is " + fi);
+                    ());
+        #share x;
+        send x(y.   sleep 10;
+                    #take y;
+                    recv y(n);
+                    #put y;
+                    send y(2*n);
+                    #release y;
+                    close y);
+        #share x;
+        send x(z.   sleep 20;
+                    #take z;
+                    recv z(n);
+                    #put z;
+                    send z(n-1);
+                    #release z;
+                    close z);
+        #take x;
+        recv x(n);
+        #put x;
+        send x(n+2);
+        #release x;
+        close x
+    }
+};;
+
+
+
+
+

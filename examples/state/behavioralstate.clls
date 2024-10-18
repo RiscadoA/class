@@ -1,0 +1,72 @@
+type corec 
+	CounterN {
+	affine CounterNL
+	}
+and CounterNL {
+	offer of {
+		| #Inc:  CounterNZ
+		| #Free: wait 
+	}
+} and
+	CounterNZ {
+	offer of {
+		| #Inc:  CounterNZ
+		| #Dec:  CounterN
+		| #Lift: CounterN
+	}
+}
+;;
+
+proc rec counterObjLoopN (c: CounterN, m:~state lint) {
+	affine c;
+	case c of {
+	| #Inc: incOp(c,m) 
+	| #Free: wait c; release m
+	}
+} and counterObjLoopNZ (c: CounterNZ, m:~state lint) {
+	case c of {
+	| #Dec: decOp(c,m) 
+	| #Inc: incOp(c,m) 
+	| #Lift: counterObjLoopN(c,m)
+	}
+} and incOp(c: CounterNZ, m:~state lint) {
+	println "Inc";
+	take m (v:~ affine lint); 
+	put m (nv:affine lint. affine nv; use v; let nv v+1);
+	counterObjLoopNZ(c,m) 
+} and decOp(c: CounterN, m:~state lint) {
+	println "Dec";
+	take m (v:~ affine lint); 
+	put m (nv:affine lint. affine nv; use v; let nv v-1);
+	counterObjLoopN(c,m)
+};;
+
+proc counterObj (c:CounterN) {
+cut {
+	cell m (v:affine lint. affine v; let v 0)
+	| m: ~state lint |
+	counterObjLoopN(c,m)
+}
+};;
+
+proc linearusage(c:~CounterN, co:CounterN) {
+	use c; 
+	#Inc c;
+	#Inc c;
+	#Dec c;
+	fwd c co
+};;
+
+proc mainbeh() {
+	cut {
+		counterObj(c)
+		| c: ~CounterN |
+		linearusage(c,co)
+		| co:~CounterN |
+		use co;
+		#Free co;
+		close co
+	}
+};;
+
+

@@ -1,0 +1,477 @@
+type rec Tree {
+    state{
+        choice of {
+            |#Null: close
+            |#Node: send {affine !lint}; send Tree; Tree
+        }
+    }
+};;
+
+type Elem{
+    affine choice of {
+        |#Null: close
+        |#Node: send {affine !lint}; send Tree; Tree
+    }
+};;
+
+proc null(elem:Elem){
+    #Null elem;
+    close elem
+};;
+
+proc node(tleft:~Tree, tright:~Tree, elem:Elem ;n:colint){
+    #Node elem;
+    send elem(k:affine !lint.
+                affine k;
+                fwdE<lint>(k;n));
+    send elem(tl:Tree. fwd tl tleft);
+    fwd elem tright
+};;
+
+proc rec contains(t:~Tree, b:lbool, nt:Tree; k:colint){
+    take t(elem:coaffine ~Elem);
+    use elem;
+    case elem of {
+        |#Null: put t(n:    affine Elem.
+                            affine n;
+                            null(n));
+                wait elem;
+                par{ let b false || fwd t nt}
+
+        |#Node: recv elem(n:coaffine ?colint);
+                recv elem(tleft:~Tree);
+                use n;
+                ?n;
+                if(n == k)
+                {
+                    put t(x:    affine Elem.
+                                affine x;
+                                node(tleft, elem, x; n));
+                    par{let b true || fwd t nt}
+
+                }
+                {
+                    if(k < n)
+                    {
+                        cut{
+                            contains(tleft, b, x; k)
+                            |x:~Tree|
+                            put t(y:    affine Elem.
+                                        affine y;
+                                        node(x,elem, y;n));
+                            fwd t nt
+                        }
+                    }
+                    {
+                        cut{
+                            contains(elem, b, x; k)
+                            |x:~Tree|
+                            put t(y:    affine Elem.
+                                        affine y;
+                                        node(tleft, x, y;n));
+                            fwd t nt
+                        }
+                    }
+                }
+    }
+};;
+
+//prints tree in preorder tree walk
+proc rec printTreeAux(t:~Tree, nt: send Tree; close){
+    take t(elem:coaffine ~Elem);
+    use elem;
+    case elem of {
+        |#Null: wait elem;
+                put t(nelem:affine Elem.
+                            affine nelem;
+                            null(nelem));
+                print("NULL");
+                send nt(td:Tree. fwd td t);
+                close nt
+
+        |#Node: recv elem(a:coaffine ?colint);
+                recv elem(tleft:~Tree);
+                use a;
+                ?a;
+                print("(NODE " + a + " ");
+                cut{
+                    printTreeAux(tleft, x)
+                    |x:recv ~Tree; wait|
+                    recv x(tleft2:~Tree);
+                    wait x;
+                    print(" ");
+                    cut{
+                        printTreeAux(elem, y)
+                        |y:recv ~Tree; wait|
+                        recv y(elem2:~Tree);
+                        wait y;
+                        print(")");
+                        put t(nelem:affine Elem.
+                                    affine nelem;
+                                    node(tleft2, elem2, nelem;a));
+                        send nt(td:Tree. fwd td t);
+                        close nt
+                    }
+                }
+    }
+};;
+
+proc printTree(t:~Tree, nt:Tree){
+    cut{
+        printTreeAux(t,x)
+        |x:recv ~Tree; wait|
+        recv x(ntd:~Tree);
+        wait x;
+        println("");
+        fwd ntd nt
+    }
+};;
+
+proc rec insert(t:~Tree, nt:Tree; a:colint){
+    take t(elem:coaffine ~Elem);
+    use elem;
+    case elem of {
+        |#Null: wait elem;
+                cut{
+                    cell tleft(x:   affine Elem.
+                                    affine x;
+                                    null(x))
+                    |tleft:~Tree|
+                    put t(nelem:affine Elem.
+                                affine nelem;
+                                node(tleft, tright, nelem;a));
+                    fwd t nt
+                    |tright:Tree|
+                    cell tright(x:  affine Elem.
+                                    affine x;
+                                    null(x))
+                }
+
+        |#Node: recv elem(b:coaffine ?colint);
+                recv elem(tleft:~Tree);
+                use b;
+                ?b;
+                if(a < b)
+                {
+                    cut{
+                        insert(tleft, ntleft; a)
+                        |ntleft:~Tree|
+                        put t(nelem:affine Elem.
+                                    affine nelem;
+                                    node(ntleft, elem, nelem; b));
+                        fwd t nt
+                    }
+                }
+                {
+                    cut{
+                        insert(elem,x;a)
+                        |x:~Tree|
+                        put t(nelem:affine Elem.
+                                    affine nelem;
+                                    node(tleft, x, nelem;b));
+                        fwd t nt
+                    }
+                }
+    }
+};;
+
+proc maxThree(max:!lint; a:colint, b:colint, c:colint){
+    if (a < b)
+    {
+        if(b < c)
+        {
+            let! max c
+        }
+        {
+            let! max c
+        }
+    }
+    {
+        if(a < c)
+        {
+            let! max c
+        }
+        {
+        let! max a
+        }
+    }
+};;
+
+
+proc rec max(t:~Tree, x: send !lint; send Tree; close){
+    take t(elem:coaffine ~Elem);
+    use elem;
+    case elem of {
+        |#Null: wait elem;
+                send x(max:!lint. let! max -1);
+                put t(nelem:affine Elem.
+                            affine nelem;
+                            null(nelem));
+                send x(td:Tree. fwd td t);
+                close x
+
+        |#Node: recv elem(a:coaffine ?colint);
+                use a;
+                ?a;
+                recv elem(tleft:~Tree);
+                cut{
+                    max(tleft, y)
+                    |y:recv ?colint; recv ~Tree; wait|
+                    recv y(aleft: ?colint);
+                    ?aleft;
+                    recv y(ntleft:~Tree);
+                    wait y;
+                    recv z(aright: ?colint);
+                    ?aright;
+                    recv z(ntright:~Tree);
+                    wait z;
+                    send x(max:!lint. maxThree(max;a, aleft, aright));
+                    put t(nelem:    affine Elem.
+                                    affine nelem;
+                                    node(ntleft, ntright, nelem; a));
+                    send x(td:Tree. fwd td t);
+                    close x
+
+                    |z:send !lint; send Tree; close|
+                    max(elem, z)
+                }
+
+    }
+};;
+
+proc unsafe_rec delete(t:~Tree, nt:Tree; k:colint){
+    take t(elem:coaffine ~Elem);
+    use elem;
+    case elem of {
+        |#Null: wait elem;
+                put t(nelem:    affine Elem.
+                                affine nelem;
+                                null(nelem));
+                fwd t nt
+
+        |#Node: recv elem(a:coaffine ?colint);
+                use a;
+                ?a;
+                recv elem(tleft:~Tree);
+                if(a == k)
+                {
+                  cut{
+                   max(tleft,x)
+                   |x:recv ?colint; recv ~Tree; wait|
+                   recv x(maxLeft:?colint);
+                   recv x(ntleft:~Tree);
+                   wait x;
+                   ?maxLeft;
+                   if(maxLeft == -1)
+                   {
+                    par{    release ntleft
+                            ||
+                             put t(nelem:    affine Elem.
+                                 affine nelem;
+                                 null(nelem));
+                             release t
+                             ||
+                             fwd elem nt
+
+                            }
+                   }
+                   {
+                    cut{
+                        delete(ntleft, ntleft2; maxLeft)
+                        |ntleft2:~Tree|
+                        put t(nelem: affine Elem.
+                                    affine nelem;
+                                    node(ntleft2,elem, nelem;maxLeft));
+                        fwd t nt
+                   }
+
+
+
+                }
+                }}
+                {//a!=k
+                    cut{
+                        delete(tleft, ntleft;k)
+                        |ntleft:~Tree|
+                        put t(nelem:    affine Elem.
+                                        affine nelem;
+                                        node(ntleft, ntright, nelem; a));
+                        fwd t nt
+                        |ntright:Tree|
+                        delete(elem, ntright;k)
+                    }
+                }
+    }
+};;
+
+proc test1(){
+    cut{
+        cell t(elem:affine Elem.
+                    affine elem;
+                    null(elem))
+        |t:~Tree|
+        printTree(t,nt)
+        |nt:~Tree|
+        release nt
+    }
+};;
+
+proc test2(){
+    cut{
+        cell t(elem:affine Elem.
+                    affine elem;
+                    null(elem))
+        |t:~Tree|
+        cut{
+            ?a;
+            insert(t,t1;a)
+            |a:!lint|
+            let! a 2
+         }
+         |t1:~Tree|
+         printTree(t1, t2)
+         |t2:~Tree|
+        release t2
+    }
+};;
+
+proc test3(){
+    cut{
+        cell t(elem:affine Elem.
+                    affine elem;
+                    null(elem))
+        |t:~Tree|
+        cut{
+            ?a;
+            insert(t,t1;a)
+            |a:!lint|
+            let! a 2
+         }
+         |t1:~Tree|
+         cut{
+            ?b;
+            insert(t1,t2;b)
+            |b:!lint|
+            let! b 3
+         }
+         |t2:~Tree|
+         printTree(t2, t3)
+         |t3:~Tree|
+         release t3
+    }
+};;
+
+proc test4(){
+    cut{
+        cell t(elem:affine Elem.
+                    affine elem;
+                    null(elem))
+        |t:~Tree|
+        cut{
+            ?a;
+            insert(t,t1;a)
+            |a:!lint|
+            let! a 2
+         }
+         |t1:~Tree|
+         cut{
+            ?b;
+            insert(t1,t2;b)
+            |b:!lint|
+            let! b 3
+         }
+         |t2:~Tree|
+         cut{
+            ?c;
+            insert(t2,t3;c)
+            |c:!lint|
+            let! c 1
+         }
+         |t3:~Tree|
+         printTree(t3, t4)
+         |t4:~Tree|
+         release t4
+    }
+};;
+
+proc test5(){
+    cut{
+        cell t(elem:affine Elem.
+                    affine elem;
+                    null(elem))
+        |t:~Tree|
+        cut{
+            ?a;
+            insert(t,t1;a)
+            |a:!lint|
+            let! a 2
+         }
+         |t1:~Tree|
+         cut{
+            ?b;
+            insert(t1,t2;b)
+            |b:!lint|
+            let! b 3
+         }
+         |t2:~Tree|
+         cut{
+            ?c;
+            insert(t2,t3;c)
+            |c:!lint|
+            let! c 1
+         }
+         |t3:~Tree|
+         printTree(t3, t4)
+         |t4:~Tree|
+         max(t4, x)
+         |x:recv ?colint; recv ~Tree; wait|
+         recv x(n:?colint);
+         recv x(t5:~Tree);
+         wait x;
+         ?n;
+         println("max element = " + n);
+         release t5
+    }
+};;
+
+proc test6(){
+    cut{
+        cell t(elem:affine Elem.
+                    affine elem;
+                    null(elem))
+        |t:~Tree|
+        cut{
+            ?a;
+            insert(t,t1;a)
+            |a:!lint|
+            let! a 2
+         }
+         |t1:~Tree|
+         cut{
+            ?b;
+            insert(t1,t2;b)
+            |b:!lint|
+            let! b 3
+         }
+         |t2:~Tree|
+         cut{
+            ?c;
+            insert(t2,t3;c)
+            |c:!lint|
+            let! c 1
+         }
+         |t3:~Tree|
+         printTree(t3, t4)
+         |t4:~Tree|
+         cut{
+            let! k 3
+            |k:?colint|
+            ?k;
+            delete(t4,t5;k)
+         }
+         |t5:~Tree|
+         printTree(t5, t6)
+         |t6:~Tree|
+         release t6
+    }
+};;

@@ -1,0 +1,63 @@
+
+type bool{
+    choice of {
+        |#F
+        |#T
+    }
+};;
+
+proc false_(b:bool){
+     b <- #F 
+ };;
+
+proc true_(b:bool){
+     b <- #T 
+};;
+
+proc discard_(b:~bool){
+    case <- b {
+        |#F
+        |#T
+     }
+};;
+
+proc print_(b:~bool){
+    case <- b {
+        |#F; 
+        println("False")
+        |#T; 
+        println("True")
+    }
+};;
+
+proc not(x:~bool, y:bool){
+     case <- x {
+        |#F;
+        true_(y)
+	    |#T;
+        false_(y)
+     } 
+};;
+
+proc and_(x:~bool, y:~bool, z:bool){
+     case <- x {
+     	|#F;
+        fork discard_(y);
+        false_(z)
+	    |#T;   
+	    y <-> z 
+	 }
+};;
+
+proc test0(){
+    fork x <- true_(x);
+    fork y <- not(x,y); 
+    print_(y)
+};;
+
+proc test1(){
+    fork x <- true_(x);
+    fork y <- true_(y);
+    fork z <- and_(x,y,z);
+    print_(z)
+};;

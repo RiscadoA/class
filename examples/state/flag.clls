@@ -1,0 +1,40 @@
+type corec Flag {
+    choice of {
+        |#On: affine Flag
+        |#Off: offer of {|#turnOn: affine Flag}
+    }
+};;
+
+proc rec on(f:Flag){
+    #On f; affine f;on(f)
+};;
+
+proc flag(f:Flag){
+    #Off f; case f of {|#turnOn: affine f; on(f)}
+};;
+
+
+proc client(c:usage ~Flag; id:~lint){
+    take c(f);
+    case f of {
+        |#Off: println(id +": wins.");
+               #turnOn f;
+               put c(f); release c
+
+        |#On: println(id +": looses.");
+              put c(f); release c
+    }
+};;
+
+
+proc main() {
+	cut {
+		cell c(f. affine f; flag(f))
+		|c:usage ~Flag|
+		share c {
+		    client(c;1)
+		    ||
+		    client(c;2)
+		}
+	}
+};;

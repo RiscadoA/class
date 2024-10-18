@@ -1,0 +1,120 @@
+/*
+    Implements the Ackermann function
+    (https://en.wikipedia.org/wiki/Ackermann_function),
+    more specifically its definition as an iterated 1-ary function:
+    A_0(n)     = n +1
+    A_{m+1}(n) = A_m^{n+1}(1)
+*/
+
+
+include "naturals.clls";;
+
+proc id<X>(f:recv ~X; X){
+    recv f(x);
+    fwd f x
+};;
+
+
+proc rec iter_(n:~Nat, g:recv ~Nat;Nat ; f: ~ recv ~Nat; Nat){
+    case n of {
+        |#Z: wait n;id<Nat>(g)
+        |#S: cut{
+                iter_(n,h; f)
+                |h:send Nat;~Nat|
+                recv g(x);
+                send h(x);
+                call f(f0);
+                send f0(h);
+                fwd g f0
+        }
+    }
+};;
+
+/*
+A_0(n) = n +1
+A_{m+1}(n)  = A_m^{n+1}(1)
+*/
+
+proc rec ackerAux(m:~Nat, f:!recv ~Nat; Nat){
+    case m of {
+        |#Z:    wait m;
+                !f(f0);
+                recv f0(n);
+                #S f0;
+                fwd f0 n
+
+        |#S:    cut{
+                    ackerAux(m,g)
+                    |g:?send Nat;~Nat|
+                    !f(f0);
+                    recv f0(n);
+                    cut{
+                        #S k; fwd k n
+                        |k:~Nat|
+                        iter_(k,h;g)
+                        |h:send Nat;~Nat|
+                        send h(x.one(x));
+                        fwd h f0
+                    }
+                 }
+        }
+};;
+
+proc acker(m:~Nat, n:~Nat, r:Nat){
+    cut{
+        ackerAux(m,f)
+        |f:?send Nat;~Nat|
+        call f(f00);
+        send f00(n);
+        fwd f00 r
+    }
+};;
+
+proc tryAcker(;m:colint, n:colint){
+     println("tryAcker");
+    cut{
+        lint2nat(m1;m)
+        |m1:~Nat|
+        cut{
+            acker(m1,n1,r)
+            |r:~Nat|
+            nat2lint(r,r1)
+            |r1:colint|
+            println ( "Ackermann("  + m + ", " + n + ") = " + r1 );
+//            println (m + n + r1);
+            ()
+            }
+        |n1:Nat|
+        lint2nat(n1;n)
+    }
+};;
+
+proc test_ackerman(){
+        tryAcker(;3,5)
+};;
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

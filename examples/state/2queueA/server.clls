@@ -1,0 +1,199 @@
+/*
+       This example defines the client side operations on the (2-views) shared queue ADT,
+       which has O(1) amortised time for enqueueing and dequeueing.
+*/
+
+
+include "../../pure/lists-systemF.clls";;
+
+
+
+proc menq<tA>(c:recv ~!tA;send state !list(!tA); close, eq:~state !list(!tA)){
+     take eq(l);
+     recv c (a:~!tA);
+     ?l;?a;
+     cut{
+        !nl(nl0:list(!tA));
+        call l(l0:~list(!tA));
+        cut{
+           !ac(ac0:tA);
+           call a(a0:~tA);
+           fwd ac0 a0
+           |ac:~!tA|
+           cons<!tA>(ac,l0,nl0)
+         }
+        |nl:~!list(!tA)|
+        ?nl;
+        put eq (nld.    affine nld;
+                        !nld(nld0:list(!tA));
+                        call nl(nl0:~list(!tA));
+                        fwd nl0 nld0
+               );
+      send c (neq: state !list(!tA). fwd neq eq);
+      close c
+      }
+};;
+
+proc mshare<tA>(c:recv state !list(!tA);recv state !list(!tA);~close, eq:~state !list(!tA)){
+     recv c(eq1:state !list(!tA));
+     recv c(eq2:state !list(!tA));
+     wait c;
+     share eq {fwd eq eq1 || fwd eq eq2}
+};;
+
+proc mfreeE<tA>(c:close, eq:~state !list(!tA)) {
+    par { release eq || close c}
+};;
+
+type square(a){
+     send a; a
+};;
+
+
+proc mdeq<tA>(c:send maybe(!tA);send square(state !list(!tA)); close, eq:~square(state !list(!tA))){
+     recv eq(dq);
+     take dq(ld);
+     ?ld;
+     cut{
+        fwd! x ld
+        |x:~!list(!tA)|
+		outB<tA>(x,hp)
+		|hp:~!toutB(tA)|
+		?hp;
+		call hp(hpp:~toutB(tA));
+     	 	case hpp of {
+		  |#Some:
+				recv hpp (a:~!tA);  // get head
+				send c(hc:  maybe(!tA). #Just hc; fwd hc a);
+				?hpp;
+		           put dq (nld. affine nld;!nld(l:list(!tA)); call hpp(ll:~list(!tA));fwd ll l);
+                     send c (neq: square(state !list(!tA)).
+		                   send neq(ndq: state !list(!tA).fwd ndq dq);
+		      	     	   fwd neq eq);
+                     close c
+
+	       |  #None:   wait hpp;
+	                   take eq(le);
+	                   ?le;
+			            cut{
+			                !rle(rle0:list(!tA));
+			                call le (le0:~list(!tA));
+			                reverse<!tA>(le0, rle0)
+			                |rle:~!list(!tA)|
+					      cut {
+							outB<tA>(rle,dp)
+							|dp:~!toutB(tA)|
+							?dp;
+							call dp(dpp:~toutB(tA));
+     	 						case dpp of {
+
+							| #None : send c(hc: maybe(!tA). #Nothing hc; close hc);
+				                		put eq(nle. affine nle; nilB<tA>(nle));
+			                            put dq(ld);
+                     					        send c (neq: square(state !list(!tA)).
+		                   				    send neq(ndq: state !list(!tA).fwd ndq dq);fwd neq eq);
+									wait dpp;
+									close c
+
+							| #Some:	recv dpp (a:~!tA);
+			                			send c (hc:  maybe(!tA). #Just hc; fwd a hc);
+								?dpp;
+		                        			put dq (nld. affine nld; !nld(z:list(!tA));
+								       call dpp(ll:~list(!tA));fwd z ll);
+				                		put eq(nle. affine nle; nilB<tA>(nle));
+                                			send c (neq: square(state !list(!tA)).
+			       	                           	send neq(ndq:state !list(!tA). fwd ndq dq);
+                                                	 	fwd neq eq);
+		                        			close c
+							}
+			                    }
+			            }
+
+	     }
+     }
+};;
+
+
+proc mfreeD<tA>(c:close, eq:~square(state !list(!tA))) {
+     recv eq(dq:~state !list(!tA));
+     par{ release eq || release dq || close c}
+};;
+
+type evMenuT(tA, tX) {
+     recv ~tX;
+     offer of {
+                |#Enq:   recv ~!tA;send tX;close
+                |#Share: recv tX; recv tX;wait
+                |#Free:  close
+     }
+};;
+
+proc evMenu<tA>(c: evMenuT(tA, state !list(!tA))){
+     recv c(eq:~state !list(!tA));
+     case c of {
+      | #Enq:    menq<tA>(c,eq)
+	  | #Share:  mshare<tA>(c,eq)
+	  | #Free:   mfreeE<tA>(c,eq)
+     }
+};;
+
+type dvMenuT(tA,tX) {
+     recv ~tX;
+     offer of {
+                |#Deq:   send maybe(!tA);send tX;close
+                |#Free:  close
+     }
+};;
+
+proc dvMenu<tA>(c: dvMenuT(tA, square(state !list(!tA)))){
+     recv c(dq:~square(state !list(!tA)));
+     case c of {
+	  | #Deq:    mdeq<tA>(c,dq)
+	  | #Free:   mfreeD<tA>(c,dq)
+     }
+     };;
+
+type teview(tA){
+     sendty tX; send !evMenuT(tA,tX); tX
+};;
+
+type tdview(tA){
+    sendty tX; send !dvMenuT(tA,tX); tX
+};;
+
+type tqueue(tA){
+     recv teview(tA);tdview(tA)
+};;
+
+proc empcell<tA>(c:state !list(!tA)){
+     cell c (l. affine l; !l(l0:list(!tA));
+		      nil<!tA>(l0))
+};;
+
+proc eview<tA>(e:teview(tA), ce:~state !list(!tA)){
+     sendty e(state !list(!tA));
+     send e(c:!evMenuT(tA,state !list(!tA)).
+              !c(r:evMenuT(tA,state !list(!tA)));
+              evMenu<tA>(r)
+            );
+     fwd e ce
+};;
+
+proc dview<tA>(d:tdview(tA), ce:~state !list(!tA)){
+     sendty d(square(state !list(!tA)));
+     send d(c:!dvMenuT(tA,square(state !list(!tA))).
+              !c(r:dvMenuT(tA,square(state !list(!tA))));
+               dvMenu<tA>(r));
+     send d(cd:state !list(!tA). empcell<tA>(cd));
+     fwd d ce
+};;
+
+proc queue<tA>(d:tqueue(tA)){
+     recv d(e:teview(tA));
+     cut {
+        empcell<tA>(ce)
+        |ce:~state !list(!tA)|
+        share ce { eview<tA>(e,ce) || dview<tA>(d,ce) }
+     }
+};;
+

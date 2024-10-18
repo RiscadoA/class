@@ -1,0 +1,75 @@
+include "../pure/lists.clls";;
+
+type BState{
+    send !lint;
+    affine List(affine wait)
+};;
+
+type Barrier{
+    state BState
+};;
+
+proc init(x:affine BState){
+    affine x;
+    send x(1000);
+    affine x;
+    nil<affine wait>(x)
+};;
+
+proc rec awakeAll(ws:~List(affine wait)){
+    sleep 1;
+    case ws of {
+        |#Nil: wait ws;()
+        |#Cons: recv ws(w);
+                par{  close w || awakeAll(ws) }
+    }
+};;
+
+proc thread (c:~Barrier;id:colint) {
+	take c(ws);
+	recv ws(n);
+	println("thread " + id + ": waiting.");
+	if (n==1) {
+	 par{
+	    println("thread " + id + ":finished.");
+	    awakeAll(ws)
+	    ||
+        put c(nws. init(nws));
+        release c
+	 }
+	 } {
+	  cut{
+	    affine w;
+	    wait w;
+    	    println("thread " + id + ":finished.");
+            ()
+        |w:coaffine close|
+	    put c (nws.  affine nws;
+	                 send nws(n-1);
+	                 affine nws;
+			 use ws;
+	                 cons<affine wait>(w,ws,nws));
+            release c
+       }
+	}
+};;
+
+proc unsafe_rec spawnall(c:~Barrier; i:colint, n:colint) {
+     if(n == 0){
+        release c
+     }{
+        share c{
+            thread(c;i)
+            ||
+            spawnall(c;i+1,n-1)
+        }
+     }
+};;
+
+proc main () {
+	cut {
+		cell c(x. init(x))
+		|c:~Barrier |
+		spawnall(c;0,1000)
+	}
+};;

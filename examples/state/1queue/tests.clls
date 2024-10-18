@@ -1,0 +1,164 @@
+/*
+    We define some tests on the (single-view) queue ADT.
+
+    To run them, invoke
+        * `systemSeq()` --  which composes the queue with a client
+                            that first enqueues the integers from
+                            1 to n and then dequeues n elements.
+
+        * `systemPar()` --  which composes the stack with a client
+                            that enqueues the integers from 1 to n,
+                            and, concurrently, dequeues n elements.
+*/
+
+include "client.clls";;
+
+proc pDEQ(h:~maybe(!lint))
+{
+    case h of {
+	    |#Nothing:  wait h;
+	                println("DEQ: None: ");
+	                ()
+
+	    |#Just:     ?h;
+	                println("DEQ Just: " + h);
+	                ()
+    }
+};;
+
+type stept(tX) {
+  send tX; send !lint; close
+};;
+
+proc doNEnq<tX> (s:~tX, ns:tX ; m:~tMenu(lint,tX), a:~lint) {
+	cut {
+		!body(step:recv ~stept(tX);send stept(tX); close);
+			recv step (p0:~stept(tX));
+			recv p0 (spre: ~tX);
+			recv p0 (vp: ?colint);
+			wait p0;
+			?vp;
+			cut { let! v vp+1
+			    |v:~!lint|
+			    ?v;
+			    cut {
+			    send e (e0: tX. fwd e0 spre);
+			    wait e; ()
+			    |e: recv ~tX; close |
+				cut { let! vx v |vx:~!lint| cenq<lint,tX>(e, vx, es ; m) }
+			    |es: recv ~tX;close |
+			    recv es (nv0:~tX);
+			    println ("ENQ "+v);
+			    send step (p1:stept(tX).
+						send p1 (spost:tX. fwd nv0 spost);
+						send p1 (vn:!lint. let! vn v);
+						close p1);
+			    par { close step  || close es }
+			    }
+			}
+		|body: ? send stept(tX);recv ~stept(tX); wait|
+		?body;
+	        cut {
+		send s0 (p:tX. fwd s p); send s0 (i:!lint. let! i 0); close s0
+		|s0:~stept(tX)|
+		iters<stept(tX)>(nsf,s0;body,a)
+		|nsf:~stept(tX)|
+		recv nsf (ns1:~tX); recv nsf (fv:~!lint); ?fv; wait nsf; fwd ns1 ns
+		}
+	}
+};;
+
+proc doNDeq<tX> (s:~tX, ns:tX ; m:~tMenu(lint,tX), a:~lint) {
+	cut {
+		!body(step:recv ~tX;send tX; close);
+			recv step (spre:~tX);
+			cut {
+		          cut {
+			    send e (e0: tX. fwd e0 spre);
+			    wait e; ()
+			    |e: recv ~tX; close |
+     		            cdeq<lint,tX>(e, v, es ; m)
+			    |es: recv ~tX;close |
+			    recv es (nv0:~tX);
+			    send step (nv1:tX. fwd nv0 nv1);
+			    par { close step || close es }
+			   }
+			    |v:~maybe(!lint)|
+			    pDEQ(v)
+			}
+		|body: ? send tX;recv ~tX; wait|
+		?body;
+		iters<tX>(ns,s;body,a)
+	}
+};;
+
+
+proc clientSeq(s:~tQueue(lint); n:~lint){
+    println("");
+    println("
+            **********************************************
+            SEQUENTIAL TEST (SINGLE-LIST) QUEUE:
+            We first enqueue the integers from " + n + " to 1.
+            Then, we dequeue " + n + " elements.
+            ***********************************************"
+            );
+    recvty s(tX);
+    recv s(m:~!tMenu(lint, tX));
+    ?m;
+    cut{
+        doNEnq<tX>(s, ns ; m, n)
+        |ns:~tX|
+        doNDeq<tX> (ns, nss ; m, n)
+        |nss:~tX|
+        cfree<lint, tX>(nss ; m)
+    }
+};;
+
+proc clientPar(s:~tQueue(lint); n:~lint){
+    println("");
+    println("
+            **********************************************
+            CONCURRENT TEST (SINGLE-LIST) QUEUE:
+            We enqueue the integers from " + n + " to 1.
+            Concurrently, we dequeue " + n + " elements.
+            ***********************************************"
+            );
+    recvty s(tX);
+    recv s(m:~!tMenu(lint, tX));
+    ?m;
+    cut{
+        cut{
+            doNEnq<tX>(s1, ns1 ; m, n)
+            |ns1:~tX|
+            cfree<lint,tX>(ns1 ; m)
+        }
+        |s1:tX|
+        cshare<lint,tX>(s,s1,s2;m)
+        |s2:~tX|
+        doNDeq<tX> (s2, ns2 ; m, n)
+        |ns2:~tX|
+        cfree<lint, tX>(ns2 ; m)
+    }
+};;
+
+proc systemSeq(){
+    cut{
+        let! n 100
+        |n:~!lint|
+        queue<lint>(s)
+        |s:~tQueue(lint)|
+        ?n;
+        clientSeq(s ; n)
+    }
+};;
+
+proc systemPar(){
+    cut{
+        let! n 100
+        |n:~!lint|
+        queue<lint>(s)
+        |s:~tQueue(lint)|
+        ?n;
+        clientPar(s ; n)
+    }
+};;

@@ -1,0 +1,12 @@
+/*
+
+proc mainN(;n:~lint, nphil:~lint)
+{
+	let ord = mkForks(;nphil);
+	let ack <- ord() ;
+	wait ack;
+	mkPhils(ord;n,nphil)
+};;
+
+
+*/

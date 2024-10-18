@@ -1,0 +1,81 @@
+include "../../pure/maybe.clls";;
+
+
+proc notifyAll(m: recv {usagel wait};close){
+    recv m(c:usagel wait);
+    put c(x:affine close. affine x; close x);
+    par{ release c || close m}
+};;
+
+proc await(m:recv {usage wait}; close){
+    recv m(c: usage wait);
+    take c(x:coaffine wait);
+    put c(y:affine close. fwd x y);
+    par{release c || close m}
+};;
+
+
+proc shareW(m:recv {usage wait}; recv {state close}; recv {state close}; wait){
+    recv m(c:usage wait);
+    recv m(c1:state close);
+    recv m(c2:state close);
+    wait m;
+    share c{fwd c c1 || fwd c c2}
+};;
+
+type MenuN(X){
+    recv ~X; close
+};;
+
+type MenuW(X){
+    offer of {
+        |#await:    recv ~X; close
+        |#share:    recv ~X; recv X; recv X; wait
+    }
+};;
+
+proc menuW(m:MenuW(state close)){
+    case m of {
+        |#await:    await(m)
+        |#share:    shareW(m)
+    }
+};;
+
+type ViewN{
+    sendty X; send !MenuN(X); X
+};;
+
+type ViewW{
+    sendty X; send !MenuW(X); X
+};;
+
+proc viewN(x:ViewN, c:usagel wait){
+    sendty x(statel close);
+    send x(m:!MenuN(statel close). !m(m0:MenuN(statel close)); notifyAll(m0));
+    fwd x c
+};;
+
+proc viewW(x:ViewW, c:usage wait){
+    sendty x(state close);
+    send x(m:!MenuW(state close). !m(m0:MenuW(state close)); menuW(m0));
+    fwd x c
+};;
+
+type Latch{
+    recv ViewN; ViewW
+};;
+
+proc latch(x:Latch){
+    recv x(y:ViewN);
+    cut{
+        empty c
+        |c:usagel wait|
+        shareL c{
+            viewN(y,c)
+            ||
+            viewW(x,c)
+        }
+    }
+};;
+
+

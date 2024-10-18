@@ -1,0 +1,264 @@
+/*
+    Implements a little endian bit counter.
+    Adapted from:
+        Bernardo Toninho, Luís Caires, and Frank Pfenning.
+        "Corecursion and non-divergence in session-typed processes."
+        International Symposium on Trustworthy Global Computing. Springer, Berlin, Heidelberg, 2014.
+*/
+
+/*
+    A session implementing the corecursive type Counter offers the following options:
+        #val:   sends the current value and recurs as Counter.
+        #inc:   increments the current value and recurs as Counter.
+        #print: prints the little endian binary representation of the current value and recurs as Counter.
+        #halt:  closes the interaction.
+
+*/
+type corec Counter {
+    offer of {
+        |#val: send !lint; Counter
+        |#inc:  Counter
+        |#print: Counter
+        |#halt: close
+    }
+};;
+
+/*
+    The counter will be implemented by a system of the following sort:
+        coord(c, n_k) |n_k| node(n_k, n_{k-1} ; b_k) |n_{k-1}| ... |n_1| node(n_1, n_0; b_1) |n_0| least(n_0; b_0)
+
+    There is a coordinator process coord(c, n_k) that offers the protocol Counter on c, it communicates on n_k with
+    the process representing the most significant bit b_k of the counter.
+
+    The counter current value is represented by a sequence of bits b_k b_{k-1} ... b_1 b_0 with k >= 0.
+
+    Each bit b_i, with 1 <= i <= k b_k, b_{k-1}, ... b_1 is represented by a process node(n_i, n_{i-1} ; b_i).
+
+    The lest significant bit is represented by least(n_0; b_0).
+*/
+
+/*
+    We introduce the following auxiliary corecursive type which will be used in the implementation.
+*/
+type corec CImpl {
+    offer of {
+        |#val: recv ?colint; send !lint; CImpl
+        |#inc: choice of {|#carry: CImpl |#done: CImpl}
+        |#print: CImpl
+        |#halt: close
+    }
+};;
+
+proc rec node(n:CImpl, x:~CImpl; b:colint){
+    case n of {
+        |#val:  #val x;
+                recv n(m:?colint);
+                ?m;
+                send x(k:!lint. let! k 2*(m+b));
+                recv x(v:?colint);
+                send n(vd:!lint. fwd vd v);
+                node(n,x ;b)
+        |#inc:  #inc x;
+                case x of {
+                    |#carry:    if(b == 1)
+                                {
+                                    #carry n;
+                                    cut{
+                                        let! bb 0
+                                        |bb:?colint|
+                                        ?bb;
+                                         node(n,x;bb)
+                                    }
+
+                                }
+                                {
+                                    #done n;
+                                    cut{
+                                        let! bb 1
+                                        |bb:?colint|
+                                        ?bb;
+                                        node(n,x;bb)
+                                    }
+                                }
+                    |#done:     #done n;
+                                node(n,x;b)
+                }
+        |#print:    print(b);
+                    #print x;
+                    node(n,x;b)
+        |#halt: #halt x;
+                wait x;
+                close n
+    }
+};;
+
+
+proc rec coord(z:Counter,x:~CImpl){
+    case z of {
+        |#val:      #val x;
+                    send x(k:!lint. let! k 0);
+                    recv x(nn:?colint);
+                    send z(nd:!lint. fwd nd nn);
+                    coord(z,x)
+
+        |#inc:      #inc x;
+                    case x of {
+                        |#carry:    cut{
+                                        let! b 1
+                                        |b:?colint|
+                                        ?b;
+                                        node(n,x;b)
+                                        |n:~CImpl|
+                                        coord(z,n)
+                                    }
+
+                        |#done:     coord(z,x)
+                    }
+
+        |#print:    #print x;
+                    coord(z,x)
+        |#halt:     #halt x;
+                    wait x;
+                    close z
+    }
+};;
+
+proc rec least(x:CImpl;b:colint){
+    case x of {
+        |#val:  recv x(ny:?colint);
+                if(b == 0)
+                {
+                    send x(nd:!lint. fwd nd ny);
+                    least(x;b)
+                }
+                {
+                    ?n;
+                    send x(k:!lint. let! k n+1);
+                    least(x;b)
+                }
+
+        |#inc:  if(b == 0)
+                {
+                    #done x;
+                    cut{
+                        let! bb 1
+                        |bb:?colint|
+                        ?bb;
+                        least(x;bb)
+                    }
+                }
+                {
+                    #carry x;
+                    cut{
+                        let! bb 0
+                        |bb:?colint|
+                        ?bb;
+                        least(x;bb)
+                    }
+                }
+        |#print: println(b);
+                 least(x;b)
+
+        |#halt: close x
+    }
+};;
+
+proc counter(c:Counter){
+    cut{
+        let! b 0
+        |b:?colint|
+        ?b;
+        least(x;b)
+        |x:~CImpl|
+        coord(c, x)
+    }
+};;
+
+
+proc test(){
+    cut{
+        counter(c)
+        |c:~Counter|
+        print("Current Binary Representation: ");
+        #print c;
+        #val c;
+        recv c(v0:?colint);
+        ?v0;
+        println("Current Value :" + v0);
+        println("Incrementing");
+        #inc c;
+        print("Current Binary Representation: ");
+        #print c;
+        #val c;
+        recv c(v1:?colint);
+        ?v1;
+        println("Current Value :" + v1);
+        println("Incrementing");
+        #inc c;
+        print("Current Binary Representation: ");
+        #print c;
+        #val c;
+        recv c(v2:?colint);
+        ?v2;
+        println("Current Value :" + v2);
+        println("Incrementing");
+        #inc c;
+        print("Current Binary Representation: ");
+        #print c;
+        #val c;
+        recv c(v3:?colint);
+        ?v3;
+        println("Current Value :" + v3);
+        println("Incrementing");
+        #inc c;
+        print("Current Binary Representation: ");
+        #print c;
+        #val c;
+        recv c(v4:?colint);
+        ?v4;
+        println("Current Value :" + v4);
+        print("Halting...");
+        #halt c;
+        wait c;
+        println("done.");
+        ()
+    }
+};;
+
+
+proc test2(){
+    cut{
+        counter(c)
+        |c:~Counter|
+	#inc c;
+        #halt c;
+        wait c;
+        println("done.");
+        ()
+    }
+};;
+
+proc unsafe_rec test_loop(c:~Counter;n:colint) {
+     if (n==0) {
+        #print c;
+     	#halt c;
+	wait c;
+     	println ("done!");()
+	}
+	{
+	#inc c;
+	test_loop(c;n-1)
+	}
+};;
+
+proc test_n(;n:colint)
+{
+cut {
+    counter(c)
+    |c:~Counter|
+    test_loop(c;n)
+    }
+};;
+
+
+

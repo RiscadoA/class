@@ -1,0 +1,207 @@
+type mPair mut {
+	#fst: lint,
+	#snd: lint,
+};;
+
+type mCoPair comut {
+	#fst: ~lint,
+	#snd: ~lint,
+};;
+
+proc copy1(i:mPair,o:mCoPair)
+{
+	fwd i o
+};;
+
+proc copy2(i:mPair,o:~mPair)
+{
+	fwd i o
+};;
+
+
+proc make(o:mPair)
+{
+mut o { #fst:lint=x, #snd=y, . par { cell x (2) || cell y (3) }  }
+};;
+
+proc take0(i:~mPair,o:mPair) {
+ take i.#fst (x);
+ put i.#fst (x);
+ fwd i o
+};;
+
+
+proc take1(i:~mPair,o:mPair) {
+ take i.#fst (x);
+ take x(v);
+ put x(0);
+ println (v);
+ par { fwd i o || release x }
+};;
+
+/*
+
+
+TODO: typecheck this:
+
+
+   /*
+    c3 = <PUT> c1=<Id> <LPAR>   
+    (LOOKAHEAD(2)
+    c2=<Id> (<COL> t=Type())? <DOT> p1=Proc() <RPAR> <SEMIC> p2=Proc()
+    { p = new ASTPut(c1.image,c2.image,t,p1,p2); p.lineno = c3.beginLine;  p1.setanc(p);  p2.setanc(p);}
+    |
+    */
+
+ > include "examples/state/barrier-tensor.clls";;
+
+~A[S]B = ~A[U]~B
+
+
+ Q |- x:!A, y!:B, De
+-------------------------------
+mut (x:A,y:B.Q) |- x:A[S]B, De
+
+  P  |- x:A[L]B, y:?A, De
+--------------------------
+-inls x (y);P |- x:A[U]B, De
+
+   P  |- x:A[R]B, y:B, De
+---------------------------
+-inls x(y);P |- x:A[U]B, De
+
+          P  |- x:A[S]B, D2
+---------------------------------
++inlr x(z);P |- z:?A, x:A[L]B, D2
+
+
+	    P |- x:A[S]B, D2
+---------------------------------
++inrr x(y);P |- y:!B, x:A[R]B, D12
+
+
+(mut c (x:!A,y:!B. Q)  |c:A[U]B| -inls c(y);P(y,c) ) -> 
+
+ ( block x:?~A |x:!A|  Q(x,y) ) |y:!A|
+  
+             (P(y,c) | c:A[L]B | block c:?~A<L>~B ) 
+
+
+ ( tap x:?~A |x:!A|  Q(x,y) ) |y:!A| 
+
+           (+inls c(y);P(y,x) | c:A[L]B | block c:?~A<L>~B ) 
+
+-> (mut x (x:!A,y:!B. Q)  |x:A[U]B| P(x,y)) 
+
+
+ ( tap x:?~A |x:!A|  Q(x,y) ) |y:!A| 
+
+           (+inls(z.R);P(y,x) | x:A[L]B | tap x:?~A<L>~B ) 
+
+-> (cell x (x:!A,y:!B. Q)  |x:A[U]B| P(x,y)) 
+
+===>>>
+
+(         )                       (         )
+  |     |                         |
+  A     B                         A
+  |_____|       _____        --->      |
+   A[S]B        A[U]B            |
+     |____________|               
+
+Q == cell a || share a { fwd x1 || fwd x2}
+
+       Q |- x1:state A1, x2:state A2, De
+----------------------------------------------------
+cell x (#a:x1,#b:x2. Q) |- De,x:mut{#a:A_1,#b:A_2} 
+
+cell x (#a:x1,#b:x2. Q) || take x.#a (v); P ... Q; put x.#a
+
+
+===
+
+cell x:mut (#a:x1,#b:x2. Q )|x:comut| take x.#a (v); P ....
+
+->
+
+(duse x2 |x2| Q |x1:commut[A1]| ( dcell x2 |x2| {x1/x}P ... ))
+
+->   
+
+(duse x2 |x2| Q |x1:mut| ( dcell x2 |x2| put x1.#a (v); P)) ->>
+
+->   
+
+cell x (#a:v,#b:x2. Q ) |x:commut| P
+
+=====
+
+cellU x (#a:v,#b:x2. Q || R ) |x| Q
+
+
+Q |- x2:state A2, D2
+R |- x:comut{#a_L:A_1,#b:A_2}, x1:usage ~A1, D3
+
+cellU { x:comut (x2) Q || R } |- 
+
+cellU { x:mut{x1_:A1, x2:A2 }(x2)  Q || put x.#a (z); Q } ->
+
+     cell x (#a:z,#b:x2. Q) || Q
+             
+             P  |- x:comut { #a_L:A_1,#b:A_2 }, De
+
+take x.#a (v);P |- x: comut { #a:A_1, #b:A_2 }, De (none marked)
+
+     Q |- v:state ~A_1,D1        |- x:mut{#a_:A_1,#b:A_2}, D2
+	 ---------------------------------------------------------
+     put x.#a (v.Q);P |- D1, x:comut{ #a_L:A_1, #b:A_2 }, D2 (none marked)
+
+
+block x2 |- x2:~!A2 co-contraction
+
+affine 
+
+*/
+
+Type List: defined.
+
+ID =a
+
+
+
+Process single: defined.
+
+
+Process nil: defined.
+
+ID =a
+ID =c
+
+Process cnext: defined.
+
+(
+ID =a
+ID =x
+
+Process append: defined.
+)
+
+
+
+
+> sysa2();;
+USE x
+AFFINE: USE x
+COSSELECT: #age@x
+SSELECT: #name@x
+
+USE x
+COSSELECT: #age@x
+AFFINE: USE x
+SSELECT: #age@x
+USE x
+AFFINE: USE x
+COSSELECT: #name@x
+SSELECT: #name@x
+Luis has 2 yo.
+

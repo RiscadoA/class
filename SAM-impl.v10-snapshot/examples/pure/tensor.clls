@@ -1,0 +1,361 @@
+
+type Go struct {
+	#go: lint,
+};;
+
+proc sys0() {
+	cut {
+	   x.#go <- 2;
+	   close x
+	|x : ~Go |
+	   y <- x.#go;
+	   wait x;
+	   println (y+1);
+        ()
+	}
+};;
+
+type Person struct {
+	#age: lint,
+	#name: lstring,
+};;
+
+proc s1(x: Person) {
+	x.#age <- 2;
+	x.#name <- "Luis";
+	close x
+};;
+
+proc s1o(x: Person) {
+	x.#name <- "Luis";
+	x.#age <- 2;
+	close x
+};;
+
+
+proc s2(x:~ Person) {
+	age <- x.#age;
+	name <- x.#name;
+	wait x;
+	println(name+" has "+age+" years.");
+	()
+};;
+
+
+
+proc sys1() {
+	cut {
+	  s2(y)
+	| y:Person |
+	  s1(y)
+	}
+};;
+
+proc sys1o() {
+	cut {
+	  s2(y)
+	| y:Person |
+	  s1o(y)
+	}
+};;
+
+proc s3(x:~ Person) {
+	name <- x.#name;
+	age <- x.#age;
+	wait x;
+	println(name+" has "+age+" years.");
+	()
+};;
+
+proc sys2() {
+	cut {
+	  s3(y)
+	| y:Person |
+	  s1(y)
+	}
+};;
+
+proc sys2fyz() {
+	cut {
+	  s3(y)
+	| y:Person |
+	 fwd y z
+	| z:Person |
+	 fwd z w
+	| w:Person |
+	  s1(w)
+	}
+};;
+
+proc sys2fzy() {
+	cut {
+	  s3(y)
+	| y:Person |
+	 fwd z y
+	| z:Person |
+	  s1(z)
+	}
+};;
+
+proc sys3() {
+	cut {
+	  recv z(w); wait z; s3(w)
+	| z:send Person;close |
+	  send z (y.s1(y)); close z
+	}
+};;
+
+type Pair struct {
+	#fst: lint,
+	#snd: lint,
+};;
+
+
+type CoPair costruct {
+	#fst: ~lint,
+	#snd: ~lint,
+};;
+
+
+proc strip(y:~Pair) {	
+   x1 <- y.#fst;
+   println ("strip x1");
+   x2 <- y.#snd;
+   wait y;
+   println("("+x1+","+x2+")");
+   ()	
+};;
+
+proc sys10() {
+	cut {
+	x.#snd <- 3;
+	x.#fst <- 2;
+	close x
+	| x:~Pair|
+	strip(x)
+	}
+};;
+
+
+proc flip(y:~Pair,x:Pair) {
+   x1 <- y.#snd;
+   x.#fst <- x1;
+   x2 <- y.#fst;
+   x.#snd <- x2;
+   wait y;
+   close x	
+};;
+
+proc sys11() {
+	cut {
+	x.#snd <- 3;
+	x.#fst <- 2;
+	close x
+	| x:~Pair|
+	flip(x,z)
+	| z:~Pair|
+	strip(z)
+	}
+};;
+
+
+proc inc(y:~Pair,x:Pair) {
+   x1 <- y.#snd;
+   x.#snd <- x1+1;
+   fwd x y	
+};;
+
+proc sys12() {
+	cut {
+	x.#fst <- 2;
+	x.#snd <- 99;
+	close x
+	| x:~Pair|
+	inc(x,z)
+	| z:~Pair|
+	strip(z)
+	}
+};;
+
+type CoPair costruct {
+	#fst: ~lint,
+	#snd: ~lint,
+};;
+
+proc dual0(x:Pair,y:CoPair) {
+  fwd x y
+};;
+
+
+proc id1(y:Pair) {
+ y.#fst:lint <- 2;
+ y.#snd <- 3;
+ close y
+};;
+
+proc id2(y:Pair) {
+ y.#snd <- 3;
+ y.#fst <- 2;
+ close y
+};;
+
+proc id2(z:~lint, y:Pair) {
+ y.#snd <- 3;
+ y.#fst <- z+2;
+ close y
+};;
+
+
+type PP struct {
+	#fst: close,
+	#snd: lint,
+}; send lint; close;;
+
+proc t1(y:PP) {
+ y.#fst <- {z.close z};
+ y.#snd <- 2;
+ send y(2);
+ close y
+};;
+
+type PairX struct {
+	#snd: lint,
+};;
+
+proc t() {
+  cut {
+	x.#snd <- 2;
+	close x
+	|x:~PairX|
+	fwd x y
+	|y:~PairX|
+	z <- y.#snd;
+	println (z+8);
+	wait y;
+	()
+  }
+};;
+
+/*
+proc t1() {
+  cut {
+	send x(2);
+	close x
+	|x:~send lint;close|
+	fwd x y
+	|y:~send lint;close|
+	recv y (z);
+	println (z);
+	wait y;
+	()
+  }
+};;
+proc id3(y:Pair) {
+ y.#fst <- 2;
+ y.#sndx <- 3;
+ close y
+};;
+
+proc incX(y:~Pair,x:PairX) {
+   x1 <- y.#snd;
+   x.#snd <- x1+1;
+   fwd x y	
+};;
+
+*/
+
+
+proc test() {
+par {
+sys0()
+||
+sys1()
+||
+sys2()
+||
+sys2fyz()
+||
+sys2fzy()
+||
+sys3()
+||
+sys10()
+||
+sys11()
+||
+sys12()
+||
+t()
+}
+};;
+
+proc unsafe_rec loop(;n:~lint)
+{
+if (n==0) {
+	println("DONE.");()
+}
+{ par {  test() || loop(;n-1) } }
+};;
+
+type APerson { affine Person };;
+
+
+proc saw(x: APerson) {
+	x.#age <- 2;
+	x.#name <- "Luis";
+	close x
+};;
+
+proc saw1(x: APerson) {
+	x.#name <- "Luis";
+	x.#age <- 2;
+	close x
+};;
+
+// affine x;x.#K <- U; affine x; x.#L <- V == affine x;x.#L <- V; affine x; x.#K <- U
+
+proc sar(x: ~APerson) {
+	age <- x.#age;
+	name <- x.#name;
+	println (name+ " has "+age+" yo.");
+	wait x;
+	()
+};;
+
+proc sysa1() {
+	cut {
+	  sar(y)
+	| y:APerson |
+	  saw(y)
+	}
+};;
+
+proc sysa2() {
+	cut {
+	  sar(y)
+	| y:APerson |
+	  saw1(y)
+	}
+};;
+
+proc sys2fyz() {
+	cut {
+	  sar(y)
+	| y:APerson |
+	 fwd y z
+	| z:APerson |
+	 fwd z w
+	| w:APerson |
+	  saw(w)
+	}
+};;
+
+proc sys2fzy() {
+	cut {
+	  sar(y)
+	| y:APerson |
+	 fwd z y
+	| z:APerson |
+	  saw(z)
+	}
+};;

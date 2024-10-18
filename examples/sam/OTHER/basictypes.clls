@@ -1,0 +1,96 @@
+
+proc b1()
+{
+cut {
+   !v(x);let x 2
+   |v:?~lint|
+   ?v;
+   call v(x);
+   println(x+4);()
+}
+};;
+
+proc b1i()
+{
+cut {
+   !v(x);let x 2
+   |v:?~lint|
+   println(v+4);()
+}
+};;
+
+
+proc b2()
+{
+cut {
+   let v 2
+   |v:~lint|
+   println(v+4);()
+}
+};;
+
+proc b3()
+{
+cut {
+   println(v+4);()
+   |v:lint|
+   let v 2
+}
+};;
+
+proc b4()
+{
+cut {
+   send v(2); close v
+   |v:~send lint; close|
+   recv v(x); println(x+4);wait v; ()
+}
+};;
+
+proc b5()
+{
+cut {
+   !v(x);let x 2
+   |v:?~lint|
+   if ((v==2) or true) {println("TWO");() }
+    {println("NO");() }
+}
+};;
+
+proc b6()
+{
+cut {
+   !v(x);let x 2
+   |v:?~lint|
+   if ((v==2) ) {println("TWO");() }
+    {println("NO");() }
+}
+};;
+
+
+proc b7()
+{ cut  {
+    let! x 2
+    | x: ?colint |
+    fwd x y
+    | y: ?colint |
+    println(2*y);()
+}
+};;	
+
+proc b8()
+{ cut  {
+    let! x 2
+    | x: ?colint |
+    call x(v); println(v);()
+}};;	
+
+proc b9()
+{ cut  {
+    let! x 2
+    | x: ?colint |
+    call x(v); fwd v z
+     | z: colint |
+    println(2*z);()
+}};;	
+

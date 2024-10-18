@@ -1,0 +1,62 @@
+type corec Counter {
+offer of{
+    |#Inc; Counter
+    |#Dec; Counter
+    |#Get; send Int; Counter
+    |#Release 
+    |#Share; recv Counter; Counter
+}
+};;
+
+proc rec counterX(x:Counter, c:~mut Int){
+    case x of {
+        |#Inc;
+        n =<- c; 
+        println("#Inc");
+        c <-n+1; 
+        counterX(x,c)
+
+        |#Dec;
+        n =<-c; 
+        if(n>0){
+            c <- n-1; 
+            counterX(c,x)
+        }
+        {
+            n <- c; 
+            counterX(x,c)
+        }
+
+        |#Get;
+        n =<- c; 
+        println("#Get");
+        c <- n; 
+        x <- n; 
+        counterX(x,c)
+
+
+        |#Release; 
+        println("#Release")
+
+        |#Share;
+        println("#Share");
+        y =<- x;
+        fork c <- counterX(x,c);
+        counterX(y,c)
+    }
+};;
+
+proc counter(x:Counter){
+    for c <- cell c(0)
+    counterX(x,c)
+};;
+
+proc main(){
+    fork x <- counter(x);
+    x <- #Share {fork y <- #Inc #Release}; 
+    x <- #Share {fork y <- #Inc #Release}; 
+    x <- #Share {fork y <-  #Dec #Release};
+    x <- #Share 
+         {fork y <- #Get; n=<- y; println("GOT: " + n); y <- #Release} 
+         #Release 
+};;

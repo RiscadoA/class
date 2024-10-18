@@ -1,0 +1,66 @@
+type Repr{
+    send !lint; affine {wait}
+};;
+
+type SState {
+	state Repr
+};;
+
+proc dummy(x:affine Repr){
+    affine x;
+    send x(n:!lint. let! n 0);
+    affine x;
+    wait x;
+    ()
+};;
+
+proc thread (s:~ SState;max:~lint) {
+	take s (x);
+	use x;
+	recv x(v);
+	?v;
+	println("inc+");
+	if (v==max) {
+	 par{
+	    use x;
+	    close x
+	    ||
+        put s(nx: affine Repr. dummy(nx));
+        release s
+	 }
+	} {
+	  put s (xn:affine Repr.
+	             affine xn;
+	             send xn(vn:!lint. let! vn v+1);
+	             fwd xn x);
+       release s
+	}
+};;
+
+proc spawnall(s:~ SState, ns: SState; n:~lint) {
+	 for spre:SState to spost (s, ns; n) {
+		share spre {
+			thread (spre;n)
+			||
+			fwd spre spost	
+           }
+	 }
+};;
+
+proc main () {
+	cut {
+	    println("Start waiting...");
+	    affine x;
+        wait x;
+        println("...done!"); ()
+        |x:coaffine close|
+		cell s (y: affine Repr. affine y; send y (n. let! n 1); fwd y x)
+		|s:~ SState |
+		let! n 5
+		|n:~!lint|
+		?n;
+		spawnall(s,ns;n)
+		|ns:~ SState |
+		release ns
+	}
+};;

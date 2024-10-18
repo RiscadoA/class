@@ -1,0 +1,127 @@
+type corec Pair(A,B){
+    offer of {
+        |#Init:
+        recv coaffine ~A; 
+        recv coaffine ~B; 
+        FPair(A,B)
+    }
+}and FPair(A,B){
+    offer of {
+        |#Upd: offer of {
+                    |#Fst: send affine A; recv coaffine ~A; FPair(A,B)
+                    |#Snd: send affine B; recv coaffine ~B; FPair(A,B)
+                }
+        |#Release: wait 
+        |#Share: recv FPair(A,B); FPair(A,B)
+    }
+};; 
+
+type Repr(A,B){
+    state {send affine A; send affine B; close}
+};;
+
+
+proc rec pair<A,B>(x:Pair(A,B)){
+    case x of {
+        |#Init: 
+        recv x(a);
+        recv x(b);
+        cut{
+            cell c(v.   affine v;
+                        send v(a);
+                        send v(b);
+                        close v)
+            |c:~Repr(A,B)| 
+            fpair<A,B>(x, c)
+        }
+    }
+} and fpair<A,B>(x:FPair(A,B), c:~Repr(A,B)){
+    case x of {
+        |#Upd:
+        case x of {
+            |#Fst:
+            take c(v);
+            recv v(a); 
+            recv v(b);
+            wait v; 
+            send x(a);
+            recv x(na); 
+            put c(nv.   affine nv; 
+                        send nv(na);
+                        send nv(b);
+                        close nv);
+            fpair<A,B>(x,c)
+            |#Snd: 
+            take c(v);
+            recv v(a); 
+            recv v(b);
+            wait v; 
+            send x(b);
+            recv x(nb); 
+            put c(nv.   affine nv; 
+                        send nv(a);
+                        send nv(nb);
+                        close nv);
+            fpair<A,B>(x,c)
+        }
+        |#Release:
+        wait x;
+        release c 
+
+        |#Share:  
+        recv x(y);
+        share c{
+            fpair<A,B>(y,c)
+            ||
+            fpair<A,B>(x,c)
+        }
+
+    }
+};;
+
+proc system0(){
+    cut{
+        pair<!lint, !lint>(x)
+        |x:~Pair(!lint, !lint)|
+        #Init x; 
+        send x(2);
+        send x(3);
+        #Upd x; 
+        #Fst x; 
+        recv x(n);
+        println("GOT FST = " + n + ". Will increment."); 
+        send x(n+1); 
+        #Release x; 
+        close x 
+    }
+};; 
+
+
+proc client(x:~FPair(!lint, !lint); id:colstring){
+    #Upd x; 
+    #Fst x;
+    recv x(n);
+    println(id + ": Upd fst: got " + n + " and will increment."); 
+    send x(n+1); 
+    #Upd x;
+    #Snd x; 
+    recv x(m);
+    println(id + ": Upd snd: got " + m + " and will double."); 
+    send x(2*m); 
+    #Release x; 
+    close x
+};; 
+
+
+proc system1(){
+    cut{
+        pair<!lint, !lint>(x)
+        |x:~Pair(!lint, !lint)|
+        #Init x; 
+        send x(2);
+        send x(5);
+        #Share x; 
+        send x(y. client(y;"client1"));
+        client(x;"client2") 
+    }
+};; 

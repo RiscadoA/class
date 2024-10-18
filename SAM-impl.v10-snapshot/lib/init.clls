@@ -1,0 +1,41 @@
+proc unsafe_rec iter<t>(x:t, z:~t; s:send t;~t, n:~lint){
+    if(n == 0)
+    {
+        fwd x z
+    }
+    {
+	call s(s0:send t;~t);
+        send s0(yd:t. fwd yd z);
+        cut { 
+		   let! m (n -1) 
+		   |m:~!lint|
+		   ?m;iter<t>(x,s0;s,m) 
+    	    }
+     }
+};;
+
+proc unsafe_rec iters<t>(x:t, z:~t; s:send t; recv ~t; wait, n:~lint){
+    if(n == 0)
+    {
+        fwd x z
+    }
+    { 
+	   call s(s0:send t; recv ~t; wait); 
+         send s0(yd:t. fwd yd z); 
+	   recv s0(rv:~t); 
+	   wait s0;
+        cut { 
+		   let! m (n -1) 
+		   |m:~!lint|
+        	   ?m;iters<t>(x,rv;s,m) 
+    	    }
+     }
+};;
+
+//exponential copycat process
+proc fwdE<A>(x:!A ; y:~A){
+    !x(x0:A);
+    call y(y0:~A);
+    fwd x0 y0
+};;
+

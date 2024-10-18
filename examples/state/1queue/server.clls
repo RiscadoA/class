@@ -1,0 +1,123 @@
+/*
+    This example implements a (single-view) shared queue ADT.
+
+    The queue is implemented with a reference cell to a single list.
+    When enqueueing, we append the element to the end of the list.
+    When dequeueing, we return the head of the stored list.
+*/
+
+include "../../pure/lists-systemF.clls";;
+
+proc menq<tA>(c:recv ~!tA;send state !list(!tA);close, s:~state !list(!tA)){
+     take s(l);
+     recv c(a);
+     ?a;
+     ?l;
+     cut{
+        !nl(nl0:list(!tA));
+        call l(l0:~list(!tA));
+        cut{
+            !a2(y:tA);
+            call a(w:~tA);
+            fwd w y
+            |a2:~!tA|
+            append<!tA>(a2,l0,nl0)
+        }
+        |nl:~!list(!tA)|
+        ?nl;
+        put s(nld.  affine nld;
+                    !nld(nld0:list(!tA));
+                    call nl(nl0:~list(!tA));
+                    fwd nl0 nld0
+              );
+         send c(ns: state !list(!tA). fwd ns s);
+        close c
+     }
+};;
+
+
+proc mdeq<tA>(c:send maybe(!tA);send state !list(!tA);close, s:~state !list(!tA)){
+    take s(l);
+     cut{
+        use l; /// inference is failing
+        outB<tA>(l, x)
+        |x:~!toutB(tA)|
+        ?x;
+        call x(x0:~toutB(tA));
+        case x0 of {
+            |#None: wait x0;
+                    send c(h:   maybe(!tA).
+                                #Nothing h;
+                                close h
+                          );
+                    put s(nl.   affine nl;
+                                nilB<tA>(nl)
+                          );
+                    send c(ns:  state !list(!tA).
+                                fwd ns s
+                          );
+                    close c
+
+            |#Some: recv x0(a:~!tA);
+                    send c(h:   maybe(!tA).
+                                #Just h;
+                                fwd h a
+                          );
+                    ?x0;
+                    put s(nl.   affine nl;
+                                !nl(nl0:list(!tA));
+                                call x0(y:~list(!tA));
+                                fwd y nl0
+                         );
+                    send c(ns:  state !list(!tA).
+                                fwd ns s
+                          );
+                    close c
+        }
+     }
+};;
+
+proc mfree<tA>(c:close, s:~state !list(!tA)) {
+    par {release s || close c}
+};;
+
+proc mshare<tA>(c:recv state !list(!tA);recv state !list(!tA);~close, s:~state !list(!tA)){
+     recv c(s1:state !list(!tA));
+     recv c(s2:state !list(!tA));
+     wait c;
+     share s {fwd s s1 || fwd s s2}
+};;
+
+type tMenu(tA, tX) {
+     recv ~tX;
+     offer of {
+		|#Enq:	recv ~!tA;send tX;close
+		|#Deq:	send maybe(!tA);send tX;close
+		|#Share:	recv tX; recv tX;wait
+		|#Free:	close
+     }
+};;
+
+proc menuQ<tA>(c: tMenu(tA, state !list(!tA))) {
+     recv c(s:~state !list(!tA));
+     case c of {
+      |#Enq:   menq<tA>(c,s)
+	  |#Deq:    mdeq<tA>(c,s)
+	  |#Share:  mshare<tA>(c,s)
+	  |#Free:   mfree<tA>(c,s)
+     }
+};;
+
+type tQueue(tA) {
+     sendty tX; send !tMenu(tA,tX);tX
+};;
+
+proc queue<tA>(s:tQueue(tA)) {
+     sendty s (state !list(!tA));
+     send s (m: !tMenu(tA, state !list(!tA)).
+                !m(c:tMenu(tA, state !list(!tA)));
+                menuQ<tA>(c));
+     cell s (l. affine l;
+     	    	!l(x:list(!tA));
+		        nil<!tA>(x))
+};;

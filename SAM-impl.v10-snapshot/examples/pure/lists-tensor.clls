@@ -1,0 +1,28 @@
+/*
+    We give an implementation of linear lists using  recursive types.
+   
+*/
+
+type rec List(A){
+    choice of {
+        |#Nil:  close
+        |#Cons: struct {
+		  #val: A,
+		  #next: List(A),
+		}
+    }
+};;
+
+proc nil<A>(l:List(A))
+{
+    #Nil l; close l
+};;
+
+proc cons<A>(a:~A, l:~List(A), nl:List(A))
+{
+   
+    #Cons nl;
+    nl.#val <-a;
+    nl.#next <- l;
+    close nl
+};;

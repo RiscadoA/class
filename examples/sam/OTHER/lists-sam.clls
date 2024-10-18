@@ -1,0 +1,97 @@
+
+type rec List {
+    choice of {
+        |#Nil:  close
+        |#Cons: send lint; List // same issue as in ackerman ....
+    }
+};;
+
+proc nil(l:List){
+    #Nil l; close l
+};;
+
+proc cons(a:~lint, l:~List, nl:List){
+       #Cons nl; println ( "cons "); send nl(a);  fwd l nl
+};;
+
+
+proc rec printlist(l:~List){
+    case l of {
+        |#Nil:	wait l; print ("NIL"); ()
+        |#Cons: recv l(a); println (a+" "); printlist(l)
+    }
+};;
+
+proc t1()
+{
+cut {
+    nil(l0)
+    | l0:~List|
+    printlist(l0)
+    }
+};;
+
+
+proc t2() {
+cut {
+    #Nil l0; close l0
+    | l0:~List|
+    cons(1,l0,l1)
+    | l1:~List|
+    printlist(l1)
+    }
+};;
+
+proc t3() 
+{
+cut {
+    #Nil l0; close l0
+    | l0:~List|
+    cons(1,l0,l1)
+    | l1:~List|
+    cons(2,l1,l2)
+    | l2:~List|
+    printlist(l2)
+}
+};;
+
+proc t3a() 
+{
+cut {
+    #Nil l0; close l0
+    | l0:~List|
+    cons(1,l0,l1)
+    | l1:~List|
+    cons(2,l1,l2)
+    | l2:~List|
+    printlist(l2)
+}
+};;
+
+
+proc t4() {
+cut {
+    nil(l0)
+    | l0:~List|
+    cons(1,l0,l1)
+    | l1:~List|
+    cons(2,l1,l2)
+    | l2:~List|
+    cons(3,l2,l3)
+    | l3:~List|
+    cons(4,l3,l4)
+    | l4:~List|
+    printlist(l4)
+    }
+};;
+
+sam t3();;
+
+/*
+
+sam t1();;
+sam t2();;
+sam t3();;
+sam t4();;
+
+*/

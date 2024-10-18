@@ -1,0 +1,106 @@
+
+/* recursion and co-recursion */
+
+type rec Nat{
+    choice of {
+        |#Z: close    
+        |#S: Nat        
+    }
+};;
+
+proc zero(n:Nat){ #Z n; close n };;
+
+proc one(n:Nat){ #S n; #Z n; close n };;
+
+proc two(n:Nat){  #S n;  #S n; #Z n; close n};;
+
+proc threee(n:Nat){  #S n; #S n;  #S n; #Z n; close n};;
+
+proc succ(n:~Nat, m:Nat){ #S m;  fwd n m};; 
+
+proc three(m:Nat){
+    cut{
+        two(n)
+        |n:~Nat|
+        succ(n,m)
+    }
+};;
+
+proc onee(m:Nat){
+    cut{
+        zero(n)
+        |n:~Nat|
+        succ(n,m)
+    }
+};;
+
+
+proc rec toInt(n:~Nat, s: lint){
+    case n of {
+        |#Z: wait n; let s 0
+        |#S: cut{
+                toInt(n,x)
+                |x:~lint|
+                let s x+1
+                }
+    }
+};;
+
+proc printNat(n:~Nat) {
+   cut {
+     toInt(n,s)
+     | s:~lint|
+     println(s); ()
+     }
+};;
+
+proc t0()  {
+   cut {
+     zero(n)
+     | n:~Nat|
+     printNat(n)
+     }
+};;
+
+proc t11()  {
+   cut {
+     #Z m; close m
+     | m:~Nat|
+     #S n; fwd n m
+     | n:~Nat|
+     printNat(n)
+     }
+};;
+
+
+proc t10()  {
+   cut {
+     #S n; #Z n; close n
+     | n:~Nat|
+     printNat(n)
+     }
+};;
+
+proc t1()  {
+   cut {
+       one(n)
+     | n:~Nat|
+     printNat(n)
+     }
+};;
+
+proc t2()  {
+   cut {
+     two(n)
+     | n:~Nat|
+     printNat(n)
+     }
+};;
+
+proc t3()  {
+   cut {
+     three(n)
+     | n:~Nat|
+     printNat(n)
+     }
+};;

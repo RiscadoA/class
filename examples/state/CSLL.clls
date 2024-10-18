@@ -1,0 +1,57 @@
+
+proc req<A,B>(c:usage ~B, c1:A, c2:state B; upd: ~ recv coaffine ~B; send affine B; A){
+    share c{
+        take c(s);
+        call upd(f);
+        send f(s);
+        recv f(ns);
+        put c(ns);
+        par {fwd f c1 || release c}
+        ||
+        fwd c c2
+    }
+};;
+
+type SType(A,B) {
+state send affine B; ! recv ~affine B; send affine B; A
+};;
+
+proc req2<A,B>(c:~SType(A,B), c1:A, c2:SType(A,B))
+{
+    share c{
+        take c(s); use s;
+	    recv s(b); ?s;
+        call s(upd);
+        send upd(b);
+        recv upd(nb);
+        put c(v.affine v;send v(nb); fwd! v s);
+        par {fwd upd c1 || release c}
+        ||
+        fwd c c2
+    }
+};;
+
+/*
+\begin{array}{ll}
+	\mathsf{req} \ c(a);(\mix{Q_1(a)}{Q_2(c)}) = & \shareP \ c \ \{ \\
+	& \take{c}{x}{\use{x}{\pparl{x}{s}{ \pwhy{x}{\\
+	&\pcopy{x}{upd}{\fout{upd}{s}{ \pparl{upd}{s'}{\\
+	&\quad \mput{c}{x'}{\affine{x'}{\fout{x'}{s'}{\fwdE{x'}{x}}}}{\\
+	&\quad \mix{Q_1(a)}{\free{c}}}}}}}}}}\\
+	&\quad \mixD \\
+	&\quad Q_2(c)\}
+\end{array}
+*/
+
+/*
+    share c{
+        take c(s);
+        call f(a);
+        send a(s);
+        recv a(s');
+        put c(s');
+        par{ contR(a) || release c}
+        ||
+        contS(c)
+    }
+*/

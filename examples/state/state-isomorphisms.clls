@@ -1,0 +1,11 @@
+/*
+Inspired by exponential-isomorphisms.clls, we try to find some remarkable morphisms
+associated with the state modalities.
+*/
+
+//state A -o state A par state A
+proc p<A>(x:recv usage ~A; recv state A; state A){
+    recv x(y:usage ~A);
+    recv x(z:state A);
+    share y{fwd y x || fwd y z}
+};;

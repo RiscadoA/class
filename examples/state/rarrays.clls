@@ -1,0 +1,527 @@
+type rec HArrayRep(T) {
+	state send affine lint; ArrayRep(T) 
+} and SArrayRep(T) {
+	state send affine T; ArrayRep(T) 
+} and ArrayRep(T) {
+    affine
+    choice of {
+	| #Empty: close
+	| #Next: SArrayRep(T)
+    }
+};;
+
+proc unsafe_rec
+newArrayElts<T>(na:ArrayRep(T) ; size:~lint, init:~affine T )
+{
+  affine na;
+  if (size==0) {
+     #Empty na; close na
+  }
+  {
+     #Next na;
+     cell na (c:affine send affine T;ArrayRep(T).
+		affine c;
+		call init(n0:~affine T);
+		send c (n:affine T. fwd n n0);
+		cut {
+			let! s0 size-1
+			|s0:~!lint|
+			newArrayElts <T>(c;s0,init)	
+       	}
+	 )
+  }
+};;
+
+proc newArray<T>(hc:HArrayRep(T) ; size:~lint, init:~affine T )
+{
+	cut {
+		newArrayElts<T>(na; size,init)
+     	|na:~ArrayRep(T)|
+		cell hc (c. affine c;
+			send c (siz:affine lint. affine siz; let siz size);
+			fwd c na)
+	}
+};;
+
+type Handle(T) {
+	choice of {
+	| #None: ArrayRep(T)
+	| #Some: send affine T; recv ~affine T; ArrayRep(T)
+	}
+};;
+
+proc put_back<T>(a: ~statel send affine T; ArrayRep(T),
+		        v0:~affine T, ac:~ArrayRep(T), r:ArrayRep(T))
+{
+	put a (vn: affine send affine T; ArrayRep(T). 
+			affine vn;
+			send vn (vnn: affine T. fwd vnn v0);
+			fwd ac vn); 
+	affine r;
+	#Next r;
+	fwd a r
+};;
+
+proc unsafe_rec
+larray_get<T>(a:~ArrayRep(T), r:Handle(T); pos:~lint)
+{
+  use a;
+  case a of {
+  | #Empty: wait a; #None r; affine r; #Empty r; close r
+  | #Next:
+		if (pos == 0) {
+			take a (ac);
+			use ac;
+			recv ac(v);
+			#Some r;
+			send r (v);
+			recv r (v0);
+			put_back<T>(a,v0,ac,r)
+		}
+		{
+			take a (ac);
+			use ac;
+			recv ac(v);
+			cut {
+				let! pos0 pos-1
+				| pos0: ~!lint |
+				larray_get<T>(ac, r0; pos0)
+				| r0: ~Handle(T) |
+				case r0 of {			
+				| #None: 
+					#None r;
+					put_back<T>(a,v,r0,r)
+				| #Some : 
+					#Some r;
+					recv r0(vi);
+					send r (vi);
+					recv r (vn);
+					send r0(vn);
+					put_back<T>(a,v,r0,r)
+			}
+  		}
+		}
+	}
+};;
+
+
+proc put_head<T>(a: ~statel send affine lint; ArrayRep(T),
+		        v0:~affine lint, ac:~ArrayRep(T), r:HArrayRep(T))
+{
+	put a (vn: affine send affine lint; ArrayRep(T). 
+			affine vn;
+			send vn (vnn: affine lint. fwd vnn v0);
+			fwd ac vn); 
+	fwd a r
+};;
+
+type AHandle(T) {
+	choice of {
+	| #None: HArrayRep(T)
+	| #Some: send affine T; recv ~affine T; HArrayRep(T)
+	}
+};;
+
+proc array_get<T>(a:~HArrayRep(T), r:AHandle(T); pos:~lint)
+{
+	take a(c);
+	recv c (siz);
+	cut {
+	   larray_get<T>(c,r0;pos)
+	   |r0:~Handle(T)|
+	   case r0 of {
+	   | #None:
+			#None r; 
+			put_head<T>(a,siz,r0,r)
+	   | #Some: 
+			#Some r; 
+		 	recv r0 (v);
+			send r (v);
+			recv r (vb);
+			send r0 (vb);
+			put_head<T>(a,siz,r0,r)
+	   }
+	}
+};;
+
+type Handle2c(T) {
+	choice of {
+	| #None: recv ~affine T;
+			ArrayRep(T)
+	| #Some: 	send affine T;
+			recv ~affine T;
+			recv ~affine T; 
+			ArrayRep(T)
+	}
+};;
+
+type Handle2(T) {
+	choice of {
+	| #None: ArrayRep(T)
+	| #Some: send affine T; 
+			Handle2c(T)
+	}
+};;
+
+type CBack2(T) {
+	send affine T; send ArrayRep(T); ~ArrayRep(T)
+};;
+
+proc unsafe_rec
+larray_get22<T>( a:~ArrayRep(T), r:Handle2c(T), r0: CBack2(T); pos:~lint)
+{
+  use a;
+  case a of {
+  | #Empty: 	wait a; 
+		   	#None r; 
+			recv r(v:~affine T);
+			send r0(v);
+			send r0 (rr:ArrayRep(T). 
+					affine rr; 
+					#Empty rr; 
+					close rr);
+			fwd r r0
+  | #Next:
+		if (pos == 0) {
+			take a (ac: ~affine send affine T; ArrayRep(T));
+			use ac;
+			recv ac(v:~ affine T);
+			#Some r;
+			send r (vo: affine T. fwd vo v);
+			recv r (v0:~ affine T);
+			put a (vn: affine send affine T; ArrayRep(T). 
+				affine vn;
+				send vn (vnn: affine T. fwd vnn v0);
+				fwd ac vn); 
+			recv r (v1:~ affine T);
+			send r0(v1);
+			send r0 (rr: ArrayRep(T). 
+					affine rr;
+					#Next rr;
+					fwd rr a);
+			fwd r r0 
+		}
+		{
+			take a (ac: ~ affine send affine T; ArrayRep(T));
+			use ac;
+			recv ac(v:~affine T);
+			cut {
+				let! pos0 pos-1
+				| pos0: ~!lint |
+				larray_get22<T>(ac, r, r00; pos0)
+				| r00: ~CBack2(T) |
+				recv r00 (v0);
+				recv r00 (ac0);
+				put a (vn: affine send affine T; ArrayRep(T). 
+						affine vn;
+						send vn (vnn: affine T. fwd vnn v);
+						fwd ac0 vn); 
+				send r0 (v0);
+				send r0 (rr: ArrayRep(T). 
+						affine rr;
+						#Next rr;
+						fwd rr a);
+				fwd r0 r00
+			}
+  		}
+	}
+};;
+ 
+
+proc unsafe_rec
+larray_get2<T>(a:~ArrayRep(T), r:Handle2(T); pos1:~lint, pos2:~lint)
+{
+  use a;
+  case a of {
+  | #Empty: wait a; #None r; affine r; #Empty r; close r
+  | #Next:
+		if (pos1 == 0) {
+			take a (ac: ~affine send affine T; ArrayRep(T));
+			use ac;
+			cut {
+				recv ac (v0:~affine T);
+				#Some r;
+				send r(v0);  
+				larray_get22<T>(ac, r, r0; pos2)	
+				| r0: ~CBack2(T) | 
+				recv r0 (v:~affine T); 
+				recv r0 (nac:~ArrayRep(T)); 
+				put_back<T>(a,v,nac,r0) 
+			}
+		}
+		{
+			take a (ac: ~ affine send affine T; ArrayRep(T));
+			use ac;
+			recv ac(v:~affine T);
+			cut {
+				let! pos0 pos1-1
+				| pos0: ~!lint |
+				cut {
+				larray_get2<T>(ac, r0; pos0, pos2)
+				| r0 : ~Handle2(T) |
+				case r0 of {
+				| #None: 
+					#None r;
+					put_back<T>(a,v,r0,r)
+				| #Some: 
+					#Some r;
+					recv r0(vi);
+					send r (vi);
+					case r0 of {
+						| #None:
+							#None r;
+							recv r(vii);
+							send r0(vii);
+							put_back<T>(a,v,r0,r)
+						| #Some:
+							#Some r;
+							recv r0(v2); 
+							send r(v2);
+							recv r(v11);
+							send r0(v11);
+							recv r(v12);
+							send r0(v12);
+							put_back<T>(a,v,r0,r)
+					}
+				}
+				}
+				}
+		}
+	}
+};;
+
+type AHandle2(T) {
+	choice of {
+	| #None: HArrayRep(T)
+	| #Some: send affine T; 
+			send affine T;
+			recv ~affine T; 
+			recv ~affine T;
+			HArrayRep(T)
+	}
+};;
+
+proc array_get2<T>(a:~HArrayRep(T), r:AHandle2(T); pos1:~lint, pos2:~lint)
+{
+	take a(c);
+	recv c (siz);
+	cut {
+	   larray_get2<T>(c,r0;pos1,pos2)
+	   |r0:~Handle2(T)|
+	   case r0 of {
+	   	| #None:
+			#None r;
+			put_head<T>(a,siz,r0,r)
+		| #Some: 
+			recv r0(v0:~ affine T);
+			case r0 of {
+				| #None:
+					send r0(v0);
+					#None r;	
+					put_head<T>(a,siz,r0,r)
+				| #Some:
+					#Some r;
+					send r (v0);
+					recv r0(v2);
+					send r(v2);
+					recv r(v11);
+					send r0(v11);
+					recv r(v12);
+					send r0(v12);
+					put_head<T>(a,siz,r0,r)
+			}
+	   }
+	}
+};;
+
+type Eint {
+	! lint
+};;
+
+proc init_zero (z:! affine Eint) 
+{
+	!z(n: affine Eint); affine n; let! n 0
+};;
+
+proc new_array(na:HArrayRep(Eint); size:~lint) 
+{
+	cut {
+		init_zero(z)
+		| z: ~! affine Eint |
+		newArray<Eint>(na;size,z)
+	}
+};;
+
+proc unsafe_rec
+fill_array(ia:~HArrayRep(Eint),oa:HArrayRep(Eint); n:~lint)
+{
+	cut {
+	let! n1 n-1
+	| n1:~!lint | 
+	if(n1<0)
+	{ fwd ia oa }
+	{
+		cut {
+			array_get<Eint>(ia,h;n1)
+			|h:~AHandle(Eint) |
+			case h of {
+			| #None: // unexpected
+				println ("unexpected");
+				fwd h oa
+			| #Some:
+				recv h (v:~affine Eint);
+				send h (r:affine Eint. affine r; let! r 30-n1);
+				fill_array(h,oa;n1)
+			}
+			}
+	}
+	}
+};;
+
+proc unsafe_rec
+iter_array(ia:~HArrayRep(Eint),oa:HArrayRep(Eint);
+			n:~lint,
+			step:send affine Eint; recv ~affine Eint; wait)
+{
+	cut {
+	let! n1 n-1
+	| n1:~!lint | 
+	if(n1<0)
+	{ fwd ia oa }
+	{
+		cut {
+			array_get<Eint>(ia,h;n1)
+			|h:~AHandle(Eint) |
+			case h of {
+			| #None: // unexpected
+				println ("unexpected");
+				fwd h oa
+			| #Some:
+				recv h (v:~affine Eint);
+				call step(c);
+				send c (vn:affine Eint. fwd v vn);
+				recv c(vnn);
+				wait c;
+				send h (r:affine Eint. fwd r vnn);
+				iter_array(h,oa;n1,step)
+			}
+			}
+	}
+	}
+};;
+
+proc main()
+{
+	cut {
+	let! size 10
+	| size:~!lint |
+	cut {
+		new_array(na;size)
+		| na: ~HArrayRep(Eint) |
+		fill_array(na,no;size)
+		| no: ~HArrayRep(Eint) |
+		!step(s);
+			recv s (v:~ affine Eint); 
+			println (v); 
+			send s (vn:affine Eint.affine vn; let! vn v);
+			close s
+		| step: ?send affine Eint; recv ~affine Eint; wait |
+		iter_array(no,noo; size,step)
+		| noo: ~HArrayRep(Eint) |
+		cut { let! p1 0 |p1:~Eint|
+		cut { let! p2 7 |p2:~Eint|
+		array_get2<Eint>(noo,h2;p1,p2)
+			}}
+		| h2: ~AHandle2(Eint) |
+		case h2 of {
+			| #Some:
+				recv h2(x); recv h2(y);
+				send h2(x); send h2(y);
+				println ("swap ->");
+				cut {
+					iter_array(h2,h3; size,step)
+					| h3: ~HArrayRep(Eint) |
+					release h3
+				}
+			| #None:
+				println ("nope");
+				release h2
+		}
+		}
+	}
+};;
+
+proc 
+unsafe_rec
+swap_min(ia:~HArrayRep(Eint), oa:HArrayRep(Eint); p:~lint, l:~lint, max:~lint)
+{ 
+	if (p+l==max) { fwd ia oa }
+	{
+		letc h2: AHandle2(Eint) {
+		array_get2<Eint>(ia,h2;p,l)
+		} {
+		case h2 of {
+			| #Some:
+				recv h2(x1st); recv h2(x2nd);
+				if (x1st < x2nd) { 
+					send h2(x2nd); 
+					send h2(x1st);
+					swap_min(h2,oa;p,l+1,max)
+				} {
+					send h2(x1st);
+					send h2(x2nd);
+					swap_min(h2,oa;p,l+1,max)
+				}
+			| #None:
+				println ("ERR: out of bounds "+p+" "+l+" "+max);
+				fwd h2 oa
+		}}
+	}
+};;
+
+proc 
+unsafe_rec
+sort(ia:~HArrayRep(Eint), oa:HArrayRep(Eint); p:~lint, l:~lint, max:~lint)
+{ 
+	if (p==max) { fwd ia oa }
+	{
+		letc sa:HArrayRep(Eint) {
+		  swap_min(ia,sa;p,l,max) }
+		{ sort(sa,oa;p+1,l,max) }
+	}
+};;
+
+proc main2()
+{
+	cut {
+	let! size 30
+	| size:~!lint |
+	cut {
+		new_array(na;size)
+		| na: ~HArrayRep(Eint) |
+		fill_array(na,no;size)
+		| no: ~HArrayRep(Eint) |
+		!step(s);
+			recv s (v:~ affine Eint); 
+			println (v); 
+			send s (vn:affine Eint.affine vn; let! vn v);
+			close s
+		| step: ?send affine Eint; recv ~affine Eint; wait |
+		iter_array(no,noo; size,step)
+		| noo: ~HArrayRep(Eint) |
+		sort(noo,no1;0,0,size-1)
+		| no1: ~HArrayRep(Eint) |
+		iter_array(no1,no2; size,step)
+		| no2: ~HArrayRep(Eint) |
+		release no2
+		}
+	}
+};;
+
+/*
+
+	recv x; send y;
+
+	recv y; send x;
+
+*/

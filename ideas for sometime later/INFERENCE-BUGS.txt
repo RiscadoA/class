@@ -1,0 +1,32 @@
+INFERENCE bugs
+
+server.clls 1queue
+
+proc mdeq<tA>(c:send maybe(!tA);send state !list(!tA);close, s:~state !list(!tA)){
+    take s(l);
+     cut{
+        use l; /// inference is failing
+
+====
+
+
+corec X.affine T... X is not disposable by 
+unfold (corec X.affine T... X) is
+
+a bit annoying
+
+====
+
+proc rec counterX(x:Counter, c:usage ?colint){
+    case x of {
+        |#Inc:  take c(n);
+                println("#Inc");
+		?n;
+                put c(n+1);
+                counterX(x,c)
+
+===
+
+
+
+

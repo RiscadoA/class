@@ -1,0 +1,9 @@
+include "../pure/recursion-for-free.clls";;
+
+sam testrNAT();;
+
+sam testMUL();;
+
+sam testEXP1();;
+
+sam testEXP2();;

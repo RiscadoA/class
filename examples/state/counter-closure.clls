@@ -1,0 +1,71 @@
+type corec Counter {
+offer of{
+    |#Inc:      Counter
+    |#Dec:      Counter
+    |#Get:      send !lint; Counter
+    |#Release:  wait
+    |#Share:    recv Counter; Counter
+}
+};;
+
+proc rec counterX(x:Counter, c:usage ?colint){
+    case x of {
+        |#Inc:  take c(n);
+                println("#Inc");
+		?n;
+                put c(n+1);
+                counterX(x,c)
+
+        |#Dec: take c(n);
+               println("#Dec");
+               if(n>0){
+                put c(n-1);
+                counterX(x,c)
+               }
+               {
+                put c(n);
+                counterX(x,c)
+               }
+
+        |#Get:  take c(n);
+                use n; ?n;
+                println("#Get");
+                put c(n);
+                send x(n);
+                counterX(x,c)
+
+
+        |#Release: println("#Release");
+                   wait x;
+                   release c
+
+        |#Share: println("#Share");
+                 recv x(y);
+                 share c{ counterX(x,c) || counterX(y,c)}
+    }
+};;
+
+proc counter(x:Counter){
+    cut{
+        cell c(0)
+        |c:usage ?colint|
+        counterX(x,c)
+    }
+};;
+
+proc main(){
+    cut{
+        counter(x)
+        |x:~Counter|
+        #Share x;
+        send x(y. #Inc y; #Release y; close y);
+        #Share x;
+        send x(y. #Inc y; #Release y; close y);
+        #Share x;
+        send x(y. #Dec y; #Release y; close y);
+        #Share x;
+        send x(y. #Get y; recv y(n);  println("GOT: " + n); #Release y; close y);
+        #Release x;
+        close x
+    }
+};;

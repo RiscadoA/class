@@ -1,0 +1,108 @@
+include "typestate.nt.clls";;
+include "shared-factory.nt.clls";;
+
+type ISharedCounterADT {
+	sendty N;
+	sendty NZ;
+	ISharedObject(LICounterINV(N,NZ))  // invariant type
+};;
+
+proc SharedCounter(c: ISharedObject(ICounterINV(state lint,state lint))) {
+	cut {
+	affine lc;
+	send lc (m. cell m (0));
+		counterObjOps(lc)
+	| lc: ~ ICounterINV(state lint,state lint) |
+	SharedObjectFactory <LICounterINV(state lint,state lint)>(c,lc)
+	}
+};;
+
+proc SharedCounterObj (c: ISharedCounterADT) {
+	sendty c (state lint);
+	sendty c (state lint);
+	SharedCounter(c)
+};;
+
+proc packandfree<N,NZ,S>(co: ~send N;ICounter(N,NZ),
+     		       u:~ recv ~ICounterINV(N,NZ); send S; close;
+		       c:~ ISharedObjectMenu (S,LICounterINV(N,NZ)) )
+{
+	recv co (sn:~N); // get linear resource back
+	#Pack co;        // 
+	send co (sn);    // pack it into affine
+		
+	send u (co); // yield linear shared object back to wrapper
+	recv u (s1:~S);  // get shared object back 
+	wait u;	// close #Use
+		
+	call c(u);
+	send u (s1);
+	#Free u;
+	close u		
+};;
+
+proc use1<N,NZ,S>(
+  u: ~ send ICounterINV(N,NZ); recv ~ICounterINV(N,NZ); send S; close;
+  c:~ ISharedObjectMenu (S,LICounterINV(N,NZ)))
+{
+	recv u (ci);		// get linear object handle
+	recv ci (si); 		// get opaque reference si
+	letc | co : LICounterINV(N,NZ)|
+    	  sampleusage<N,NZ>(si,ci,co)	 // use according to linear protocol
+	  in
+	  packandfree<N,NZ,S>(co,u;c)	// pack and release
+};;
+
+proc testShared1()
+{
+	cut {
+	SharedCounterObj(c)
+	|c:~ ISharedCounterADT |
+	recvty c (N);
+	recvty c (NZ);
+	recvty c (S);
+	recv c (s:~S);
+	call c(u);  // call menu
+	send u (s); // send shared object handle
+	#Use u;	    // call Use
+	use1<N,NZ,S>(u;c)}
+};;
+
+
+proc testShared2()
+{
+	cut {
+	SharedCounterObj(c)
+	|c:~ ISharedCounterADT |
+	recvty c (N);
+	recvty c (NZ);
+	recvty c (S);
+	recv c (s:~S);
+
+	call c(u);	// call menu
+	send u (s);	// send shared object handle
+	#Share u;	// call Share
+	send u (sh0. // Fork!
+	        call c(u0); send u0(sh0); #Use u0; use1<N,N,S>(u0;c)); 
+	call c(u1);
+	send u1(u);
+ 	#Use u1;
+	use1<N,N,S>(u1;c)
+}
+};;
+
+/*
+
+include "examples/state/typestate-shared.nt.clls";;
+
+*/
+
+
+
+
+
+
+
+
+
+

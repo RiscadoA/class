@@ -1,0 +1,205 @@
+type rec Nat{
+    choice of {
+        |#Z: close    
+        |#S: Nat        
+    }
+};;
+
+proc zero(n:Nat){ #Z n; close n };;
+
+proc one(n:Nat){ #S n; #Z n; close n };;
+
+proc two(n:Nat){  #S n;  #S n; #Z n; close n};;
+
+proc rec toStr(n:~Nat, s: lstring){
+    println("toStr");
+    case n of {
+        |#Z: wait n; let s "Z"
+        |#S: cut{
+                toStr(n,x)
+                |x:~lstring|
+                let s "S "+x
+                }
+    }
+};;
+
+proc printNat(n:~Nat) {
+   cut {
+     toStr(n,s)
+     | s:~lstring|
+     println(s); ()
+     }
+};;
+
+//some tests
+
+proc testzero(){
+cut{
+    zero(n)
+    |n:~Nat|
+    toStr(n,s)
+    |s:~lstring|
+    println(s);
+    ()
+}
+};;
+
+proc testone(){
+cut{
+    one(n)
+    |n:~Nat|
+    toStr(n,s)
+    |s:~lstring|
+    println(s);
+    ()
+}
+};;
+
+//sam testzero();;
+
+//sam testone();;
+
+
+proc testrfwd2(){
+cut{
+    zero(m)
+    |m:~Nat|
+    send p (k.#S k; #S k; #S k; fwd k m); close p
+    |p:~send Nat; close|
+    recv p(v);wait p;
+    cut { toStr(v,s)
+    |s:~lstring|
+    println(s);
+    ()
+    }
+}
+};;
+
+proc testrfwd2x(){
+cut{
+    zero(m)
+    |m:~Nat|
+    send p (k.#S k;#S k; fwd k m); close p
+    |p:~send Nat; close|
+    recv p(v);wait p;
+        send q (w. #S w; fwd w v); close q
+    |q:~send Nat; close|
+    recv q(u);wait q;
+    cut { toStr(u,s)
+    |s:~lstring|
+    println(s);
+    ()
+    }
+}
+};;
+
+
+/*
+proc testrfwd4(){ // OK
+cut{
+    one(m)
+    |m:~Nat|
+    send p (k:Nat.fwd m k); close p
+    |p:~send Nat; close|
+    recv p(v);wait p;
+    cut { toStr(v,s)
+    |s:~lstring|
+     println(s);
+    ()
+    }
+}
+};;
+
+proc testrfwd5(){ // OK
+cut{
+    two(m)
+    |m:~Nat|
+    send p (k:Nat.fwd m k); close p
+    |p:~send Nat; close|
+    recv p(v);wait p;
+    cut { toStr(v,s)
+    |s:~lstring|
+     println(s);
+    ()
+    }
+}
+};;
+
+
+// HERE
+
+proc testrfwd20(){
+cut{
+    send p (k.two(k)); close p
+    |p:~send Nat; close|
+    recv p(v);wait p;
+    cut { toStr(v,s)
+    |s:~lstring|
+    println(s);
+    ()
+    }
+}
+};;
+
+
+proc testrfwd2(){
+cut{
+    zero(m)
+    |m:~Nat|
+    send p (k.#S k; fwd k m); close p
+    |p:~send Nat; close|
+    recv p(v);wait p;
+    cut { toStr(v,s)
+    |s:~lstring|
+    println(s);
+    ()
+    }
+}
+};;
+
+proc testrfwd21(){
+cut{
+    send p (k.#S k; zero(k)); close p
+    |p:~send Nat; close|
+    recv p(v);wait p;
+    cut { toStr(v,s)
+    |s:~lstring|
+    println(s);
+    ()
+    }
+}
+};;
+
+proc testrfwd(){
+cut{
+    two(n)
+    |n:~Nat|
+    fwd n m
+    |m:~Nat|
+    send p (k.#S k; fwd m k); close p
+    |p:~send Nat; close|
+    recv p(v);wait p;
+    cut { toStr(v,s)
+    |s:~lstring|
+    println(s);
+    ()
+    }
+}
+};;
+
+proc testrfwd3(){ // OK
+cut{
+    zero(m)
+    |m:~Nat|
+    send p (k:Nat.fwd m k); close p
+    |p:~send Nat; close|
+    recv p(v);wait p;
+    cut { toStr(v,s)
+    |s:~lstring|
+     println(s);
+    ()
+    }
+}
+};;
+
+*/

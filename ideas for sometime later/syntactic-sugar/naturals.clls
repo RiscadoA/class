@@ -1,0 +1,52 @@
+type rec Nat{
+    choice of {
+        |#Z; close      //zero
+        |#S; Nat        //successor
+    }
+};;
+
+//Encoding of naturals zero, one and two
+proc zero(n:Nat){ n <- #Z  };;
+
+proc one(n:Nat){ n <- #S #Z };;
+
+proc two(n:Nat){ n <- #S #S #Z };;
+
+//Computes the successor of n on m
+proc succ(n:~Nat, m:Nat){ m <- #S; n <-> m };; 
+    
+//Computes the double of on on m
+proc rec double(n:~Nat, m:Nat)
+{
+    case n of {
+        |#Z; 
+        m <- #Z 
+        |#S: 
+        fork k <- double(n,k); 
+        m <- #S #S 
+        m <-> k
+    }
+};;
+
+
+proc rec add(n:~Nat, m:~Nat, r:Nat)
+{
+   case n of {
+    |#Z;
+    m <-> r 
+    |#S;
+    r <- #S;
+    add(n,m,r)
+   }
+};;
+
+
+proc rec mul(n:~Nat, m:?~Nat, r:Nat)
+{
+   case n of {
+   |#Z;
+   r <- #Z
+   |#S;
+   fork k <- mul(n,m,k);
+   add(k,m,r)
+};;

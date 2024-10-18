@@ -1,0 +1,62 @@
+/** not typing landn's knot */
+
+type fun {
+	recv ~lint; send lint; close
+};;
+
+proc fill(n:~statel fun) {
+		put n (f:affine fun. affine f; recv f(x);send f(x); close f);
+		release n
+};;
+
+proc landin0() {
+
+	cut {
+		cell n (f:affine fun. affine f; recv f(x);send f(x+1); close f)
+		| n: ~state fun |
+		take n(g);
+		send g(2);
+		recv g(ret);
+		print (ret);
+		wait g;
+		fill(n)
+	}
+
+};;
+
+proc landin1() {
+
+	cut {
+		cell n (f:affine fun. affine f; recv f(x);send f(x+1); close f)
+		| n: ~state fun |
+		take n(g);
+		send g(2);
+		recv g(ret);
+		print (ret);
+		wait g;
+		// put n(f:affine fun. ???) cannot use n here
+		fill(n)
+	}
+
+};;
+
+proc landin2() {
+
+	cut {
+		cell n (f:affine fun. affine f; recv f(x);send f(x+1); close f)
+		| n: ~state fun |
+		cut {
+			affine f1; 
+			recv f1(x); take n(v); put n(v); send f1 (x+1);
+			par { release n || close f1 }
+			|f1:~affine fun|
+			//* n not available here !! *///
+			send f1( 3);
+			recv f1( x);
+			print (x);
+			wait f1;
+			()
+		}
+	}
+
+};;

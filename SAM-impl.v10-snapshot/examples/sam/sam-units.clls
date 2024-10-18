@@ -1,0 +1,25 @@
+// small examples
+
+sam cut { close a |a:wait| wait a;() };;
+
+sam cut { wait a;() |a:close| close a  };;
+
+sam cut { close a |a:wait| close b |b:wait| wait b;wait a;() };;
+
+sam cut { close a |a:wait| wait b;wait a;() |b:close| close b };;
+
+sam cut { close a |a:wait| wait b;() |b:close| wait a; close b };;
+
+sam cut { cut { wait b;wait a;() |a:close| close a } |b:close| close b };;
+
+sam cut { close a |a:wait| wait a;close b |b:wait| wait b;() };;
+
+sam cut {
+		close a 
+		|a:wait| 
+		wait a;close b
+		|b:wait|
+		wait b;wait c; ()
+		|c:close|
+		close c 
+};;

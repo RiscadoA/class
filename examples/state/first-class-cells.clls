@@ -1,0 +1,72 @@
+/*
+   We will go step-by-step on a an example
+   which illustrates that reference cells are first-class objects
+   that can be passed around along session channels.
+
+    We start by defining a reference cell that stores
+    the integer 42.
+*/
+
+proc cellInt(c: state lint){
+    cell c(n: affine lint.  affine n; let n 42)
+};;
+
+/*
+    Now, we define a process that communicates its cell
+    usage on a channel x and then closes the session on x.
+    But first it prints a message informing that the
+    cell is being sent.
+*/
+
+proc sendProc(x:send state lint;close, c:usage ~lint){
+    println("SENDING CELL");
+    send x(c_: state lint. fwd c c_); //free output construct
+    close x
+};;
+
+/*
+  We define a process that receives a cell usage on x,
+  waits for the session to be closed, gets which
+  integer the cell is storing, displays the integer,
+  puts the dummy integer 0 and then
+  releases its cell usage, continuing as the
+  inaction process.
+*/
+
+proc recvProc(x:recv usage ~lint; wait){
+    recv x(c:usage ~lint);
+    wait x;
+    take c(n:coaffine colint);
+    use n;
+    println("READ " + n);
+    put c(m:affine lint. affine m; let m 0);
+    release c
+};;
+
+/*
+    Finally, we compose everything in a process
+    called system.
+*/
+
+proc system(){
+    cut{
+        cellInt(c)
+        |c:usage colint|
+        sendProc(x,c)
+        |x:recv usage colint; wait|
+        recvProc(x)
+    }
+};;
+
+/*
+    Now you can run process system. It will
+    print the following log:
+        SENDING CELL
+        READ 42
+*/
+
+//system();;
+
+
+
+

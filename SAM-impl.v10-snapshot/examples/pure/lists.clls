@@ -1,0 +1,91 @@
+/*
+    We give an  implementation of lists using  recursive types.
+   
+*/
+
+type rec List(A){
+    choice of {
+        |#Nil:  close
+        |#Cons: send A; List(A)
+    }
+};;
+
+proc nil<A>(l:List(A)){
+    #Nil l; close l
+};;
+
+proc cons<A>(a:~A, l:~List(A), nl:List(A)){
+    #Cons nl; send nl(ad:A. fwd ad a); fwd nl l
+};;
+
+
+proc rec dispose<A>(l:~List(!A)){
+    case l of {
+        |#Nil: wait l; ()
+        |#Cons: recv l(a:?~A); ?a;dispose<A>(l) // needs ?a;
+    }
+};;
+
+include "maybe.clls";;
+
+proc head<A>(l:~List(!A), a:maybe(!A)){
+    case l of {
+        |#Nil: wait l; #Nothing a; close a
+        |#Cons: recv l(b:?~A); par{dispose<A>(l) || #Just a; fwd a b}
+    }
+};;
+
+proc tail<A>(l:~List(!A), tl: maybe(List(!A))){
+    case l of {
+        |#Nil: wait l; #Nothing tl; close tl
+        |#Cons: recv l(a:?~A); ?a; #Just tl; fwd tl l
+    }
+};;
+
+proc rec append<A>(l:~List(A),a:~A, nl:List(A)){
+    case l of {
+        |#Nil: wait l; cut{nil<A>(x) |x:~List(A)| cons<A>(a,x,nl)}
+        |#Cons: recv l(b:~A); cut{ append<A>(l,a, x) |x:~List(A)| cons<A>(b,x,nl)}
+    }
+};;
+
+/*
+    Promotes a list of affine elements to an affine list of affine elements.
+*/
+proc rec affList<tA>(x:~List(affine tA), y:affine List(affine tA)){
+    case x of {
+        |#Nil: wait x; affine y; nil<affine tA>(y)
+        |#Cons: recv x(a:coaffine ~tA);
+                cut{
+                    affList<tA>(x,z)
+                    |z:coaffine ~List(affine tA)|
+                    affine y;
+                    #Cons y;
+                    send y(ad: affine tA. fwd ad a);
+                    use z;
+                    fwd z y
+                }
+    }
+};;
+
+proc unsafe_rec genList<A>(l:List(A) ; z:~A, f:send A;~A, niters:colint){
+    if (niters == 0){
+        nil<A>(l)
+    }{
+        cut{
+            !n(n0);
+            call f(f0);
+            send f0(z0:A. call z(z0d); fwd z0d z0);
+            fwd n0 f0
+            |n:?~A|
+            genList<A>(tail; n, f, niters-1) 
+            |tail:~List(A)|
+            cut{
+                call z(z0);
+                fwd z0 w
+                |w:~A|
+                cons<A>(w,tail,l) 
+            }
+        }
+    }
+};;

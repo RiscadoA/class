@@ -1,0 +1,2 @@
+src/javacc  -STATIC=false  -ERROR_REPORTING=true -OUTPUT_DIRECTORY=src src/CLLSj.j
+javac -d bin src/*.java

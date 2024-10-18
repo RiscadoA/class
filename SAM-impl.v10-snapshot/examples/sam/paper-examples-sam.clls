@@ -1,0 +1,94 @@
+
+proc P1(b: recv ~lint; recv ~lint; close ) {
+	recv b(x);
+	recv b(z);
+	println (x+" "+z);
+	close b
+
+};;
+
+proc Q1(d:send lint; recv ~lint; close , 
+        b: send lint; send lint; wait ) {
+	send d(1);
+	send b(3);
+	fwd b d
+};;
+
+proc R1(d: recv ~lint; send lint; wait) {
+	recv d(y);
+	send d(2);
+	wait d;
+	println (y);
+	()
+};;
+
+proc example2cR() {
+	cut {
+	P1(b)
+	| b: ~ recv ~lint; recv ~lint; close |
+	ccut {
+	    Q1(d,b)
+	    | d: ~ send lint; recv ~lint; close |
+	    R1(d)
+	    }
+	}
+};;
+
+
+proc example2() {
+	cut {
+	P1(b)
+	| b: ~ recv ~lint; recv ~lint; close |
+	Q1(d,b)
+	| d: ~ send lint; recv ~lint; close |
+	R1(d)
+	}
+
+};;
+
+sam example1();;
+sam example2();;
+
+// with mixed concurrency
+
+proc example2cc() {
+	ccut {
+	P1(b)
+	| b: ~ recv ~lint; recv ~lint; close |
+	Q1(d,b)
+	| d: ~ send lint; recv ~lint; close |
+	R1(d)
+	}
+
+};;
+
+
+proc example2c1() {
+	ccut {
+	P1(b)
+	| b: ~ recv ~lint; recv ~lint; close |
+	cut {
+	    Q1(d,b)
+	    | d: ~ send lint; recv ~lint; close |
+	    R1(d)
+	    }
+	}
+};;
+
+
+proc example2cR() {
+	cut {
+	P1(b)
+	| b: ~ recv ~lint; recv ~lint; close |
+	ccut {
+	    Q1(d,b)
+	    | d: ~ send lint; recv ~lint; close |
+	    R1(d)
+	    }
+	}
+};;
+
+sam example2cc();;
+sam example2c1();;
+sam example2cR();;
+

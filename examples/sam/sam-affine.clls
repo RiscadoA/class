@@ -1,0 +1,134 @@
+
+proc affd0 ()
+{
+cut {
+   affine x; close x
+    | x: ~ affine close |
+   discard x
+   }
+};;
+
+sam affd0();;
+
+proc aff0 ()
+{
+cut {
+   affine x; send x (2); close x
+    | x: ~ affine send lint; close |
+   use x; recv x(y); println (y); wait x; ()
+   }
+};;
+
+sam aff0();;
+
+proc aff1 ()
+{
+cut {
+   affine x; use x; send x (2); close x
+    | x: ~ affine coaffine send lint; close |
+   use x; affine x; recv x(y); println (y); wait x; ()
+   }
+};;
+
+sam aff1();;
+
+proc aff2 ()
+{
+cut {
+   send p (x. affine x; use x; send x (2); close x); affine p;close p
+    | p: ~ send affine coaffine send lint; close; affine close |
+   recv p(x); use x; affine x; recv x(y); println (y); wait x; use p; wait p; ()
+   }
+};;
+
+sam aff2();;
+
+proc aff3 ()
+{
+cut {
+   send p (x. affine x; use x; send x (2); close x); affine p;close p
+    | p: ~ send affine coaffine send lint; close; affine close |
+   recv p(x); use x; affine x; recv x(y); println (y); wait x; use p; wait p; ()
+   }
+};;
+
+sam aff3();;
+
+
+
+proc aff3a ()
+{
+cut {
+   send p (x. affine x; use x; send x (2); close x); affine p;close p
+    | p: ~ send affine coaffine send lint; close; affine close |
+   recv p(x); use x; affine x; recv x(y); println (y); wait x; discard p
+   }
+};;
+
+sam aff3a();;
+
+proc aff4 ()
+{
+cut {
+     affine p; send p(2); close p
+     | p: ~ affine send lint; close |
+     affine k; send k (p); close k
+       | k: ~ affine send  affine send lint; close; close |
+      use k; recv k(v); use v; recv v(x); println (x); wait v; wait k; ()
+}
+};;
+
+sam aff4();;
+
+proc aff5 ()
+{
+cut {
+     affine p; send p(2); close p
+     | p: ~ affine send lint; close |
+     affine k; send k (p); close k
+       | k: ~ affine send  affine send lint; close; close |
+      use k; recv k(v); wait k; discard v
+}
+};;
+
+sam aff5();;
+
+
+proc aff6 ()
+{
+cut {
+     affine p; send p(2); close p
+     | p: ~ affine send lint; close |
+     affine k; send k (z. fwd z p); close k
+       | k: ~ affine send  affine send lint; close; close |
+      discard k
+}
+};;
+
+sam aff6();;
+
+proc aff7 ()
+{
+cut {
+     affine r; send r(2); close r
+     | r: ~ affine send lint; close |
+     affine p; send p(2); use r; recv r(x); wait r; println (x); close p
+     | p: ~ affine send lint; close |
+     affine k; send k (z. fwd z p); close k
+       | k: ~ affine send  affine send lint; close; close |
+      discard k
+}
+};;
+
+sam aff7();;
+
+proc affc0 ()
+{
+cut {
+   affine x; close x
+    | x: ~ affine close |
+   discard x
+   }
+};;
+
+sam affc0();;

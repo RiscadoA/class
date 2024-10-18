@@ -1,0 +1,82 @@
+include "toggle.nt.clls";;
+include "shared-factory.nt.clls";;
+
+type ISharedToggle {
+	ISharedObject(Off)  // invariant type
+};;
+
+proc SharedToggle(c: ISharedObject(Off)) {
+	cut {
+		affine lo; off(lo)
+		| lo: ~ affine Off |
+		SharedObjectFactory <Off>(c,lo)
+	}
+};;
+
+proc someUse<S>(s:~S; c:~ISharedObjectMenu (S,Off) )
+{
+
+	call c(u);  // call menu
+	send u (s); // send shared object handle
+	#Use u;
+	recv u(t);
+	#turnOn t; #turnOff t; // linear behavior (uniquely owned)
+	send u(t);
+	recv u(s); // get shared object back
+	wait u;
+	
+	call c(u);  // call menu
+	send u (s); // send shared object handle	
+	#Free u;    // call Free
+	close u
+
+
+
+};;
+
+proc testShared1()
+{
+	cut {
+	SharedToggle(c)
+	|c:~ ISharedToggle |
+	recvty c (S);
+	recv c (s:~S);
+	someUse<S>(s;c)
+	}
+};;
+
+proc testShared2()
+{
+
+	cut {
+	SharedToggle(c)
+	|c:~ ISharedToggle |
+	recvty c (S);
+	recv c (s:~S);
+	
+	call c(u);  // call menu
+	send u (s); // send shared object handle
+	#Share u;
+	cut {
+	     someUse<S>(sh0;c)            // forked
+	     |sh0:S|	
+	     send u (sh0);someUse<S>(u;c) // forked
+	     }
+	}
+};;
+
+/*
+
+include "examples/state/toggle-shared.nt.clls";;
+
+*/
+
+
+
+
+
+
+
+
+
+

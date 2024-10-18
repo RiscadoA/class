@@ -1,0 +1,103 @@
+type corec Pair(A,B){
+    offer of {
+        |#Init;
+        recv ~A; 
+        recv ~B; 
+        FPair(A,B)
+    }
+}and FPair(A,B){
+    offer of {
+        |#Upd; offer of {
+                    |#Fst; send A; recv ~A; FPair(A,B)
+                    |#Snd; send B; recv ~B; FPair(A,B)
+                }
+        |#Release 
+        |#Share; recv FPair(A,B); FPair(A,B)
+    }
+};; 
+
+
+
+type Two(A,B){
+    send A; send B 
+};; 
+
+Disposable ~A, ~B => proc dispose(x:~Two(A,B)){
+    recv x(a);
+    recv x(b);
+    fork dispose(a);
+    dispose (b)
+};; 
+
+type Repr(A,B){
+    state {Two(A,B)}
+};;
+
+
+Disposable ~A, ~B => 
+proc rec pair<A,B>(x:Pair(A,B)){
+    case x of {
+        |#Init;
+        a b =<- x; 
+        fork c:~Repr(A,B)<- cell c (v. v <- a b); 
+        fpair<A,B>(x,c) 
+    }
+} and fpair<A,B>(x:FPair(A,B), c:~Repr(A,B)){
+    case x of {
+        |#Upd #Fst; 
+        v := c; 
+        a b =<- v; 
+        x <- a; 
+        na =<- x; 
+        c := v. v <- na b; 
+        fpair<A,B>(x,c)
+
+        |#Upd #Snd; 
+        v := c; 
+        a b =<- v;  
+        x <- b;
+        nb =<- x; 
+        c := v. v <- a nb; 
+        fpair<A,B>(x,c)
+     
+        |#Share;
+        y =<- x; 
+        fork c <- fpair<A,B>(y,c);
+        fpair<A,B>(x,c)
+    }
+};;
+
+proc system0(){
+    cut{
+        pair<!lint, !lint>(x)
+        |x:~Pair(!lint, !lint)|
+        x <- #Init 2 3; 
+        x <- #Upd #Fst; 
+        n =<- x; 
+        println("GOT FST = " + n + ". Will increment."); 
+        x <- n+1 #Release
+    }
+};; 
+
+proc client(x:~FPair(Int, Int), id:~String){
+    x <- #Upd #Fst; 
+    n =<- x; 
+    println(id + ": Upd fst: got " + n + " and will increment."); 
+    x <- n+1; 
+    x <- #Upd #Snd; 
+    m =<- x; 
+    println(id + ": Upd snd: got " + m + " and will double."); 
+    x <- 2*m #Release
+};; 
+
+
+proc system1(){
+    cut{
+        pair<!lint, !lint>(x)
+        |x:~Pair(!lint, !lint)|
+        x <- #Init 2 5; 
+        x <- #Share; 
+        x <- y. client(y, "client1"); 
+        client(x, "client2") 
+    }
+};; 

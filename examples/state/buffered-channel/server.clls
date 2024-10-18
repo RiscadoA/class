@@ -1,0 +1,153 @@
+include "../../pure/maybe.clls";;
+include "../linked-lists2.clls";;
+
+proc msend<A>(me: recv coaffine ~A; send state SList(A); close,
+    tailptr: usage ~SList(A)) {
+    recv me(a);
+    take tailptr(cs: coaffine ~SList(A));
+//    use cs;
+//    unfold cs;
+    take cs(ls:coaffine ~List(A));
+    cut{
+//	clltype c2;
+//       	unfold c2;
+	cell c2(l88. // affine l88; // use ls;
+	fwd l88 ls)
+        |c2:~SList(A)|
+//	unfold c2;
+        share c2 {
+            put cs(l2. cnext<A>(a,c2,l2));
+            release cs
+            ||
+//	    clltype c2;
+//	    clltype tailptr;
+            put tailptr(x. affine x; fwd x c2);
+            send me(h77. fwd h77 tailptr);
+            close me
+        }
+    }
+};;
+
+proc mrecv<A>(me: send maybe(affine A); send state SList(A); close, head:usage ~SList(A)) {
+    take head(cr);
+    take cr(lr);
+    use lr;
+    unfold lr;
+    case lr of {
+        |#Null: wait lr;
+                put cr(l2. nil<A>(l2));
+    		clltype cr;
+                put head(cr8. affine cr8; unfold cr8; fwd cr8 cr);
+                send me(x. nothing<affine A>(x));
+                send me(hhh. fwd hhh head);
+                close me
+        |#Next: par{
+                    put cr(x. nil<A>(x));
+     		    clltype cr;
+                    release cr
+                    ||
+                    recv lr(b);
+		    clltype head;
+		    clltype lr;
+		    clltype head;
+                    put head(l00. fwd lr l00); // verify typechecker here
+                    send me(x. just<affine A>(b, x));
+                    send me(hhh. fwd hhh head);
+                    close me
+		    }
+    }
+};;
+
+proc mfree<A>(m:close, headtail:usage ~SList(A)){
+    par{ release headtail || close m}
+};;
+
+proc mshare<tA>(c:recv state SList(tA);recv state SList(tA);~close, eq:~state SList(tA)){
+     recv c(eq1);
+     recv c(eq2);
+     wait c;
+     share eq {fwd eq eq1 || fwd eq eq2}
+};;
+
+type MenuS(tA, tX) {
+     recv ~tX;
+     offer of {
+                |#Send:   recv coaffine ~tA;send tX;close
+                |#Share: recv tX; recv tX;wait
+                |#Free:  close
+     }
+};;
+
+proc menuS<tA>(c: MenuS(tA, state SList(tA))){
+     recv c(eq:~state SList(tA));
+     case c of {
+      | #Send:    msend<tA>(c,eq)
+      | #Share:  mshare<tA>(c,eq)
+	  | #Free:   mfree<tA>(c,eq)
+     }
+};;
+
+type MenuR(tA,tX) {
+     recv ~tX;
+     offer of {
+                |#Recv:   send maybe( affine tA);send tX;close
+                |#Share: recv tX; recv tX;wait
+                |#Free:  close
+     }
+};;
+
+proc menuR<tA>(c: MenuR(tA, state SList(tA))){
+     recv c(dq:~state SList(tA));
+     case c of {
+	  | #Recv:    mrecv<tA>(c,dq)
+      | #Share:  mshare<tA>(c,dq)
+	  | #Free:   mfree<tA>(c,dq)
+     }
+     };;
+
+type SendT(tA){
+     sendty tX; send !MenuS(tA,tX); tX
+};;
+
+type RecvT(tA){
+    sendty tX; send !MenuR(tA,tX); tX
+};;
+
+type BChan(tA){
+     recv SendT(tA);RecvT(tA)
+};;
+
+
+proc sendP<tA>(e:SendT(tA), ce:~state SList(tA)){
+     sendty e(state SList(tA));
+     send e(c:!MenuS(tA,state SList(tA)).
+              !c(r:MenuS(tA,state SList(tA)));
+              menuS<tA>(r)
+            );
+     fwd e ce
+};;
+
+proc recvP<tA>(e:RecvT(tA), ce:~state SList(tA)){
+     sendty e(state SList(tA));
+     send e(c:!MenuR(tA,state SList(tA)).
+              !c(r:MenuR(tA,state SList(tA)));
+              menuR<tA>(r)
+            );
+     fwd e ce
+};;
+
+
+proc bchan<tA>(d:BChan(tA))
+{
+     recv d(e:SendT(tA));
+     cut {
+        cell l(n. nil<tA>(n))
+        |l:~UList(tA)|
+        share l {
+            cut{ cell tail(tl:affine SList(tA). affine tl; unfold tl;fwd tl l) |tail:~state SList(tA)| sendP<tA>(e, tail) }
+            ||
+            cut{ cell head(hl:affine SList(tA). affine hl; unfold hl;fwd hl l) |head:~state SList(tA)| recvP<tA>(d, head) }
+        }
+     }
+};;
+

@@ -1,0 +1,76 @@
+type unState(A,B){
+    send affine A; state B
+};;
+
+type Pair(A,B){
+    state unState(A,B)
+};;
+
+proc init<A,B>(a:coaffine ~A, b:coaffine ~B, c:Pair(A,B)){
+cut{
+    cell c2(x2: affine B.
+                fwd x2 b)
+    |c2:usage ~B|
+    cell c(x1:   affine unState(A,B).
+                affine x1;
+                send x1(ad:affine A. fwd ad a);
+                fwd x1 c2)
+    }
+};;
+
+proc swap<A>(c1:~Pair(A,A), c2:Pair(A,A)){
+    take c1(x:coaffine ~unState(A,A));
+    use x;
+    recv x(a:coaffine ~A);
+    take x(b:coaffine ~A);
+    put x(ad:affine A. fwd ad a);
+    put c1(y:   affine unState(A,A).
+                affine y;
+                send y(bd:affine A. fwd bd b);
+                fwd y x);
+    fwd c1 c2
+};;
+
+proc printPairInt(c1:~Pair(!lint, !lint), c2:Pair(!lint, !lint)){
+    take c1(x:coaffine ~unState(!lint, !lint));
+    use x;
+    recv x (a:coaffine ?colint);
+    use a;
+    ?a;
+    take x(b:coaffine ?colint);
+    use b;
+    ?b;
+    put x(b2:   affine !lint.
+                affine b2;
+                fwdE<lint>(b2;b));
+    put c1(y:affine unState(!lint, !lint).
+            affine y;
+            send y(a2:  affine !lint.
+                        affine a2;
+                        fwdE<lint>(a2;a));
+            fwd y x);
+    println("(" + a + ", " + b + ")");
+    fwd c1 c2
+};;
+
+proc test(){
+    cut{
+        affine a;
+        let! a 2
+        |a:coaffine ?colint|
+        cut{
+            affine b;
+            let! b 5
+            |b:coaffine ?colint|
+            init<!lint, !lint>(a,b,c1)
+        }
+        |c1:~Pair(!lint, !lint)|
+        printPairInt(c1,c2)
+        |c2:~Pair(!lint, !lint)|
+        swap<!lint>(c2,c3)
+        |c3:~Pair(!lint, !lint)|
+        printPairInt(c3,c4)
+        |c4:~Pair(!lint, !lint)|
+        release c4
+    }
+};;

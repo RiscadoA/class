@@ -1,0 +1,72 @@
+/*
+    This example defines a shared counter ADT.
+*/
+
+type counter { state !lint };;
+
+type cellproto(t)
+{
+	offer of {
+	|#Inc:  recv ~t;t
+	|#Dec:  recv ~t;t
+	|#Get:  recv ~t; send !lint; t
+	|#Share:recv ~t; recv t; t
+	|#Free: recv ~t; wait
+     }
+};;
+
+type counterT() {
+	sendty x; 
+	send x; 
+	! cellproto(x)
+};;
+
+proc new(c:counterT())
+{
+	sendty c (state !lint);
+   	cut {
+ 	  cell s(n: affine !lint. affine n; let! n 0)
+	  |s : usage ?colint|
+	  send c (nc:state !lint. fwd s nc);
+	  !c(p: cellproto(state !lint));
+	  case p of {
+		|#Inc:
+			recv p (ss: usage ?colint);
+			take ss(v:coaffine ?colint);
+			use v;
+			?v;
+			put ss(vi: affine !lint. affine vi; let! vi v + 1);
+			print "INC ";
+			fwd ss p
+		|#Dec:
+			recv p (ss: usage ?colint);
+			take ss(v:coaffine ?colint);
+			use v;
+			?v;
+			put ss(vi: affine !lint. affine vi; let! vi v - 1);
+			print "DEC ";
+			fwd ss p
+ 		|#Get:
+			recv p (ss: usage ?colint);
+			take ss(v:coaffine ?colint);
+			use v;
+			?v;
+			put ss(vc: affine !lint. affine vc; fwdE<lint>(vc ; v));
+			send p(vm:!lint. fwdE<lint>(vm ; v));
+			fwd ss p
+		|#Share:
+			recv p (ss: usage ?colint);
+			recv p (a: state !lint);
+			share ss {
+				fwd ss a
+				||
+				fwd ss p
+			}
+ 		|#Free:
+			recv p (ss: usage ?colint);
+			wait p;
+			release ss
+     }
+    }
+};;
+

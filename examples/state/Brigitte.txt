@@ -1,0 +1,26 @@
+x <- M <- a,b; b <- 
+
+
+lam v w.. { a <-  v : b  <- w <-} M N 
+
+
+Programs e := .... | box (Psi . M)
+
+LF Terms M :=  ... | unbox_1 (e)
+
+
+Kripke'style lambda calc.
+
+vec(G) ; G |- t : tau 
+
+vec(G) ; G ; . |- t : tau
+--------
+vec(G) ; G |- box t : box tau
+
+vec(G) |- t : box tau
+-------
+vec(G) ; G |- unbox_1 t : tau
+
+vec(G) ; G |- t : box tau
+--------
+vec(G) ; G |- unbox_0 t : tau

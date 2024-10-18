@@ -1,0 +1,83 @@
+include "../pure/lists-tensor.clls";;
+
+type BState
+     struct {
+     #count: !lint,
+     #pool: affine List(affine wait),
+};;
+
+type Barrier{
+    state BState
+};;
+
+proc init(x:affine BState){
+    affine x;
+    x.#count <- 100;
+    x.#pool <- { x.affine x; nil<affine wait>(x) };
+    close x 
+};;
+
+proc rec awakeAll(ws:~List(affine wait)){
+    sleep 1;
+    case ws of {
+        |  #Nil: wait ws;()
+        |  #Cons: w <- ws.#val;
+	          n <- ws.#next;
+		  par { close w || wait ws; awakeAll(n) }
+    }
+};;
+
+
+proc thread (c:~Barrier;id:colint) {
+	take c(ws);
+	n <- ws.#count;
+	println("thread " + id + ": waiting.");
+	if (n==1) {
+	 par{
+	    println("thread " + id + ": *** finished! ****");
+	    p <- ws.#pool;
+	    wait ws;
+	    use p;
+	    awakeAll(p)
+	    ||
+            put c(nws. init(nws)); // clean up
+       	    release c
+	 }
+	 } {
+	  cut{
+	    affine newt;
+	    wait newt;
+    	    println("thread " + id + " Go !");
+            ()
+            |newt:coaffine close|
+	    p <- ws.#pool;
+	    put c (nws.  affine nws;
+	    	  	 nws.#count <- n-1;
+			 nws.#pool <- { np. affine np; cons<affine wait>(newt,p,np) };
+			 close nws);
+	    wait ws;		 
+            release c
+       }
+	}
+};;
+
+
+proc unsafe_rec spawnall(c:~Barrier; i:colint, n:colint) {
+     if(n == 0){
+        release c
+     }{
+        share c{
+            thread(c;i)
+            ||
+            spawnall(c;i+1,n-1)
+        }
+     }
+};;
+
+proc main () {
+	cut {
+		cell c(x. init(x))
+		|c:~Barrier |
+		spawnall(c;0,100)
+	}
+};;

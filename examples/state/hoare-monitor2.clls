@@ -1,0 +1,347 @@
+/* Luis Caires 21.10.24 */
+/* simple monitor wait / notify, two conditions */
+/* counter with invariant 0 <= C <= MAX */
+
+type corec CIncI {
+   	coaffine IncI }
+and IncI {
+	offer of {
+	| #Inc: coaffine recv ContInc; wait
+	| #Share: recv CIncI; CIncI
+	| #End: wait
+	}
+} and ContInc {
+	coaffine send CIncI; close
+};;
+
+type corec CDecI {
+	coaffine DecI }
+and DecI {
+	offer of {
+	| #Dec: coaffine recv ContDec; wait
+	| #Share: recv CDecI; CDecI
+	| #End: wait
+	}
+} and ContDec {
+	coaffine send CDecI; close
+};;
+
+type CounterBT {
+	recv CDecI; CIncI
+};;
+
+type rec Rep {
+	send !lint; 
+	affine					// ADT state
+	send WaitQ(DecI); WaitQ(IncI)		// condition "variables"
+} and WaitQ(I) {
+	affine
+	choice of {
+	| #Next: NodeQ(I)
+	| #Null: close
+	}
+} and ContW(I) {
+	affine recv ~affine Rep; send affine Rep; recv ~coaffine I; wait
+} and NodeQ(I) {
+	state send ContW(I); WaitQ(I)	
+};;
+
+proc newWaitNode<I>(n:NodeQ(I), acc:~ContW(I))
+{
+	cell n (c. affine c; send c (acc); affine c; #Null c; close c )
+};;
+
+proc consWaitNode<I>(acc:~ ContW(I), next:~WaitQ(I), n:WaitQ(I))
+{
+	affine n; #Next n;
+	cell n (c. affine c; send c (acc); fwd c next)
+};;
+
+proc dummyWaitSDecI(c:affine send ContW(DecI); WaitQ(DecI))
+{
+	letc dacc: ContW(DecI) {
+		affine dacc; 
+		recv dacc (rep); 
+		send dacc (rep); 
+		recv dacc (di); wait dacc; affine di; #End di; close di
+	}
+	{ affine c; send c (dacc); affine c; #Null c; close c }
+};;
+
+proc disposeWaitNodeDecI(n:~statel send ContW(DecI); WaitQ(DecI) )
+{
+	put n (c.dummyWaitSDecI(c));
+	release n
+};;
+
+proc dummyWaitSIncI(c:affine send ContW(IncI); WaitQ(IncI))
+{
+	letc dacc: ContW(IncI) {
+		affine dacc; 
+		recv dacc (rep); 
+		send dacc (rep); 
+		recv dacc (di); wait dacc; affine di; #End di; close di
+	} { affine c; send c (dacc); affine c; #Null c; close c }
+};;
+
+proc disposeWaitNodeIncI(n:~statel send ContW(IncI); WaitQ(IncI) )
+{
+	put n (c.dummyWaitSIncI(c));
+	release n
+};;
+
+proc awaitNZ(m:usagel ~Rep, val:~!lint,
+			qd:~WaitQ(DecI), 
+			qi:~WaitQ(IncI),
+			cc:~ ContW(DecI))
+{
+	put m(v. affine v; send v (val);
+			affine v;
+			send v (nn.consWaitNode<DecI>(cc,qd,nn));
+	fwd v qi); 
+	release m
+};;
+
+proc awaitNM(m:usagel ~Rep, val:~!lint,
+			qd:~WaitQ(DecI), 
+			qi:~WaitQ(IncI),
+			cc:~ ContW(IncI))
+{
+	put m(v. affine v; send v (val);
+			affine v;
+			send v (qd);
+			consWaitNode<IncI>(cc,qi,v));
+	release m
+};;
+
+type decloopFT {
+	affine recv DecI;
+	recv usage ~Rep;
+	wait
+};;
+
+
+proc notifyNZ(s:~Rep, m:usagel ~Rep, m0:state Rep, dl: ~decloopFT) {
+	recv s(val);
+	?val; // this inference is generating some issue
+	recv s(wnz);
+	case wnz of {
+	| #Null: // no one waiting
+		put m(v. 	affine v; send v (val); 
+			 	affine v;
+			 	send v(wnzn. affine wnzn; #Null wnzn; close wnzn);
+			 	fwd v s);
+		wait wnz;
+		par { fwd m m0 || discard dl }
+	| #Next: // some waiting
+		take wnz(h); 
+		recv h(cc);
+		send cc(so. affine so; send so (val); 
+				  affine so; send so (h); fwd so s);
+		recv cc(si);
+		put m(si);
+		share m {
+			send cc (ccn. send dl (ccn); send dl (m); close dl); 
+			par { close cc || disposeWaitNodeDecI(wnz) }
+			||
+			fwd m m0
+		}
+	}
+};;
+
+type incloopFT {
+	affine recv IncI;
+	recv usage ~Rep;
+	wait
+};;
+
+proc notifyNM(s:~Rep, m:usagel ~Rep, m0:state Rep, il:~incloopFT) {
+	recv s(val);
+	recv s(wnm);
+	case s of {
+	| #Null: // no one waiting
+				wait s;
+		put m(v. affine v;
+				send v (val); 
+			 	affine v;
+				send v(wnm);
+			 	affine v; #Null v; close v);
+		par { fwd m m0 || discard il }
+	| #Next: // some waiting
+		take s(h); 
+		recv h(cc);
+		send cc(so. affine so; send so (val); 
+				  affine so; send so (wnm); fwd so h);
+		recv cc(si);
+		put m(si);
+		share m {
+			send cc (ccn. send il (ccn); send il (m); close il); 
+			par { close cc || disposeWaitNodeIncI(s) }
+			||
+			fwd m m0
+		}
+	}
+};;
+
+proc rec decloop(dv:DecI, m:usage ~Rep)
+{
+	case dv of {
+	|#Share:	recv dv (dvn); 
+			share m { decloop(dvn,m) || decloop(dv,m) }
+	|#Dec:   
+		   	recv dv(acc);
+			wait dv;
+			take m(n); 
+			recv n(val);
+			if (val>0) {
+		   		letc s:Rep { send s (val-1); fwd s n } {
+				letc iloop: incloopFT { affine iloop;
+					recv iloop (iv);
+					recv iloop (m);
+					wait iloop;
+					incloop(iv,m) } {
+		   		letc m0:state Rep { notifyNM(s, m, m0, iloop) } {
+				println ("Dec "+val);
+				send acc (coo. decloop(coo,m0)); 
+				close acc
+				}}}
+			
+			} {  
+				recv n(qd);
+				println ("Dec put on Wait "+val);
+				letc  decc: ~ContW(DecI)  {
+					awaitNZ(m, val, qd, n, decc)
+				}{	
+					affine decc;
+					recv decc(s0);
+					recv s0(v);
+					send decc(s.affine s; send s (v-1); fwd s0 s);
+					println ("Dec");
+					fwd acc decc  }
+			}
+	|#End: wait dv; release m
+	}
+} and incloop(iv:IncI, m:usage ~Rep)
+{
+	case iv of {
+	|#Share:	recv iv (ivn); 
+			share m { incloop(ivn,m) || incloop(iv,m) }
+	|#Inc:   
+		   	recv iv(acc);
+			wait iv;
+			take m(n); 
+			recv n(val);
+			if (val<10) {
+		   		letc s:Rep  { send s (val+1); fwd s n
+				} {
+				letc  dloop: decloopFT  {affine dloop;
+					recv dloop (dv);
+					recv dloop (m);
+					wait dloop;
+					decloop(dv,m) } {
+		   		letc m0:state Rep  {
+				notifyNZ(s, m, m0, dloop) } {
+				println ("Inc "+val);
+				send acc (coo. incloop(coo,m0)); 
+				close acc
+				}}}
+			} {  
+				recv n(qd);
+				println ("Inc put on Wait "+val);
+				letc   incc: ~ContW(IncI)  {
+					awaitNM(m, val, qd, n, incc) } {
+				affine incc;
+					recv incc(s0);
+					recv s0(v);
+					send incc(s.affine s; send s (v+1); fwd s0 s);
+					println ("Inc");
+					fwd acc incc
+					} } 
+	|#End: wait iv; release m
+	}
+};;
+
+proc MonitorCounter(cv:CounterBT)
+{
+	letc m:state Rep  {
+		cell m(r. affine r;
+				send r (0); 
+				affine r;
+				send r(r0. affine r0; #Null r0; close r0);
+				affine r; #Null r; close r)
+			} {  
+	recv cv (dv);
+	share m {
+		incloop(cv,m)
+		||
+		decloop(dv,m)
+	}}
+};;
+
+
+proc unsafe_rec cli1(c2:~CIncI;n:~lint) {
+	affine c2;
+	if (n==0) {
+		#End c2; 
+		close c2
+	}
+	{
+		println ("Client Call #Inc");
+		#Inc c2; 
+		affine c2;
+		send c2(acc. 
+			affine acc;
+			recv acc (cb);
+			wait acc;
+			cli1(cb; n-1));
+		close c2
+	}
+};;
+
+proc unsafe_rec cli2(c2:~CDecI;n:~lint) {
+	affine c2;
+	if (n==0) {
+		#End c2; 
+		close c2
+	}
+	{
+	        sleep 4;  // uncomment to speed down decrements
+		println ("Client Call #Dec");
+		#Dec c2; 
+		affine c2;
+		send c2(acc. 
+			affine acc;
+			recv acc (cb);
+			wait acc;
+			cli2(cb; n-1));
+		close c2
+	}
+};;
+
+
+proc unsafe_rec cliNDec(c2:~CDecI;nThreads:~lint,kDecs:~lint) {
+	if (nThreads==1) {
+		cli2(c2; kDecs)
+	} {
+		affine c2;
+		#Share c2;
+		send c2 (u. cli2(u; kDecs));
+			cliNDec(c2; nThreads-1, kDecs)
+	}
+};;
+
+proc main() 
+{
+	letc c0:CounterBT { MonitorCounter(c0) }
+	{
+	letc c1:~CIncI
+	     { cli1(c1;100)}
+	{  	  // 1 incrementer thread, does 100 decs
+	letc c2:~CDecI
+	     {cliNDec(c2;2,50)}
+	{    	// 2 decrementer threads, each does 50 decs
+	send c0 (c2);
+	fwd c1 c0}}
+	}
+};;
+

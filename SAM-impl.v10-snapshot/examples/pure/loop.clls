@@ -1,0 +1,30 @@
+
+type rec L {
+    choice of {
+        |#end: close
+        |#loop:  L
+    }
+};;
+
+
+proc unsafe_rec loop(c:~L){
+case c of {
+    |#end: wait c; ()
+    |#loop: println("loop");
+            cut{
+            loop(d)
+            |d:L|
+            #loop d;
+            fwd d c
+          }
+    }
+};;
+
+
+proc p(c:L){
+    #loop c; #end c; close c
+};;
+
+proc q(){
+    cut{loop(c) |c:L| p(c)}
+};;

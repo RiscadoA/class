@@ -1,0 +1,280 @@
+/*
+    Includes and runs all examples.
+*/
+
+
+/*
+    Queue implemented using a single list:
+    enqueueing is implemented by appending the element to the end of the list,
+    whereas dequeueing is implemented by removing (if any) the head element.
+
+*/
+include "1queue/client.clls";;
+include "1queue/server.clls";;
+include "1queue/tests.clls";;
+systemSeq();;
+systemPar();;
+
+
+/*
+    Code for queue implemented using two lists,
+    which has O(1) amortised time for enqueueing and dequeueing.
+*/
+include "2queue/client.clls";;
+include "2queue/server.clls";;
+include "2queue/tests.clls";;
+systemPar();;
+
+
+
+/*
+    A fine-grained variant of the functional queue defined in 2queue/.
+*/
+include "2queueA/client.clls";;
+include "2queueA/server.clls";;
+include "2queueA/tests.clls";;
+systemPar();;
+
+/*
+   Composes a reference cells storing a natural with three concurrent threads:
+   one increments, the other doubles and the third gets the natural and prints it.
+
+   The goal is to show how the outcome of the printing thread depends on the interleaving
+   of the three atomic actions. In the metatheoretical model of CLASS we can expose all
+   the possible outcomes (with nondeterministic sums)
+   by reducing the system with a couple of simple algebraic-like manipulations.
+
+*/
+include "algebraic-reasoning.clls";;
+system();;
+
+
+/*
+    Defines an imperative binary search tree
+    and some tests.
+*/
+/*
+include "binary-search-trees.clls";;
+test1();;
+test2();;
+test3();;
+test4();;
+test5();;
+test6();;
+*/
+
+/*
+    Shows how exponential cells (cells storing exponential sessions) can be implemented
+    using the affine-storing reference cells of CLASS.
+    In exponential-cells.clls we consider just read and write operations.
+    In cells-with-exponentials-and-locks we extend the encoding to accommodate locks.
+
+*/
+include "exponential-cells.clls";;
+system1();;
+system2();;
+
+
+/*
+    Implements a counter using closures.
+*/
+include "counter-closure.clls";;
+//main();;
+
+/*
+    Defines a shared counter ADT and some tests.
+    Tests in  tests/counter.clls.
+*/
+include "counter/server.clls";;
+include "counter/client.clls";;
+include "counter/tests.clls";;
+test1();;
+test2();;
+
+
+/*
+    Implements the dining philosophers and defines some tests.
+*/
+include "dining-philosophers.clls";;
+main();;
+
+/*
+    Shows with a simple example that cells are first class objects
+    which can be communicated along session channels.
+*/
+include "first-class-cells.clls";;
+system();;
+
+/*
+Defines a concurrent shareable buffered channel,
+implemented using a linked list with two indepedent pointers:
+one to the head (for receiving) and other to the tail (for sending).
+This example is based on the buffered channel implementation from:
+Simon Marlow. 2013. "Parallel and concurrent programming in Haskell:
+Techniques for multicore and multithreaded programming."
+*/
+include "buffered-channel/client.clls";;
+include "buffered-channel/server.clls";;
+include "buffered-channel/tests.clls";;
+systemPar2();;
+//systemPar3();;
+//systemPar();;
+
+/*
+Defines a variation of the buffered channel, inspired by the multicast
+operation given in
+Simon Marlow. 2013. "Parallel and concurrent programming in Haskell:
+Techniques for multicore and multithreaded programming."
+This example allows two receive usages to be duplicated,
+i.e. when one element is received through one the usages
+it is still available to the other. Since there is copy involved on each
+read operation, this variant of the buffered channel only works with
+buffered channels that store persistent elements of type !A.
+
+*/
+include "buffered-channel-multicast/client.clls";;
+include "buffered-channel-multicast/server.clls";;
+include "buffered-channel-multicast/tests.clls";;
+systemPar();;
+systemPar2();;
+systemPar3();;
+systemPar4();;
+
+/*
+Implements a buffered channel in which receives blocks if the channel is empty.
+The implementation exposes two views: one for sending, another for receiving. 
+Only the view for sending can be shared. 
+*/
+include "blocking-buff-chan.clls";; 
+main();;
+
+/*
+    Defines linked lists, some operations and tests.
+*/
+include "linked-lists.clls";;
+test0();;
+test1();;
+
+/*
+    A simple example with mutable pairs, some operations and tests.
+*/
+include "mutable-pairs.clls";;
+test();;
+
+
+/*
+   Implements language CSLL from
+    "Client-server sessions in linear logic" 5(ICFP) (Aug 2021)
+    Qian, Z., Kavvos, G.A., Birkedal, L.
+   in CLASS.
+*/
+include "CSLL.clls";;
+
+/*
+    Implements a shared stack ADT using a list, where push inserts an element to the head of
+    the list and pop removes (if any) the head element.
+ */
+include "stack/client.clls";;
+include "stack/server.clls";;
+include "stack/tests.clls";;
+systemSeq();;
+systemPar();;
+systemPar2();;
+
+/*
+Inspired by exponential-isomorphisms.clls, we try to find and code
+some remarkable morphisms
+associated with the state modalities.
+*/
+include "state-isomorphisms.clls";;
+
+
+/*
+    Defines a simple latch ADT.
+*/
+include "latch/client.clls";;
+include "latch/server.clls";;
+include "latch/tests.clls";;
+system();;
+
+/*
+    Implements a fork-join.
+*/
+include "fork-join.clls";;
+main();;
+
+/*
+    Implements a barrier.
+*/
+include "barrier.clls";;
+main();;
+
+/*
+    Implements a counter with typestates.
+*/
+include "behavioralstate.clls";;
+mainbeh();;
+
+/*
+    Defines a shared factory for general corecursive processes.
+*/
+include "behavioralstate-shared.clls";;
+ mainSharedB();;
+
+/*
+ Implements arrays using linked lists.
+*/
+include "rarrays.clls";;
+main();;
+
+/*
+    Implements some examples based on Rust language library documentation.
+include "rust1.clls";;
+main();;
+include "rust2.clls";;
+main();;
+*/
+
+/*
+    Implementes a simple toggle.
+*/
+include "toggle.clls";;
+main();;
+/*
+    Implements a counter with typestates.
+*/
+include "typestate.clls";;
+mainLinear();;
+include "typestate-shared.clls";;
+mainShared();;
+include "typestates-counter.clls";;
+
+
+/*
+    Implements a shared corecursive flag.
+*/
+include "flag.clls";;
+main();;
+
+/*
+    Implements a  Hoare-style monitor for a counter with wait/notify and
+    a single counter invariant C >= 0.
+*/
+include "hoare-monitor.clls";;
+main();;
+
+/*
+    Implements a  Hoare-style monitor for a (bounded) counter with wait/notify and
+    a two counter invariants C >= 0 and C <= MAX.
+*/
+include "hoare-monitor2.clls";;
+main();;
+
+/*
+    Implements cells with an user-inputted finaliser, using reference counting.
+*/
+include "cells-with-finaliser.clls";;
+test0();;
+test1();;
+test2();;
+test3();;

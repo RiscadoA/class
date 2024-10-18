@@ -1,0 +1,119 @@
+/*
+    We define some tests for the shared counter ADT.
+        * test1() --  composes the counter with three clients running concurrently:
+                      One increments the counter n times,
+                      other decrements the counter n times,
+                      and other gets n times the value of the counter.
+
+        * test2() --  composes the counter with a client that first increments the
+                      counter n times, gets its value and finally decrements the
+                      counter n times.
+*/
+
+include "client.clls";;
+
+
+proc doNInc<tX> (s:~tX, ns:tX ; m:~cellproto(tX), a:~lint) {
+	cut {
+		!body(sb:recv ~tX;tX);
+			recv sb (e:~tX);
+			inc<tX>(e,sb;m)
+		|body: ?send tX; ~tX|
+		?body;
+		iter<tX>(ns,s;body,a)
+	}
+};;
+
+proc doNDec<tX> (s:~tX, ns:tX ; m:~cellproto(tX), a:~lint) {
+	cut {
+		!body(sb:recv ~tX;tX);
+			recv sb (e:~tX);
+			dec<tX>(e,sb;m)
+		|body: ?send tX; ~tX|
+		?body;
+		iter<tX>(ns,s;body,a)
+	}
+};;
+
+proc doNGet<tX> (s:~tX, ns:tX ; m:~cellproto(tX), a:~lint) {
+	cut {
+		!body(sb:recv ~tX;tX);
+			recv sb (e:~tX);
+			cut {
+			get<tX>(e,v,sb;m)
+			|v:~!lint|
+			?v;
+			print "GOT "+v+" ";()
+			}
+		|body: ?send tX; ~tX|
+		?body;
+		iter<tX>(ns,s;body,a)
+	}
+};;
+
+proc test1aux(;a:~lint) {
+cut{
+	new(s)
+	|s:~counterT()|
+	recvty s (t);
+	recv s (x0:~t);
+	?s;
+	cut {
+	cut {
+	shhare<t>(x0, s1, s2; s)
+	|s1:~t|
+	cut { doNInc<t> (s1, ns ; s, a) |ns:~t| dispose<t>(ns;s) 	}
+	}
+	|s2:~t|
+	cut {
+	cut {
+	shhare<t>(s2, s21, s22; s)
+	|s21:~t|
+	cut { doNDec<t> (s21, ns ; s, a)  |ns:~t| dispose<t>(ns;s)  }
+	}
+	|s22:~t|
+	cut { doNGet<t> (s22, ns ; s, a) |ns:~t| dispose<t>(ns;s) }
+	}
+}}};;
+
+proc test1() {
+     cut {
+     let! a 50
+     |a:~!lint|
+     ?a;
+     test1aux(;a)
+     }
+};;
+
+proc test2aux(;a:~lint) {
+cut{
+	new(s)
+	|s:~counterT()|
+	recvty s (t);
+	recv s (x0:~t);
+	?s;
+	cut {
+	doNInc<t> (x0, x1 ; s, a)
+	|x1:~t|
+	cut {
+	get<t>(x1,v,x2;s)
+	|v:~!lint|
+	?v;
+	print "GOT "+v+" ";()
+	}
+	|x2:~t|
+	doNDec<t> (x2, x3 ; s, a)
+	|x3:~t|
+	dispose<t>(x3;s)
+	}
+	}
+};;
+
+proc test2() {
+     cut {
+     let! a 50
+     |a:~!lint|
+     ?a;
+     test2aux(;a)
+     }
+};;

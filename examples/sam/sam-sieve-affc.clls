@@ -1,0 +1,142 @@
+type corec AIntStream {
+     affine send !lint; AIntStream
+ };;
+ 
+proc rec intsfm(nk: AIntStream; k:~lint)
+ {
+     affine nk; send nk(k); intsfm(nk;k+1)
+ };;
+
+proc intsfm2(n2: AIntStream)
+ {
+     intsfm(n2;2)
+ };;
+ 
+proc rec filter (outsf:AIntStream, insf:~affine send !lint; AIntStream;nf:~lint)
+ {
+    use insf;
+    recv insf (v); 
+     if  ((v / nf)*nf==v)
+     	 { unfold insf; filter(outsf,insf;nf) }
+     	 { unfold insf; affine outsf; send outsf (v); filter(outsf, insf;nf) }
+ };; 
+
+proc rec sieve(outss:AIntStream, inss:~affine send !lint; AIntStream)
+ {
+    // use inss;
+    recv inss (p);
+    unfold inss;
+ //   ?p;
+    affine outss;
+    send outss(p);
+    cut  {
+    filter(outp,inss;p)
+    |outp:~AIntStream|
+    // unfold outp;
+    sieve(outss,outp)
+    }
+ };;
+
+proc primesN(primes:AIntStream)
+ {
+ cut  {
+      intsfm2(nn)
+      |nn:~AIntStream|
+      // unfold nn;
+      sieve(primes,nn)
+}
+};;
+
+proc unsafe_rec printfirst(il:~AIntStream;k:~lint)
+{
+   if(k==0)
+     	 {
+	 // unfold il;
+	 println(" STOP.");
+	 discard il
+	 }
+     	 {
+	 // unfold il;
+	 // use il;
+	 recv il(n);
+	 print(n);
+	 print(" ");
+	 printfirst(il;k-1)
+	}
+};;
+
+proc main_sa()
+{
+ cut  {
+       primesN(primes)
+       |primes:~AIntStream|
+       printfirst(primes;80)
+      }
+ };;
+
+proc primesNC(primes:AIntStream)
+{
+ ccut  {
+      intsfm2(ni)
+      |ni:~AIntStream|
+      // unfold ni;  // should not type check without this !!
+      sieve(primes,ni)
+}
+};;
+
+
+proc mainc_sa()
+{
+ ccut  {
+       primesNC(primes)
+       |primes:~AIntStream|
+       printfirst(primes;80)
+      }
+ };;
+
+proc printfirst1(il:~AIntStream)
+{
+	 unfold il;
+	 use il;
+	 recv il(n);
+	 print(n);
+	 println(" **");
+	 unfold il;
+	 discard il
+};;
+
+proc printfirst0(il:~AIntStream)
+{
+	 unfold il;
+	 discard il
+};;
+
+proc rec pipe(outss:AIntStream, inss: ~affine send !lint; AIntStream )
+{
+    unfold outss;
+    affine outss;
+    use inss;
+    recv inss (num);
+    ?num;
+    send outss(num);
+    // unfold inss;
+    pipe(outss,inss)
+ };;
+
+
+proc mainc_sna()
+{
+ ccut  {
+       intsfm2(ni)
+       |ni:~AIntStream|
+       ccut  {
+       unfold ni;    // inferring this now (unfoldRecInferParameter)!
+       pipe(no,ni)
+       |no:~AIntStream|
+       printfirst1(no)
+      }
+      }
+ };;
+
+sam main_sa();;
+sam mainc_sa();;

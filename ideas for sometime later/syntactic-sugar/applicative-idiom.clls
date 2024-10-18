@@ -1,0 +1,28 @@
+type List {
+offer {
+  #Nil: stop 
+  #Cons: int ; List 
+}};;
+
+proc nil () returns (ret:List)
+{
+  ret <- #Nil
+};;
+
+proc cons(n:int, l:List) returns (ret:List)
+{
+  ret <- #Cons; n; l
+};;
+
+/* also 
+
+    ret <- #Cons;
+    ret <- n;
+    fwd l ret
+
+*/
+
+proc main() returns (l:list)
+{
+     l <- cons(1,cons(2, nil()))
+};;

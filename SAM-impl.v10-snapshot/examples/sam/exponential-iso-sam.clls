@@ -1,0 +1,55 @@
+/*
+We typecheck the CLL exponential isomorphisms
+
+! (A & B) == !A x !B  and ?(A + B) == !A par ?B
+
+Two formulas A, B are equivalent, written A == B, iff there exists a process P(x:~A, y:B) and a process Q(x:~B, y:A).
+*/
+
+//!(A & B) -o !A x !B
+
+proc p<A,B>(x: ~!offer of {|#L:A |#R:B}, y:send !A; !B){
+    ?x;
+    send y(z:!A. !z(z0:A);call x(x0:choice of {|#L:~A |#R:~B}); #L x0; fwd x0 z0);
+    !y(y0:B); call x(x0:choice of {|#L:~A |#R:~B});#R x0; fwd x0 y0
+};;
+
+// !A x !B  -o !(A & B)
+
+
+proc q<A,B>(x:~ send !A; !B, y:!offer of {|#L: A |#R:B}){
+    recv x(z:?~A);
+    ?z;
+    ?x;
+    !y(y0:offer of {|#L: A |#R:B});
+    case y0 of {
+        |#L: call z(z0:~A); fwd y0 z0
+        |#R: call x(x0:~B); fwd y0 x0
+    }
+};;
+
+type proto {
+	recv ~lint; send lint; close
+};;
+
+proc test_iso()
+{
+    cut {
+	!b(x);
+	case x of {
+	|	#L: recv x (v); send x(v+1); close x
+	|	#R: recv x (v); send x(2*v); close x
+	}
+	| b: ~!offer of {|#L:proto |#R: proto }  |
+	p<proto,proto>(b, d)
+	| d:   ~ send !proto ; !proto  |
+	recv d(s1);
+	par {
+		call s1(p1); send p1(2); recv p1 (res); println (res); wait p1; ()
+	||
+		call d(p2); send p2(5); recv p2 (res); println (res); wait p2; ()
+	}
+    }
+};;
+
+

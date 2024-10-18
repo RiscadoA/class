@@ -1,0 +1,73 @@
+proc rec getLast(s:~LockOrder,
+	fi:~Fork,
+	lh: send LockOrder; send Fork; close ; 
+	nam:colstring)
+{
+	take s (h1: ~ALock );
+	recv h1 (f:~Fork);
+	case h1 of {
+	| #Null:
+		wait h1;
+		print (nam+" fi"); #Pick fi;
+		print (nam+" f" ); #Pick f; 
+		println (nam+" got 2"); 
+	   	shareL s {
+					//sleep 10;
+					print (nam+" f"); #Drop f; 
+					put s (v:ALock.null(v,f));
+					release s
+					||
+	   				send lh (lh0:LockOrder. fwd s lh0);
+					//sleep 10;
+					print (nam+" fi"); #Drop fi; 
+					send lh (fo:Fork. fwd fi fo);
+					close lh
+				}
+	| #Next: 
+		cut { 	 
+				 	getLast(h1,fi,lhn; nam) 
+				  	|lhn: ~ send LockOrder; send Fork; close | 
+				   	recv lhn (loo:~LockOrder);
+					put s (n1: ALock. 
+							affine n1;
+							send n1 (fn1:Fork. fwd f fn1);
+							affine n1;
+			 				#Next n1; fwd n1 loo);
+	   				send lh (lh0:LockOrder. fwd s lh0);
+				   	recv lhn (foo:~Fork);	
+					wait lhn;				
+	   				send lh (fo1:Fork. fwd foo fo1);
+					close lh
+	    }
+    }
+};;
+
+
+
+proc eat2(s: ~LockOrder, lh:LockOrder; nam:colstring) 
+{
+	take s (h1: ~ALock );
+	recv h1 (f:~Fork);
+	case h1 of {
+	| #Null: // never happens
+		wait h1; 
+		println (nam+"UNREACHABLE");
+	   	put s (v:ALock.null(v,f));
+	   	fwd s lh
+	| #Next: 
+			cut {
+			getLast(h1,f,lhn;nam) 
+			// that takes and puts last and returns h1
+			|lhn: ~ send LockOrder; send Fork; close |
+			recv lhn (loo:~LockOrder);
+			recv lhn (foo:~Fork);	
+			wait lhn;				
+			put s (n1: ALock. 
+					affine n1;
+					send n1 (f0:Fork. fwd foo f0);
+					affine n1;
+					#Next n1; fwd loo n1);
+			fwd s lh
+			}	
+     }	
+};;

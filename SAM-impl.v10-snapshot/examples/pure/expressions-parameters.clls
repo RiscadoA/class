@@ -1,0 +1,182 @@
+// inlined expression syntax
+
+proc test1() {
+       cut{
+        send s(2); close s
+	|s: recv ~lint; wait|
+        recv s(x);
+	println(x+2); wait s; ()
+    }
+};;
+
+test1();;
+
+proc test2() {
+       cut{
+        recv s(x);
+	println(x+2); wait s; ()
+	|s: send lint; close|
+        send s(2); close s
+    }
+};;
+
+test2();;
+
+proc test3() {
+       cut{
+        send s(6); recv s(x);
+	println(x); wait s; ()
+	|s: recv ~lint; send lint; close|
+        recv s(y);send s(y); close s
+    }
+};;
+
+test3();;
+
+proc test1b1() {
+       cut{
+       let! s 3
+	|s: ~!lint|
+       println(s);()
+    }
+};;
+
+test1b1();;
+
+proc test1b() {
+       cut{
+        send s(2); send s(" foo!"); close s
+	|s: recv ~!lint; recv ~!lstring; wait|
+        recv s(x);
+	recv s(a);
+	println("hello = "+(4*x+2*x)/2+a); wait s; ()
+    }
+};;
+
+test1b();;
+
+proc test1p(;v:colint) {
+       cut{
+        send s(v); send s(" foo!"); close s
+	|s: recv ~!lint; recv ~!lstring; wait|
+        recv s(x);
+	recv s(a);
+	println("hello = "+(4*x+2*x)/2+a); wait s; ()
+    }
+};;
+
+test1p(;10);;
+
+proc test3(v:colint) {
+       cut{
+        send s(v); recv s(x);
+	println(x); wait s; ()
+	|s: recv ~lint; send lint; close|
+        recv s(y);send s(y); close s
+    }
+};;
+
+test3(89);;
+
+proc test1B1() {
+       cut{
+	send s (x. let! x 3); close s
+      	 |s: recv ~!lint; wait|
+         recv s(x); wait s;
+	 ?x;
+	 let! z x+1
+	 |z:~!lint|
+	 println(z); () 
+    }
+};;
+
+test1B1();;
+
+proc test1B2(;y:colint) {
+       cut{
+	send s (x. !x(v); let v (3+y)); close s
+      	 |s: recv ~!lint; wait|
+         recv s(x); wait s;
+	 ?x;
+	 let! z x+x
+	 |z:~!lint|
+	 println(z); () 
+    }
+};;
+
+test1B2(;3);;
+
+proc testF1() {
+     cut {
+	 let z 101
+	 |z:~lint|
+	 fwd z w
+	 |w:~lint|
+	 println(w);()
+    }
+};;
+
+testF1();;
+
+proc testF() {
+     cut {
+	 let z 1
+	 |z:~lint|
+	 fwd w z
+	 |w:~lint|
+	 println(w);()
+    }
+};;
+
+testF();;
+
+proc testF1x() {
+     cut {
+	 let! z 1
+	 |z:~!lint|
+	 fwd z w
+	 |w:~!lint|
+	 print(w+1);()
+    }
+};;
+
+testF1x();;
+
+proc testF1i() {
+     cut {
+	 let! z 1
+	 |z:~!lint|
+	 fwd z w
+	 |w:~!lint|
+	 if (w<0) {println("FOO");() } { println("BAR");() }
+    }
+};;
+
+testF1i();;
+
+proc testF2i() {
+     cut {
+	 let! z 1
+	 |z:~!lint|
+	 fwd z w
+	 |w:~!lint|
+	 if (w>0) {println("FOO");() } { println("BAR");() }
+    }
+};;
+
+testF2i();;
+
+proc testF2ie(;a:colint) {
+     cut {
+	 let! z 1+a
+	 |z:~!lint|
+	 fwd z w
+	 |w:~!lint|
+	 if (w>0) {println("FOO");() } { println("BAR");() }
+    }
+};;
+
+
+
+testF2ie(;1);;
+testF2ie(;-1);;

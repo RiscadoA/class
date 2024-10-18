@@ -1,0 +1,8 @@
+proc cbv(){
+    ccut{
+	send s (2); recv s(y); println (y); close s
+	|s:~ send lint; recv ~lint; close|
+	recv s(x); send s(x+1); wait s; ()
+}
+};;
+

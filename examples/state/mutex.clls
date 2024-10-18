@@ -1,0 +1,197 @@
+include "../pure/maybe.clls";; 
+//include "../pure/lists.clls";; 
+
+type rec List(A){
+    affine 
+    choice of {
+        |#Nil:  close
+        |#Cons: send affine A; List(A)
+    }
+};;
+
+proc nil<A>(l:List(A)){
+   affine l; #Nil l; close l
+};;
+
+proc cons<A>(a:coaffine ~A, l:~List(A), nl:List(A)){
+    affine nl; #Cons nl; send nl(a); fwd nl l
+};;
+
+proc rec append<A>(l:~List(A),a:coaffine ~A, nl:List(A)){
+    case l of {
+        |#Nil: wait l; cut{nil<A>(x) |x:~List(A)| cons<A>(a,x,nl)}
+        |#Cons: recv l(b); cut{ append<A>(l,a, x) |x:~List(A)| cons<A>(b,x,nl)}
+    }
+};;
+
+
+type corec MutexF(A){
+    offer of {
+        |#Acquire:  coaffine Cont(A)
+        |#Release:  wait
+        |#Share:    recv MutexF(A); MutexF(A)
+}}
+and MutexE(A){
+    offer of {
+        |#Put: recv coaffine ~A; MutexF(A)
+    }
+} and Cont(A){
+    send affine A; MutexE(A)
+} and State(A){
+    usage{recv coaffine ~maybe(affine A);coaffine ~List(~Cont(A))} 
+};;
+
+proc rec mutexF<A>(x:MutexF(A), c:State(A)){
+    case x of {
+        |#Acquire:  take c(l);
+                    use l;
+                    recv l(v); 
+                    case v of {
+                        |#Nothing:
+                        wait v; 
+                        put c(nl.   affine nl;
+                                    send nl(nv. affine nv; #Nothing nv; close nv);
+                                    affine nl; 
+                                    append<~Cont(A)>(l,x,nl));
+                        release c 
+                        |#Just: 
+                        put c(nl.   affine nl;
+                                    send nl(nv. affine nv; #Nothing nv; close nv);
+                                    affine nl; 
+                                    fwd nl l);
+                        use x; 
+                        send x(v);
+                        mutexE<A>(x,c)
+                    } 
+        |#Release:  wait x;
+                    release c
+
+        |#Share: recv x(y);
+                 share c{ mutexF<A>(x,c) || mutexF<A>(y,c)}
+    }
+}
+and mutexE<A>(x:MutexE(A), c:State(A)){
+    case x of {
+        |#Put:  recv x(a);
+                take c(l);
+                recv l(v);
+                par{
+                    discard v
+                 ||
+                    shareL c{
+                        awake<A>(l,a,c)
+                        ||
+                        mutexF<A>(x,c)
+                    }
+                }
+    }
+}
+and awake<A>(l:~List(~Cont(A)),a: coaffine ~A, c:usagel{recv coaffine ~maybe(affine A);coaffine ~List(~Cont(A))}){
+    case l of {
+        |#Nil:
+        wait l; 
+        put c(nl.   affine nl;
+                    send nl(nv. affine nv; #Just nv; fwd nv a);
+                    affine nl; 
+                    nil<~Cont(A)>(nl));
+        release c
+
+        |#Cons: 
+        recv l(y);
+        send y(a);
+        put c(nl.   affine nl;
+                    send nl(nv. affine nv; #Nothing nv; close nv);
+                    affine nl;
+                    fwd nl l);
+        mutexE<A>(y,c)
+    }
+};;
+
+
+proc main0(){
+    cut{
+        cell c(l.   affine l;
+                    send l(v. affine v; #Just v; affine v;close v);
+                    affine l; 
+                    nil<~Cont(close)>(l))
+        |c:State(close)|
+        mutexF<close>(x,c)
+        |x:~MutexF(close)|
+        #Release x;
+        close x
+    }
+};; 
+
+proc main1(){
+    cut{
+        cell c(l.   affine l;
+                    send l(v. affine v;#Just v;affine v;close v);
+                    affine l; 
+                    nil<~Cont(close)>(l))
+        |c:State(close)|
+        mutexF<close>(x,c)
+        |x:~MutexF(close)|
+        #Share x;
+        send x(y. #Release y;
+                  close y);
+        #Release x; 
+        close x 
+    }
+};; 
+
+proc main2(){
+    cut{
+        cell c(l.   affine l;
+                    send l(v. affine v; #Just v; affine v; close v);
+                    affine l; 
+                    nil<~Cont(close)>(l))
+        |c:State(close)|
+        mutexF<close>(x,c)
+        |x:~MutexF(close)|
+        #Acquire x;
+        affine x;
+        recv x(a);
+        #Put x;
+        send x(a);
+        #Release x; 
+        close x 
+    }
+};; 
+
+proc main3(){
+    cut{
+        cell c(l.   affine l;
+                    send l(v. affine v; #Just v; affine v; close v);
+                    affine l; 
+                    nil<~Cont(close)>(l))
+        |c:State(close)|
+        mutexF<close>(x,c)
+        |x:~MutexF(close)|
+        #Share x; 
+        send x(y.   #Acquire y;
+                    affine y;
+                    println("thread y: successively acquired");
+                    recv y(a);
+                    #Put y;
+                    send y(a);
+                    #Release y;
+                    close y);
+        #Share x;            
+        send x(z.   #Acquire z;
+                    affine z;
+                    println("thread z: successively acquired");
+                    recv z(a);
+                    #Put z;
+                    send z(a);
+                    #Release z;
+                    close z);                    
+        #Acquire x;
+        affine x;
+        println("thread x: successively acquired");
+        recv x(a);
+        #Put x;
+        send x(a);
+        #Release x; 
+        close x 
+    }
+};; 

@@ -1,0 +1,29 @@
+type Counter { state lint };;
+
+proc counter(c: Counter){
+    cell c(42)
+};;
+
+proc reset(c: ~Counter){
+    take c(n);
+    println("GOT "+n+" and RESET");
+    put c(0);
+    release c
+};;
+
+proc inc(c: ~Counter){
+    take c(n);
+    println ("INC");
+    put c(n+1);
+    release c
+};;
+
+proc main(){
+    cut{
+        counter(c)
+        |c: ~Counter|
+        share c {
+            inc(c) || reset(c) || inc(c) || reset(c)
+        }
+}};;
+

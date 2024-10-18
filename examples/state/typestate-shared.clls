@@ -1,0 +1,73 @@
+include "typestate.nt.clls";;
+include "shared-factory.clls";;
+
+type ISharedCounterADT {
+	sendty N;
+	sendty NZ;
+	ISharedObject(LICounterINV(N,NZ))  // invariant type
+};;
+
+proc SharedCounter(c: ISharedObject(ICounterINV(state lint,state lint))) {
+	cut {
+	affine lc;
+	send lc (m. cell m (0));
+		counterObjOps(lc)
+	| lc: ~ ICounterINV(state lint,state lint) |
+	SharedObjectFactory <LICounterINV(state lint,state lint)>(c,lc)
+	}
+};;
+
+proc SharedCounterObj (c: ISharedCounterADT) {
+	sendty c (state lint);
+	sendty c (state lint);
+	SharedCounter(c)
+};;
+
+proc mainShared()
+{
+	cut {
+	SharedCounterObj(c)
+	|c:~ ISharedCounterADT |
+	recvty c (N);
+	recvty c (NZ);
+	recvty c (S);
+	recv c (s:~S);
+
+	call c(u:~ ISharedObjectMenu(S,LICounterINV(N,NZ)));
+	send u (s0:S. fwd s0 s);
+	#Use u;
+	recv u (ci:~ICounterINV(N,NZ));
+
+	use ci;
+	recv ci (s1:~N);
+	// linear usage here
+	cut {
+		sampleusage<N,NZ>( s1, ci, co)
+		| co : ~LICounterINV(N,NZ)|
+		recv co (sn:~N);
+		use co;
+		#Pack co;
+		send co (s11:N. fwd s11 sn);
+
+		send u (cf: ICounterINV(N,NZ). fwd co cf);
+		recv u (s1:~S);
+	wait u;
+
+	call c(u:~ ISharedObjectMenu(S,LICounterINV(N,NZ)));
+	send u (s0:S. fwd s0 s1);
+	#Free u;
+	close u	
+	}
+}
+};;
+
+
+
+
+
+
+
+
+
+
+

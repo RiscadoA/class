@@ -1,0 +1,43 @@
+Hi Derek,
+
+Yes, I certainly agree that the main gain is on expressiveness and
+generality, in the semantic approach we generally  talk about
+properties of programs in abstract semantical terms, not so  really
+about typing derivations or proof transformations.
+
+But, I also believe that, on top of that, the semantic method, if
+properly formulated over an inductive type structure (cf logical
+relations), usually yields compositional reasoning for free, and
+arguably compositionality promotes modularity.
+
+In that old paper I was arguing for the semantic approach in the
+context of types for process calculi, not just because that was my
+main setting, and there the situation was (and still is) a bit
+"messy". We often find many ad-hoc type system designs, playing with
+types-as-annotations with no clearly defined semantic meaning, but
+that turn out to satisfy type safety in the synactical sense, using
+quite complicated and /or very specific proof techniques.
+
+For exampoe, while in a LR-based soundness proof, the key case of
+parallel composition (aka cut) does not need to change if new
+primitive constructs are added to the language, due to the way the
+safety predicate is defined, this not what we usually find in
+syntactical proofs, wheer the whole building becames pretty
+monolithic. Overall, we could not prove the properties we wanted for
+CLASS, a full fledged higher-order session based concurreny language
+such CLASS using the syntactic method.
+
+Anyway, semantic proofs of type safty are becoming more an more
+popular, largely due to your works.
+
+This mays seem a bit paradoxical if we remember all the counter
+argumentation in Felleisen and Wright about the complexity overhead
+due to the by then dominant semantic soundness proof methods. The main
+difference with the presenyt I guess is that they were using complex
+denotatinal semantic moddels, not so broadly understood, while we now
+use predicates on computations defined using more elementary
+operational semantics structures. Would you agree with this ?
+
+Melhores cumprimentos 
+
+Luís Caires

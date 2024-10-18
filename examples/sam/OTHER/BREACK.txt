@@ -1,0 +1,53 @@
+
+1 - 2024  arxiv paper unpublished (to appear ECAI - CORE A)
+
+2 - Não esta na lista de top 20 (2021 ISCA CORE A*) 
+
+3 - Não esta na lista de top 20 (EACL (CORE A)
+
+=== 
+
+4 - Não está na lista de top 20, BMC bioinformatics 23
+
+5 - SIGGRAPH 2024, Não está na lista de top 20, Parece na area da publicação 20 (CORE A*)
+
+6 - Não está na lista de top 20 (Nature Scientific Reports)
+
+===
+
+7 - Não está na lista de top 20. IEEE Transactions on Power Systems 2021 Q1
+
+8 - 2019 Não está na lista de top 20. IEEE Transactions on Industrial Electronics 2019 Q1
+
+9 - 2022 Não está na lista de top 20. Electric Power Systems Research 2021 Q1
+ 
+===
+
+10 - CCS 2020 Não está na lista de top 20 (conferencia CORE A*)
+
+11 - NDSS 2021 Não está na lista de top 20 (conferencia CORE A*)
+
+12 - TrustCOM 2020 Não está na lista de top 20 (conferencia CORE B)
+
+
+[1] Barradas, D., Santos, N., & Rodrigues, L. (2018) Effective Detection of Multimedia Protocol Tunneling using Machine Learning SEC'18: Proceedings of the 27th USENIX Conference on Security Symposium, 169-185. https://dl.acm.org/doi/10.5555/3277203.3277217
+[2] Bilal, M., Serafini, M., Canini, M., & Rodrigues, R. (2020). Do the Best Cloud Configurations Grow on Trees? An Experimental Evaluation of Black Box Algorithms for Optimizing Cloud Workloads. Proceedings of the VLDB Endowment, Volume 13, Issue 12, 2563-2575. https://doi.org/10.14778/3407790.3407845
+[3] Carvalho, D. S., Melo, F. S., & Santos, P. A. (2020). A new convergent variant of Q-learning with linear function approximation. NIPS '20: Proceedings of the 34th International Conference on Neural Information Processing Systems, 1628, 19412- 19421. https://dl.acm.org/doi/10.5555/3495724.3497352
+[4] Durieux, T., Ferreira, J. F., Abreu, R., & Cruz, P. (2020). Empirical Review of Automated Analysis Tools on 47,587 Ethereum Smart Contracts. ICSE '20: Proceedings of the ACM/IEEE 42nd International Conference on Software Engineering, 530-541 https://doi.org/10.1145/3377811.3380364
+[5] Fidalgo, C. G., Sousa, M., Mendes, D., dos Anjos, R. K., Medeiros, D., Singh, K., & Jorge, J. (2023). MAGIC: Manipulating Avatars and Gestures to Improve Remote Collaboration. Proceedings - 2023 IEEE Conference Virtual Reality and 3D User Interfaces, VR 2023, 438-448. https://doi.org/10.1109/VR55154.2023.00059
+[6] Fotouhi Ghazvini, M. A., Lipari, G., Pau, M., Ponci, F., Monti, A., Soares, J., Castro, R., & Vale, Z. (2019). Congestion management in active distribution networks through demand response implementation. Sustainable Energy, Grids and Networks, 17, 100185. https://doi.org/10.1016/j.segan.2018.100185
+[7] Gonçalves, E., Poulos, R. C., Cai, Z., Barthorpe, S., Manda, S. S., et al. (2022). Pan-cancer proteomic map of 949 human cell lines. Cancer Cell, 40(8), 835-849.e8. https://doi.org/10.1016/j.ccell.2022.06.010
+[8] Guerreiro, J., Ilic, A., Roma, N., & Tomas, P. (2018). GPGPU Power Modeling for Multi-domain Voltage-Frequency Scaling. 2018 IEEE International Symposium on High Performance Computer Architecture (HPCA), 789-800. https://doi.org/10.1109/HPCA.2018.00072
+[9] Maksimovic, P., Ayoun, S.-É., Santos, J. F., & Gardner, P. (2021). Gillian, Part II: Real-World Verification for JavaScript and C, Computer Aided Verification: 33rd International Conference, CAV 2021, Proceedings, Part II, (pp. 827-850). https://doi.org/10.1007/978-3-030-81688-9_38
+[10] Marques, D., Ilic, A., Matveev, Z. A., & Sousa, L. (2020). Application-driven Cache-AwareRooflineModel.FutureGenerationComputerSystems,107,257-273. https://doi.org/10.1016/j.future.2020.01.044
+[11] Mendes, P., Casimiro, M., Romano, P., & Garlan, D. (2023). HyperJump: Accelerating HyperBand via Risk Modelling, Thirty-Seventh AAAI Conference on Artificial Intelligence (AAAI 2023) https://doi.org/10.48550/arXiv.2108.02479
+[12] Monteiro, P. T., Oliveira, J., Pais, P., Antunes, M., et al. (2020). YEASTRACT+: a portal for cross-species comparative genomics of transcription regulation in yeasts. Nucleic Acids Research, 48(D1), D642-D649. https://doi.org/10.1093/nar/gkz859
+[13] Neiheiser, R., & Matos, M. (2021). Kauri: Scalable BFT Consensus with Pipelined Tree-Based Dissemination and Aggregation. SOSP '21: Proceedings of the ACM SIGOPS 28th Symposium on Operating Systems Principles,35-48 https://doi.org/10.1145/3477132.3483584
+[14] Neto, I., Nicolau, H., & Paiva, A. (2021). Community Based Robot Design for Classrooms with Mixed Visual Abilities Children. Proceedings of the 2021 CHI Conference on Human Factors in Computing Systems, 1-12. https://doi.org/10.1145/3411764.3445135
+[15] Pires, V. F., Cordeiro, A., Foito, D., & Silva, J. F. (2019). High Step-Up DC-DC Converter for Fuel Cell Vehicles Based on Merged Quadratic Boost-Cuk. IEEE Transactions on Vehicular Technology, 68(8), 7521-7530.                                            
+https://doi.org/10.1109/TVT.2019.2921851
+[16] Santos, F. P., Santos, F. C., & Pacheco, J. M. (2018). Social norm complexity and past reputations in the evolution of cooperation. Nature, 555(7695), 242-245. https://doi.org/10.1038/nature25763
+[17] Scott, I. J., Carvalho, P. M., Botterud, A., & Silva, C. A. (2019). Clustering representative days for power systems generation expansion planning: Capturing the effects of variable renewables and energy storage. Applied Energy, 253, 113603. https://doi.org/10.1016/j.apenergy.2019.113603
+[18] Terra-Neves, M., Lynce, I., & Manquinho, V. (2019). Integrating Pseudo-Boolean Constraint Reasoning in Multi-Objective Evolutionary Algorithms. Proceedings of the Twenty-Eighth International Joint Conference on Artificial Intelligence, 1184-1190. https://doi.org/10.24963/ijcai.2019/165
+[19] Vasco, M., Yin, H., Melo, F. S., & Paiva, A. (2022). How to Sense the World: Leveraging Hierarchy in Multimodal Perception for Robust Reinforcement Learning Agents, International Conference on Autonomous Agents and MultiAgent Systems (AAMAS) 2022. https://doi.org/10.48550/arXiv.2110.03608
+[20] Zorzal, E. R., Campos Gomes, J. M., Sousa, M., Belchior, P., da Silva, P. G., Figueiredo, N., Lopes, D. S., & Jorge, J. (2020). Laparoscopy with augmented reality adaptations. Journal of Biomedical Informatics, 107, 103463. https://doi.org/10.1016/j.jbi.2020.103463

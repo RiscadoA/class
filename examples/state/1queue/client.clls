@@ -1,0 +1,53 @@
+/*
+    This example defines the client side operations on the
+    (single-view) shared queue ADT.
+*/
+
+include "server.clls";;
+
+proc cfree<tA,tX>(s:~tX ; m:~tMenu(tA, tX)){
+       call m(c:~tMenu(tA,tX));
+       send c(sd:tX. fwd sd s);
+       #Free c;
+       wait c;
+       ()
+};;
+
+proc cenq<tA,tX>(si:recv ~tX;close, a:~!tA, ns:send tX;wait ; m:~tMenu(tA,tX)){
+     recv si(s: ~tX);
+     call m(c:~tMenu(tA,tX));
+     send c(sd:tX. fwd sd s);
+     #Enq c;
+     send c(ad:!tA. fwd ad a);
+     recv c(os:~tX);
+     wait c;
+     send ns(osd:tX. fwd os osd);
+     wait ns;
+     close si
+};;
+
+proc cdeq<tA,tX>(si:recv ~tX;close, h:maybe(!tA), ns:send tX; wait ; m:~tMenu(tA,tX)){
+     recv si(s:~tX);
+     call m(c:~tMenu(tA,tX));
+     send c(sd:tX. fwd sd s);
+     #Deq c;
+     recv c(hd: ~maybe(!tA));
+     recv c(os:~tX);
+     wait c;
+     par{
+        fwd h hd
+        ||
+        send ns(osd:tX. fwd os osd);
+        wait ns;
+        close si
+        }
+};;
+
+proc cshare<tA,tX>(s:~tX, s1:tX, s2:tX ; m:~tMenu(tA,tX)){
+     call m(c:~tMenu(tA,tX));
+     send c(sd:tX. fwd sd s);
+     #Share c;
+     send c(s1d:~tX. fwd s1d s1);
+     send c(s2d:~tX. fwd s2d s2);
+     close c
+};;

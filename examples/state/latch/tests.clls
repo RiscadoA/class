@@ -1,0 +1,73 @@
+include "client.clls";;
+
+proc clientWait<X>(c:~X ;m:~MenuW(X)){
+    cut{
+        println("Waiting Thread 1: Start Waiting...");
+        cut{
+            cawait<X>(c1, d1 ; m)
+            |d1:wait|
+            wait d1;
+            println("Waiting Thread 1: ... finished.");
+            ()
+        }
+        |c1:X|
+        cshare<X>(c, c1,c2 ; m)
+        |c2:~X|
+        println("Waiting Thread 2: Start Waiting...");
+        cut{
+            cawait<X>(c2, d2 ; m)
+            |d2:wait|
+            wait d2;
+            println("Waiting Thread 2: ... finished.");
+            ()
+        }
+    }
+};;
+
+proc unsafe_rec doSomething(x:close ; n:colint){
+    if(n == 0)
+    {
+        close x
+    }
+    {
+        cut{
+            let! m n-1
+            |m:?colint|
+            ?m;
+            doSomething(y ; m)
+            |y:wait|
+            wait y;
+            close x
+        }
+    }
+};;
+
+proc clientNotify<X>(c:~X; m:~MenuN(X)){
+    cut{
+        let! n 20
+        |n:?colint|
+        ?n;
+        println("Notify Thread: We will do something...");
+        doSomething(x;n)
+        |x:wait|
+        wait x;
+        println("Notify Thread:...done. We will notify all waiting threads.");
+        cnotifyAll<X>(c;m)
+    }
+};;
+
+proc client(x:~Latch){
+    send x(y:~ViewN.
+            recvty y(X);
+            recv y(m:?~MenuN(X));
+            ?m;
+            clientNotify<X>(y;m));
+    recvty x(X);
+    recv x(m:?~MenuW(X));
+    ?m;
+    clientWait<X>(x;m)
+};;
+
+proc system(){
+    cut{ latch(x) |x:~Latch| client(x) }
+};;
