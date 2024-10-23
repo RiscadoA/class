@@ -51,7 +51,6 @@ public class ASTPList extends ASTNode {
       d.setEnv(ep);
       d.typecheck(ed, eg, ep);
     }
-    ;
   }
 
   public Env<EnvEntry> definemany(
@@ -63,7 +62,6 @@ public class ASTPList extends ASTNode {
       if (!unsafe) System.out.println("Process " + d.id + ": defined.");
       // d.getEnv().crawl();
     }
-    ;
     return ep;
   }
 

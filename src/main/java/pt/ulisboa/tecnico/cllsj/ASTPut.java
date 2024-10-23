@@ -62,7 +62,6 @@ public class ASTPut extends ASTNode {
       lhs = lhs.ASTweakeningOnLeaf(ch, t, exp);
       return this;
     }
-    ;
     rhs = rhs.ASTweakeningOnLeaf(ch, t, exp);
     return this;
   }

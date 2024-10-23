@@ -36,7 +36,6 @@ public class ASTCaseT extends ASTType {
         if (t1 == null) return false;
         if (!t1.equalst(cases.get(lab1), e, lit, trail)) return false;
       }
-      ;
       return true;
     }
     return false;
@@ -48,7 +47,6 @@ public class ASTCaseT extends ASTType {
       ASTType t1 = cases.get(lab1);
       t1.kindcheck(e);
     }
-    ;
   }
 
   public ASTType dual(Env<EnvEntry> e) {
@@ -62,7 +60,6 @@ public class ASTCaseT extends ASTType {
         System.out.println("Exception dual ASTCaseT");
       }
     }
-    ;
     return to;
   }
 
@@ -85,7 +82,6 @@ public class ASTCaseT extends ASTType {
       ASTType t1 = cases.get(lab1);
       s = s + " | " + lab1 + " : " + t1.toStr(e);
     }
-    ;
     return s + " }";
   }
 
@@ -99,7 +95,6 @@ public class ASTCaseT extends ASTType {
       } catch (Exception never) {
       }
     }
-    ;
     return ts;
   }
 
@@ -115,7 +110,6 @@ public class ASTCaseT extends ASTType {
       } catch (Exception never) {
       }
     }
-    ;
     //	System.out.println("CASE OFFSETS => " + max);
     return max;
   }

@@ -130,9 +130,7 @@ public class ASTAffine extends ASTNode {
         } else {
           tyId = eg.find(id); // just to make sure declared in Gamma
         }
-        ;
       }
-      ;
       ASTAffineT tyr = (ASTAffineT) ty;
       contType = tyr.getin().unfoldType(ep);
       ed.upd(ch, contType);

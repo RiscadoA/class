@@ -91,7 +91,6 @@ public class ASTIf extends ASTNode {
       lin = false;
       et = expr.etypecheck(ed, eg, ep, lin);
     }
-    ;
 
     //	Env<ASTType> egb = eg.dupe();
 

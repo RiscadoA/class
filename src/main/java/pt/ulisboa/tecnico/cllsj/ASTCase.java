@@ -102,7 +102,6 @@ public class ASTCase extends ASTNode {
       ASTNode cp = cases.get(lab);
       cases.replace(lab, cp.ASTweakeningOnLeaf(ch, typ, exp));
     }
-    ;
     return this;
   }
 
@@ -182,7 +181,6 @@ public class ASTCase extends ASTNode {
           // eg = egg.dupe();
         }
       }
-      ;
     } else
       throw new TypeError(
           "Line "
@@ -202,7 +200,6 @@ public class ASTCase extends ASTNode {
       ASTNode p1 = cases.get(lab);
       s = p1.fn(s);
     }
-    ;
     return s;
   }
 
@@ -213,7 +210,6 @@ public class ASTCase extends ASTNode {
       ASTNode p1 = cases.get(lab);
       s = p1.fnLinear(s);
     }
-    ;
     return s;
   }
 
@@ -229,7 +225,6 @@ public class ASTCase extends ASTNode {
       } catch (Exception never) {
       }
     }
-    ;
     return ts;
   }
 

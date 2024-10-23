@@ -89,7 +89,6 @@ public class ASTCell extends ASTNode {
       typeex = type.unfoldType(ep); // bug here because this will not match unfoldRecInfer
       typeex = ASTType.unfoldRec(typeex);
     }
-    ;
     ty = ty.unfoldType(ep);
     ty = ASTType.unfoldRecInfer(ty, this, ch, ep);
 

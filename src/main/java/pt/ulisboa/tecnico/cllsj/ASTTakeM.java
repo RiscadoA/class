@@ -87,7 +87,6 @@ public class ASTTakeM extends ASTNode {
       typee = type.unfoldType(ep);
       typee = ASTType.unfoldRec(typee);
     }
-    ;
 
     if (ty instanceof ASTCoMutT) {
       ASTCoMutT tyr = (ASTCoMutT) ty;

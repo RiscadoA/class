@@ -84,7 +84,6 @@ public abstract class ASTNode {
             "Line " + lineno + " :" + "for " + id + " type pending = " + te.toStr(ep));
       }
     }
-    ;
   }
 
   public void linclose(String id, Env<ASTType> ed, Env<EnvEntry> ep) throws Exception {

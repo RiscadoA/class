@@ -90,7 +90,6 @@ public class ASTCall extends ASTNode {
       if (ty instanceof ASTWhyT) {
         ASTWhyT t = (ASTWhyT) ty;
         ty = t.getin();
-        ;
         this.getanc().ASTInsertWhyNot(chr, ty, this);
         // eg.crawl();
         ed.updmove(chr);
@@ -109,7 +108,6 @@ public class ASTCall extends ASTNode {
     // System.out.println("TC CALL unfolded ty "+ty.unfoldType(ep).toStr(ep)+ " go to unf "+type);
 
     ASTType typee = (type == null) ? null : type.unfoldType(ep);
-    ;
 
     // System.out.println("TC CALL equalst "+typee+" "+ty);
 

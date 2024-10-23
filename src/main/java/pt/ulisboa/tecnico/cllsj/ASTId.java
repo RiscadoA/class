@@ -375,15 +375,12 @@ public class ASTId extends ASTNode {
     for (ASTType param : tpars) {
       nid.addTpar(param.subst(e));
     }
-    ;
     for (String param : pars) {
       nid.addpar(param);
     }
-    ;
     for (String param : gpars) {
       nid.addGpar(param);
     }
-    ;
     for (ASTExpr expr : exprs) {
       nid.addExpr(expr);
     }

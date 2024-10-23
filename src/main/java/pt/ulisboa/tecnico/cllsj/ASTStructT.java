@@ -67,7 +67,6 @@ public class ASTStructT extends ASTType {
         if (t1 == null) return false;
         if (!t1.equalst(cases.get(lab1), e, lit, trail)) return false;
       }
-      ;
       return rhs.equalst(w.getrhs(), e, lit, trail);
     }
     return false;
@@ -79,7 +78,6 @@ public class ASTStructT extends ASTType {
       ASTType t1 = cases.get(lab1);
       t1.kindcheck(e);
     }
-    ;
   }
 
   public ASTType dual(Env<EnvEntry> e) {
@@ -91,7 +89,6 @@ public class ASTStructT extends ASTType {
         to.addCase(lab1, t1.dual(e));
         to.setrhs(rhs.dual(e));
       }
-      ;
     } catch (Exception never) {
       System.out.println("Exception dual ASTStructT");
     }
@@ -110,7 +107,6 @@ public class ASTStructT extends ASTType {
       ASTType t1 = cases.get(lab1);
       s = s + " " + lab1 + " : " + t1.toStr(e) + ",";
     }
-    ;
     return s + " }";
   }
 
@@ -124,7 +120,6 @@ public class ASTStructT extends ASTType {
       } catch (Exception never) {
       }
     }
-    ;
     ts.setrhs(rhs.subst(e));
     return ts;
   }
@@ -142,7 +137,6 @@ public class ASTStructT extends ASTType {
       } catch (Exception never) {
       }
     }
-    ;
     return max;
   }
 }

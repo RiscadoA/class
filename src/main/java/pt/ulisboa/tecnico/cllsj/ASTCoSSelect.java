@@ -99,7 +99,6 @@ public class ASTCoSSelect extends ASTNode {
       typee = type.unfoldType(ep);
       typee = ASTType.unfoldRec(typee);
     }
-    ;
     ty = ty.unfoldType(ep);
     ty = ASTType.unfoldRecInfer(ty, this, chr, ep);
 
@@ -140,7 +139,6 @@ public class ASTCoSSelect extends ASTNode {
                 + " not found in "
                 + tyr.toStr(ep));
       ty = st.fst.unfoldType(ep);
-      ;
       ty = ASTType.unfoldRec(ty);
       // System.out.println("SND = "+st.snd);
       tyrhs = st.snd.unfoldType(ep);

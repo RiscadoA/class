@@ -48,7 +48,6 @@ public class ASTDList extends ASTNode {
     for (ASTTypeDef d : ld) {
       d.typecheck(ed, eg, ep);
     }
-    ;
   }
 
   public Env<EnvEntry> definemany(Env<ASTType> ed, Env<ASTType> eg, Env<EnvEntry> ep)
@@ -57,7 +56,6 @@ public class ASTDList extends ASTNode {
       ep = ep.assoc(d.id, new TypeDefEntry(d));
       System.out.println("Type " + d.id + ": defined.");
     }
-    ;
     return ep;
   }
 
