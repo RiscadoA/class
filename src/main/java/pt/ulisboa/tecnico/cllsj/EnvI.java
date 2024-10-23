@@ -1,31 +1,29 @@
 package pt.ulisboa.tecnico.cllsj;
 
-public interface EnvI<X>
-{
-    public EnvI<X> assoc(String id, X assoc);
-    
-    public void insert(String _id, X _assoc);
-    
-    public Env<X> shallowDup();
+public interface EnvI<X> {
+  public EnvI<X> assoc(String id, X assoc);
 
-    public Env<X> dup();
-    
-    public Env<X> dupe();
-    
-    public boolean eq(Env<X> e);
+  public void insert(String _id, X _assoc);
 
-    public String findI(SessionRecord _it) throws Exception;
+  public Env<X> shallowDup();
 
-    public X find(String _id) throws Exception;
+  public Env<X> dup();
 
-    public boolean def(String _id) throws Exception;
+  public Env<X> dupe();
 
-    public void upd(String _id, X _assoc) throws Exception;
+  public boolean eq(Env<X> e);
 
-    public void updmove(String _id) throws Exception;
+  public String findI(SessionRecord _it) throws Exception;
 
-    public void updmove(Env<X> env2) throws Exception;
-	
-    public void crawl();
+  public X find(String _id) throws Exception;
 
+  public boolean def(String _id) throws Exception;
+
+  public void upd(String _id, X _assoc) throws Exception;
+
+  public void updmove(String _id) throws Exception;
+
+  public void updmove(Env<X> env2) throws Exception;
+
+  public void crawl();
 }

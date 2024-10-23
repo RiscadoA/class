@@ -1,5 +1,3 @@
 package pt.ulisboa.tecnico.cllsj;
 
-public class RVarEntry implements EnvEntry {
-
-}
+public class RVarEntry implements EnvEntry {}

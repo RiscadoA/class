@@ -4,135 +4,129 @@ import java.util.*;
 import java.util.function.*;
 
 public class ASTTypeDef extends ASTNode {
-    String id;
-    ASTType rhs;
-    ASTType dualcached;
-    ASTTypeDef dual;
-    List<String> args;
-    boolean rec;
-    boolean corec;
-    
-    public ASTTypeDef (String _id) {
-	id = _id;
-	args = new ArrayList<String>();
-    }
-    
-    public void ASTInsertPipe(Function<ASTNode,ASTNode> f, ASTNode from) throws Exception
-    {	throw new Exception("ASTInsertPipe: call not expected");
-    }
+  String id;
+  ASTType rhs;
+  ASTType dualcached;
+  ASTTypeDef dual;
+  List<String> args;
+  boolean rec;
+  boolean corec;
 
-    public void ASTInsertUse(String ch, ASTType _t, ASTNode here, Boolean disCont) throws Exception
-    {
-	throw new Exception ("Unexpected call editASTInsertUse"); // never called
-    }
+  public ASTTypeDef(String _id) {
+    id = _id;
+    args = new ArrayList<String>();
+  }
 
-    public void ASTupdCont(ASTNode newCont, ASTNode caller) throws Exception{
-	throw new Exception ("Unexpected call.");
-    }
+  public void ASTInsertPipe(Function<ASTNode, ASTNode> f, ASTNode from) throws Exception {
+    throw new Exception("ASTInsertPipe: call not expected");
+  }
 
-    public void ASTInsertCall(String ch, String cho, ASTType t, ASTNode here) throws Exception
-    {
-	throw new Exception ("Unexpected call editASTInsertCall"); // never called
-    }
+  public void ASTInsertUse(String ch, ASTType _t, ASTNode here, Boolean disCont) throws Exception {
+    throw new Exception("Unexpected call editASTInsertUse"); // never called
+  }
 
-    public void ASTInsertWhyNot(String _ch, ASTType _t, ASTNode here) throws Exception
-    {
-	throw new Exception ("Unexpected call: ASTInsertWhyNot"); // never called
-    }
+  public void ASTupdCont(ASTNode newCont, ASTNode caller) throws Exception {
+    throw new Exception("Unexpected call.");
+  }
 
-    public ASTNode ASTweakeningOnLeaf(String _ch, ASTType t, boolean exp) throws Exception
-    {
-	throw new Exception ("Unexpected call: ASTInsertWhyNot"); // never called
-    }
+  public void ASTInsertCall(String ch, String cho, ASTType t, ASTNode here) throws Exception {
+    throw new Exception("Unexpected call editASTInsertCall"); // never called
+  }
 
-    public String getid() {
-	return id;
-    }
+  public void ASTInsertWhyNot(String _ch, ASTType _t, ASTNode here) throws Exception {
+    throw new Exception("Unexpected call: ASTInsertWhyNot"); // never called
+  }
 
-    public void addPar(String pid) throws Exception {
-	if(args.contains(pid)) 
-	    throw new SyntaxError("Parameter "+pid+" declared twice in "+id);
-	args.add(pid);
-    }
+  public ASTNode ASTweakeningOnLeaf(String _ch, ASTType t, boolean exp) throws Exception {
+    throw new Exception("Unexpected call: ASTInsertWhyNot"); // never called
+  }
 
-    public void setType (ASTType _rhs) {
-	rhs = _rhs;
-    }
+  public String getid() {
+    return id;
+  }
 
-    public ASTType getType () {
-	return rhs;
-    }
+  public void addPar(String pid) throws Exception {
+    if (args.contains(pid)) throw new SyntaxError("Parameter " + pid + " declared twice in " + id);
+    args.add(pid);
+  }
 
-    public void setDual (ASTType _d) {
-	dualcached = _d;
-    }
+  public void setType(ASTType _rhs) {
+    rhs = _rhs;
+  }
 
-    public ASTType getDual () {
-	return dualcached;
-    }
+  public ASTType getType() {
+    return rhs;
+  }
 
-    public void setRec(boolean _rec){
-	rec = _rec;
-    }
-    
-    public void setCoRec(boolean _corec){
-	corec = _corec;
-    }
+  public void setDual(ASTType _d) {
+    dualcached = _d;
+  }
 
-    public boolean getRec(){
-	return rec;
-    }
-    
-    public boolean getCoRec(){
-	return corec;
-    }
+  public ASTType getDual() {
+    return dualcached;
+  }
 
-    public void typecheck(Env<ASTType> ed, Env<ASTType> eg, Env<EnvEntry> ep) throws Exception {
+  public void setRec(boolean _rec) {
+    rec = _rec;
+  }
 
-    	List<String> newargs = new ArrayList<String>();
+  public void setCoRec(boolean _corec) {
+    corec = _corec;
+  }
 
-	for (String param : args) {
+  public boolean getRec() {
+    return rec;
+  }
 
-	    String newparam = ASTType.gensym();
-	    ep = ep.assoc(newparam, new TypeEntry (new ASTIdT(newparam)));
+  public boolean getCoRec() {
+    return corec;
+  }
 
-	    { Env<ASTType> e = new Env<ASTType>().assoc(param, new ASTIdT(newparam));
+  public void typecheck(Env<ASTType> ed, Env<ASTType> eg, Env<EnvEntry> ep) throws Exception {
 
-		rhs = rhs.subst(e);
-	    }
-	    newargs.add(newparam);
-	}
-	
-	args = newargs;
+    List<String> newargs = new ArrayList<String>();
 
-	if (rec) {
-	    rhs = new ASTRecT(id, rhs);
-	    // System.out.println("TYPE REC "+id+" "+rhs);
-	}
-	if (corec) {
-	    rhs = new ASTCoRecT(id, rhs);
-	    // System.out.println("TYPE COREC "+id+" "+rhs);
-	}
+    for (String param : args) {
 
-      	if (rec || corec) {
-	    ep=ep.assoc(id,new TypeDefEntry(this)); 
+      String newparam = ASTType.gensym();
+      ep = ep.assoc(newparam, new TypeEntry(new ASTIdT(newparam)));
 
-	}
-	rhs.kindcheck(ep);
+      {
+        Env<ASTType> e = new Env<ASTType>().assoc(param, new ASTIdT(newparam));
+
+        rhs = rhs.subst(e);
+      }
+      newargs.add(newparam);
     }
 
-    public Set<String> fn(Set<String> s) {
-	return s;
+    args = newargs;
+
+    if (rec) {
+      rhs = new ASTRecT(id, rhs);
+      // System.out.println("TYPE REC "+id+" "+rhs);
+    }
+    if (corec) {
+      rhs = new ASTCoRecT(id, rhs);
+      // System.out.println("TYPE COREC "+id+" "+rhs);
     }
 
-    public Set<String> fnLinear(Set<String> s) {
-	return s;
+    if (rec || corec) {
+      ep = ep.assoc(id, new TypeDefEntry(this));
     }
+    rhs.kindcheck(ep);
+  }
 
-    public ASTNode subst(Env<ASTType> e) {
-	return this;
-    }
+  public Set<String> fn(Set<String> s) {
+    return s;
+  }
 
-    public void subs(String x, String y){
-    }
+  public Set<String> fnLinear(Set<String> s) {
+    return s;
+  }
+
+  public ASTNode subst(Env<ASTType> e) {
+    return this;
+  }
+
+  public void subs(String x, String y) {}
 }

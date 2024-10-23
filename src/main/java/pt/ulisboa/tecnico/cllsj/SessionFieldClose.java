@@ -1,7 +1,6 @@
 package pt.ulisboa.tecnico.cllsj;
 
-public class SessionFieldClose extends SessionField  {
+public class SessionFieldClose extends SessionField {
 
-    public SessionFieldClose ()
-    {}
+  public SessionFieldClose() {}
 }

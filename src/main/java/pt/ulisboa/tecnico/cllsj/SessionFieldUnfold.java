@@ -1,7 +1,6 @@
 package pt.ulisboa.tecnico.cllsj;
 
-public class SessionFieldUnfold extends SessionField  {
+public class SessionFieldUnfold extends SessionField {
 
-    public SessionFieldUnfold ()
-    {}
+  public SessionFieldUnfold() {}
 }
