@@ -1,5 +1,3 @@
 package pt.ulisboa.tecnico.cllsj;
 
-public interface EnvEntry {
-
-}
+public interface EnvEntry {}

@@ -2,36 +2,31 @@ package pt.ulisboa.tecnico.cllsj;
 
 public class ASTLCointT extends ASTCoLBasicType {
 
-    public boolean equalst(ASTType t, Env<EnvEntry> e, boolean lit, Trail trail) throws Exception {
-    	t = t.unfoldType(e);
-        return (t instanceof ASTLCointT);
-    }
+  public boolean equalst(ASTType t, Env<EnvEntry> e, boolean lit, Trail trail) throws Exception {
+    t = t.unfoldType(e);
+    return (t instanceof ASTLCointT);
+  }
 
-    public void kindcheck(Env<EnvEntry> e) throws Exception
-    {
-    }
+  public void kindcheck(Env<EnvEntry> e) throws Exception {}
 
-    public ASTType dual(Env<EnvEntry> e) {
-	return new ASTLintT();
-    }
+  public ASTType dual(Env<EnvEntry> e) {
+    return new ASTLintT();
+  }
 
-    public String toStr(Env<EnvEntry> e) {
-	return "LCOINT";
-    }
+  public String toStr(Env<EnvEntry> e) {
+    return "LCOINT";
+  }
 
-    public ASTType unfoldType(Env<EnvEntry> e) throws Exception
-    {
-	return this;
-    }
+  public ASTType unfoldType(Env<EnvEntry> e) throws Exception {
+    return this;
+  }
 
-    public  ASTType subst(Env<ASTType> e) {
-	    return this;
-    }
-    
-    public int SetOffsets(int base, Env<EnvEntry> e) throws Exception
-    {
-	// offset = base;
-	return base;
-    }
+  public ASTType subst(Env<ASTType> e) {
+    return this;
+  }
 
+  public int SetOffsets(int base, Env<EnvEntry> e) throws Exception {
+    // offset = base;
+    return base;
+  }
 }

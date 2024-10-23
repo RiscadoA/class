@@ -2,9 +2,9 @@ package pt.ulisboa.tecnico.cllsj;
 
 public class KindError extends Exception {
 
-    public String msg;
-    
-    public KindError(String _msg) {
-	msg = _msg;
-    }
+  public String msg;
+
+  public KindError(String _msg) {
+    msg = _msg;
+  }
 }

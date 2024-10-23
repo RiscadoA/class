@@ -1,24 +1,22 @@
 package pt.ulisboa.tecnico.cllsj;
 
-class VBool extends Value{
+class VBool extends Value {
 
-    boolean val;
+  boolean val;
 
-    VBool(boolean val){
-        this.val = val;
-    }
+  VBool(boolean val) {
+    this.val = val;
+  }
 
-    boolean get(){
-        return val;
-    }
+  boolean get() {
+    return val;
+  }
 
-    String toStr(){
-        return Boolean.toString(val);
-    }
+  String toStr() {
+    return Boolean.toString(val);
+  }
 
-    boolean equal(Value v) {
-	return val == ((VBool)v).get();
-    }
-
-
+  boolean equal(Value v) {
+    return val == ((VBool) v).get();
+  }
 }

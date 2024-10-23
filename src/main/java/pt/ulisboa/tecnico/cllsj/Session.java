@@ -2,9 +2,11 @@ package pt.ulisboa.tecnico.cllsj;
 
 class Session extends SessionField {
 
-    String id;
+  String id;
 
-    Session(){}
+  Session() {}
 
-    Session(String _id) { id = _id;}
+  Session(String _id) {
+    id = _id;
+  }
 }

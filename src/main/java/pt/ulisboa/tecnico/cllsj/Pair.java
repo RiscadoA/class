@@ -1,13 +1,12 @@
 package pt.ulisboa.tecnico.cllsj;
 
-public class Pair<X,Y> {
+public class Pair<X, Y> {
 
-    X fst;
-    Y snd;
+  X fst;
+  Y snd;
 
-    public Pair(X a, Y b) {
-	fst = a;
-	snd = b;
-    }
-
+  public Pair(X a, Y b) {
+    fst = a;
+    snd = b;
+  }
 }
