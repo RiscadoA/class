@@ -1,0 +1,1302 @@
+PARSER_BEGIN(CLLSj)
+
+package pt.ulisboa.tecnico.cllsj;
+
+import java.util.*;
+import java.io.*;
+import java.util.logging.*;
+import java.util.concurrent.*;
+
+
+public class CLLSj {
+
+static CLLSj parser;
+static Env<ASTType> ed;
+static Env<ASTType> eg;
+static Env<EnvEntry> ep;
+static boolean trace = false;
+static int trace_level = 0;
+static boolean unsafe = true;
+
+static final ASTType CLOSETYPE = new ASTOneT();
+static final ASTType WAITTYPE = new ASTBotT();
+static final int MAXTRACE = 10;
+
+public static long time = 0;
+public static long elapsed = 0;
+
+// for liveness checks
+public static volatile int num_sends = 0;
+public static volatile int num_recvs = 0;
+public static volatile int num_affines = 0;
+public static volatile int num_coaff = 0;
+
+public static  synchronized void inc_sends (int v)
+{
+	num_sends += v;
+}
+
+public static  synchronized void inc_coaff (int v)
+{
+	num_coaff += v;
+}
+
+public static  synchronized void  inc_recvs (int v)
+{
+	num_recvs += v;
+}
+
+public static  synchronized void  inc_affines (int v)
+{
+	num_affines += v;
+}
+
+
+public static void clear_statistics ()
+{
+	num_sends = 0;
+	num_recvs = 0;
+	num_affines = 0;
+	num_coaff = 0;
+}
+
+public static void liveness_statistics ()
+{
+       System.out.println("\n\nSTATISTICS");
+       System.out.println("num_sends = "+ num_sends);
+       System.out.println("num_recvs = "+ num_recvs);
+       System.out.println("num_affines = "+ num_affines);
+       System.out.println("num_coaff = "+ num_coaff);
+}
+
+//public static ConsoleHandler handler = new ConsoleHandler() {{setOutputStream(System.out);}};
+
+//public static Logger logger = Logger.getLogger("ASTNode");
+
+public static final ExecutorService threadPool = Executors.newCachedThreadPool();
+
+static {
+    try {
+    System.setProperty("java.util.logging.SimpleFormatter.format", "%5$s %n");
+    }
+    catch (Exception e) { e.printStackTrace(System.out); }
+}
+
+public static void main(String args[]) {
+    ed = new Env<ASTType>();
+    eg = new Env<ASTType>();
+    ep = new Env<EnvEntry>();
+    FileInputStream fboot;
+
+    //System.out.println("maximum pool size = " + ((ThreadPoolExecutor) threadPool).getMaximumPoolSize() );
+    try {
+     fboot = new FileInputStream("lib/init.clls");
+    } catch (FileNotFoundException ex) {
+
+    System.out.println("Cannot find lib/init.cls");
+      return;
+    };
+    processFile(System.getProperty("user.dir"),new CLLSj(fboot), true);
+    System.out.println ("CLASS-LSAM driver demo version 10.0, July 2024\n");
+    unsafe = false;
+    processFile(System.getProperty("user.dir"),new CLLSj(System.in), false);
+    System.exit(0);
+}
+
+public static void processFile(String path, CLLSj parser, boolean inc)
+{
+    while (true) {
+    //ASTNode.reinit();
+    //ASTType.reinit();
+    if (!inc) { System.out.print("> "); }
+    try {
+      	// ep.crawl(); 
+	ASTNode n = parser.Start();
+   	eg = new Env<ASTType>(); // because of in place inserts during inference
+   	if (n == null) {  return; }
+   	if (n instanceof ASTTrace) {
+	int lev = ((ASTTrace)n).getLevel();
+	if (lev >= 0 && lev <MAXTRACE) {
+	trace_level = lev;
+	trace = (trace_level == 1);
+	     }	     
+	  } else
+   	  if (n instanceof ASTSamL) {
+                /* some code (e.g. argument-as-expressions) assume that every node has a parent,
+                so we will create a dummy coclose node to serve as parent of the running process n (UNCLEAN) */
+	      ASTNode exp = ((ASTSamL)n).getExp();
+              ASTCoClose parent = new ASTCoClose("dummy", exp);  // because of rewriting 
+              exp.setanc(parent);
+      	      exp.typecheck(ed,eg,ep);
+	      CLLSj.time=System.nanoTime();
+	      clear_statistics();
+
+	      //for (int i=0;i<20;i++)
+	      { 
+	      SAM.SAMloop(parent.rhs, new Env<SessionField>(),ep);
+ 	      }
+              while(((ThreadPoolExecutor)threadPool).getActiveCount() > 0) {
+	      //
+              //System.out.println("MaxThreads = " +
+              //((ThreadPoolExecutor)threadPool).getActiveCount());
+	      //liveness_statistics();
+	      //Thread.sleep(1);
+	      //
+	      }
+	      if (trace_level > 0) {
+	      System.out.println("ThrTime="+(System.nanoTime()-CLLSj.time));
+              System.out.println("MaxThreads = " +
+              ((ThreadPoolExecutor)threadPool).getActiveCount());
+	      }
+	      if (// true ||
+	      trace_level == 3) {
+	      SessionRecord.dumpStats();
+	      SessionRecord.clearStats();
+	      }
+	      } else
+   	      if (n instanceof ASTInclude) {
+	      String fd = ((ASTInclude)n).getFn();
+	      //System.out.println("FD="+fd);
+	      //System.out.println("PATH="+path);
+	      String fn = path+"/"+fd;
+	      String newpath = fn.substring(0,fn.lastIndexOf("/"));
+	      //System.out.println("NEWPATH="+newpath);
+	      InputStream f = new FileInputStream(fn);
+	      System.out.println("> including "+fn);
+	      processFile(newpath, new CLLSj(f), true); // this should return on error
+	      f.close();
+	      if (!unsafe)
+	      System.out.println("included "+fn);
+    	  }
+    	  else {
+       //  n.typecheck(ed,eg,ep);
+    	   if (n instanceof ASTDList) {
+       	      ASTDList ld = (ASTDList)n;
+	       ld.typecheckmany(ed,eg,ep);
+	       ep = ld.definemany(ed,eg,ep);
+               //  n.typecheck(ed,eg,ep); // recursion !
+               //  ep=ep.assoc(td.id,new TypeDefEntry(td));
+      	       //  if (!unsafe) System.out.println ("Type "+td.id+": defined.");
+       	   } else
+    	   if (n instanceof ASTTypeDef) {
+       	      ASTTypeDef td = (ASTTypeDef)n;
+              n.typecheck(ed,eg,ep); // recursion !
+              ep=ep.assoc(td.id,new TypeDefEntry(td));
+      	   if (!unsafe)
+	      System.out.println ("Type "+td.id+": defined.");
+       	   } else
+	   if (n instanceof ASTPList) {
+       	      ASTPList ld = (ASTPList)n;
+	      ld.typecheckmany(ed,eg,ep);
+	      ep = ld.definemany(ed,eg,ep,unsafe);
+	      //System.out.println ("\nMain:");
+	      //ep.crawl();	 
+	   }
+	   else
+       	   if (n instanceof ASTProcDef) {
+              	      ASTProcDef td = (ASTProcDef)n;
+           	      n.typecheck(ed,eg,ep);
+	   	      ep=ep.assoc(td.id,new ProcEntry(td));
+           	      td.setEnv(ep);
+	      	      if (!unsafe)
+		        System.out.println ("Process  "+td.id+": defined.");
+	      }
+	      else
+	      { // must be process to run
+
+                /* some code (e.g. argument-as-expressions) assume that every node has a parent,
+                so we will create a dummy coclose node to serve as parent of the running process n */
+                ASTCoClose parent = new ASTCoClose("dummy", n);
+                n.setanc(parent);
+
+              	n.typecheck(ed,eg,ep);
+		// System.out.println("Type Checked.");
+		
+            	if (n.repeat > 1) System.out.println("[RunStatus] Running process " + n.repeat + " times.");
+
+             Logger logger = Logger.getAnonymousLogger();
+             ConsoleHandler handler = new ConsoleHandler() {{setOutputStream(System.out);}};
+             handler.setFormatter(new SimpleFormatter());
+             logger.addHandler(handler);
+
+             if(n.info){
+                logger.setLevel(Level.INFO);
+             }
+             else
+                logger.setLevel(Level.OFF);
+
+                int maxThreads = 0;
+	        CLLSj.time = System.nanoTime();
+
+		clear_statistics();
+
+                while(n.repeat	> 0){
+	  	     parent.rhs.runproc(ep, new Env<LinSession>(), new Env<Server>(), logger);
+                n.repeat--;
+		}
+		
+                while(((ThreadPoolExecutor)threadPool).getActiveCount() > 0)
+		{
+			// Thread.sleep(1000);
+			if (CLLSj.trace) {
+			liveness_statistics();
+			System.out.println ("..."+((ThreadPoolExecutor)threadPool).getActiveCount());
+		 }
+		 }
+		 if (CLLSj.trace) {
+		 System.out.println("ThrTime="+(System.nanoTime()-CLLSj.time));
+                 System.out.println("MaxThreads = " +
+                 ((ThreadPoolExecutor)threadPool).getActiveCount());}
+		 }
+		 }
+	} catch (TypeError e) {
+    	  	System.out.println ("TypeError: ("+e.msg+")");
+	  	e.printStackTrace(System.out);	
+		parser.ReInit(System.in);
+		}
+	catch (KindError e) {
+    	        System.out.println ("KindError: "+e.msg);
+		if (inc) { return; } else {
+	      	parser.ReInit(System.in);
+		}
+	} catch (SyntaxError e) {
+	  	System.out.println (e.msg);
+  	  e.printStackTrace(System.out);	
+      if (inc) {return;} else{
+        parser.ReInit(System.in);
+      }
+	} catch (FileNotFoundException e) {
+	  System.out.println ("File not found: "+e.getMessage());
+		if (inc) { return; } else {
+	      	parser.ReInit(System.in);
+		}
+	} catch (TokenMgrError e) {
+	  System.out.println(e.getMessage());
+		if (inc) { return; } else {
+	      	parser.ReInit(System.in);
+		}
+	} catch (ParseException e) {
+ 	  System.out.println(e.getMessage());
+		if (inc) { return; } else {
+	      	parser.ReInit(System.in);
+		}
+	} catch (SAMError e) {
+ 	  System.out.println("SAM Error: "+e.msg);
+  	  e.printStackTrace(System.out);	
+		if (inc) { return; } else {
+	      	parser.ReInit(System.in);
+		}
+	} catch (RunError e) {
+ 	  System.out.println("Runtime Error: "+e.msg);
+  	  e.printStackTrace(System.out);	
+		if (inc) { return; } else {
+	      	parser.ReInit(System.in);
+		}
+	} catch (Exception e) {
+	  System.out.println ("Unexpected error: ");
+	  e.printStackTrace(System.out);
+		if (inc) { return; } else {
+	      	parser.ReInit(System.in);
+		}
+	  }
+      }
+    }
+}
+
+
+PARSER_END(CLLSj)
+
+SKIP :
+{
+  " "
+| "\t"
+| "\r"
+| "\n"
+| < "//" (~["\r", "\n"])* >
+| < "/*" > : ML_COM_NEXT
+}
+
+<ML_COM_NEXT> SKIP :
+{
+  < "*/" > : DEFAULT
+| < ~[] >   
+}
+
+TOKEN :
+{
+  < FOR: "for" >
+  |
+  < TO: "to" >
+  |
+  < LET: "let" >
+  |
+  < LETC: "letc" >
+  |
+  < IN: "in" >
+  |
+  < REC: "rec" >
+  |
+  < UNSAFE_REC: "unsafe_rec" >
+  |
+  < COREC: "corec" >
+  |
+  < LETB: "let!" >
+  |
+  < INT: "int" >
+  |
+  < COINT: "coint" >
+  |
+  < LINT: "lint" >
+  |
+  < LCOINT: "colint" >
+  |
+   < LBOOL: "lbool" >
+  |
+  < LCOBOOL: "colbool" >
+  |
+  < LSTRING: "lstring" >
+  |
+  < LCOSTRING: "colstring" >
+  |
+  < IF: "if" >
+  |
+  < PRINT: "print" >
+  |
+  < PRINTLN: "println" >
+  |
+  < INFO: "info" >
+  |
+  < REPEAT: "repeat" >
+  |
+  < CLLTYPE: "clltype" >
+  |
+  < SEND: "send" >
+  |
+  < INCLUDE: "include" >
+  |
+  < RECV: "recv" >
+  |
+  < SENDT: "sendty" >
+  |
+  < RECVT: "recvty" >
+  |
+  < DISCARD: "discard" >
+  |
+  < USE: "use" >
+  |
+  < SOME: "some" >
+  |
+  < RELEASE: "release" >
+  |
+  < TAKE: "take" >
+  |
+  < PUT: "put" >
+  |
+  < FWD: "fwd" >
+  |
+  < FWDB: "fwd!" >
+  |
+  < CUT: "cut" >
+  |
+  < CCUT: "ccut" >
+  |
+  < MIX: "par" >
+  |
+  < CMIX: "cpar" >
+  |
+  < CASE: "case" >
+  |
+  < CHOICE: "choice" >
+  |
+  < OFFER: "offer" >
+  |  
+  < OF: "of" >
+  |
+  < TYPE: "type" >
+  |
+  < PROC: "proc" >
+  |
+  < STATE: "state" >
+  |
+  < STATEL: "statel" >
+  |
+  < USAGE: "usage" >
+  |
+  < USAGEL: "usagel" >
+  |
+  < STATEB: "state!" >
+  |
+  < USAGEB: "usage!" >
+  |
+  <STATEBL: "state!l">
+  |
+  < USAGEBL: "usage!l">
+  |
+  < AFFINE: "affine" >
+  |
+  < COAFFINE: "coaffine" >
+  |
+  < CELL: "cell" >
+  |
+  < RD: "rd" >
+  |
+  < WRT: "wrt" >
+  |
+  < LOCK: "lock" >
+  |
+  < UNLK: "unlk" >
+  |
+  < CELLB: "cell!" >
+  |
+  < EMPTY: "empty" >
+  |
+  < CLOSE: "close" >
+  |
+  < CCLOSE: "wait" >
+  |
+  < SHARE: "share" >
+  |
+  < SSHARE: "sshare" >
+  |
+  < SHAREL: "shareL" >
+  |
+  < SHARER: "shareR" >
+  |
+  < UNFOLD: "unfold" >
+  |
+  < QUIT: "quit" >
+  |
+  < SLEEP: "sleep" >
+  |
+  < CALL: "call" >
+  |
+  < OR : "or" >
+  |
+  < AND : "and" >
+  |
+  < REPL: "bang" >
+  |
+  < TRUE: "true" >
+  |
+  < FALSE: "false" >
+  |
+  < RAND: "rand" >
+  |
+  < STRUC: "struct" >
+  |
+  < COSTRUC: "costruct" >
+  |
+  < MUT: "mut" >
+  |
+  < TRACE: "trace" >
+  |
+  < COMUT: "comut" >
+  |
+  < SAML: "sam" >
+  |
+  < SAMR: "samr" >
+  |  
+  < lab: "#"( ["A"-"Z", "a"-"z","_","0"-"9"] )+ >
+  |
+  < Id: ["A"-"Z", "a"-"z"] ( ["A"-"Z", "a"-"z","_", "0"-"9"] )* >
+  |
+  < Num: (["0"-"9"]) + >
+  |
+  < VBAR : "|" >
+  |
+  < LEFTA : "<-" >
+  |
+  < RIGHTA : "->" >
+  |
+  < PLUS : "+" >
+  |
+  < MINUS : "-">
+  |
+  < TIMES : "*">
+  |
+  < DIV : "/">
+  |
+  < NOT : "~">
+  |
+  < DOT : ".">
+  |
+  < BANG : "!">
+  |
+  < WHY : "?">
+  |
+  < WHYY : "??">
+  |
+  <LPAR : "(" >
+  |
+  <RPAR : ")" >
+  |
+  <LBRA : "{" >
+  |
+  <RBRA : "}" >
+  |
+  <LE : "<=" >
+  |
+  <IMP : "=>" >
+  |
+  <GE : ">=" >
+  |
+  <LT : "<" >
+  |
+  <GT : ">" >
+  |
+  <EQ : "==" >
+  |
+  <EQ1 : "=" >
+  |
+  <NEQ : "!=" >
+  |
+  <HAT : "^" >
+  |
+  <SEMIC : ";" >
+  |
+  <COMMA : "," >
+  |
+  <COL : ":" >
+  |
+  <TERM: ";;" >
+  |
+  <STRING: "\"" (~["\""])* "\"" >
+}
+
+ASTNode Start() throws Exception:
+{ASTNode n;
+Token c;
+List<ASTTypeDef> ld;
+}
+{
+(   n=TypeD() <TERM>
+  | n=ProcD() <TERM>
+  | n=Proc() <TERM>
+  | <REPEAT> c = <Num> n = Proc() <TERM> { n.repeat = Integer.parseInt(c.image); }
+  | <SAML> n=Proc() <TERM> { n  = new ASTSamL(n); }
+  | <SAMR> n=Proc() <TERM> { n  = new ASTSam(n); }
+  | <TRACE> c=<Num> <TERM> { n  = new ASTTrace( Integer.parseInt(c.image)); }
+  | <INFO> n = Proc() <TERM> { n.info = true; }
+  | <QUIT> <TERM> {n = null;}
+  | <EOF> {n = null;}
+  | <INCLUDE> c=<STRING> <TERM> {n = new ASTInclude(c.image);}
+)
+{return n;}
+}
+
+ASTTypeDef Type1D(boolean rec, boolean corec) throws Exception:
+{ASTType p1; Token c1;
+ASTTypeDef p;}
+{
+     c1 = <Id>
+{ p = new ASTTypeDef(c1.image); }
+(<LPAR> ParamListt(p) <RPAR>)?
+    /*  <LBRA> */
+         p1 = Type() { p.setType(p1); }
+    /* <RBRA> */
+     { p.setRec(rec); p.setCoRec(corec);}
+     {return p;}
+}
+
+
+ASTNode TypeD() throws Exception:
+{ASTType p1; Token c1;
+boolean rec = false;
+boolean corec = false;
+List<ASTTypeDef> ld = new ArrayList<ASTTypeDef>();
+ASTTypeDef  p;}
+{
+     <TYPE>
+     ( <REC> { rec = true; } | <COREC> { corec = true; })?
+     p = Type1D(rec,corec) { ld.add(p); }
+     (<AND> p = Type1D(rec,corec) { ld.add(p); })*
+     {return new ASTDList(ld, rec || corec);}
+}
+
+void ParamListt(ASTTypeDef p) throws Exception:
+{ASTType t; Token i;}
+{
+    ( i=<Id> {  p.addPar(i.image);  }
+   (<COMMA> i=<Id> {  p.addPar(i.image);  } )*)*
+}
+
+void ArgListT(ASTIdT t) throws Exception:
+{ASTType ty;}
+{
+    ( ty=Type() {t.addarg(ty); } (<COMMA> ty=Type() {t.addarg(ty); })*)*
+
+}
+
+ASTType Type() throws Exception:
+{ ASTType l,r,t; Token s;}
+{
+   t = SType()
+   (
+   (<IMP> r = Type() { t = new ASTRecvT(new ASTNotT(t),r); } )
+   |
+   (<TIMES> r = Type() { t = new ASTSendT(t,r); } )
+   ) ?
+   { return t; }
+}
+
+ASTType SType() throws Exception:
+{ ASTType l,r,t; Token s;}
+{
+(   s=<Id>  { t = new ASTIdT(s.image); } ( <LPAR> ArgListT((ASTIdT)t) <RPAR> )?
+    |
+    <LINT> {
+    t = new ASTLintT();
+    }
+    |
+    <LCOINT> {
+    t = new ASTLCointT();
+    }
+    |
+    <LBOOL> {
+    t = new ASTLboolT();
+    }
+    |
+    <LCOBOOL> {
+    t = new ASTCoLboolT();
+    }
+    |
+    <LSTRING> {
+    t = new ASTLstringT();
+    }
+    |
+    <LCOSTRING> {
+    t = new ASTCoLstringT();
+    }
+    |
+    <SEND> l=Type() <SEMIC> r=SType() { t = new ASTSendT(l,r); }
+    |
+    <RECV> l=Type() <SEMIC> r=SType() { t = new ASTRecvT(l,r); }
+    |
+    <SENDT> s=<Id> <SEMIC> r=SType() { t = new ASTSendTT(s.image,r); }
+    |
+    <RECVT> s=<Id> <SEMIC> r=SType() { t = new ASTRecvTT(s.image,r); }
+    |
+    <CHOICE> <OF> <LBRA>
+    { ASTCaseT tc = new ASTCaseT();
+    } (TypeCase(tc))+ <RBRA> { t = tc; }
+    |
+    <OFFER> <OF> <LBRA>
+    { ASTOfferT to = new ASTOfferT();
+    } (TypeOffer(to))+ <RBRA> { t = to; }
+    |
+    <STRUC> <LBRA>
+    { ASTStructT tc1 = new ASTStructT();
+      r = null;
+    } (StructElem(tc1))+ <RBRA> (LOOKAHEAD(2) <SEMIC> r=SType() { tc1.setrhs(r); })?
+      { if (r==null) tc1.setrhs(CLOSETYPE);
+        t = tc1; }
+    |
+    <COSTRUC> <LBRA>
+    { ASTCoStructT tc2 = new ASTCoStructT();
+      r = null;
+    } (CoStructElem(tc2))+ <RBRA>  (LOOKAHEAD(2) <SEMIC> r=SType() { tc2.setrhs(r); })?
+       { if (r==null) tc2.setrhs(WAITTYPE);
+        t = tc2; }   
+    |
+    <MUT> <LBRA>
+    { ASTMutT tcm1 = new ASTMutT();
+      r = null;
+    } (MutElem(tcm1))+ <RBRA> 
+      { t = tcm1; }
+    |
+    <COMUT> <LBRA>
+    { ASTCoMutT tcm2 = new ASTCoMutT();
+      r = null;
+    } (CoMutElem(tcm2))+ <RBRA>  
+       { t = tcm2; }
+       |
+    <CLOSE> { t =CLOSETYPE; }
+    |
+    <CCLOSE> { t = WAITTYPE; }
+    |
+    <USAGE> l=SType()  { t = new ASTUsageT(l); }
+    |
+    <USAGEL> l=SType()  { t = new ASTUsageLT(l); }
+    |
+    <STATE> l=SType()  { t = new ASTCellT(l); }
+    |
+    <STATEL> l=SType()  { t = new ASTCellLT(l); }
+    |
+    <USAGEB> l=SType()  { t = new ASTUsageBT(l); }
+    |
+    <USAGEBL> l=SType()  { t = new ASTUsageBLT(l); }
+    |
+    <STATEB> l=SType()  { t = new ASTCellBT(l); }
+    |
+    <STATEBL> l=SType()  { t = new ASTCellBLT(l); }
+    |
+    <AFFINE> l=SType() { t = new ASTAffineT(l); }
+    |
+    <COAFFINE> l=SType() { t = new ASTCoAffineT(l); }
+    |
+    <NOT> l=SType() { t = new ASTNotT(l); }
+    |
+    <BANG> l=SType() { t = new ASTBangT(l); }
+    |
+    <WHY> l=SType() { t = new ASTWhyT(l); }
+    |
+    <LBRA> t=Type() <RBRA>
+)
+{ return t;}
+}
+
+void StructElem(ASTStructT lt) throws Exception:
+{Token s; ASTType t;}
+{
+   s=<lab> <COL> t=Type() <COMMA> {
+   lt.addCase(s.image,t);
+}
+}
+
+void CoStructElem(ASTCoStructT lt) throws Exception:
+{Token s; ASTType t;}
+{
+   s=<lab> <COL> t=Type() <COMMA> {
+   lt.addCase(s.image,t);
+}
+}
+
+void MutElem(ASTMutT lt) throws Exception:
+{Token s; ASTType t;}
+{
+   s=<lab> <COL> t=Type() <COMMA> {
+   lt.addCase(s.image,t);
+}
+}
+
+void CoMutElem(ASTCoMutT lt) throws Exception:
+{Token s; ASTType t;}
+{
+   s=<lab> <COL> t=Type() <COMMA> {
+   lt.addCase(s.image,t);
+}
+}
+
+void TypeCase(ASTCaseT lt) throws Exception:
+{Token s; ASTType t;}
+{
+<VBAR> s=<lab> <COL> t=Type() {
+   lt.addCase(s.image,t);
+}
+}
+
+void TypeOffer(ASTOfferT lt) throws Exception:
+{Token s; ASTType t;}
+{
+<VBAR> s=<lab> <COL> t=Type() {
+   lt.addCase(s.image,t);
+}
+}
+
+ASTProcDef Proc1D(boolean rec) throws Exception:
+{ASTNode p1; Token c1;
+ASTProcDef p = new ASTProcDef();}
+{
+     c1 = <Id>
+     { p.setId(c1.image); }
+     (<LT> TParamList(p) <GT>)?
+     <LPAR> ParamList(p) <RPAR> <LBRA>
+         p1 = Proc()
+	 { p.setProc(p1);
+	   p1.setanc(p);
+	   p.setRec(rec); }
+     <RBRA>
+     {return p;}
+}
+
+
+ASTNode ProcD() throws Exception:
+{ASTNode p1; Token c1;
+boolean rec = false;
+boolean unsafe_rec = false;
+List<ASTProcDef> ld = new ArrayList<ASTProcDef>();
+ASTProcDef p ;
+}
+{
+     <PROC>
+        ( <REC> {rec = true; } | <UNSAFE_REC> { unsafe_rec = true;})?
+	 p = Proc1D(rec) { ld.add(p);  p.setUnsafe_Rec(unsafe_rec);  }
+     (<AND> p = Proc1D(rec) { ld.add(p); })*
+     {return new ASTPList(ld, rec, unsafe_rec );}
+}
+
+void ParamList(ASTProcDef p) throws Exception:
+{ASTType t; Token i;}
+{
+   (
+      i=<Id> <COL> t=Type() {  p.addDPar(i.image,t);  }
+     (<COMMA> i=<Id> <COL> t=Type() {  p.addDPar(i.image,t);  } ) *
+   )?
+   ((<SEMIC>
+     i=<Id> <COL> t=Type() {  p.addGPar(i.image,t);  }
+    (<COMMA> i=<Id> <COL> t=Type() {  p.addGPar(i.image,t);  } ) *
+   )?)
+}
+
+void TParamList(ASTProcDef p) throws Exception:
+{ASTType t; Token i;}
+{
+    ( i=<Id> {  p.addTPar(i.image);  }
+   (<COMMA> i=<Id> {  p.addTPar(i.image);  } )*)?
+}
+
+void ArgList(ASTId t) throws Exception :
+{ASTExpr pe;}
+{
+    ( pe=Expr() {t.addExpr(pe); } (<COMMA> pe=Expr() {t.addExpr(pe); })*)?
+    ( <SEMIC>  ( pe=Expr() {t.addGExpr(pe); } (<COMMA> pe=Expr() {t.addGExpr(pe); })*))?
+}
+
+void ArgTList(ASTId t) throws Exception:
+{ASTType ty;}
+{
+    ( ty=Type() {t.addTpar(ty); } (<COMMA> ty=Type() {t.addTpar(ty); })*)?
+}
+
+ASTExpr Expr()
+throws Exception:
+{
+ASTExpr p1,p2,p;
+ASTType t;
+Token c1,c2;
+}
+{
+	p1=CExpr()
+	(
+	c1 = <AND> p2=CExpr() { p = new ASTAnd(p1,p2); p.lineno = c1.beginLine; p1.setanc(p); p2.setanc(p); p1 = p;}
+	|
+	c1 = <OR> p2=CExpr() { p = new ASTOr(p1,p2); p.lineno = c1.beginLine; p1.setanc(p); p2.setanc(p); p1 = p;}
+	)?
+	{ return p1; }
+}
+
+
+ASTExpr CExpr()
+throws Exception:
+{
+ASTExpr p1,p2,p;
+ASTType t;
+Token c1,c2;
+}
+{
+	p1=AExpr()
+	(
+	c1 = <EQ> p2=AExpr() { p = new ASTEq(p1,p2); p.lineno = c1.beginLine; p1.setanc(p); p2.setanc(p); p1 = p;  }
+	|
+	c1 = <NEQ> p2=AExpr() { p = new ASTNEq(p1,p2); p.lineno = c1.beginLine; p1.setanc(p); p2.setanc(p); p1 = p; }
+	|
+	c1 = <LT> p2=AExpr() { p = new ASTLt(p1,p2); p.lineno = c1.beginLine; p1.setanc(p); p2.setanc(p); p1 = p; }
+	|
+	c1 = <GT> p2=AExpr() { p = new ASTGt(p1,p2); p.lineno = c1.beginLine; p1.setanc(p); p2.setanc(p); p1 = p; }
+	)?
+	{ return p1; }
+}
+
+
+ASTExpr AExpr()
+throws Exception:
+{
+ASTExpr p1,p2,p;
+ASTType t;
+Token c1,c2;
+}
+{
+	p1=Term()
+	(
+	c1 = <PLUS> p2=Term() { p = new ASTAdd(p1,p2); p.lineno = c1.beginLine; p1.setanc(p); p2.setanc(p); p1 = p;}
+	|
+	c1 = <MINUS> p2=Term() { p=new ASTSub(p1,p2); p.lineno = c1.beginLine; p1.setanc(p); p2.setanc(p); p1 = p;}
+	)* 
+	{ return p1; }
+}
+
+ASTExpr Term()
+throws Exception:
+{
+ASTExpr p1,p2,p;
+ASTType t;
+Token c1,c2;
+}
+{
+	p1=Fact()
+	(
+	c1 = <TIMES> p2=Fact() { p = new ASTMul(p1,p2); p.lineno = c1.beginLine; p1.setanc(p); p2.setanc(p); p1 = p;}
+	|
+	c1 = <DIV> p2=Fact() { p=new ASTDiv(p1,p2); p.lineno = c1.beginLine; p1.setanc(p); p2.setanc(p); p1 = p;}
+	)* 
+	{ return p1; }
+}
+
+ASTExpr Fact()
+throws Exception:
+{
+ASTExpr p1,p2,p;
+ASTType t;
+Token c1,c2;
+}
+{
+(
+	c1=<Num> { p = new ASTInt(Integer.parseInt(c1.image)); p.lineno = c1.beginLine; }
+	|
+	c1=<TRUE> { p = new ASTBool(true); p.lineno = c1.beginLine; }
+	|
+	c1=<FALSE> { p = new ASTBool(false); p.lineno = c1.beginLine; }
+	|
+	c1=<STRING> { p = new ASTString(c1.image.substring(1,c1.image.length()-1)); p.lineno = c1.beginLine; }
+	|
+	c1=<Id> { p = new ASTVId(c1.image); p.lineno = c1.beginLine; }
+	|
+	<LPAR> p = Expr() <RPAR>
+	|
+	c1 = <MINUS> p = Fact() { p1 = new ASTSub(new ASTInt(0),p); p1.lineno = c1.beginLine; p.setanc(p1); p = p1; }
+	|
+	c1 = <BANG> p = Fact() { p1 = new ASTNot(p); p1.lineno = c1.beginLine; p.setanc(p1); p = p1; }
+)
+	{ return p; }
+}
+
+
+ASTNode CCut(boolean con) throws Exception:
+{
+ASTNode p1,p2,p;
+ASTExpr pe;
+ASTType t;
+Token c1,c2;
+String str;
+}
+{
+ p1=Proc() (<VBAR> c1=<Id><COL> t=Type() <VBAR> p2=CCut(con)
+ { ASTCut pc = new ASTCut(c1.image,t,p1,p2);
+   pc.con = con;
+   p = pc;
+   p1.setanc(p);
+   p2.setanc(p);
+   p1 = p; })?
+ { return p1; }
+
+}
+
+ASTNode Proc() throws Exception:
+{
+ASTNode p1,p2,p;
+ASTExpr pe;
+ASTType t = null;
+Token c1,c2,c3,c4,c5;
+String str;
+boolean b;
+}
+{
+(
+    <CLLTYPE>
+    c2=<Id>
+    <SEMIC>
+    p2=Proc()
+    { 
+      p = new ASTCLLType(c2.image,p2);
+      p2.setanc(p);
+    }
+    |
+    <PRINT>
+    pe=Expr()
+    <SEMIC>
+    p2=Proc()
+    { 
+      p = new ASTPrintLn(pe,p2,false);
+      p2.setanc(p);
+      pe.setanc(p);
+    }
+    |
+    c2 = <SLEEP>
+    c1 = <Num>
+    <SEMIC>
+    p=Proc()
+    {
+      p1 = new ASTSleep(Integer.parseInt(c1.image),p);
+      p.setanc(p1);
+      p = p1;
+      p1.lineno = c2.beginLine; 
+    }
+    |
+    c1 = <PRINTLN>
+    <LPAR>
+    {pe = null;}
+    (pe=Expr())?
+    <RPAR>
+    <SEMIC>
+    p2=Proc()
+    {
+      if (pe==null) pe = new ASTString("");
+      p = new ASTPrintLn(pe,p2,true);
+      p.lineno = c1.beginLine; 
+      pe.setanc(p);
+      p2.setanc(p);
+    }
+    |
+    c1 = <IF>
+    pe=Expr()
+    <LBRA>
+    p1=Proc()
+    <RBRA>
+    <LBRA>
+    p2=Proc()
+    <RBRA>
+    { 
+      p = new ASTIf(pe,p1,p2);
+      pe.setanc(p);
+      p1.setanc(p);
+      p2.setanc(p);
+      p.lineno = c1.beginLine; 
+    }
+    |
+    c1 = <LET>
+    c2=<Id>
+    pe = Expr()  
+    { 
+    p = new ASTCoExpr(c2.image, pe);
+    pe.setanc(p);
+    p.lineno = c1.beginLine; 
+    }
+    |
+    c1 = <LETB>
+    c2=<Id>
+    pe = Expr()  
+    { 
+    p = new ASTPromoCoExpr(c2.image, pe);
+    pe.setanc(p);
+    p.lineno = c1.beginLine; 
+    }
+    |
+    c1 = <LPAR> <RPAR>
+    { p = new ASTEmpty(); p.lineno = c1.beginLine; }
+    |
+    <LBRA> p=Proc() <RBRA>
+    |
+    c1=<Id> { p = new ASTId(c1.image); p.lineno = c1.beginLine;}
+    (
+    ((<COL> t=Type())? <LEFTA> c3=<Id> <DOT> c2=<lab>  <SEMIC> p2=Proc()  {
+
+	   p = new ASTCoSSelect(c1.image,t, c3.image, c2.image,p2); // y:T <- x.#l; P
+    })
+    |
+    (<DOT> c2=<lab> (<COL> t=Type())? <LEFTA>
+    	   // <LPAR>
+    	   (LOOKAHEAD(2)
+     	   <LBRA> c3=<Id> <DOT> p1=Proc()  <RBRA> <SEMIC> p2=Proc()
+    	   {
+	   p = new ASTSSelect(c1.image,c2.image,t, c3.image,p1,p2); // c1.#c2 <- x.P1; P2
+           p.lineno = c1.beginLine; 
+	   p1.setanc(p); p2.setanc(p); }
+    	   |
+   	    pe = Expr()
+	    //<RPAR>
+	    <SEMIC> p2=Proc()
+    	    {
+      	      p = new ASTSSelect(c1.image,c2.image, t, ASTType.gensym(),pe,p2);
+      	      p.lineno = c1.beginLine; 
+       	      pe.setanc(p); p2.setanc(p); 
+    	    }
+    )
+    | 
+    ( <LT>  ArgTList((ASTId)p) <GT>)?  <LPAR>  ArgList((ASTId)p) <RPAR>
+    ))
+    |
+    c1 = <CUT> <LBRA> p1=CCut(false) <RBRA>
+    { p = p1; p.lineno = c1.beginLine; }
+    |
+    c1 = <CCUT> <LBRA> p1=CCut(true) <RBRA>
+    { p = p1; p.lineno = c1.beginLine; }
+    |
+    c2 = <LETC>  c1=<Id> { t = null; } (<COL> t=Type())? <LBRA> p1=Proc() <RBRA>
+    <LBRA> p2=Proc() <RBRA>
+    	  {   p = new ASTCut(c1.image,t,p2,p1);
+              p.lineno = c2.beginLine; 
+  	      p1.setanc(p);
+	      p2.setanc(p);
+  	  }
+    |
+    c1 = <MIX> <LBRA> p1=Proc() ( <VBAR><VBAR> p2=Proc()
+    	  { p = new ASTMix(false,p1,p2); p.lineno = c1.beginLine; p1.setanc(p); p2.setanc(p); p1=p; } )+ <RBRA>
+    { p = p1; } 
+    |
+    c1 = <CMIX> <LBRA> p1=Proc() ( <VBAR><VBAR> p2=Proc()
+    	  { p = new ASTMix(true,p1,p2); p.lineno = c1.beginLine; p1.setanc(p); p2.setanc(p); p1=p; } )+ <RBRA>
+    { p = p1; } 
+    |        { boolean cs = true; }  (c2 = <SHARE> | c2 = <SSHARE>  { cs = false; } )
+       c1=<Id> <LBRA> p1=Proc() ( <VBAR><VBAR> p2=Proc()
+    	    { p =new ASTShare(c1.image,p1,p2,cs);  p.lineno =
+   	     c2.beginLine; p1.setanc(p); p2.setanc(p); p1=p;  } )+ <RBRA>
+    	     { p = p1;} 
+    |    
+//    c2 = <SHARE> c1=<Id> <LBRA> p1=Proc() <VBAR> <VBAR> p2=Proc() <RBRA>
+//    { p = new ASTShare(c1.image,p1,p2); p.lineno = c2.beginLine;}
+//    |
+    c2 = <SHAREL> c1=<Id> <LBRA> p1=Proc() <VBAR> <VBAR> p2=Proc() <RBRA>
+    { p = new ASTShareL(c1.image,p1,p2);p.lineno = c2.beginLine; p1.setanc(p); p2.setanc(p); }
+    |
+    c2 = <SHARER> c1=<Id> <LBRA> p1=Proc() <VBAR> <VBAR> p2=Proc() <RBRA>
+    { p = new ASTShareR(c1.image,p1,p2); p.lineno = c2.beginLine; p1.setanc(p); p2.setanc(p); }
+    |
+    c3=<SEND> c1=<Id> <LPAR>
+    (LOOKAHEAD(2)
+     c2=<Id> (<COL> t=Type())? <DOT> p1=Proc() <RPAR> <SEMIC> p2=Proc()
+    {
+	p = new ASTSend(c1.image,c2.image,t,p1,p2);
+        p.lineno = c3.beginLine; 
+	p1.setanc(p); p2.setanc(p); }
+    |
+    pe = Expr()  <RPAR> <SEMIC> p2=Proc()
+    {
+       p = new ASTSend(c1.image,ASTType.gensym(),null,pe,p2);
+       p.lineno = c3.beginLine; 
+       pe.setanc(p); p2.setanc(p); 
+    }
+    )    
+    |
+    c3 = <RECV> c1=<Id> <LPAR> c2=<Id> ( <COL> t=Type()) ? <RPAR> <SEMIC> p1=Proc()
+    { p = new ASTRecv(c1.image,c2.image,t,p1); p.lineno = c3.beginLine;	p1.setanc(p); }
+    |
+    c3 = <SENDT> c1=<Id> <LPAR> t=Type() <RPAR> <SEMIC> p2=Proc()
+    { p = new ASTSendTy(c1.image,t,p2) ; p2.setanc(p); p.lineno = c3.beginLine; }
+    |
+    c3 = <RECVT> c1=<Id> <LPAR> c2=<Id> <RPAR> <SEMIC> p1=Proc()
+    { p = new ASTRecvTy(c1.image,c2.image,p1); p.lineno = c3.beginLine; p1.setanc(p);}
+    |
+    c3 = <CASE> c1=<Id> <OF> <LBRA>
+    { ASTCase tc = new ASTCase(c1.image);
+    }  (ProcCase(tc))+ <RBRA> { p = tc; p.lineno = c3.beginLine;  }
+    |
+    c1=<lab> c2=<Id> <SEMIC> p1=Proc()
+    { p = new ASTSelect(c2.image, c1.image, p1); p.lineno = c1.beginLine; 
+      p1.setanc(p);
+      }
+    |
+    c2 = <CLOSE> c1=<Id>  { p = new ASTClose(c1.image); p.lineno = c2.beginLine; }
+    |
+    c2 = <CCLOSE> c1=<Id> <SEMIC> p1 = Proc() { p = new ASTCoClose(c1.image,p1); p.lineno = c2.beginLine;  p1.setanc(p); }
+    |
+    c2 = <UNFOLD> c1=<Id> <SEMIC> p1 = Proc() { p = new ASTUnfold(c1.image,p1);p.lineno = c2.beginLine; p1.setanc(p);  }
+    |
+    <MUT> c1=<Id> <LBRA>  { p = new ASTCellM(c1.image); }
+    	  ( c2 = <lab> (<COL> t =Type())?
+	    <EQ1> c3=<Id> 
+	     <COMMA>
+	    { ((ASTCellM)p).addSlot(c2.image,c3.image,t);} )+
+	  <DOT>
+	  p1 = Proc()
+    <RBRA> { ((ASTCellM)p).setrhs(p1); p1.setanc(p); }
+    |
+    c3 = <CELL> c1=<Id> <LPAR>
+    (LOOKAHEAD(2)
+    c2=<Id> ( <COL> t=Type())? <DOT> p1=Proc() <RPAR>
+    { p = new ASTCell(c1.image,c2.image,t,p1); p.lineno = c3.beginLine;  p1.setanc(p); }
+    |
+    pe = Expr()  <RPAR>
+    {
+    p = new ASTCell(c1.image,ASTType.gensym(),null,pe); p.lineno = c3.beginLine; pe.setanc(p);
+    }
+    )
+    |
+    c3 = <EMPTY> c1=<Id>
+    { p = new ASTEmptyCell(c1.image); p.lineno = c3.beginLine; }
+    |
+    c3 = <DISCARD> c1 =<Id>
+    { p = new ASTDiscard(c1.image); p.lineno = c3.beginLine; }
+    |
+    c3 = <USE> c1 = <Id> <SEMIC> p1 = Proc()
+    {
+        p = new ASTUse(c1.image, p1);
+        p.lineno = c3.beginLine; 
+        p1.setanc(p);
+        // p = p1;
+    }
+    |
+   c3 =  <AFFINE> c1 = <Id> <SEMIC> p1 = Proc()
+    { p = new ASTAffine(c1.image, p1); p.lineno = c3.beginLine;  p1.setanc(p); }
+    |
+    c3 = <RELEASE> c1=<Id>
+    { p = new ASTRelease(c1.image); p.lineno = c3.beginLine;  }
+    |
+    c3 = <PUT>  { b = true; } c1=<Id> (<DOT> c3=<lab> { b = false; })? <LPAR>   
+    (LOOKAHEAD(2)
+    c2=<Id> (<COL> t=Type())? <DOT> p1=Proc() <RPAR> <SEMIC> p2=Proc()
+    { if (b) p = new ASTPut(c1.image,c2.image,t,p1,p2);
+      	     else p = new ASTPutM(c1.image,c3.image,c2.image,t,p1,p2);
+      p.lineno = c3.beginLine;
+      p1.setanc(p);
+      p2.setanc(p);}
+    |
+    pe = Expr()  <RPAR> <SEMIC> p2=Proc()
+    {
+       if (b) p = new ASTPut(c1.image,ASTType.gensym(),null,pe,p2);
+       else p = new ASTPutM(c1.image,c3.image, ASTType.gensym(),null,pe,p2);
+       p.lineno = c3.beginLine;  pe.setanc(p);  p2.setanc(p);
+    }
+    )
+    |
+    c3 = <TAKE> { b = true; } c1=<Id> (<DOT> c3=<lab> { b = false; })?  // take x.#l (x:T); P
+        <LPAR> c2=<Id> (<COL> t=Type())? <RPAR> <SEMIC> p1=Proc()
+          { if (b) { p = new ASTTake(c1.image,c2.image,t,p1);}
+	    else   { p = new ASTTakeM(c1.image,c3.image,c2.image,t,p1); };
+	    p.lineno = c3.beginLine; p1.setanc(p);
+	    }
+    |
+    c3 = <LOCK> c1=<Id> <SEMIC> p1=Proc()
+    { p = new ASTLock(c1.image,p1); p.lineno = c3.beginLine;  p1.setanc(p);}
+    |
+    c3 = <UNLK> c1=<Id> <SEMIC> p1=Proc()
+    { p = new ASTUnlock(c1.image,p1); p.lineno = c3.beginLine; p1.setanc(p); }
+    |
+    c3 = <WRT> c1=<Id> <LPAR> c2=<Id> <COL> t=Type() <DOT> p1=Proc() <RPAR> <SEMIC> p2=Proc()
+    { p = new ASTWrt(c1.image,c2.image,t,p1,p2); p.lineno = c3.beginLine; p1.setanc(p);  p2.setanc(p);}
+    |
+    c3 = <RD> c1=<Id> <LPAR> c2=<Id> <COL> t=Type() <RPAR> <SEMIC> p1=Proc()
+    { p = new ASTRead(c1.image,c2.image,t,p1); p.lineno = c3.beginLine;  p1.setanc(p);}
+    |
+    c3 = <FWD> c1=<Id> c2=<Id> { p = new ASTFwd(c1.image, c2.image); p.lineno = c3.beginLine; }
+    |
+    c3 = <FWDB> c1=<Id> c2=<Id> { p = new ASTFwdB(c1.image, c2.image); p.lineno = c3.beginLine; }
+    |
+    c3 = <BANG> c1=<Id> <LPAR> c2=<Id> (<COL> t=Type())? <RPAR> <SEMIC> p1=Proc()
+    { p = new ASTBang(c1.image,c2.image,t,p1); p.lineno = c3.beginLine;  p1.setanc(p); }
+    |
+    c3 =<CALL> c1=<Id> <LPAR> c2=<Id> (<COL> t=Type())? <RPAR> <SEMIC> p1=Proc()
+    { p = new ASTCall(c1.image,c2.image,t,p1); p.lineno = c3.beginLine; p1.setanc(p); }
+    |
+    c3 = <WHY> c1=<Id>  <SEMIC> p1=Proc()
+        { p = new ASTWhy(c1.image,p1); p.lineno = c3.beginLine;  p1.setanc(p) ;
+            //p = p1;
+        }
+    |
+    <FOR> c1=<Id> <COL> t=Type() <TO> c2=<Id>
+    	  <LPAR>
+    	   c3=<Id>
+	<COMMA>
+	    c4=<Id>
+	<SEMIC>
+    	   c5=<Id>
+	<RPAR>
+	<LBRA>
+    	  p1=Proc()
+	<RBRA>
+        { p = ASTNode.ForMacroFactory(c1.image,t,c2.image,c3.image,c4.image,c5.image, p1);
+	   p1.setanc(p);  // provisional
+	}
+    )
+    { return p;}
+}
+
+
+void ProcCase(ASTCase lt) throws Exception:
+{Token s; ASTNode t;}
+{
+<VBAR> s=<lab> <COL> t=Proc() {
+   lt.addCase(s.image,t);
+   t.setanc(lt);
+}
+}
+
