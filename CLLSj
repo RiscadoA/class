@@ -1,1 +1,1 @@
-rlwrap -c java -cp bin CLLSj
+rlwrap -c mvn exec:java
