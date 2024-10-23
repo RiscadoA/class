@@ -59,7 +59,6 @@ public class ASTPrintLn extends ASTNode {
     } catch (Exception ee) {
       et = expr.etypecheck(ed, eg, ep, true);
     }
-    ;
     if (!(et instanceof ASTCoLBasicType))
       throw new TypeError("Line " + lineno + " :" + "PRINT : argument not of CoLBasicType");
     rhs.typecheck(ed, eg, ep);

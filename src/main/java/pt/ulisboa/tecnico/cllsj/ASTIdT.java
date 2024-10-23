@@ -175,7 +175,6 @@ public class ASTIdT extends ASTType {
       if (((ASTIdT) t).getid().equals(s)) return true;
     }
     // else System.out.println("NOT SELFT"+t.toString())
-    ;
     return false;
   }
 
@@ -278,7 +277,6 @@ public class ASTIdT extends ASTType {
         return e.find(s);
       } catch (Exception _e) {
       }
-      ;
       return this;
     } else {
       Iterator<ASTType> ait = args.iterator();

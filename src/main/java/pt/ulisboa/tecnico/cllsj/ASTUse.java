@@ -141,7 +141,6 @@ public class ASTUse extends ASTNode {
   }
 
   static SessionFieldUse SFUSE = new SessionFieldUse();
-  ;
 
   public void samCUse(Channel channel, Env<SessionField> frame, Env<EnvEntry> ep, SAMCont p_cont)
       throws Exception {

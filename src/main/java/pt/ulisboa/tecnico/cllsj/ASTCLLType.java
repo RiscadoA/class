@@ -56,7 +56,6 @@ public class ASTCLLType extends ASTNode {
       ty = eg.find(id);
       lin = false;
     }
-    ;
     System.out.println("\n\n" + (lin ? "lin " : "exp ") + id + " : " + ty.toStr(ep));
     rhs.typecheck(ed, eg, ep);
   }

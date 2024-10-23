@@ -32,7 +32,6 @@ public class ASTOfferT extends ASTType {
         if (t1 == null) return false;
         if (!t1.equalst(cases.get(lab1), e, lit, trail)) return false;
       }
-      ;
       return true;
     }
     return false;
@@ -44,7 +43,6 @@ public class ASTOfferT extends ASTType {
       ASTType t1 = cases.get(lab1);
       t1.kindcheck(e);
     }
-    ;
   }
 
   public ASTType dual(Env<EnvEntry> e) {
@@ -57,7 +55,6 @@ public class ASTOfferT extends ASTType {
       } catch (Exception never) {
       }
     }
-    ;
     return to;
   }
 
@@ -80,7 +77,6 @@ public class ASTOfferT extends ASTType {
       ASTType t1 = cases.get(lab1);
       s = s + "| " + lab1 + " : " + t1.toStr(e);
     }
-    ;
     return s + " }";
   }
 
@@ -96,7 +92,6 @@ public class ASTOfferT extends ASTType {
         System.exit(0);
       }
     }
-    ;
     return ts;
   }
 
@@ -112,7 +107,6 @@ public class ASTOfferT extends ASTType {
       } catch (Exception never) {
       }
     }
-    ;
     return max;
   }
 }

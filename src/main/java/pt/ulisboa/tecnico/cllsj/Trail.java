@@ -26,7 +26,6 @@ public class Trail {
       ls = new ArrayList<ASTType>();
       store.put(x, ls);
     } // else  System.out.println("found bucket for "+x)
-    ;
     ls.add(t);
     // System.out.println("trail added "+x+" -> "+t);
     S++;

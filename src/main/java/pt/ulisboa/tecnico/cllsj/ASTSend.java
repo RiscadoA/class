@@ -72,7 +72,6 @@ public class ASTSend extends ASTNode {
       lhs = lhs.ASTweakeningOnLeaf(ch, typ, exp);
       return this;
     }
-    ;
     rhs = rhs.ASTweakeningOnLeaf(ch, typ, exp);
     return this;
   }
@@ -114,7 +113,6 @@ public class ASTSend extends ASTNode {
       typee = (type != null) ? type.unfoldType(ep) : type;
       //	    typee = ASTType.unfoldRec(typee);
     }
-    ;
     if (ty instanceof ASTSendT) {
       ASTSendT tys = (ASTSendT) ty;
 

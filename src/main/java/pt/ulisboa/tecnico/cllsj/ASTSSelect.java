@@ -93,7 +93,6 @@ public class ASTSSelect extends ASTNode {
       typee = (type != null) ? type.unfoldType(ep) : type;
       typee = ASTType.unfoldRec(typee);
     }
-    ;
 
     while (ty instanceof ASTAffineT) {
       ty = ((ASTAffineT) ty).getin();
@@ -132,7 +131,6 @@ public class ASTSSelect extends ASTNode {
                 + " not found in "
                 + tys.toStr(ep));
       tys_lhs = st.fst.unfoldType(ep);
-      ;
       tys_lhs = ASTType.unfoldRec(tys_lhs);
 
       contType = st.snd.unfoldType(ep);

@@ -88,7 +88,6 @@ public class ASTDiscard extends ASTNode {
   }
 
   static SessionFieldDiscard SDISC = new SessionFieldDiscard();
-  ;
 
   public void samCDiscard(
       String chr, Channel channel, Env<SessionField> frame, Env<EnvEntry> ep, SAMCont p_cont)
@@ -164,7 +163,6 @@ public class ASTDiscard extends ASTNode {
             code.samL(frm, epn, p_cont);
           }
         }
-        ;
         p_cont.code = null;
         CLLSj.elapsed = System.nanoTime();
       }

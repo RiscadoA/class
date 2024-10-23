@@ -54,7 +54,6 @@ public class ASTCut extends ASTNode {
         lhs = lhs.ASTweakeningOnLeaf(ch, typ, exp);
         return this;
       }
-      ;
       rhs = rhs.ASTweakeningOnLeaf(ch, typ, exp);
       return this;
     }

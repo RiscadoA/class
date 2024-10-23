@@ -134,7 +134,6 @@ public class ASTFwd extends ASTNode {
     tt1 = ASTType.unfoldRec(tt1);
     // if (!t1s.equalst(tt1,ep, true, new Trail())) System.out.println("TT1 === "+t1s+" "+tt1);
     ASTType tt2 = t2.unfoldType(ep);
-    ;
     ASTType t2s = tt2;
     tt2 = ASTType.unfoldRec(tt2);
     // if (!t2s.equalst(tt2,ep, true, new Trail())) System.out.println("TT2 === "+t2s+" "+tt2);
@@ -205,9 +204,7 @@ public class ASTFwd extends ASTNode {
 
   public void subs(String x, String y) { // implements x/y (substitutes y by x)
     if (y == ch1) ch1 = x;
-    if (y == ch2)
-      ;
-    ch2 = x;
+    if (y == ch2) ch2 = x;
   }
 
   public void runproc(Env<EnvEntry> ep, Env<LinSession> ed, Env<Server> eg, Logger logger)
@@ -286,7 +283,6 @@ public class ASTFwd extends ASTNode {
       ix++;
       bx++;
     }
-    ;
     sref2o.UpdSessionRefInplace(srecw, bx);
     srecw.setPol(false);
     srecw.setcch(srecr.getcch());
@@ -637,7 +633,6 @@ public class ASTFwd extends ASTNode {
         ix++;
         bx++;
       }
-      ;
       sref2ois.UpdSessionRefInplace(srecw, bx);
     }
     srecw.setPol(false); // THIS MUST BE CHECKED

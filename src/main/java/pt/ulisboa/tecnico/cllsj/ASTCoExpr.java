@@ -114,12 +114,10 @@ public class ASTCoExpr extends ASTNode {
     Value v = expr.sameval(frame);
 
     SessionField sf = frame.find(ch);
-    ;
 
     if (sf instanceof IndexedSessionRef) {
 
       IndexedSessionRef sref = (IndexedSessionRef) frame.find(ch);
-      ;
       int doffset = sref.getOffset();
       SessionRecord srec = sref.getSessionRec();
 

@@ -138,7 +138,6 @@ public class ASTWhy extends ASTNode {
 
     if (pol) {
       int i = 9 / 0;
-      ;
       /*
          if (CLLSj.trace) {
       System.out.println("why?-op [-] "+ srec.getcch());

@@ -64,7 +64,6 @@ public class ASTMix extends ASTNode {
       lhs = lhs.ASTweakeningOnLeaf(ch, t, exp);
       return this;
     }
-    ;
     rhs = rhs.ASTweakeningOnLeaf(ch, t, exp);
     return this;
   }

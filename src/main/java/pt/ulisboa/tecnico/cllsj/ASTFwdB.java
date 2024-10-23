@@ -74,7 +74,6 @@ public class ASTFwdB extends ASTNode {
     } else throw new TypeError("Line " + lineno + " :" + "Fwd!: " + ch1 + " is not of ! type.");
 
     ASTType tt2 = t2.unfoldType(ep);
-    ;
     tt2 = ASTType.unfoldRec(tt2);
     ASTType tdual = tt2.dual(ep);
 
@@ -114,9 +113,7 @@ public class ASTFwdB extends ASTNode {
 
   public void subs(String x, String y) { // implements x/y (substitutes y by x)
     if (y == ch1) ch1 = x;
-    if (y == ch2)
-      ;
-    ch2 = x;
+    if (y == ch2) ch2 = x;
   }
 
   public void runproc(Env<EnvEntry> ep, Env<LinSession> ed, Env<Server> eg, Logger logger)

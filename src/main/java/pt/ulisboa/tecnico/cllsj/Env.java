@@ -62,12 +62,10 @@ public class Env<X> {
         return elt;
       } catch (Exception e) {
       }
-    ;
     try {
       if (((IndexedSessionRef) assoc).getSessionRec() == _it) {
         return id;
       }
-      ;
     } catch (Exception e) {
     }
     if (anc != null) return anc.findI(_it);
@@ -87,7 +85,6 @@ public class Env<X> {
       if (assoc != null) return assoc;
       else throw new TypeError(_id + " -> null; not declared.");
     }
-    ;
     if (anc != null) return anc.find(_id);
     else throw new TypeError(_id + " not declared.");
   }
@@ -146,7 +143,6 @@ public class Env<X> {
         } catch (Exception _e) {
           System.out.println("X ");
         }
-        ;
       } else if (assoc instanceof TypeDefEntry) {
         try {
           ASTTypeDef tn = ((TypeDefEntry) assoc).getTypeDef();
@@ -161,7 +157,6 @@ public class Env<X> {
         } catch (Exception _e) {
           System.out.println(" ?X? ");
         }
-        ;
       } else if (assoc instanceof ASTType) {
         ASTType tn = (ASTType) assoc;
         try {
@@ -169,7 +164,6 @@ public class Env<X> {
         } catch (Exception _e) {
           System.out.println(" ?X? ");
         }
-        ;
       } else Pderef(assoc);
     }
     if (anc != null) anc.crawl();
