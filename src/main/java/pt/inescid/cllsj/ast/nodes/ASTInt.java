@@ -8,6 +8,8 @@ import pt.inescid.cllsj.Server;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.VInt;
 import pt.inescid.cllsj.Value;
+import pt.inescid.cllsj.ast.types.ASTLCointT;
+import pt.inescid.cllsj.ast.types.ASTType;
 
 public class ASTInt extends ASTExpr {
 

@@ -4,6 +4,7 @@ import java.util.*;
 import java.util.function.*;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
+import pt.inescid.cllsj.ast.types.ASTType;
 
 public class ASTTrace extends ASTNode {
 

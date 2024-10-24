@@ -1,6 +1,6 @@
 package pt.inescid.cllsj;
 
-import pt.inescid.cllsj.ast.nodes.ASTType;
+import pt.inescid.cllsj.ast.types.ASTType;
 
 public class TypeClosure extends SessionField {
 

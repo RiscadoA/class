@@ -7,13 +7,17 @@ import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.SyntaxError;
 import pt.inescid.cllsj.TypeDefEntry;
 import pt.inescid.cllsj.TypeEntry;
+import pt.inescid.cllsj.ast.types.ASTCoRecT;
+import pt.inescid.cllsj.ast.types.ASTIdT;
+import pt.inescid.cllsj.ast.types.ASTRecT;
+import pt.inescid.cllsj.ast.types.ASTType;
 
 public class ASTTypeDef extends ASTNode {
   String id;
-  ASTType rhs;
+  public ASTType rhs;
   ASTType dualcached;
   ASTTypeDef dual;
-  List<String> args;
+  public List<String> args;
   boolean rec;
   boolean corec;
 

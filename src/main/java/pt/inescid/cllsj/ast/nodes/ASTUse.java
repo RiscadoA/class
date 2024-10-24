@@ -18,6 +18,8 @@ import pt.inescid.cllsj.SessionFieldAffine;
 import pt.inescid.cllsj.SessionFieldUse;
 import pt.inescid.cllsj.SessionRecord;
 import pt.inescid.cllsj.TypeError;
+import pt.inescid.cllsj.ast.types.ASTCoAffineT;
+import pt.inescid.cllsj.ast.types.ASTType;
 
 public class ASTUse extends ASTNode {
   String ch;

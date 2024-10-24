@@ -8,6 +8,7 @@ import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.LinSession;
 import pt.inescid.cllsj.ProcEntry;
 import pt.inescid.cllsj.Server;
+import pt.inescid.cllsj.ast.types.ASTType;
 
 public class ASTPList extends ASTNode {
 

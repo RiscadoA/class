@@ -18,6 +18,9 @@ import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.SessionRecord;
 import pt.inescid.cllsj.Trail;
 import pt.inescid.cllsj.TypeError;
+import pt.inescid.cllsj.ast.types.ASTBotT;
+import pt.inescid.cllsj.ast.types.ASTSendT;
+import pt.inescid.cllsj.ast.types.ASTType;
 
 public class ASTSend extends ASTNode {
 
@@ -315,7 +318,7 @@ public class ASTSend extends ASTNode {
       IndexedSessionRef sref = (IndexedSessionRef) sf;
       int doffset = sref.getOffset();
       SessionRecord srec = sref.getSessionRec();
-      ASTType contType = ((ASTSendT) type).rhs.unfoldType(ep);
+      ASTType contType = ((ASTSendT) type).getrhs().unfoldType(ep);
 
       if (CLLSj.trace) {
         System.out.println("send-op " + chs + " " + srec + " @ " + doffset + " tyrhs = " + tys_rhs);

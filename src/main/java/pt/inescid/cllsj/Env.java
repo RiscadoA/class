@@ -1,8 +1,8 @@
 package pt.inescid.cllsj;
 
-import pt.inescid.cllsj.ast.nodes.ASTIdT;
-import pt.inescid.cllsj.ast.nodes.ASTType;
 import pt.inescid.cllsj.ast.nodes.ASTTypeDef;
+import pt.inescid.cllsj.ast.types.ASTIdT;
+import pt.inescid.cllsj.ast.types.ASTType;
 
 public class Env<X> {
 

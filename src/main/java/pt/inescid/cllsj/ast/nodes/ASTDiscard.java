@@ -18,6 +18,8 @@ import pt.inescid.cllsj.SessionFieldAffine;
 import pt.inescid.cllsj.SessionFieldDiscard;
 import pt.inescid.cllsj.SessionRecord;
 import pt.inescid.cllsj.TypeError;
+import pt.inescid.cllsj.ast.types.ASTCoAffineT;
+import pt.inescid.cllsj.ast.types.ASTType;
 
 public class ASTDiscard extends ASTNode {
   String chr;

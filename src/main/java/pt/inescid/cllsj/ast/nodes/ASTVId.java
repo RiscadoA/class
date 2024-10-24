@@ -13,6 +13,11 @@ import pt.inescid.cllsj.SessionClosure;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.SessionRecord;
 import pt.inescid.cllsj.Value;
+import pt.inescid.cllsj.ast.types.ASTCoAffineT;
+import pt.inescid.cllsj.ast.types.ASTCoLBasicType;
+import pt.inescid.cllsj.ast.types.ASTType;
+import pt.inescid.cllsj.ast.types.ASTUsageT;
+import pt.inescid.cllsj.ast.types.ASTWhyT;
 
 public class ASTVId extends ASTExpr {
 

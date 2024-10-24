@@ -16,6 +16,11 @@ import pt.inescid.cllsj.SessionClosure;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.Trail;
 import pt.inescid.cllsj.TypeError;
+import pt.inescid.cllsj.ast.types.ASTAffineT;
+import pt.inescid.cllsj.ast.types.ASTBotT;
+import pt.inescid.cllsj.ast.types.ASTType;
+import pt.inescid.cllsj.ast.types.ASTUsageLT;
+import pt.inescid.cllsj.ast.types.ASTUsageT;
 
 public class ASTPut extends ASTNode {
   String chs;

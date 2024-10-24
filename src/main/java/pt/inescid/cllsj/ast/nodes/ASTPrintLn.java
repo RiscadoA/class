@@ -13,6 +13,9 @@ import pt.inescid.cllsj.SessionClosure;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.TypeError;
 import pt.inescid.cllsj.Value;
+import pt.inescid.cllsj.ast.types.ASTCoLBasicType;
+import pt.inescid.cllsj.ast.types.ASTCointT;
+import pt.inescid.cllsj.ast.types.ASTType;
 
 public class ASTPrintLn extends ASTNode {
 

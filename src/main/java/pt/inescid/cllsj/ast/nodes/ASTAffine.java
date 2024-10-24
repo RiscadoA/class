@@ -20,6 +20,14 @@ import pt.inescid.cllsj.SessionFieldDiscard;
 import pt.inescid.cllsj.SessionFieldUse;
 import pt.inescid.cllsj.SessionRecord;
 import pt.inescid.cllsj.TypeError;
+import pt.inescid.cllsj.ast.types.ASTAffineT;
+import pt.inescid.cllsj.ast.types.ASTCoAffineT;
+import pt.inescid.cllsj.ast.types.ASTCoRecT;
+import pt.inescid.cllsj.ast.types.ASTCoStructT;
+import pt.inescid.cllsj.ast.types.ASTRecT;
+import pt.inescid.cllsj.ast.types.ASTType;
+import pt.inescid.cllsj.ast.types.ASTUsageT;
+import pt.inescid.cllsj.ast.types.ASTWhyT;
 
 public class ASTAffine extends ASTNode {
   String ch;

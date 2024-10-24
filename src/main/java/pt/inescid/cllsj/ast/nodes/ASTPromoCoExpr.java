@@ -18,6 +18,10 @@ import pt.inescid.cllsj.SessionValue;
 import pt.inescid.cllsj.Trail;
 import pt.inescid.cllsj.TypeError;
 import pt.inescid.cllsj.Value;
+import pt.inescid.cllsj.ast.types.ASTBangT;
+import pt.inescid.cllsj.ast.types.ASTBasicType;
+import pt.inescid.cllsj.ast.types.ASTCointT;
+import pt.inescid.cllsj.ast.types.ASTType;
 
 public class ASTPromoCoExpr extends ASTNode {
 

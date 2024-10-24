@@ -16,6 +16,8 @@ import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.SessionRecord;
 import pt.inescid.cllsj.TypeClosure;
 import pt.inescid.cllsj.TypeError;
+import pt.inescid.cllsj.ast.types.ASTSendTT;
+import pt.inescid.cllsj.ast.types.ASTType;
 
 public class ASTSendTy extends ASTNode {
   String chs;

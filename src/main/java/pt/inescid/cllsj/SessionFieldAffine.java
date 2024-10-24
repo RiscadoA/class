@@ -1,7 +1,7 @@
 package pt.inescid.cllsj;
 
 import java.util.*;
-import pt.inescid.cllsj.ast.nodes.ASTType;
+import pt.inescid.cllsj.ast.types.ASTType;
 
 public class SessionFieldAffine extends SessionField {
 

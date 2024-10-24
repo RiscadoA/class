@@ -9,6 +9,9 @@ import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.TypeError;
 import pt.inescid.cllsj.VBool;
 import pt.inescid.cllsj.Value;
+import pt.inescid.cllsj.ast.types.ASTBotT;
+import pt.inescid.cllsj.ast.types.ASTCoLboolT;
+import pt.inescid.cllsj.ast.types.ASTType;
 
 public class ASTAnd extends ASTExpr {
 
