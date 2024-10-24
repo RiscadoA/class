@@ -11,6 +11,7 @@ import pt.inescid.cllsj.SAM;
 import pt.inescid.cllsj.SAMCont;
 import pt.inescid.cllsj.Server;
 import pt.inescid.cllsj.SessionField;
+import pt.inescid.cllsj.ast.ASTVisitor;
 
 public class ASTMix extends ASTNode {
 
@@ -22,6 +23,14 @@ public class ASTMix extends ASTNode {
     lhs = _lhs;
     rhs = _rhs;
     con = _con;
+  }
+
+  public ASTNode getLhs() {
+    return lhs;
+  }
+
+  public ASTNode getRhs() {
+    return rhs;
   }
 
   public void ASTInsertUse(String ch, ASTType t, ASTNode here, Boolean disCont) throws Exception {
@@ -170,5 +179,10 @@ public class ASTMix extends ASTNode {
       p_cont.frame = frame;
       p_cont.epnm = ep;
     }
+  }
+
+  @Override
+  public void accept(ASTVisitor visitor) {
+    visitor.visit(this);
   }
 }

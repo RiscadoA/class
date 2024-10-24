@@ -26,4 +26,8 @@ public abstract class ASTVisitor {
   public void visit(ASTEmpty node) {
     visit((ASTNode) node);
   }
+
+  public void visit(ASTMix node) {
+    visit((ASTNode) node);
+  }
 }

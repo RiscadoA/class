@@ -1,6 +1,7 @@
 package pt.inescid.cllsj.compiler;
 
 import pt.inescid.cllsj.CLLSj;
+import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.ast.nodes.ASTNode;
 
 public class Compiler {
@@ -15,6 +16,13 @@ public class Compiler {
 
     if (ast == null) {
       System.err.println("Parsing error: AST is null");
+      return 1;
+    }
+
+    try {
+      ast.typecheck(new Env<>(), new Env<>(), new Env<>());
+    } catch (Exception e) {
+      System.err.println("Typechecking error: " + e.getMessage());
       return 1;
     }
 
