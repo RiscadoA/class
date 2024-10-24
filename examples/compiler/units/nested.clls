@@ -1,6 +1,8 @@
 cut {
     cut {
-        wait b;wait a;()
+        wait b;
+        wait a;
+        ()
         |a:close|
         close a
     }
