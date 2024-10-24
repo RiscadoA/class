@@ -14,6 +14,7 @@ import pt.inescid.cllsj.SAMCont;
 import pt.inescid.cllsj.Server;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.SessionRecord;
+import pt.inescid.cllsj.ast.ASTVisitor;
 
 // unfolded
 
@@ -31,6 +32,22 @@ public class ASTCut extends ASTNode {
     type = _type;
     lhs = _lhs;
     rhs = _rhs;
+  }
+
+  public String getId() {
+    return id;
+  }
+
+  public ASTType getType() {
+    return type;
+  }
+
+  public ASTNode getLhs() {
+    return lhs;
+  }
+
+  public ASTNode getRhs() {
+    return rhs;
   }
 
   public void show() {
@@ -279,5 +296,10 @@ public class ASTCut extends ASTNode {
         p_cont.epnm = ep;
       }
     }
+  }
+
+  @Override
+  public void accept(ASTVisitor visitor) {
+    visitor.visit(this);
   }
 }

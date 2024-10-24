@@ -16,6 +16,7 @@ import pt.inescid.cllsj.Server;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.SessionRecord;
 import pt.inescid.cllsj.TypeError;
+import pt.inescid.cllsj.ast.ASTVisitor;
 
 public class ASTClose extends ASTNode {
 
@@ -23,6 +24,10 @@ public class ASTClose extends ASTNode {
 
   public ASTClose(String _ch) {
     ch = _ch;
+  }
+
+  public String getCh() {
+    return ch;
   }
 
   public void ASTInsertPipe(Function<ASTNode, ASTNode> f, ASTNode from) throws Exception {
@@ -134,5 +139,10 @@ public class ASTClose extends ASTNode {
         throw new SAMError("clos-op - " + ch);
       }
     }
+  }
+
+  @Override
+  public void accept(ASTVisitor visitor) {
+    visitor.visit(this);
   }
 }

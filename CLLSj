@@ -1,1 +1,1 @@
-rlwrap -c mvn exec:java
+rlwrap -c mvn -q exec:java -Dexec.args="$*"
