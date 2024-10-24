@@ -1,6 +1,7 @@
 package pt.inescid.cllsj;
 
 import java.util.*;
+import pt.inescid.cllsj.ast.nodes.ASTNode;
 
 public class SAMState {
 

@@ -1,5 +1,7 @@
 package pt.inescid.cllsj;
 
+import pt.inescid.cllsj.ast.nodes.ASTNode;
+
 public class SessionClosure extends SessionField {
 
   String id;
@@ -9,9 +11,9 @@ public class SessionClosure extends SessionField {
   Env<EnvEntry> ep;
   int sessionsize;
 
-  SessionClosure() {}
+  public SessionClosure() {}
 
-  SessionClosure(
+  public SessionClosure(
       String _id,
       int _size,
       boolean _pol,
@@ -30,43 +32,43 @@ public class SessionClosure extends SessionField {
     pol = _pol;
   }
 
-  String getId() {
+  public String getId() {
     return id;
   }
 
-  void setId(String _id) {
+  public void setId(String _id) {
     id = _id;
   }
 
-  ASTNode getBody() {
+  public ASTNode getBody() {
     return body;
   }
 
-  void setBody(ASTNode _body) {
+  public void setBody(ASTNode _body) {
     body = _body;
   }
 
-  void setEnv(Env<SessionField> _env) {
+  public void setEnv(Env<SessionField> _env) {
     env = _env;
   }
 
-  Env<SessionField> getEnv() {
+  public Env<SessionField> getEnv() {
     return env;
   }
 
-  void setEnvP(Env<EnvEntry> _ep) {
+  public void setEnvP(Env<EnvEntry> _ep) {
     ep = _ep;
   }
 
-  Env<EnvEntry> getEnvP() {
+  public Env<EnvEntry> getEnvP() {
     return ep;
   }
 
-  int getSize() {
+  public int getSize() {
     return sessionsize;
   }
 
-  boolean getPol() {
+  public boolean getPol() {
     return pol;
   }
 }

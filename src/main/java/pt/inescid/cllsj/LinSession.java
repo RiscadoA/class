@@ -3,8 +3,10 @@ package pt.inescid.cllsj;
 import java.util.*;
 import java.util.concurrent.locks.*;
 import java.util.logging.*;
+import pt.inescid.cllsj.ast.nodes.ASTDiscard;
+import pt.inescid.cllsj.ast.nodes.ASTNode;
 
-class LinSession extends Session implements Cell, Channel {
+public class LinSession extends Session implements Cell, Channel {
 
   private Logger logger;
 
@@ -40,7 +42,7 @@ class LinSession extends Session implements Cell, Channel {
 
   private boolean linear;
 
-  LinSession() {
+  public LinSession() {
     message2take = false;
     putLock = false;
     takeLock = false;
@@ -51,7 +53,7 @@ class LinSession extends Session implements Cell, Channel {
     condition = lock.newCondition();
   }
 
-  LinSession(String _id) {
+  public LinSession(String _id) {
     this();
     id = _id + "$" + n++;
   }

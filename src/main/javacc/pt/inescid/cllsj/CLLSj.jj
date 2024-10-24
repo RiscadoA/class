@@ -7,6 +7,7 @@ import java.io.*;
 import java.util.logging.*;
 import java.util.concurrent.*;
 
+import pt.inescid.cllsj.ast.nodes.*;
 
 public class CLLSj {
 
@@ -14,8 +15,8 @@ public class CLLSj {
   static Env<ASTType> ed;
   static Env<ASTType> eg;
   static Env<EnvEntry> ep;
-  static boolean trace = false;
-  static int trace_level = 0;
+  public static boolean trace = false;
+  public static int trace_level = 0;
   static boolean unsafe = true;
 
   static final ASTType CLOSETYPE = new ASTOneT();
@@ -131,7 +132,7 @@ public class CLLSj {
 
           //for (int i=0;i<20;i++)
           { 
-            SAM.SAMloop(parent.rhs, new Env<SessionField>(),ep);
+            SAM.SAMloop(parent.getrhs(), new Env<SessionField>(),ep);
           }
 
           while(((ThreadPoolExecutor)threadPool).getActiveCount() > 0) {
@@ -176,8 +177,8 @@ public class CLLSj {
           } else if (n instanceof ASTTypeDef) {
             ASTTypeDef td = (ASTTypeDef)n;
             n.typecheck(ed,eg,ep); // recursion !
-            ep=ep.assoc(td.id,new TypeDefEntry(td));
-            if (!unsafe) System.out.println ("Type "+td.id+": defined.");
+            ep=ep.assoc(td.getid(),new TypeDefEntry(td));
+            if (!unsafe) System.out.println ("Type "+td.getid()+": defined.");
           } else if (n instanceof ASTPList) {
             ASTPList ld = (ASTPList)n;
             ld.typecheckmany(ed,eg,ep);
@@ -187,9 +188,9 @@ public class CLLSj {
           } else if (n instanceof ASTProcDef) {
             ASTProcDef td = (ASTProcDef)n;
             n.typecheck(ed,eg,ep);
-            ep=ep.assoc(td.id,new ProcEntry(td));
+            ep=ep.assoc(td.getId(),new ProcEntry(td));
             td.setEnv(ep);
-            if (!unsafe) System.out.println ("Process  "+td.id+": defined.");
+            if (!unsafe) System.out.println ("Process  "+td.getId()+": defined.");
           } else { // must be process to run
             /* some code (e.g. argument-as-expressions) assume that every node has a parent,
             so we will create a dummy coclose node to serve as parent of the running process n */
@@ -215,7 +216,7 @@ public class CLLSj {
             clear_statistics();
 
             while(n.repeat	> 0){
-              parent.rhs.runproc(ep, new Env<LinSession>(), new Env<Server>(), logger);
+              parent.getrhs().runproc(ep, new Env<LinSession>(), new Env<Server>(), logger);
               n.repeat--;
             }
 

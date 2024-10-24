@@ -1,22 +1,22 @@
 package pt.inescid.cllsj;
 
-class VBool extends Value {
+public class VBool extends Value {
 
   boolean val;
 
-  VBool(boolean val) {
+  public VBool(boolean val) {
     this.val = val;
   }
 
-  boolean get() {
+  public boolean get() {
     return val;
   }
 
-  String toStr() {
+  public String toStr() {
     return Boolean.toString(val);
   }
 
-  boolean equal(Value v) {
+  public boolean equal(Value v) {
     return val == ((VBool) v).get();
   }
 }

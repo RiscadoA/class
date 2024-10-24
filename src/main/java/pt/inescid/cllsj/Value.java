@@ -1,8 +1,8 @@
 package pt.inescid.cllsj;
 
-abstract class Value extends Server {
+public abstract class Value extends Server {
 
-  LinSession call(String _chi) throws Exception {
+  public LinSession call(String _chi) throws Exception {
     LinSession session = new LinSession(_chi);
     Value linValue = this;
     CLLSj.threadPool.submit(
@@ -18,7 +18,7 @@ abstract class Value extends Server {
     return session;
   }
 
-  abstract String toStr();
+  public abstract String toStr();
 
-  abstract boolean equal(Value v);
+  public abstract boolean equal(Value v);
 }

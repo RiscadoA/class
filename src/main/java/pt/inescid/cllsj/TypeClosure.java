@@ -1,11 +1,13 @@
 package pt.inescid.cllsj;
 
+import pt.inescid.cllsj.ast.nodes.ASTType;
+
 public class TypeClosure extends SessionField {
 
   ASTType ty;
   Env<EnvEntry> ep;
 
-  TypeClosure(ASTType _ty, Env<EnvEntry> _ep) throws Exception {
+  public TypeClosure(ASTType _ty, Env<EnvEntry> _ep) throws Exception {
     ty = _ty;
     ep = _ep;
     if (ep == null) {
@@ -14,15 +16,15 @@ public class TypeClosure extends SessionField {
     }
   }
 
-  ASTType getTy() {
+  public ASTType getTy() {
     return ty;
   }
 
-  void setTy(ASTType _ty) {
+  public void setTy(ASTType _ty) {
     ty = _ty;
   }
 
-  Env<EnvEntry> getEnv() throws Exception {
+  public Env<EnvEntry> getEnv() throws Exception {
     if (ep == null) {
       System.out.println("EP null?? " + ty.toStr(ep));
       System.exit(0);
@@ -30,7 +32,7 @@ public class TypeClosure extends SessionField {
     return ep;
   }
 
-  void setEnv(Env<EnvEntry> _ep) {
+  public void setEnv(Env<EnvEntry> _ep) {
     ep = _ep;
   }
 }

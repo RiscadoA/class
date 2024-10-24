@@ -1,5 +1,9 @@
 package pt.inescid.cllsj;
 
+import pt.inescid.cllsj.ast.nodes.ASTIdT;
+import pt.inescid.cllsj.ast.nodes.ASTType;
+import pt.inescid.cllsj.ast.nodes.ASTTypeDef;
+
 public class Env<X> {
 
   private volatile Env<X> anc;
@@ -148,12 +152,12 @@ public class Env<X> {
           ASTTypeDef tn = ((TypeDefEntry) assoc).getTypeDef();
           Env<EnvEntry> ep = (Env<EnvEntry>) this;
           System.out.print("(");
-          for (String param : tn.args) {
+          for (String param : tn.getArgs()) {
             System.out.print(param + " ");
             ep = ep.assoc(param, new TypeEntry(new ASTIdT(param)));
           }
-          System.out.print(")" + tn.rhs + " ");
-          System.out.println(tn.rhs.toStr(ep));
+          System.out.print(")" + tn.getType() + " ");
+          System.out.println(tn.getType().toStr(ep));
         } catch (Exception _e) {
           System.out.println(" ?X? ");
         }
