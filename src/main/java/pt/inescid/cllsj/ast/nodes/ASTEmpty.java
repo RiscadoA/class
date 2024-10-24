@@ -10,6 +10,7 @@ import pt.inescid.cllsj.LinSession;
 import pt.inescid.cllsj.SAMCont;
 import pt.inescid.cllsj.Server;
 import pt.inescid.cllsj.SessionField;
+import pt.inescid.cllsj.ast.ASTVisitor;
 
 public class ASTEmpty extends ASTNode {
 
@@ -80,5 +81,10 @@ public class ASTEmpty extends ASTNode {
       System.out.println("empty-op");
     }
     p_cont.code = null;
+  }
+
+  @Override
+  public void accept(ASTVisitor visitor) {
+    visitor.visit(this);
   }
 }

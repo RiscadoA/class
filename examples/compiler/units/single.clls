@@ -1,0 +1,6 @@
+cut {
+    close a
+    |a:wait|
+    wait a;
+    ()
+}

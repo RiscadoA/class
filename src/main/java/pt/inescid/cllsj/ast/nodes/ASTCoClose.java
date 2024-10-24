@@ -16,6 +16,7 @@ import pt.inescid.cllsj.Server;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.SessionRecord;
 import pt.inescid.cllsj.TypeError;
+import pt.inescid.cllsj.ast.ASTVisitor;
 
 // unfolded
 
@@ -28,7 +29,11 @@ public class ASTCoClose extends ASTNode {
     rhs = _rhs;
   }
 
-  public ASTNode getrhs() {
+  public String getCh() {
+    return ch;
+  }
+
+  public ASTNode getRhs() {
     return rhs;
   }
 
@@ -184,5 +189,10 @@ public class ASTCoClose extends ASTNode {
         SessionRecord.freeSessionRecord(srec);
       }
     }
+  }
+
+  @Override
+  public void accept(ASTVisitor visitor) {
+    visitor.visit(this);
   }
 }
