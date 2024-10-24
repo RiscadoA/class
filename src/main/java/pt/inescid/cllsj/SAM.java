@@ -2,6 +2,8 @@ package pt.inescid.cllsj;
 
 import java.util.*;
 import java.util.concurrent.*;
+import pt.inescid.cllsj.ast.nodes.ASTId;
+import pt.inescid.cllsj.ast.nodes.ASTNode;
 
 public class SAM {
 
@@ -9,12 +11,13 @@ public class SAM {
     String msg = t ? ("SAM START THREAD ") : ("SAM STOP THREAD ");
     System.out.print(msg + " " + n + " ");
     if (n instanceof ASTId) {
-      System.out.print(((ASTId) n).id);
+      System.out.print(((ASTId) n).getId());
     }
     System.out.println();
   }
 
-  static void SAMloop(ASTNode code, Env<SessionField> frame, Env<EnvEntry> ep) throws Exception {
+  public static void SAMloop(ASTNode code, Env<SessionField> frame, Env<EnvEntry> ep)
+      throws Exception {
 
     if (CLLSj.trace && code != null) {
       tracedef(code, true);

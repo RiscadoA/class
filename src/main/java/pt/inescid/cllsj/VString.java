@@ -1,22 +1,22 @@
 package pt.inescid.cllsj;
 
-class VString extends Value {
+public class VString extends Value {
 
   String val;
 
-  VString(String val) {
+  public VString(String val) {
     this.val = val;
   }
 
-  String get() {
+  public String get() {
     return val;
   }
 
-  String toStr() {
+  public String toStr() {
     return val;
   }
 
-  boolean equal(Value v) {
+  public boolean equal(Value v) {
     return val.equals(((VString) v).get());
   }
 }

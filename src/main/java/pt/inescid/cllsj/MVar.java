@@ -8,7 +8,7 @@ public class MVar extends SessionField {
   SessionClosure store;
   int refc = 1;
 
-  static MVar newMVar() {
+  public static MVar newMVar() {
     if (mvar_free == null) {
       return new MVar();
     } else {
@@ -20,7 +20,7 @@ public class MVar extends SessionField {
     }
   }
 
-  static synchronized void dropMVar(MVar sr) throws Exception {
+  public static synchronized void dropMVar(MVar sr) throws Exception {
     if (sr.refc == 0) throw new SAMError("drop free reference");
     sr.refc--;
     if (sr.refc == 0) {

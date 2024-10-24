@@ -1,8 +1,10 @@
 package pt.inescid.cllsj;
 
 import java.util.logging.*;
+import pt.inescid.cllsj.ast.nodes.ASTNode;
+import pt.inescid.cllsj.ast.nodes.ASTType;
 
-class Server extends Session {
+public class Server extends Session {
 
   public final String chi;
 
@@ -16,7 +18,7 @@ class Server extends Session {
 
   private final Env<Server> ge;
 
-  Server() {
+  public Server() {
     chi = "FUC";
     type = null;
     rhs = null;
@@ -25,7 +27,7 @@ class Server extends Session {
     logger = null;
   }
 
-  Server(
+  public Server(
       String _chi,
       ASTType _type,
       ASTNode _rhs,
@@ -40,7 +42,7 @@ class Server extends Session {
     logger = _logger;
   }
 
-  LinSession call(String _chi) throws Exception {
+  public LinSession call(String _chi) throws Exception {
     LinSession session = new LinSession(_chi);
 
     CLLSj.threadPool.submit(

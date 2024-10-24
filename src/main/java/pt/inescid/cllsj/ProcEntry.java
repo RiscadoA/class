@@ -1,5 +1,7 @@
 package pt.inescid.cllsj;
 
+import pt.inescid.cllsj.ast.nodes.ASTNode;
+
 public class ProcEntry implements EnvEntry {
   ASTNode p;
 

@@ -1,6 +1,6 @@
 package pt.inescid.cllsj;
 
-interface Channel {
+public interface Channel {
 
   String getId();
 

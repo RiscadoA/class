@@ -1,8 +1,9 @@
 package pt.inescid.cllsj;
 
 import java.util.logging.*;
+import pt.inescid.cllsj.ast.nodes.ASTNode;
 
-interface Cell {
+public interface Cell {
 
   String getId();
 

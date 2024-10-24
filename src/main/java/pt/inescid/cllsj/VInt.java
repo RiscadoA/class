@@ -1,22 +1,22 @@
 package pt.inescid.cllsj;
 
-class VInt extends Value {
+public class VInt extends Value {
 
   int val;
 
-  VInt(int val) {
+  public VInt(int val) {
     this.val = val;
   }
 
-  int get() {
+  public int get() {
     return val;
   }
 
-  String toStr() {
+  public String toStr() {
     return Integer.toString(val);
   }
 
-  boolean equal(Value v) {
+  public boolean equal(Value v) {
     return val == ((VInt) v).get();
   }
 }

@@ -1,5 +1,7 @@
 package pt.inescid.cllsj;
 
+import pt.inescid.cllsj.ast.nodes.ASTType;
+
 public class TypeEntry implements EnvEntry {
   ASTType t;
 

@@ -1,6 +1,6 @@
 package pt.inescid.cllsj;
 
-class Session extends SessionField {
+public class Session extends SessionField {
 
   String id;
 

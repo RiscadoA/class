@@ -7,7 +7,7 @@ public class LinSessionValue extends SessionField {
     lin = new LinSession(id);
   }
 
-  LinSession getLin() {
+  public LinSession getLin() {
     return lin;
   }
 }

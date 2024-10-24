@@ -1,6 +1,7 @@
 package pt.inescid.cllsj;
 
 import java.util.*;
+import pt.inescid.cllsj.ast.nodes.ASTType;
 
 public class Trail {
   HashMap<String, List<ASTType>> store;
@@ -10,7 +11,7 @@ public class Trail {
     store = new HashMap<String, List<ASTType>>();
   }
 
-  boolean in(String x, ASTType t) {
+  public boolean in(String x, ASTType t) {
     List<ASTType> ls = store.get(x);
     if (ls == null) return false;
     // System.out.println("TRAIL FOUND "+x+" ->? "+t);
@@ -19,7 +20,7 @@ public class Trail {
     return ls.contains(t);
   }
 
-  void add(String x, ASTType t) {
+  public void add(String x, ASTType t) {
     List<ASTType> ls = store.get(x);
     if (ls == null) {
       // System.out.println("new trail bucket for "+x);
@@ -31,11 +32,11 @@ public class Trail {
     S++;
   }
 
-  int size() {
+  public int size() {
     return S;
   }
 
-  void dump(Env<EnvEntry> e) throws Exception {
+  public void dump(Env<EnvEntry> e) throws Exception {
     for (String key : store.keySet()) {
       for (ASTType t : store.get(key)) System.out.println(key + " - > " + t.toStr(e));
     }

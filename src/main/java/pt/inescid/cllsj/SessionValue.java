@@ -1,43 +1,45 @@
 package pt.inescid.cllsj;
 
+import pt.inescid.cllsj.ast.nodes.ASTNode;
+
 public class SessionValue extends SessionField {
 
   Value v;
   SessionClosure cont;
 
-  SessionValue() {
+  public SessionValue() {
     cont = new SessionClosure();
   }
 
-  Value getValue() {
+  public Value getValue() {
     return v;
   }
 
-  void setValue(Value _v) {
+  public void setValue(Value _v) {
     v = _v;
   }
 
-  ASTNode getCont() {
+  public ASTNode getCont() {
     return cont.getBody();
   }
 
-  void setCont(ASTNode _body) {
+  public void setCont(ASTNode _body) {
     cont.setBody(_body);
   }
 
-  void setFrame(Env<SessionField> _env) {
+  public void setFrame(Env<SessionField> _env) {
     cont.setEnv(_env);
   }
 
-  Env<SessionField> getFrame() {
+  public Env<SessionField> getFrame() {
     return cont.getEnv();
   }
 
-  void setFrameP(Env<EnvEntry> _env) {
+  public void setFrameP(Env<EnvEntry> _env) {
     cont.setEnvP(_env);
   }
 
-  Env<EnvEntry> getFrameP() {
+  public Env<EnvEntry> getFrameP() {
     return cont.getEnvP();
   }
 }

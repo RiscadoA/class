@@ -1,5 +1,7 @@
 package pt.inescid.cllsj;
 
+import pt.inescid.cllsj.ast.nodes.ASTNode;
+
 public class SessionRecord {
   int size;
   SessionField slots[];
@@ -38,7 +40,7 @@ public class SessionRecord {
     }
   }
 
-  static synchronized SessionRecord newSessionRecord(int _size) {
+  public static synchronized SessionRecord newSessionRecord(int _size) {
     statsnew[_size]++;
     if (cache[_size] == null) {
       statsalloc[_size]++;
@@ -55,7 +57,7 @@ public class SessionRecord {
     }
   }
 
-  static synchronized void freeSessionRecord(SessionRecord sr) {
+  public static synchronized void freeSessionRecord(SessionRecord sr) {
     int sz = sr.getSize();
     // System.out.println("free "+sz);
 
@@ -63,11 +65,11 @@ public class SessionRecord {
     cache[sz] = sr;
   }
 
-  void setcch(String ch) {
+  public void setcch(String ch) {
     cont.setId(ch);
   }
 
-  String getcch() {
+  public String getcch() {
     return cont.getId();
   }
 
