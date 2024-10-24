@@ -21,6 +21,15 @@ import pt.inescid.cllsj.SessionRecord;
 import pt.inescid.cllsj.Trail;
 import pt.inescid.cllsj.TypeError;
 import pt.inescid.cllsj.Value;
+import pt.inescid.cllsj.ast.types.ASTAffineT;
+import pt.inescid.cllsj.ast.types.ASTCellBLT;
+import pt.inescid.cllsj.ast.types.ASTCellBT;
+import pt.inescid.cllsj.ast.types.ASTCellLT;
+import pt.inescid.cllsj.ast.types.ASTCellT;
+import pt.inescid.cllsj.ast.types.ASTCoRecT;
+import pt.inescid.cllsj.ast.types.ASTOneT;
+import pt.inescid.cllsj.ast.types.ASTRecT;
+import pt.inescid.cllsj.ast.types.ASTType;
 
 public class ASTFwd extends ASTNode {
 

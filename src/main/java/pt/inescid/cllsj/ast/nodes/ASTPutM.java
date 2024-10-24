@@ -10,6 +10,11 @@ import pt.inescid.cllsj.LinSession;
 import pt.inescid.cllsj.Server;
 import pt.inescid.cllsj.Trail;
 import pt.inescid.cllsj.TypeError;
+import pt.inescid.cllsj.ast.types.ASTAffineT;
+import pt.inescid.cllsj.ast.types.ASTBotT;
+import pt.inescid.cllsj.ast.types.ASTType;
+import pt.inescid.cllsj.ast.types.ASTUsageLT;
+import pt.inescid.cllsj.ast.types.ASTUsageT;
 
 public class ASTPutM extends ASTNode {
   String chs;

@@ -19,6 +19,11 @@ import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.SessionRecord;
 import pt.inescid.cllsj.Trail;
 import pt.inescid.cllsj.TypeError;
+import pt.inescid.cllsj.ast.types.ASTAffineT;
+import pt.inescid.cllsj.ast.types.ASTBangT;
+import pt.inescid.cllsj.ast.types.ASTCellBT;
+import pt.inescid.cllsj.ast.types.ASTCellT;
+import pt.inescid.cllsj.ast.types.ASTType;
 
 // unfolded
 

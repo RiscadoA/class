@@ -9,6 +9,8 @@ import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.LinSession;
 import pt.inescid.cllsj.Server;
 import pt.inescid.cllsj.TypeError;
+import pt.inescid.cllsj.ast.types.ASTCellLT;
+import pt.inescid.cllsj.ast.types.ASTType;
 
 // unfolded
 

@@ -18,6 +18,12 @@ import pt.inescid.cllsj.SessionRecord;
 import pt.inescid.cllsj.Trail;
 import pt.inescid.cllsj.TypeEntry;
 import pt.inescid.cllsj.TypeError;
+import pt.inescid.cllsj.ast.types.ASTBangT;
+import pt.inescid.cllsj.ast.types.ASTCoAffineT;
+import pt.inescid.cllsj.ast.types.ASTCoRecT;
+import pt.inescid.cllsj.ast.types.ASTType;
+import pt.inescid.cllsj.ast.types.ASTUsageT;
+import pt.inescid.cllsj.ast.types.ASTWhyT;
 
 // unfolded
 

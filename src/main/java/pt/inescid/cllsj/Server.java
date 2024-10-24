@@ -2,7 +2,7 @@ package pt.inescid.cllsj;
 
 import java.util.logging.*;
 import pt.inescid.cllsj.ast.nodes.ASTNode;
-import pt.inescid.cllsj.ast.nodes.ASTType;
+import pt.inescid.cllsj.ast.types.ASTType;
 
 public class Server extends Session {
 

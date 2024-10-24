@@ -18,6 +18,9 @@ import pt.inescid.cllsj.TypeClosure;
 import pt.inescid.cllsj.TypeDefEntry;
 import pt.inescid.cllsj.TypeEntry;
 import pt.inescid.cllsj.TypeError;
+import pt.inescid.cllsj.ast.types.ASTIdT;
+import pt.inescid.cllsj.ast.types.ASTRecvTT;
+import pt.inescid.cllsj.ast.types.ASTType;
 
 public class ASTRecvTy extends ASTNode {
 

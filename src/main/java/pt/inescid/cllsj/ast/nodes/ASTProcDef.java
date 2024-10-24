@@ -9,6 +9,9 @@ import pt.inescid.cllsj.RVarEntry;
 import pt.inescid.cllsj.SyntaxError;
 import pt.inescid.cllsj.TypeEntry;
 import pt.inescid.cllsj.TypeError;
+import pt.inescid.cllsj.ast.types.ASTCoRecT;
+import pt.inescid.cllsj.ast.types.ASTIdT;
+import pt.inescid.cllsj.ast.types.ASTType;
 
 public class ASTProcDef extends ASTNode {
   String id;

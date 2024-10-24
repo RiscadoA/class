@@ -9,6 +9,7 @@ import pt.inescid.cllsj.LinSession;
 import pt.inescid.cllsj.SAMCont;
 import pt.inescid.cllsj.Server;
 import pt.inescid.cllsj.SessionField;
+import pt.inescid.cllsj.ast.types.ASTType;
 
 public class ASTSleep extends ASTNode {
 

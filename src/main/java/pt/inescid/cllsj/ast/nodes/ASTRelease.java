@@ -16,6 +16,9 @@ import pt.inescid.cllsj.Server;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.SessionRecord;
 import pt.inescid.cllsj.TypeError;
+import pt.inescid.cllsj.ast.types.ASTType;
+import pt.inescid.cllsj.ast.types.ASTUsageBT;
+import pt.inescid.cllsj.ast.types.ASTUsageT;
 
 public class ASTRelease extends ASTNode {
   String chr;

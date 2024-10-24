@@ -18,6 +18,9 @@ import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.SessionRecord;
 import pt.inescid.cllsj.SyntaxError;
 import pt.inescid.cllsj.TypeError;
+import pt.inescid.cllsj.ast.types.ASTBotT;
+import pt.inescid.cllsj.ast.types.ASTOfferT;
+import pt.inescid.cllsj.ast.types.ASTType;
 
 // unfold
 
@@ -131,7 +134,7 @@ public class ASTCase extends ASTNode {
     ty = ASTType.unfoldRecInfer(ty, this, ch, ep);
     if (ty instanceof ASTOfferT) {
       ASTOfferT tyr = (ASTOfferT) ty;
-      HashMap<String, ASTType> tcase = tyr.cases;
+      HashMap<String, ASTType> tcase = tyr.getcases();
 
       for (Iterator<String> itCasesTyp = tcase.keySet().iterator(); itCasesTyp.hasNext(); ) {
         String lab = itCasesTyp.next();

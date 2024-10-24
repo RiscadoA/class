@@ -12,6 +12,10 @@ import pt.inescid.cllsj.SessionClosure;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.TypeError;
 import pt.inescid.cllsj.VBool;
+import pt.inescid.cllsj.ast.types.ASTBotT;
+import pt.inescid.cllsj.ast.types.ASTCoLboolT;
+import pt.inescid.cllsj.ast.types.ASTCointT;
+import pt.inescid.cllsj.ast.types.ASTType;
 
 public class ASTIf extends ASTNode {
 

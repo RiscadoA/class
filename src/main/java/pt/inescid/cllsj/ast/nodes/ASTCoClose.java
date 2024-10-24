@@ -17,6 +17,8 @@ import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.SessionRecord;
 import pt.inescid.cllsj.TypeError;
 import pt.inescid.cllsj.ast.ASTNodeVisitor;
+import pt.inescid.cllsj.ast.types.ASTBotT;
+import pt.inescid.cllsj.ast.types.ASTType;
 
 // unfolded
 

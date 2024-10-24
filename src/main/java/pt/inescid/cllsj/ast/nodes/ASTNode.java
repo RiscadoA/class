@@ -15,6 +15,17 @@ import pt.inescid.cllsj.SessionFieldClose;
 import pt.inescid.cllsj.Trail;
 import pt.inescid.cllsj.TypeError;
 import pt.inescid.cllsj.ast.ASTNodeVisitor;
+import pt.inescid.cllsj.ast.types.ASTAffineT;
+import pt.inescid.cllsj.ast.types.ASTBangT;
+import pt.inescid.cllsj.ast.types.ASTBasicType;
+import pt.inescid.cllsj.ast.types.ASTBotT;
+import pt.inescid.cllsj.ast.types.ASTCoAffineT;
+import pt.inescid.cllsj.ast.types.ASTNotT;
+import pt.inescid.cllsj.ast.types.ASTRecvT;
+import pt.inescid.cllsj.ast.types.ASTSendT;
+import pt.inescid.cllsj.ast.types.ASTType;
+import pt.inescid.cllsj.ast.types.ASTUsageT;
+import pt.inescid.cllsj.ast.types.ASTWhyT;
 
 public abstract class ASTNode {
 

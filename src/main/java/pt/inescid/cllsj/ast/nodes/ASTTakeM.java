@@ -10,6 +10,9 @@ import pt.inescid.cllsj.LinSession;
 import pt.inescid.cllsj.Server;
 import pt.inescid.cllsj.Trail;
 import pt.inescid.cllsj.TypeError;
+import pt.inescid.cllsj.ast.types.ASTCoMutT;
+import pt.inescid.cllsj.ast.types.ASTType;
+import pt.inescid.cllsj.ast.types.ASTUsageT;
 
 public class ASTTakeM extends ASTNode {
   String chr;

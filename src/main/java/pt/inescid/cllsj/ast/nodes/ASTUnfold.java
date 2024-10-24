@@ -17,13 +17,19 @@ import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.SessionFieldUnfold;
 import pt.inescid.cllsj.SessionRecord;
 import pt.inescid.cllsj.TypeError;
+import pt.inescid.cllsj.ast.types.ASTCoAffineT;
+import pt.inescid.cllsj.ast.types.ASTCoRecT;
+import pt.inescid.cllsj.ast.types.ASTRecT;
+import pt.inescid.cllsj.ast.types.ASTType;
+import pt.inescid.cllsj.ast.types.ASTUsageT;
+import pt.inescid.cllsj.ast.types.ASTWhyT;
 
 // unfolded
 
 public class ASTUnfold extends ASTNode {
   String ch;
   ASTNode rhs;
-  boolean rec;
+  public boolean rec;
   ASTType tyrhs;
 
   public ASTUnfold(String _ch, ASTNode _rhs) {

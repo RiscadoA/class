@@ -11,6 +11,9 @@ import pt.inescid.cllsj.Pair;
 import pt.inescid.cllsj.Server;
 import pt.inescid.cllsj.Trail;
 import pt.inescid.cllsj.TypeError;
+import pt.inescid.cllsj.ast.types.ASTCoAffineT;
+import pt.inescid.cllsj.ast.types.ASTCoStructT;
+import pt.inescid.cllsj.ast.types.ASTType;
 
 public class ASTCoSSelect extends ASTNode {
   String chr;

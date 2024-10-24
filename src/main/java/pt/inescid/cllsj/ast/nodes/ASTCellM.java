@@ -12,6 +12,9 @@ import pt.inescid.cllsj.Server;
 import pt.inescid.cllsj.SyntaxError;
 import pt.inescid.cllsj.Trail;
 import pt.inescid.cllsj.TypeError;
+import pt.inescid.cllsj.ast.types.ASTCellT;
+import pt.inescid.cllsj.ast.types.ASTMutT;
+import pt.inescid.cllsj.ast.types.ASTType;
 
 // unfolded
 

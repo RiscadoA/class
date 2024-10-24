@@ -17,6 +17,8 @@ import pt.inescid.cllsj.Server;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.SessionRecord;
 import pt.inescid.cllsj.TypeError;
+import pt.inescid.cllsj.ast.types.ASTCaseT;
+import pt.inescid.cllsj.ast.types.ASTType;
 
 public class ASTSelect extends ASTNode {
 
@@ -92,7 +94,7 @@ public class ASTSelect extends ASTNode {
     if (ty instanceof ASTCaseT) {
 
       ASTCaseT tyr = (ASTCaseT) ty;
-      ASTType tcase = tyr.cases.get(lab);
+      ASTType tcase = tyr.getcases().get(lab);
       contType = tcase;
       if (tcase == null) {
         throw new TypeError("Line " + lineno + " :" + "case: " + lab + " is not a valid label.");
