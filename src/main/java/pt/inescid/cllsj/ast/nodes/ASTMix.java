@@ -11,7 +11,7 @@ import pt.inescid.cllsj.SAM;
 import pt.inescid.cllsj.SAMCont;
 import pt.inescid.cllsj.Server;
 import pt.inescid.cllsj.SessionField;
-import pt.inescid.cllsj.ast.ASTVisitor;
+import pt.inescid.cllsj.ast.ASTNodeVisitor;
 
 public class ASTMix extends ASTNode {
 
@@ -182,7 +182,7 @@ public class ASTMix extends ASTNode {
   }
 
   @Override
-  public void accept(ASTVisitor visitor) {
+  public void accept(ASTNodeVisitor visitor) {
     visitor.visit(this);
   }
 }
