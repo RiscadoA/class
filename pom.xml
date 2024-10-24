@@ -2,7 +2,7 @@
 xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
-  <groupId>pt.ulisboa.tecnico</groupId>
+  <groupId>pt.inescid</groupId>
   <artifactId>cllsj</artifactId>
   <version>10.0-SNAPSHOT</version>
   <packaging>jar</packaging>
@@ -33,7 +33,7 @@ xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/x
         <artifactId>exec-maven-plugin</artifactId>
         <version>3.0.0</version>
         <configuration>
-          <mainClass>pt.ulisboa.tecnico.cllsj.CLLSj</mainClass>
+          <mainClass>pt.inescid.cllsj.CLLSj</mainClass>
         </configuration>
       </plugin>
       <!-- Plugin for verifying formatting according to google's code style guide -->
