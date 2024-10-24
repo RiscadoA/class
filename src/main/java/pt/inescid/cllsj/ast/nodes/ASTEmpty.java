@@ -10,7 +10,7 @@ import pt.inescid.cllsj.LinSession;
 import pt.inescid.cllsj.SAMCont;
 import pt.inescid.cllsj.Server;
 import pt.inescid.cllsj.SessionField;
-import pt.inescid.cllsj.ast.ASTVisitor;
+import pt.inescid.cllsj.ast.ASTNodeVisitor;
 
 public class ASTEmpty extends ASTNode {
 
@@ -84,7 +84,7 @@ public class ASTEmpty extends ASTNode {
   }
 
   @Override
-  public void accept(ASTVisitor visitor) {
+  public void accept(ASTNodeVisitor visitor) {
     visitor.visit(this);
   }
 }

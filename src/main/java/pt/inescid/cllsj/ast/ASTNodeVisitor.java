@@ -2,7 +2,7 @@ package pt.inescid.cllsj.ast;
 
 import pt.inescid.cllsj.ast.nodes.*;
 
-public abstract class ASTVisitor {
+public abstract class ASTNodeVisitor {
   // Catch all for nodes which do not have their own visit method
   public abstract void visit(ASTNode node);
 

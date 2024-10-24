@@ -14,7 +14,7 @@ import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.SessionFieldClose;
 import pt.inescid.cllsj.Trail;
 import pt.inescid.cllsj.TypeError;
-import pt.inescid.cllsj.ast.ASTVisitor;
+import pt.inescid.cllsj.ast.ASTNodeVisitor;
 
 public abstract class ASTNode {
 
@@ -43,7 +43,7 @@ public abstract class ASTNode {
     System.out.println(this);
   }
 
-  public void accept(ASTVisitor visitor) {
+  public void accept(ASTNodeVisitor visitor) {
     visitor.visit(this);
   }
 

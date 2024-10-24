@@ -3,10 +3,10 @@ package pt.inescid.cllsj.compiler;
 import java.util.HashMap;
 import java.util.Map;
 import pt.inescid.cllsj.Env;
-import pt.inescid.cllsj.ast.ASTVisitor;
+import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.nodes.*;
 
-public class Generator extends ASTVisitor {
+public class Generator extends ASTNodeVisitor {
   private String generatedCode = "";
   private int indentLevel = 0;
   private final Map<String, SessionRecord> sessionRecords = new HashMap<>();

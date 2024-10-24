@@ -16,7 +16,7 @@ import pt.inescid.cllsj.Server;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.SessionRecord;
 import pt.inescid.cllsj.TypeError;
-import pt.inescid.cllsj.ast.ASTVisitor;
+import pt.inescid.cllsj.ast.ASTNodeVisitor;
 
 public class ASTClose extends ASTNode {
 
@@ -142,7 +142,7 @@ public class ASTClose extends ASTNode {
   }
 
   @Override
-  public void accept(ASTVisitor visitor) {
+  public void accept(ASTNodeVisitor visitor) {
     visitor.visit(this);
   }
 }
