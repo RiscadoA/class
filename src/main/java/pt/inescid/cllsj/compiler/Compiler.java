@@ -11,6 +11,7 @@ public class Compiler {
       ast = new CLLSj(System.in).Proc();
     } catch (Exception e) {
       System.err.println("Parsing error: " + e.getMessage());
+      e.printStackTrace();
       return 1;
     }
 
@@ -23,6 +24,7 @@ public class Compiler {
       ast.typecheck(new Env<>(), new Env<>(), new Env<>());
     } catch (Exception e) {
       System.err.println("Typechecking error: " + e.getMessage());
+      e.printStackTrace();
       return 1;
     }
 
@@ -31,6 +33,7 @@ public class Compiler {
       output = Generator.generate(ast);
     } catch (Exception e) {
       System.err.println("Generation error: " + e.getMessage());
+      e.printStackTrace();
       return 1;
     }
 

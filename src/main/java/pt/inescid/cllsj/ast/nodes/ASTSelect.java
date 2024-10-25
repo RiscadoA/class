@@ -17,6 +17,7 @@ import pt.inescid.cllsj.Server;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.SessionRecord;
 import pt.inescid.cllsj.TypeError;
+import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.types.ASTCaseT;
 import pt.inescid.cllsj.ast.types.ASTType;
 
@@ -24,6 +25,7 @@ public class ASTSelect extends ASTNode {
 
   String ch;
   String lab;
+  int labIndex = -1;
   ASTNode rhs;
   ASTType contType;
 
@@ -31,6 +33,27 @@ public class ASTSelect extends ASTNode {
     ch = _ch;
     lab = _lab;
     rhs = _rhs;
+  }
+
+  @Override
+  public String getSubjectCh() {
+    return ch;
+  }
+
+  public String getCh() {
+    return ch;
+  }
+
+  public String getLabel() {
+    return lab;
+  }
+
+  public int getLabelIndex() {
+    return labIndex;
+  }
+
+  public ASTNode getRhs() {
+    return rhs;
   }
 
   public void ASTInsertPipe(Function<ASTNode, ASTNode> f, ASTNode from) throws Exception {
@@ -94,7 +117,8 @@ public class ASTSelect extends ASTNode {
     if (ty instanceof ASTCaseT) {
 
       ASTCaseT tyr = (ASTCaseT) ty;
-      ASTType tcase = tyr.getcases().get(lab);
+      ASTType tcase = tyr.getCaseType(lab);
+      labIndex = tyr.getIndex(lab);
       contType = tcase;
       if (tcase == null) {
         throw new TypeError("Line " + lineno + " :" + "case: " + lab + " is not a valid label.");
@@ -203,5 +227,10 @@ public class ASTSelect extends ASTNode {
   public void show() {
     System.out.println(this + " " + lab);
     rhs.show();
+  }
+
+  @Override
+  public void accept(ASTNodeVisitor visitor) {
+    visitor.visit(this);
   }
 }

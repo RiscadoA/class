@@ -1,0 +1,13 @@
+cut {
+    case x of {
+        |#A: close x
+        |#B: case x of {
+            |#A: wait x; ()
+            |#B: close x
+        }
+    }
+    |x : choice of { |#A: wait |#B: choice of { |#A: close |#B: wait } }|
+    #A x;
+    wait x;
+    ()
+}

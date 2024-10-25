@@ -18,6 +18,7 @@ import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.SessionRecord;
 import pt.inescid.cllsj.SyntaxError;
 import pt.inescid.cllsj.TypeError;
+import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.types.ASTBotT;
 import pt.inescid.cllsj.ast.types.ASTOfferT;
 import pt.inescid.cllsj.ast.types.ASTType;
@@ -26,17 +27,53 @@ import pt.inescid.cllsj.ast.types.ASTType;
 
 public class ASTCase extends ASTNode {
   String ch;
-  HashMap<String, ASTNode> cases;
+  TreeMap<String, ASTNode> cases;
   HashMap<String, ASTType> casetypes;
 
   public ASTCase(String id) {
     ch = id;
-    cases = new HashMap<String, ASTNode>();
+    cases =
+        new TreeMap<
+            String,
+            ASTNode>(); // We need to keep the order of the cases so that we have consistent case
+    // indexes
     casetypes = new HashMap<String, ASTType>();
   }
 
   public void addCase(String id, ASTNode t) throws Exception {
     if (cases.putIfAbsent(id, t) != null) throw new SyntaxError("Duplicate Label in CASE");
+  }
+
+  @Override
+  public String getSubjectCh() {
+    return ch;
+  }
+
+  public String getCh() {
+    return ch;
+  }
+
+  public int getCaseCount() {
+    return cases.size();
+  }
+
+  public String getCaseLabelFromIndex(int index) {
+    for (String label : cases.keySet()) {
+      if (index == 0) {
+        return label;
+      }
+      index--;
+    }
+
+    return null;
+  }
+
+  public ASTNode getCase(String label) {
+    return cases.get(label);
+  }
+
+  public ASTType getCaseType(String label) {
+    return casetypes.get(label);
   }
 
   public void ASTInsertPipe(Function<ASTNode, ASTNode> f, ASTNode from) throws Exception {
@@ -324,5 +361,10 @@ public class ASTCase extends ASTNode {
       System.out.println("** " + lab);
       cp.show();
     }
+  }
+
+  @Override
+  public void accept(ASTNodeVisitor visitor) {
+    visitor.visit(this);
   }
 }

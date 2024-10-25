@@ -11,6 +11,10 @@ public abstract class ASTNodeVisitor {
     visit((ASTNode) node);
   }
 
+  public void visit(ASTCase node) {
+    visit((ASTNode) node);
+  }
+
   public void visit(ASTClose node) {
     visit((ASTNode) node);
   }
@@ -28,6 +32,10 @@ public abstract class ASTNodeVisitor {
   }
 
   public void visit(ASTMix node) {
+    visit((ASTNode) node);
+  }
+
+  public void visit(ASTSelect node) {
     visit((ASTNode) node);
   }
 }

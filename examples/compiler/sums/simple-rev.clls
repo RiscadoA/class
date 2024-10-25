@@ -1,0 +1,10 @@
+cut {
+    case x of {
+        |#C: close x
+        |#W: wait x; ()
+    }
+    |x : choice of { |#C: wait |#W: close }|
+    #C x;
+    wait x;
+    ()
+}
