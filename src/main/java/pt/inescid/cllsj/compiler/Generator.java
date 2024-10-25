@@ -18,6 +18,15 @@ public class Generator extends ASTNodeVisitor {
     generator.putLine("#include <stdlib.h>");
     generator.putLine("#include <stdio.h>");
     generator.putLine("");
+    generator.putLine("struct session_record {");
+    generator.indentLevel++;
+    generator.putLine("void* cont;");
+    generator.putLine("unsigned char* queue_m;");
+    generator.putLine("unsigned char* queue_r;");
+    generator.putLine("unsigned char* queue_w;");
+    generator.indentLevel--;
+    generator.putLine("};");
+    generator.putLine("");
     generator.putLine("int main() {");
     generator.indentLevel++;
     generator.putLine("void* " + generator.sessionContSwapRegister() + ";");
@@ -42,9 +51,7 @@ public class Generator extends ASTNodeVisitor {
   @Override
   public void visit(ASTCase node) {
     // We pop a label from the session queue and use it as the switch expression.
-    this.beginLine("switch (");
-    this.popLabel(node.getCh());
-    this.endLine(") {");
+    this.putLine("switch (" + this.popLabel(node.getCh()) + ") {");
     this.indentLevel++;
 
     for (int i = 0; i < node.getCaseCount(); i++) {
@@ -69,12 +76,22 @@ public class Generator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTClose node) {
+    String closeEnd = this.makeLabel("close_end_" + node.getCh());
+
     // Push a close token onto the session queue.
     this.pushClose(node.getCh());
 
-    // Jump to the continuation, which the type checker guarantees to eventually contain a matching
+    // Set the new continuation to point to after the close.
+    // This won't be used normally, but it may be necessary when there's another process next to
+    // this one which should execute.
+    this.putLine(sessionContSwapRegister() + " = " + sessionContRegister(node.getCh()) + ";");
+    this.putLine(sessionContRegister(node.getCh()) + " = &&" + closeEnd + ";");
+
+    // Jump to the previously stored continuation, which the type checker guarantees to eventually
+    // contain a matching
     // wait process.
-    this.putLine("goto *" + sessionContRegister(node.getCh()) + ";");
+    this.putLine("goto *" + sessionContSwapRegister() + ";");
+    this.putLabel(closeEnd);
   }
 
   @Override
@@ -104,17 +121,25 @@ public class Generator extends ASTNodeVisitor {
 
     // The first code to be executed for a given session must be positive, so we set the polarity to
     // true.
+    this.putLine("{");
+    this.indentLevel++;
     this.sessionPolarities.put(node.getCh(), true);
     this.generateContinuation(node.getLhs());
     this.putJump(cutEnd);
+    this.indentLevel--;
+    this.putLine("}");
 
     // The right hand side code only executes right after the left hand side jumps to it.
     // Thus, we set the initial session polarity to false, so that the right hand side doesn't jump
     // back to the left hand side if it is a negative node.
+    this.putLine("{");
+    this.indentLevel++;
     this.sessionPolarities.put(node.getCh(), false);
     this.putLabel(cutRhs);
     this.generateContinuation(node.getRhs());
     this.putLabel(cutEnd);
+    this.indentLevel--;
+    this.putLine("}");
 
     // We clean up the session state on the compiler side.
     this.sessionPolarities.remove(node.getCh());
@@ -129,14 +154,79 @@ public class Generator extends ASTNodeVisitor {
   @Override
   public void visit(ASTMix node) {
     // Simply execute both sides of the mix sequentially.
+    this.putLine("{");
+    this.indentLevel++;
     node.getLhs().accept(this);
+    this.indentLevel--;
+    this.putLine("}");
+
+    this.putLine("{");
+    this.indentLevel++;
     node.getRhs().accept(this);
+    this.indentLevel--;
+    this.putLine("}");
+  }
+
+  @Override
+  public void visit(ASTRecv node) {
+    String recvRhs = this.makeLabel("recv_" + node.getChr() + "_" + node.getChi() + "_rhs");
+
+    assert !this.sessionPolarities.containsKey(node.getChi());
+    assert !this.sessionRecordSizes.containsKey(node.getChi());
+
+    // Pop a session record from the session queue.
+    this.popSessionRecord(node.getChr(), node.getChi());
+
+    // We set the continuation to the right hand side of the receive, and jump to it.
+    this.putLine(sessionContSwapRegister() + " = " + sessionContRegister(node.getChi()) + ";");
+    this.putLine(sessionContRegister(node.getChi()) + " = &&" + recvRhs + ";");
+    this.putLine("goto *" + sessionContSwapRegister() + ";");
+
+    // The session is fresh, so we consider its previous polarity to be positive.
+    this.sessionPolarities.put(node.getChi(), true);
+    this.sessionRecordSizes.put(node.getChi(), SizeCalculator.calculate(node.getChiType()));
+    this.putLabel(recvRhs);
+    this.generateContinuation(node.getRhs());
+    this.sessionRecordSizes.remove(node.getChi());
+    this.sessionPolarities.remove(node.getChi());
   }
 
   @Override
   public void visit(ASTSelect node) {
     // Push the label's index onto the session queue.
     this.pushLabel(node.getCh(), node.getLabelIndex(), node.getLabel());
+    this.generateContinuation(node.getRhs());
+  }
+
+  @Override
+  public void visit(ASTSend node) {
+    String sendLhs = this.makeLabel("send_" + node.getChs() + "_" + node.getCho() + "_lhs");
+    String sendRhs = this.makeLabel("send_" + node.getChs() + "_" + node.getCho() + "_rhs");
+
+    assert !this.sessionPolarities.containsKey(node.getCho());
+    assert !this.sessionRecordSizes.containsKey(node.getCho());
+
+    // Initialize a new session record.
+    int size = SizeCalculator.calculate(node.getLhsType());
+    sessionRecordSizes.put(node.getCho(), size);
+    this.allocSessionRecord(node.getCho(), size, sendLhs);
+    this.putJump(sendRhs);
+
+    // The session is fresh, so we consider its previous polarity to be positive.
+    this.sessionPolarities.put(node.getCho(), true);
+
+    // Generate the continuation for the left hand side.
+    // Additionally, we jump to the receiver continuation after the left hand side is done.
+    // This is necessary in cases where the session is not closed by the left hand side.
+    this.putLabel(sendLhs);
+    this.generateContinuation(node.getLhs());
+    this.putLine("goto *" + sessionContRegister(node.getCho()) + ";");
+    this.sessionRecordSizes.remove(node.getCho());
+    this.sessionPolarities.remove(node.getCho());
+
+    // Push the session record onto the session queue and continue with the right hand side.
+    this.putLabel(sendRhs);
+    this.pushSessionRecord(node.getChs(), node.getCho());
     this.generateContinuation(node.getRhs());
   }
 
@@ -179,48 +269,62 @@ public class Generator extends ASTNodeVisitor {
   }
 
   // Creates a new expression which pops a label from the session queue.
-  private void popLabel(String ch) {
-    popLiteral(ch, "unsigned char");
+  private String popLabel(String ch) {
+    return popLiteral(ch, "unsigned char");
   }
 
-  // Creates a new statement which pushes a literal onto the session queue.
+  // Creates a new statement which pushes a session record onto the session queue.
+  private void pushSessionRecord(String ch, String pushedCh) {
+    pushLiteral(ch, "struct session_record*", sessionRecordRegister(pushedCh));
+    putPrint(ch + ".push(" + pushedCh + ")");
+  }
+
+  // Creates statements which create a new session record from a session queue.
+  private void popSessionRecord(String ch, String poppedCh) {
+    putLine(
+        "struct session_record* "
+            + sessionRecordRegister(poppedCh)
+            + " = "
+            + popLiteral(ch, "struct session_record*")
+            + ";");
+    putPrint(ch + ".pop(" + poppedCh + ")");
+  }
+
+  // Creates statements which pushes a literal onto the session queue.
   private void pushLiteral(String ch, String cType, String literal) {
-    putLine("*(unsigned char*)" + sessionQueueWriteRegister(ch) + " = " + literal + ";");
+    putLine("*(" + cType + "*)" + sessionQueueWriteRegister(ch) + " = " + literal + ";");
     putLine(sessionQueueWriteRegister(ch) + " += sizeof(" + cType + ");");
   }
 
-  // Creates a new expression which pops a literal from the session queue.
-  private void popLiteral(String ch, String cType) {
-    generatedCode +=
-        "*(("
-            + cType
-            + "*)(("
-            + sessionQueueReadRegister(ch)
-            + " += sizeof("
-            + cType
-            + ")) - sizeof("
-            + cType
-            + ")))";
+  // Returns a new expression which pops a literal from the session queue.
+  private String popLiteral(String ch, String cType) {
+    return "*(("
+        + cType
+        + "*)(("
+        + sessionQueueReadRegister(ch)
+        + " += sizeof("
+        + cType
+        + ")) - sizeof("
+        + cType
+        + ")))";
   }
 
   private void allocSessionRecord(String ch, int size, String contLabel) {
-    putLine("void* " + sessionContRegister(ch) + " = &&" + contLabel + ";");
+    putLine("struct session_record session_record_mem_" + ch + ";");
+    putLine(
+        "struct session_record* "
+            + sessionRecordRegister(ch)
+            + " = &session_record_mem_"
+            + ch
+            + ";");
+
+    putLine(sessionContRegister(ch) + " = &&" + contLabel + ";");
 
     // Only allocate the session queue if we actually need one.
     if (size > 0) {
-      putLine("unsigned char* " + sessionQueueRegister(ch) + " = malloc(" + size + ");");
-      putLine(
-          "unsigned char* "
-              + sessionQueueWriteRegister(ch)
-              + " = "
-              + sessionQueueRegister(ch)
-              + ";");
-      putLine(
-          "unsigned char* "
-              + sessionQueueReadRegister(ch)
-              + " = "
-              + sessionQueueRegister(ch)
-              + ";");
+      putLine(sessionQueueRegister(ch) + " = malloc(" + size + ");");
+      putLine(sessionQueueWriteRegister(ch) + " = " + sessionQueueRegister(ch) + ";");
+      putLine(sessionQueueReadRegister(ch) + " = " + sessionQueueRegister(ch) + ";");
     }
 
     putPrint(ch + ".alloc(" + size + ")");
@@ -238,24 +342,28 @@ public class Generator extends ASTNodeVisitor {
     putPrint(ch + ".free()");
   }
 
-  private String sessionContRegister(String ch) {
-    return "scont_" + ch;
-  }
-
   private String sessionContSwapRegister() {
     return "swap_scont";
   }
 
+  private String sessionRecordRegister(String ch) {
+    return "session_record_ptr_" + ch;
+  }
+
+  private String sessionContRegister(String ch) {
+    return sessionRecordRegister(ch) + "->cont";
+  }
+
   private String sessionQueueRegister(String ch) {
-    return "squeue_m_" + ch;
+    return sessionRecordRegister(ch) + "->queue_m";
   }
 
   private String sessionQueueReadRegister(String ch) {
-    return "squeue_r_" + ch;
+    return sessionRecordRegister(ch) + "->queue_r";
   }
 
   private String sessionQueueWriteRegister(String ch) {
-    return "squeue_w_" + ch;
+    return sessionRecordRegister(ch) + "->queue_w";
   }
 
   private void putPrint(String msg) {

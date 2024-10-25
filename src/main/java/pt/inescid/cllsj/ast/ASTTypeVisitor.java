@@ -17,4 +17,12 @@ public abstract class ASTTypeVisitor {
   public void visit(ASTOneT type) {
     visit((ASTType) type);
   }
+
+  public void visit(ASTRecvT type) {
+    visit((ASTType) type);
+  }
+
+  public void visit(ASTSendT type) {
+    visit((ASTType) type);
+  }
 }
