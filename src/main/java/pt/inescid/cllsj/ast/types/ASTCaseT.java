@@ -5,19 +5,42 @@ import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.SyntaxError;
 import pt.inescid.cllsj.Trail;
+import pt.inescid.cllsj.ast.ASTTypeVisitor;
 
 public class ASTCaseT extends ASTType {
-  HashMap<String, ASTType> cases;
+  TreeMap<String, ASTType> cases;
 
   public ASTCaseT() {
-    cases = new HashMap<String, ASTType>();
+    cases = new TreeMap<String, ASTType>();
   }
 
   public void addCase(String id, ASTType t) throws Exception {
     if (cases.putIfAbsent(id, t) != null) throw new SyntaxError("Duplicate Label in Choice");
   }
 
-  public HashMap<String, ASTType> getcases() {
+  public int getIndex(String label) {
+    int i = 0;
+    for (String lab : cases.keySet()) {
+      if (lab.equals(label)) return i;
+      i++;
+    }
+    return -1;
+  }
+
+  public String getLabel(int index) {
+    int i = 0;
+    for (String lab : cases.keySet()) {
+      if (i == index) return lab;
+      i++;
+    }
+    return null;
+  }
+
+  public ASTType getCaseType(String label) {
+    return cases.get(label);
+  }
+
+  public Map<String, ASTType> getcases() {
     return cases;
   }
 
@@ -116,5 +139,10 @@ public class ASTCaseT extends ASTType {
     }
     //	System.out.println("CASE OFFSETS => " + max);
     return max;
+  }
+
+  @Override
+  public void accept(ASTTypeVisitor visitor) {
+    visitor.visit(this);
   }
 }

@@ -271,7 +271,12 @@ public abstract class ASTNode {
         || it instanceof ASTFwd
         || it instanceof ASTSelect
         || it instanceof ASTCall
-        || it instanceof ASTSendTy);
+        || it instanceof ASTSendTy
+        || it instanceof ASTEmpty);
+  }
+
+  public String getSubjectCh() {
+    return null;
   }
 
   public ASTNode compileFwd(String x1, String x2, ASTType t1, ASTType t2, Env<EnvEntry> ep)

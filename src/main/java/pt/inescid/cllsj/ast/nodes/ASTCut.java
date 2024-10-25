@@ -36,11 +36,11 @@ public class ASTCut extends ASTNode {
     rhs = _rhs;
   }
 
-  public String getId() {
+  public String getCh() {
     return id;
   }
 
-  public ASTType getType() {
+  public ASTType getChType() {
     return type;
   }
 

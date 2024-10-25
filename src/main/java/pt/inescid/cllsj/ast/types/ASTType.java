@@ -6,6 +6,7 @@ import pt.inescid.cllsj.CLLSj;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.Trail;
+import pt.inescid.cllsj.ast.ASTTypeVisitor;
 import pt.inescid.cllsj.ast.nodes.ASTDiscard;
 import pt.inescid.cllsj.ast.nodes.ASTNode;
 import pt.inescid.cllsj.ast.nodes.ASTUnfold;
@@ -243,5 +244,9 @@ public abstract class ASTType {
     System.out.println(this + "@SetOffsets UNDEFINED");
     System.exit(0);
     return -10; // unreachable
+  }
+
+  public void accept(ASTTypeVisitor visitor) {
+    visitor.visit(this);
   }
 }

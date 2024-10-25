@@ -28,6 +28,11 @@ public class ASTClose extends ASTNode {
     ch = _ch;
   }
 
+  @Override
+  public String getSubjectCh() {
+    return ch;
+  }
+
   public String getCh() {
     return ch;
   }
