@@ -18,6 +18,7 @@ import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.SessionRecord;
 import pt.inescid.cllsj.Trail;
 import pt.inescid.cllsj.TypeError;
+import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.types.ASTRecvT;
 import pt.inescid.cllsj.ast.types.ASTType;
 
@@ -34,6 +35,27 @@ public class ASTRecv extends ASTNode {
     chi = _chi;
     type = _type;
     rhs = _rhs;
+  }
+
+  @Override
+  public String getSubjectCh() {
+    return chr;
+  }
+
+  public String getChr() {
+    return chr;
+  }
+
+  public String getChi() {
+    return chi;
+  }
+
+  public ASTType getChiType() {
+    return type;
+  }
+
+  public ASTNode getRhs() {
+    return rhs;
   }
 
   public void ASTInsertPipe(Function<ASTNode, ASTNode> f, ASTNode from) throws Exception {
@@ -344,5 +366,10 @@ public class ASTRecv extends ASTNode {
         return;
       }
     }
+  }
+
+  @Override
+  public void accept(ASTNodeVisitor visitor) {
+    visitor.visit(this);
   }
 }

@@ -4,6 +4,8 @@ import pt.inescid.cllsj.ast.ASTTypeVisitor;
 import pt.inescid.cllsj.ast.types.ASTBotT;
 import pt.inescid.cllsj.ast.types.ASTCaseT;
 import pt.inescid.cllsj.ast.types.ASTOneT;
+import pt.inescid.cllsj.ast.types.ASTRecvT;
+import pt.inescid.cllsj.ast.types.ASTSendT;
 import pt.inescid.cllsj.ast.types.ASTType;
 
 public class SizeCalculator extends ASTTypeVisitor {
@@ -38,5 +40,17 @@ public class SizeCalculator extends ASTTypeVisitor {
   @Override
   public void visit(ASTOneT type) {
     size = 0;
+  }
+
+  @Override
+  public void visit(ASTRecvT type) {
+    size = 8; // 8 bytes for the pointer to the received value
+    size += calculate(type.getrhs());
+  }
+
+  @Override
+  public void visit(ASTSendT type) {
+    size = 8; // 8 bytes for the pointer to the sent value
+    size += calculate(type.getrhs());
   }
 }

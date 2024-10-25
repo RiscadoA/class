@@ -1,0 +1,9 @@
+cut {
+	send x(z. close z);
+	wait x;
+	()
+	|x: recv wait; close|
+	recv x(y);
+	wait y;
+	close x
+}

@@ -18,6 +18,7 @@ import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.SessionRecord;
 import pt.inescid.cllsj.Trail;
 import pt.inescid.cllsj.TypeError;
+import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.types.ASTBotT;
 import pt.inescid.cllsj.ast.types.ASTSendT;
 import pt.inescid.cllsj.ast.types.ASTType;
@@ -38,6 +39,31 @@ public class ASTSend extends ASTNode {
     type = _type;
     lhs = _lhs;
     rhs = _rhs;
+  }
+
+  @Override
+  public String getSubjectCh() {
+    return chs;
+  }
+
+  public String getChs() {
+    return chs;
+  }
+
+  public String getCho() {
+    return cho;
+  }
+
+  public ASTType getLhsType() {
+    return tys_lhs;
+  }
+
+  public ASTNode getLhs() {
+    return lhs;
+  }
+
+  public ASTNode getRhs() {
+    return rhs;
   }
 
   public void ASTInsertPipe(Function<ASTNode, ASTNode> f, ASTNode from) throws Exception {
@@ -355,5 +381,10 @@ public class ASTSend extends ASTNode {
         throw new SAMError("send-op - " + chs);
       }
     }
+  }
+
+  @Override
+  public void accept(ASTNodeVisitor visitor) {
+    visitor.visit(this);
   }
 }
