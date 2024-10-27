@@ -1,0 +1,12 @@
+cut {
+    close a
+    |a:wait|
+    par {
+        fwd a b
+        ||
+        ()
+    }
+    |b:wait|
+    wait b;
+    ()
+}

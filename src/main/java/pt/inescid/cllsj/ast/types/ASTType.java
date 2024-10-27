@@ -221,6 +221,16 @@ public abstract class ASTType {
   //	return offset;
   // }
 
+  public boolean isPos() {
+    try {
+      return isPos(null);
+    } catch (Exception e) {
+      e.printStackTrace(System.out);
+      System.exit(1);
+      return false;
+    }
+  }
+
   public boolean isPos(Env<EnvEntry> ep) throws Exception {
     ASTType it = this;
     it = it.unfoldType(ep);

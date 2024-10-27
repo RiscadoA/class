@@ -21,6 +21,7 @@ import pt.inescid.cllsj.SessionRecord;
 import pt.inescid.cllsj.Trail;
 import pt.inescid.cllsj.TypeError;
 import pt.inescid.cllsj.Value;
+import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.types.ASTAffineT;
 import pt.inescid.cllsj.ast.types.ASTCellBLT;
 import pt.inescid.cllsj.ast.types.ASTCellBT;
@@ -40,6 +41,18 @@ public class ASTFwd extends ASTNode {
   public ASTFwd(String _ch1, String _ch2) {
     ch1 = _ch1;
     ch2 = _ch2;
+  }
+
+  public String getCh1() {
+    return ch1;
+  }
+
+  public String getCh2() {
+    return ch2;
+  }
+
+  public ASTType getCh2Type() {
+    return typeCh2;
   }
 
   public void ASTInsertPipe(Function<ASTNode, ASTNode> f, ASTNode from) throws Exception {
@@ -676,5 +689,10 @@ public class ASTFwd extends ASTNode {
     p_cont.epnm = epnw;
 
     SessionRecord.freeSessionRecord(srecr);
+  }
+
+  @Override
+  public void accept(ASTNodeVisitor visitor) {
+    visitor.visit(this);
   }
 }

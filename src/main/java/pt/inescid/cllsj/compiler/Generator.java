@@ -50,6 +50,8 @@ public class Generator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTCase node) {
+    this.putPrint("case " + node.getCh());
+
     // We pop a label from the session queue and use it as the switch expression.
     this.putLine("switch (" + this.popLabel(node.getCh()) + ") {");
     this.indentLevel++;
@@ -76,6 +78,8 @@ public class Generator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTClose node) {
+    this.putPrint("close " + node.getCh());
+
     String closeEnd = this.makeLabel("close_end_" + node.getCh());
 
     // Push a close token onto the session queue.
@@ -87,15 +91,19 @@ public class Generator extends ASTNodeVisitor {
     this.putLine(sessionContSwapRegister() + " = " + sessionContRegister(node.getCh()) + ";");
     this.putLine(sessionContRegister(node.getCh()) + " = &&" + closeEnd + ";");
 
+    // So that a forward can detect that the session has been closed.
+    this.putLine(sessionQueueWriteRegister(node.getCh()) + " = NULL;");
+
     // Jump to the previously stored continuation, which the type checker guarantees to eventually
-    // contain a matching
-    // wait process.
+    // contain a matching wait process.
     this.putLine("goto *" + sessionContSwapRegister() + ";");
     this.putLabel(closeEnd);
   }
 
   @Override
   public void visit(ASTCoClose node) {
+    this.putPrint("wait " + node.getCh());
+
     // Pop a close token from the session queue.
     this.popClose(node.getCh());
 
@@ -107,6 +115,8 @@ public class Generator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTCut node) {
+    this.putPrint("begin cut " + node.getCh());
+
     assert !sessionPolarities.containsKey(node.getCh());
     assert !sessionRecordSizes.containsKey(node.getCh());
 
@@ -121,54 +131,79 @@ public class Generator extends ASTNodeVisitor {
 
     // The first code to be executed for a given session must be positive, so we set the polarity to
     // true.
-    this.putLine("{");
-    this.indentLevel++;
     this.sessionPolarities.put(node.getCh(), true);
     this.generateContinuation(node.getLhs());
     this.putJump(cutEnd);
-    this.indentLevel--;
-    this.putLine("}");
 
     // The right hand side code only executes right after the left hand side jumps to it.
     // Thus, we set the initial session polarity to false, so that the right hand side doesn't jump
     // back to the left hand side if it is a negative node.
-    this.putLine("{");
-    this.indentLevel++;
     this.sessionPolarities.put(node.getCh(), false);
     this.putLabel(cutRhs);
     this.generateContinuation(node.getRhs());
     this.putLabel(cutEnd);
-    this.indentLevel--;
-    this.putLine("}");
 
     // We clean up the session state on the compiler side.
     this.sessionPolarities.remove(node.getCh());
     this.sessionRecordSizes.remove(node.getCh());
+
+    this.putPrint("end cut " + node.getCh());
   }
 
   @Override
   public void visit(ASTEmpty node) {
-    putPrint("empty");
+    putPrint("()");
+  }
+
+  @Override
+  public void visit(ASTFwd node) {
+    this.putPrint("fwd " + node.getCh1() + " " + node.getCh2());
+
+    // Check which of the channels is positive.
+    String negative, positive;
+    if (node.getCh2Type().isPos()) {
+      positive = node.getCh2();
+      negative = node.getCh1();
+    } else {
+      positive = node.getCh1();
+      negative = node.getCh2();
+    }
+
+    assert sessionPolarities.containsKey(negative);
+    if (sessionPolarities.get(negative)) {
+      // We've been writing to the negative end point, which means that we should jump back to it.
+      this.putLine(sessionContSwapRegister() + " = " + sessionContRegister(negative) + ";");
+      this.putLine(sessionContRegister(negative) + " = " + sessionContRegister(positive) + ";");
+  } else {
+      // We've been reading from the negative end point, which means that we should jump to the positive end point.
+      this.putLine(sessionContSwapRegister() + " = " + sessionContRegister(positive) + ";");
+    }
+
+    // We free the negative session record, as its pointer will now be pointing to the positive session record.
+    this.freeSessionRecord(positive);
+    this.putLine(sessionRecordRegister(positive) + " = " + sessionRecordRegister(negative) + ";");
+    this.putPrint(positive + " = " + negative);
+
+    // Jump to the address we decided on earlier.
+    this.putLine("goto *" + sessionContSwapRegister() + ";");
+    // TODO: what if there is code after the forward which should be executed? For example, a parallel process.
   }
 
   @Override
   public void visit(ASTMix node) {
-    // Simply execute both sides of the mix sequentially.
-    this.putLine("{");
-    this.indentLevel++;
-    node.getLhs().accept(this);
-    this.indentLevel--;
-    this.putLine("}");
+    this.putPrint("begin par");
 
-    this.putLine("{");
-    this.indentLevel++;
+    // Simply execute both sides of the mix sequentially.
+    node.getLhs().accept(this);
     node.getRhs().accept(this);
-    this.indentLevel--;
-    this.putLine("}");
+
+    this.putPrint("end par");
   }
 
   @Override
   public void visit(ASTRecv node) {
+    this.putPrint("recv " + node.getChr() + " " + node.getChi());
+
     String recvRhs = this.makeLabel("recv_" + node.getChr() + "_" + node.getChi() + "_rhs");
 
     assert !this.sessionPolarities.containsKey(node.getChi());
@@ -193,6 +228,8 @@ public class Generator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTSelect node) {
+    this.putPrint(node.getCh() + "." + node.getLabel());
+
     // Push the label's index onto the session queue.
     this.pushLabel(node.getCh(), node.getLabelIndex(), node.getLabel());
     this.generateContinuation(node.getRhs());
@@ -200,6 +237,8 @@ public class Generator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTSend node) {
+    this.putPrint("send " + node.getChs() + "(" + node.getCho() + ")");
+
     String sendLhs = this.makeLabel("send_" + node.getChs() + "_" + node.getCho() + "_lhs");
     String sendRhs = this.makeLabel("send_" + node.getChs() + "_" + node.getCho() + "_rhs");
 
