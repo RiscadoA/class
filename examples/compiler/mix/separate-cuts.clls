@@ -1,0 +1,14 @@
+par {
+    cut {
+        wait a; ()
+        |a:close|
+        close a
+    }
+    ||
+    cut {
+        close a
+        |a:wait|
+        wait a;
+        ()
+    }
+}

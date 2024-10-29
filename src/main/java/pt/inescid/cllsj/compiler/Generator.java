@@ -1,39 +1,62 @@
 package pt.inescid.cllsj.compiler;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.Stack;
 import pt.inescid.cllsj.ast.ASTNodeVisitor;
-import pt.inescid.cllsj.ast.nodes.*;
+import pt.inescid.cllsj.ast.nodes.ASTCase;
+import pt.inescid.cllsj.ast.nodes.ASTClose;
+import pt.inescid.cllsj.ast.nodes.ASTCoClose;
+import pt.inescid.cllsj.ast.nodes.ASTCut;
+import pt.inescid.cllsj.ast.nodes.ASTEmpty;
+import pt.inescid.cllsj.ast.nodes.ASTFwd;
+import pt.inescid.cllsj.ast.nodes.ASTMix;
+import pt.inescid.cllsj.ast.nodes.ASTNode;
+import pt.inescid.cllsj.ast.nodes.ASTRecv;
+import pt.inescid.cllsj.ast.nodes.ASTSelect;
+import pt.inescid.cllsj.ast.nodes.ASTSend;
 
 public class Generator extends ASTNodeVisitor {
   private String generatedCode = "";
   private int indentLevel = 0;
   private int labelIndex = 0;
-  private Map<String, Integer> sessionRecordSizes = new HashMap<>();
-  private Map<String, Boolean> sessionPolarities = new HashMap<>();
+  private Stack<Environment> environments = new Stack<>();
+  private Stack<String> wrappingComments = new Stack<>();
 
   public static String generate(ASTNode ast) {
     Generator generator = new Generator();
 
     generator.putLine("#include <stdlib.h>");
     generator.putLine("#include <stdio.h>");
+    generator.putLine("#include <string.h>");
     generator.putLine("");
-    generator.putLine("struct session_record {");
+    generator.putLine("struct record {");
     generator.indentLevel++;
     generator.putLine("void* cont;");
-    generator.putLine("unsigned char* queue_m;");
-    generator.putLine("unsigned char* queue_r;");
-    generator.putLine("unsigned char* queue_w;");
+    generator.putLine("struct record** env;");
+    generator.putLine("unsigned char* read;");
+    generator.putLine("unsigned char* write;");
+    generator.putLine("int index;");
+    generator.indentLevel--;
+    generator.putLine("};");
+    generator.putLine("");
+    generator.putLine("struct task {");
+    generator.indentLevel++;
+    generator.putLine("void* cont;");
+    generator.putLine("struct record** env;");
+    generator.putLine("struct task* next;");
     generator.indentLevel--;
     generator.putLine("};");
     generator.putLine("");
     generator.putLine("int main() {");
     generator.indentLevel++;
-    generator.putLine("void* " + generator.sessionContSwapRegister() + ";");
+    generator.putLine("struct record* tmp_session;");
+    generator.putLine("struct record** env = NULL;");
+    generator.putLine("struct record** tmp_env;");
+    generator.putLine("void* tmp_cont;");
+    generator.putLine("struct task* next_task = NULL;");
+    generator.putLine("struct task* tmp_task;");
     generator.putLine("");
     ast.accept(generator);
-    generator.putLine("");
-    generator.putLine("return 0;");
+
     generator.indentLevel--;
     generator.putLine("}");
 
@@ -50,7 +73,7 @@ public class Generator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTCase node) {
-    this.putPrint("case " + node.getCh());
+    this.pushWrappingComment("case(" + node.getCh() + "):" + node.lineno);
 
     // We pop a label from the session queue and use it as the switch expression.
     this.putLine("switch (" + this.popLabel(node.getCh()) + ") {");
@@ -58,106 +81,104 @@ public class Generator extends ASTNodeVisitor {
 
     for (int i = 0; i < node.getCaseCount(); i++) {
       String label = node.getCaseLabelFromIndex(i);
-      this.putLine("case " + i + " /* " + label + " */: {");
+      this.putLine("case " + i + ":");
       this.indentLevel++;
 
-      // Generate the continuation for each case.
-      // We preserve the session polarities so that we generate the correct code for the next cases.
-      Map<String, Boolean> oldSessionPolarities = new HashMap<>(sessionPolarities);
-      this.putPrint(node.getCh() + ".pop(" + label + ")");
+      this.environments.push(this.environment().copy());
+      this.pushWrappingComment("case" + label + "(" + node.getCh() + "):" + node.lineno);
+      this.putPrint("case" + label + "(" + node.getCh() + "):" + node.lineno);
       this.generateContinuation(node.getCase(label));
-      sessionPolarities = oldSessionPolarities;
+      this.popWrappingComment();
+      this.environments.pop();
 
       this.indentLevel--;
-      this.putLine("} break;");
     }
 
     this.indentLevel--;
     this.putLine("}");
+
+    this.popWrappingComment();
   }
 
   @Override
   public void visit(ASTClose node) {
-    this.putPrint("close " + node.getCh());
+    this.pushWrappingComment("close(" + node.getCh() + "):" + node.lineno);
+    this.putPrint("close(" + node.getCh() + "):" + node.lineno);
 
-    String closeEnd = this.makeLabel("close_end_" + node.getCh());
-
-    // Push a close token onto the session queue.
+    // Push a close token onto the session queue and flip to the other side of the session.
     this.pushClose(node.getCh());
+    this.flip(node.getCh());
 
-    // Set the new continuation to point to after the close.
-    // This won't be used normally, but it may be necessary when there's another process next to
-    // this one which should execute.
-    this.putLine(sessionContSwapRegister() + " = " + sessionContRegister(node.getCh()) + ";");
-    this.putLine(sessionContRegister(node.getCh()) + " = &&" + closeEnd + ";");
-
-    // So that a forward can detect that the session has been closed.
-    this.putLine(sessionQueueWriteRegister(node.getCh()) + " = NULL;");
-
-    // Jump to the previously stored continuation, which the type checker guarantees to eventually
-    // contain a matching wait process.
-    this.putLine("goto *" + sessionContSwapRegister() + ";");
-    this.putLabel(closeEnd);
+    this.popWrappingComment();
   }
 
   @Override
   public void visit(ASTCoClose node) {
-    this.putPrint("wait " + node.getCh());
+    this.pushWrappingComment("coclose(" + node.getCh() + "):" + node.lineno);
+    this.putPrint("coclose(" + node.getCh() + "):" + node.lineno);
 
-    // Pop a close token from the session queue.
+    // Pop a close token from the session queue, terminate the session, and generate the
+    // continuation.
     this.popClose(node.getCh());
-
-    // The session has been closed, we can get rid of the session record.
-    this.freeSessionRecord(node.getCh());
-
+    this.putLine("free(" + this.sessionPointer(node.getCh()) + ");");
     this.generateContinuation(node.getRhs());
+
+    this.popWrappingComment();
   }
 
   @Override
   public void visit(ASTCut node) {
-    this.putPrint("begin cut " + node.getCh());
+    this.pushWrappingComment("cut(" + node.getCh() + "):" + node.lineno);
+    this.putPrint("cut(" + node.getCh() + "):" + node.lineno);
+    this.pushScope(node);
 
-    assert !sessionPolarities.containsKey(node.getCh());
-    assert !sessionRecordSizes.containsKey(node.getCh());
+    // Initialize the cut session, with initial continuation pointing to the right hand side.
+    String cutRhs = this.makeLabel("cut_" + node.getCh());
+    this.initSession(node.getCh());
+    this.putLine(sessionCont(node.getCh()) + " = &&" + cutRhs + ";");
+    this.putLine(sessionEnv(node.getCh()) + " = env;");
+    this.putLine(sessionIndex(node.getCh()) + " = " + environment().getIndex(node.getCh()) + ";");
 
-    String cutRhs = this.makeLabel("cut_rhs_" + node.getCh());
-    String cutEnd = this.makeLabel("cut_end_" + node.getCh());
-
-    // Allocate a new session record for the channel, with the continuation set to the right hand
-    // side of the cut.
-    int size = SizeCalculator.calculate(node.getChType());
-    sessionRecordSizes.put(node.getCh(), size);
-    this.allocSessionRecord(node.getCh(), size, cutRhs);
-
-    // The first code to be executed for a given session must be positive, so we set the polarity to
-    // true.
-    this.sessionPolarities.put(node.getCh(), true);
+    // The first code to be executed for a given session must be positive.
+    // Thus, we set the polarity to true, to force a flip if the first node is negative.
+    this.environment().setPolarity(node.getCh(), true);
     this.generateContinuation(node.getLhs());
-    this.putJump(cutEnd);
 
-    // The right hand side code only executes right after the left hand side jumps to it.
-    // Thus, we set the initial session polarity to false, so that the right hand side doesn't jump
-    // back to the left hand side if it is a negative node.
-    this.sessionPolarities.put(node.getCh(), false);
+    // The right hand side code only execute right after the left hand side jumps to it.
+    // Thus, if it's negative, it can immediately run, as the positive code has already run.
+    // If it isn't, then it can also immediately run.
+    // So, we set to polarity to false.
     this.putLabel(cutRhs);
+    this.environment().setPolarity(node.getCh(), false);
     this.generateContinuation(node.getRhs());
-    this.putLabel(cutEnd);
 
-    // We clean up the session state on the compiler side.
-    this.sessionPolarities.remove(node.getCh());
-    this.sessionRecordSizes.remove(node.getCh());
-
-    this.putPrint("end cut " + node.getCh());
+    this.popScope();
+    this.popWrappingComment();
   }
 
   @Override
   public void visit(ASTEmpty node) {
-    putPrint("()");
+    this.pushWrappingComment("empty:" + node.lineno);
+
+    putLine("if (next_task != NULL) {");
+    indentLevel++;
+    this.putPrint("empty(continue):" + node.lineno);
+    putLine("tmp_cont = next_task->cont;");
+    putLine("env = next_task->env;");
+    putLine("next_task = next_task->next;");
+    putLine("free(next_task);");
+    putLine("goto *tmp_cont;");
+    indentLevel--;
+    putLine("}");
+    this.putPrint("empty(done):" + node.lineno);
+    putLine("return 0;");
+
+    this.popWrappingComment();
   }
 
   @Override
   public void visit(ASTFwd node) {
-    this.putPrint("fwd " + node.getCh1() + " " + node.getCh2());
+    this.pushWrappingComment("fwd(" + node.getCh1() + ", " + node.getCh2() + "):" + node.lineno);
 
     // Check which of the channels is positive.
     String negative, positive;
@@ -169,145 +190,239 @@ public class Generator extends ASTNodeVisitor {
       negative = node.getCh2();
     }
 
-    assert sessionPolarities.containsKey(negative);
-    if (sessionPolarities.get(negative)) {
-      // We've been writing to the negative end point, which means that we should jump back to it.
-      this.putLine(sessionContSwapRegister() + " = " + sessionContRegister(negative) + ";");
-      this.putLine(sessionContRegister(negative) + " = " + sessionContRegister(positive) + ";");
+    if (this.environment().getPolarity(negative)) {
+      // We've previously written to the negative channel.
+      // Thus, the negative channel may have data on its buffer that it still hasn't read.
+      // We pass control to the negative channel, so that it can read that data that is already in
+      // the buffer.
+
+      this.putLine("tmp_env = " + sessionEnv(negative) + ";");
+      this.putLine("tmp_cont = " + sessionCont(negative) + ";");
+
+      if (this.environment().getPolarity(positive)) {
+        this.putPrint("fwd(W " + negative + ", W " + positive + "):" + node.lineno);
+
+        // We've previously written to the positive channel.
+        // Thus, the positive channel might have data on its buffer that it still hasn't read.
+        //
+        // In this case, we should append what we've already written in the positive channel to
+        // the negative channel's buffer - basically pretending that it was written by the negative
+        // channel.
+
+        this.beginLine("memcpy(" + sessionWrite(negative) + ", ");
+        this.continueLine(sessionRead(positive) + ", ");
+        this.endLine(sessionWrite(positive) + " - " + sessionRead(positive) + ");");
+
+        this.beginLine(sessionWrite(negative) + " += ");
+        this.endLine(sessionWrite(positive) + " - " + sessionRead(positive) + ";");
+      } else {
+        this.putPrint("fwd(W " + negative + ", R " + positive + "):" + node.lineno);
+
+        // We've previously read from the positive channel.
+        // Thus, since we're now writing to it, we must have already read all the data sent by it.
+        // So, we can ignore the contents of the positive channel's buffer, and do nothing.
+      }
+
+      // We need to set the continuation of the negative channel to the continuation of the positive
+      // channel.
+      this.putLine(sessionEnv(negative) + " = " + sessionEnv(positive) + ";");
+      this.putLine(sessionCont(negative) + " = " + sessionCont(positive) + ";");
+
+      // We make the positive channel bindings point to the negative channel, and terminate the old
+      // positive channel.
+      this.putLine("tmp_session = " + sessionPointer(positive) + ";");
+      this.putLine(
+          sessionEnv(positive)
+              + "["
+              + sessionIndex(positive)
+              + "] = "
+              + sessionPointer(negative)
+              + ";");
+      this.putLine("free(tmp_session);");
     } else {
-      // We've been reading from the negative end point, which means that we should jump to the
-      // positive end point.
-      this.putLine(sessionContSwapRegister() + " = " + sessionContRegister(positive) + ";");
+      // We've previously read from the negative channel.
+      // Thus, data meant for the positive channel will already have been pushed to the negative
+      // channel's buffer.
+      // We pass control to the positive channel, so that it can read that data that is already in
+      // the buffer.
+
+      this.putLine("tmp_env = " + sessionEnv(positive) + ";");
+      this.putLine("tmp_cont = " + sessionCont(positive) + ";");
+
+      if (this.environment().getPolarity(positive)) {
+        this.putPrint("fwd(R " + negative + ", W " + positive + "):" + node.lineno);
+
+        // We've previously written to the positive channel.
+        // Thus, the positive channel might have data on its buffer that it still hasn't read.
+        // In this case, we should append the extra data from the negative channel's buffer to the
+        // positive channel's buffer.
+
+        this.beginLine("memcpy(" + sessionWrite(positive) + ", ");
+        this.continueLine(sessionRead(negative) + ", ");
+        this.endLine(sessionWrite(negative) + " - " + sessionRead(negative) + ");");
+
+        this.beginLine(sessionWrite(positive) + " += ");
+        this.endLine(sessionWrite(negative) + " - " + sessionRead(negative) + ";");
+
+        // We need to set the continuation of the positive channel to the continuation of the
+        // negative channel.
+        this.putLine(sessionEnv(positive) + " = " + sessionEnv(negative) + ";");
+        this.putLine(sessionCont(positive) + " = " + sessionCont(negative) + ";");
+
+        // We make the negative channel bindings point to the positive channel, and terminate the
+        // old negative channel.
+        this.putLine("tmp_session = " + sessionPointer(negative) + ";");
+        this.putLine(
+            sessionEnv(negative)
+                + "["
+                + sessionIndex(negative)
+                + "] = "
+                + sessionPointer(positive)
+                + ";");
+        this.putLine("free(tmp_session);");
+      } else {
+        this.putPrint("fwd(R " + negative + ", R " + positive + "):" + node.lineno);
+
+        // We've previously read from the positive channel.
+        // Thus, since we're now writing to it, we must have already read all the data sent by it.
+        // So, we can ignore the contents of the positive channel's buffer.
+
+        // We make the positive channel bindings point to the negative channel, and terminate the
+        // old positive channel.
+        this.putLine("tmp_session = " + sessionPointer(positive) + ";");
+        this.putLine(
+            sessionEnv(positive)
+                + "["
+                + sessionIndex(positive)
+                + "] = "
+                + sessionPointer(negative)
+                + ";");
+        this.putLine("free(tmp_session);");
+      }
     }
 
-    // We free the negative session record, as its pointer will now be pointing to the positive
-    // session record.
-    this.freeSessionRecord(positive);
-    this.putLine(sessionRecordRegister(positive) + " = " + sessionRecordRegister(negative) + ";");
-    this.putPrint(positive + " = " + negative);
-
-    // Jump to the address we decided on earlier.
-    this.putLine("goto *" + sessionContSwapRegister() + ";");
-    // TODO: what if there is code after the forward which should be executed? For example, a
-    // parallel process.
+    this.putLine("env = tmp_env;");
+    this.putLine("goto *tmp_cont;");
   }
 
   @Override
   public void visit(ASTMix node) {
-    this.putPrint("begin par");
+    this.pushWrappingComment("mix:" + node.lineno);
+    this.putPrint("mix(lhs):" + node.lineno);
 
-    // Simply execute both sides of the mix sequentially.
+    // We push the continuation for the right hand side to the global stack,
+    // and generate code for the left hand side.
+    String mixRhs = this.makeLabel("mix_rhs");
+    this.putLine("tmp_task = malloc(sizeof(struct task));");
+    this.putLine("tmp_task->cont = &&" + mixRhs + ";");
+    this.putLine("tmp_task->env = env;");
+    this.putLine("tmp_task->next = next_task;");
+    this.putLine("next_task = tmp_task;");
     node.getLhs().accept(this);
+
+    // The right hand side code won't run until an empty node pops it from the stack.
+    this.putLabel(mixRhs);
+    this.putPrint("mix(rhs):" + node.lineno);
     node.getRhs().accept(this);
 
-    this.putPrint("end par");
+    this.popWrappingComment();
   }
 
   @Override
   public void visit(ASTRecv node) {
-    this.putPrint("recv " + node.getChr() + " " + node.getChi());
+    this.pushWrappingComment("recv(" + node.getChr() + ", " + node.getChi() + "):" + node.lineno);
+    this.putPrint("recv(" + node.getChr() + ", " + node.getChi() + "):" + node.lineno);
 
-    String recvRhs = this.makeLabel("recv_" + node.getChr() + "_" + node.getChi() + "_rhs");
-
-    assert !this.sessionPolarities.containsKey(node.getChi());
-    assert !this.sessionRecordSizes.containsKey(node.getChi());
-
-    // Pop a session record from the session queue.
-    this.popSessionRecord(node.getChr(), node.getChi());
-
-    // We set the continuation to the right hand side of the receive, and jump to it.
-    this.putLine(sessionContSwapRegister() + " = " + sessionContRegister(node.getChi()) + ";");
-    this.putLine(sessionContRegister(node.getChi()) + " = &&" + recvRhs + ";");
-    this.putLine("goto *" + sessionContSwapRegister() + ";");
-
-    // The session is fresh, so we consider its previous polarity to be positive.
-    this.sessionPolarities.put(node.getChi(), true);
-    this.sessionRecordSizes.put(node.getChi(), SizeCalculator.calculate(node.getChiType()));
-    this.putLabel(recvRhs);
+    // We simply pop the record from the queue and store it in the environment.
+    this.putLine(this.sessionPointer(node.getChi()) + " = " + this.popRecord(node.getChr()) + ";");
     this.generateContinuation(node.getRhs());
-    this.sessionRecordSizes.remove(node.getChi());
-    this.sessionPolarities.remove(node.getChi());
+
+    this.popWrappingComment();
   }
 
   @Override
   public void visit(ASTSelect node) {
-    this.putPrint(node.getCh() + "." + node.getLabel());
+    this.pushWrappingComment("select" + node.getLabel() + "(" + node.getCh() + "):" + node.lineno);
+    this.putPrint("select" + node.getLabel() + "(" + node.getCh() + "):" + node.lineno);
 
     // Push the label's index onto the session queue.
     this.pushLabel(node.getCh(), node.getLabelIndex(), node.getLabel());
     this.generateContinuation(node.getRhs());
+
+    this.popWrappingComment();
   }
 
   @Override
   public void visit(ASTSend node) {
-    this.putPrint("send " + node.getChs() + "(" + node.getCho() + ")");
+    this.pushWrappingComment("send(" + node.getChs() + "):" + node.lineno);
+    this.putPrint("send(" + node.getChs() + "):" + node.lineno);
 
     String sendLhs = this.makeLabel("send_" + node.getChs() + "_" + node.getCho() + "_lhs");
     String sendRhs = this.makeLabel("send_" + node.getChs() + "_" + node.getCho() + "_rhs");
 
-    assert !this.sessionPolarities.containsKey(node.getCho());
-    assert !this.sessionRecordSizes.containsKey(node.getCho());
+    // We need a new, fresh environment for the send left hand side.
+    Environment env = Environment.fromNode(node.getLhs());
+    env.insert(node.getCho(), node.getLhsType());
 
-    // Initialize a new session record.
-    int size = SizeCalculator.calculate(node.getLhsType());
-    sessionRecordSizes.put(node.getCho(), size);
-    this.allocSessionRecord(node.getCho(), size, sendLhs);
-    this.putJump(sendRhs);
+    // We initialize the new environment and record.
+    this.environments.push(env);
+    this.putLine("tmp_env = env;");
+    this.putLine("env = malloc(sizeof(struct record*) * (" + env.getSize() + "));");
+    this.initSession(node.getCho());
+    this.putLine(sessionEnv(node.getCho()) + " = env;");
+    this.putLine(sessionCont(node.getCho()) + " = &&" + sendLhs + ";");
+    this.putLine(sessionIndex(node.getCho()) + " = " + env.getIndex(node.getCho()) + ";");
+    this.putLine("tmp_session = " + sessionPointer(node.getCho()) + ";");
+    this.putLine("env = tmp_env;");
+    this.environments.pop();
+    
+    // We send the session record to the session queue.
+    this.pushRecord(node.getChs(), "tmp_session");
 
-    // The session is fresh, so we consider its previous polarity to be positive.
-    this.sessionPolarities.put(node.getCho(), true);
-
-    // Generate the continuation for the left hand side.
-    // Additionally, we jump to the receiver continuation after the left hand side is done.
-    // This is necessary in cases where the session is not closed by the left hand side.
+    // We jump to the right hand side, so that we can generate the left hand side code here.
+    this.pushWrappingComment("closure(" + node.getCho() + "):" + node.lineno);
+    this.putLine("goto " + sendRhs + ";");
     this.putLabel(sendLhs);
+    this.environments.push(env);
+    env.setPolarity(node.getCho(), false); // This won't ever be the first end point.
     this.generateContinuation(node.getLhs());
-    this.putLine("goto *" + sessionContRegister(node.getCho()) + ";");
-    this.sessionRecordSizes.remove(node.getCho());
-    this.sessionPolarities.remove(node.getCho());
+    this.environments.pop();
+    this.popWrappingComment();
 
-    // Push the session record onto the session queue and continue with the right hand side.
+    // In the right hand side, we simply continue as usual.
     this.putLabel(sendRhs);
-    this.pushSessionRecord(node.getChs(), node.getCho());
     this.generateContinuation(node.getRhs());
+
+    this.popWrappingComment();
   }
 
   private void generateContinuation(ASTNode node) {
     String ch = node.getSubjectCh();
     if (ch != null) {
-      assert sessionPolarities.containsKey(ch) : "No polarity previously set for channel " + ch;
-      if (sessionPolarities.get(ch) && !node.isPos()) {
-        // If we're continuing a positive session and we encounter a negative node,
-        // we need to first return to the continuation.
-        String label = this.makeLabel("cont");
-        this.putLine(
-            sessionContSwapRegister() + " = " + sessionContRegister(ch) + "; /* polarity swap */");
-        this.putLine(sessionContRegister(ch) + " = &&" + label + ";");
-        this.putLine("goto *" + sessionContSwapRegister() + ";");
-        this.putLabel(label);
+      // If we were previously writing to the channel and we're now reading from it, we need to flip
+      // to the other side of the session.
+      if (this.environment().getPolarity(ch) && !node.isPos()) {
+        this.flip(ch);
       }
 
-      // Update the session polarity.
-      sessionPolarities.put(ch, node.isPos());
+      // Update polarity for future continuations.
+      this.environment().setPolarity(ch, node.isPos());
     }
 
     node.accept(this);
   }
 
   private void pushClose(String ch) {
-    // The close token is zero-sized, so we don't actually do anything to the queue.
-    putPrint(ch + ".push(close)");
+    // The close token is zero-sized, so we don't actually do anything.
   }
 
   private void popClose(String ch) {
-    // The close token is zero-sized, so we don't actually do anything to the queue.
-    putPrint(ch + ".pop(close)");
+    // The close token is zero-sized, so we don't actually do anything.
   }
 
   // Creates a new statement which pushes a label onto the session queue.
   private void pushLabel(String ch, int labelIndex, String label) {
     pushLiteral(ch, "unsigned char", Integer.toString(labelIndex) + " /* " + label + " */");
-    putPrint(ch + ".push(" + label + ")");
   }
 
   // Creates a new expression which pops a label from the session queue.
@@ -315,27 +430,30 @@ public class Generator extends ASTNodeVisitor {
     return popLiteral(ch, "unsigned char");
   }
 
-  // Creates a new statement which pushes a session record onto the session queue.
-  private void pushSessionRecord(String ch, String pushedCh) {
-    pushLiteral(ch, "struct session_record*", sessionRecordRegister(pushedCh));
-    putPrint(ch + ".push(" + pushedCh + ")");
+  // Creates a new statement which pushes a record pointer onto the session queue.
+  private void pushRecord(String ch, String expression) {
+    pushLiteral(ch, "struct record*", expression);
   }
 
-  // Creates statements which create a new session record from a session queue.
-  private void popSessionRecord(String ch, String poppedCh) {
-    putLine(
-        "struct session_record* "
-            + sessionRecordRegister(poppedCh)
-            + " = "
-            + popLiteral(ch, "struct session_record*")
-            + ";");
-    putPrint(ch + ".pop(" + poppedCh + ")");
+  // Creates a new expression which pops a record pointer from the session queue.
+  private String popRecord(String ch) {
+    return popLiteral(ch, "struct record*");
+  }
+
+  // Creates a new statement which pushes a continuation onto the session queue.
+  private void pushContinuation(String ch, String cont) {
+    pushLiteral(ch, "void*", "&&" + cont);
+  }
+
+  // Creates a new expression which pops a continuation from the session queue.
+  private String popContinuation(String ch) {
+    return popLiteral(ch, "void*");
   }
 
   // Creates statements which pushes a literal onto the session queue.
   private void pushLiteral(String ch, String cType, String literal) {
-    putLine("*(" + cType + "*)" + sessionQueueWriteRegister(ch) + " = " + literal + ";");
-    putLine(sessionQueueWriteRegister(ch) + " += sizeof(" + cType + ");");
+    putLine("*(" + cType + "*)" + sessionWrite(ch) + " = " + literal + ";");
+    putLine(sessionWrite(ch) + " += sizeof(" + cType + ");");
   }
 
   // Returns a new expression which pops a literal from the session queue.
@@ -343,7 +461,7 @@ public class Generator extends ASTNodeVisitor {
     return "*(("
         + cType
         + "*)(("
-        + sessionQueueReadRegister(ch)
+        + sessionRead(ch)
         + " += sizeof("
         + cType
         + ")) - sizeof("
@@ -351,69 +469,80 @@ public class Generator extends ASTNodeVisitor {
         + ")))";
   }
 
-  private void allocSessionRecord(String ch, int size, String contLabel) {
-    putLine("struct session_record session_record_mem_" + ch + ";");
+  private void flip(String ch) {
+    this.pushWrappingComment("flip(" + ch + ")");
+    ;
+    putPrint("flip(" + ch + ")");
+
+    String label = makeLabel("flip_" + ch);
+    putLine("tmp_env = " + sessionEnv(ch) + ";");
+    putLine("tmp_cont = " + sessionCont(ch) + ";");
+    putLine(sessionCont(ch) + " = &&" + label + ";");
+    putLine(sessionEnv(ch) + " = env;");
+    putLine(sessionIndex(ch) + " = " + environment().getIndex(ch) + ";");
+    putLine("env = tmp_env;");
+    putLine("goto *tmp_cont;");
+    putLabel(label);
+    this.popWrappingComment();
+  }
+
+  private void pushScope(ASTNode node) {
+    if (this.environments.empty()) {
+      this.environments.push(Environment.fromNode(node));
+      this.putLine("env = malloc(sizeof(struct record*) * " + this.environment().getSize() + ");");
+    } else {
+      this.environments.push(this.environment());
+    }
+  }
+
+  private void popScope() {
+    this.environments.pop();
+    if (this.environments.empty()) {
+      this.putLine("free(env);");
+    }
+  }
+
+  private void initSession(String ch) {
     putLine(
-        "struct session_record* "
-            + sessionRecordRegister(ch)
-            + " = &session_record_mem_"
-            + ch
-            + ";");
-
-    putLine(sessionContRegister(ch) + " = &&" + contLabel + ";");
-
-    // Only allocate the session queue if we actually need one.
-    if (size > 0) {
-      putLine(sessionQueueRegister(ch) + " = malloc(" + size + ");");
-      putLine(sessionQueueWriteRegister(ch) + " = " + sessionQueueRegister(ch) + ";");
-      putLine(sessionQueueReadRegister(ch) + " = " + sessionQueueRegister(ch) + ";");
-    }
-
-    putPrint(ch + ".alloc(" + size + ")");
+        sessionPointer(ch)
+            + " = malloc(sizeof(struct record) + ("
+            + environment().getSessionCSize(ch)
+            + "));");
+    putLine(
+        sessionWrite(ch)
+            + " = "
+            + sessionRead(ch)
+            + " = (unsigned char*)"
+            + sessionPointer(ch)
+            + " + sizeof(struct record);");
   }
 
-  private void freeSessionRecord(String ch) {
-    Integer size = sessionRecordSizes.get(ch);
-    assert size != null : "No session record allocated for channel " + ch;
-
-    // Only free the session record if we actually allocated one.
-    if (size > 0) {
-      putLine("free((unsigned char*)" + sessionQueueRegister(ch) + ");");
-    }
-
-    putPrint(ch + ".free()");
+  private String sessionPointer(String ch) {
+    return "env[" + environment().getIndex(ch) + " /*" + ch + "*/]";
   }
 
-  private String sessionContSwapRegister() {
-    return "swap_scont";
+  private String sessionCont(String ch) {
+    return sessionPointer(ch) + "->cont";
   }
 
-  private String sessionRecordRegister(String ch) {
-    return "session_record_ptr_" + ch;
+  private String sessionEnv(String ch) {
+    return sessionPointer(ch) + "->env";
   }
 
-  private String sessionContRegister(String ch) {
-    return sessionRecordRegister(ch) + "->cont";
+  private String sessionRead(String ch) {
+    return sessionPointer(ch) + "->read";
   }
 
-  private String sessionQueueRegister(String ch) {
-    return sessionRecordRegister(ch) + "->queue_m";
+  private String sessionWrite(String ch) {
+    return sessionPointer(ch) + "->write";
   }
 
-  private String sessionQueueReadRegister(String ch) {
-    return sessionRecordRegister(ch) + "->queue_r";
-  }
-
-  private String sessionQueueWriteRegister(String ch) {
-    return sessionRecordRegister(ch) + "->queue_w";
+  private String sessionIndex(String ch) {
+    return sessionPointer(ch) + "->index";
   }
 
   private void putPrint(String msg) {
     putLine("puts(\"" + escapeString(msg) + "\");");
-  }
-
-  private void putJump(String label) {
-    putLine("goto " + label + ";");
   }
 
   // Adds an indented line to the generated code
@@ -427,6 +556,10 @@ public class Generator extends ASTNodeVisitor {
     if (!line.isBlank()) {
       generatedCode += "  ".repeat(indentLevel) + line;
     }
+  }
+
+  private void continueLine(String line) {
+    generatedCode += line;
   }
 
   private void endLine(String line) {
@@ -444,5 +577,20 @@ public class Generator extends ASTNodeVisitor {
 
   private String makeLabel(String prefix) {
     return prefix + "_lbl_" + labelIndex++;
+  }
+
+  private Environment environment() {
+    return environments.peek();
+  }
+
+  private void pushWrappingComment(String comment) {
+    wrappingComments.push(comment);
+    putLine("/* BEGIN " + comment + " */");
+    this.indentLevel++;
+  }
+
+  private void popWrappingComment() {
+    this.indentLevel--;
+    putLine("/* END " + wrappingComments.pop() + " */");
   }
 }

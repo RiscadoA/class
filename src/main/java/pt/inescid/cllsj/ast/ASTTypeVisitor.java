@@ -14,6 +14,10 @@ public abstract class ASTTypeVisitor {
     visit((ASTType) type);
   }
 
+  public void visit(ASTOfferT type) {
+    visit((ASTType) type);
+  }
+
   public void visit(ASTOneT type) {
     visit((ASTType) type);
   }
