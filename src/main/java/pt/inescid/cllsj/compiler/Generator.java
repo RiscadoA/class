@@ -174,19 +174,22 @@ public class Generator extends ASTNodeVisitor {
       // We've been writing to the negative end point, which means that we should jump back to it.
       this.putLine(sessionContSwapRegister() + " = " + sessionContRegister(negative) + ";");
       this.putLine(sessionContRegister(negative) + " = " + sessionContRegister(positive) + ";");
-  } else {
-      // We've been reading from the negative end point, which means that we should jump to the positive end point.
+    } else {
+      // We've been reading from the negative end point, which means that we should jump to the
+      // positive end point.
       this.putLine(sessionContSwapRegister() + " = " + sessionContRegister(positive) + ";");
     }
 
-    // We free the negative session record, as its pointer will now be pointing to the positive session record.
+    // We free the negative session record, as its pointer will now be pointing to the positive
+    // session record.
     this.freeSessionRecord(positive);
     this.putLine(sessionRecordRegister(positive) + " = " + sessionRecordRegister(negative) + ";");
     this.putPrint(positive + " = " + negative);
 
     // Jump to the address we decided on earlier.
     this.putLine("goto *" + sessionContSwapRegister() + ";");
-    // TODO: what if there is code after the forward which should be executed? For example, a parallel process.
+    // TODO: what if there is code after the forward which should be executed? For example, a
+    // parallel process.
   }
 
   @Override
