@@ -76,6 +76,10 @@ public class ASTCase extends ASTNode {
     return casetypes.get(label);
   }
 
+  public Map<String, ASTNode> getCases() {
+    return cases;
+  }
+
   public void ASTInsertPipe(Function<ASTNode, ASTNode> f, ASTNode from) throws Exception {
     for (Iterator<String> itCases = cases.keySet().iterator(); itCases.hasNext(); ) {
       String lab = itCases.next();

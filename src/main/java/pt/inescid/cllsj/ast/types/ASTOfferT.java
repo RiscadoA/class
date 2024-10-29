@@ -5,6 +5,7 @@ import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.SyntaxError;
 import pt.inescid.cllsj.Trail;
+import pt.inescid.cllsj.ast.ASTTypeVisitor;
 
 public class ASTOfferT extends ASTType {
   HashMap<String, ASTType> cases;
@@ -112,5 +113,10 @@ public class ASTOfferT extends ASTType {
       }
     }
     return max;
+  }
+
+  @Override
+  public void accept(ASTTypeVisitor visitor) {
+    visitor.visit(this);
   }
 }
