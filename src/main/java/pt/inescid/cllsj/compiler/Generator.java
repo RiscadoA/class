@@ -126,9 +126,9 @@ public class Generator extends ASTNodeVisitor {
     this.popWrappingComment();
   }
 
-  // LC: no need to "guess" flip, use type polarity saved by typechecker to order the code
+  // LC: no need to force a flip, use type polarity saved by typechecker to order the code
   // or even better, we change the type checker to put positive writer on LHS 
-  
+
   @Override
   public void visit(ASTCut node) {
     this.pushWrappingComment("cut(" + node.getCh() + "):" + node.lineno);
