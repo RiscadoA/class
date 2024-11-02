@@ -375,7 +375,7 @@ public class Generator extends ASTNodeVisitor {
     this.putLine("tmp_session = " + sessionPointer(node.getCho()) + ";");
     this.putLine("env = tmp_env;");
     this.environments.pop();
-    
+
     // We send the session record to the session queue.
     this.pushRecord(node.getChs(), "tmp_session");
 
