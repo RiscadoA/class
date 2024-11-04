@@ -126,9 +126,6 @@ public class Generator extends ASTNodeVisitor {
     this.popWrappingComment();
   }
 
-  // LC: no need to force a flip, use type polarity saved by typechecker to order the code
-  // or even better, we change the type checker to put positive writer on LHS 
-
   @Override
   public void visit(ASTCut node) {
     this.pushWrappingComment("cut(" + node.getCh() + "):" + node.lineno);
@@ -142,18 +139,25 @@ public class Generator extends ASTNodeVisitor {
     this.putLine(sessionEnv(node.getCh()) + " = env;");
     this.putLine(sessionIndex(node.getCh()) + " = " + environment().getIndex(node.getCh()) + ";");
 
-    // The first code to be executed for a given session must be positive.
-    // Thus, we set the polarity to true, to force a flip if the first node is negative.
-    this.environment().setPolarity(node.getCh(), true);
-    this.generateContinuation(node.getLhs());
+    ASTNode positive, negative;
+    if (node.getChType().isPos()) {
+      positive = node.getRhs();
+      negative = node.getLhs();
+    } else {
+      positive = node.getLhs();
+      negative = node.getRhs();
+    }
 
-    // The right hand side code only execute right after the left hand side jumps to it.
-    // Thus, if it's negative, it can immediately run, as the positive code has already run.
-    // If it isn't, then it can also immediately run.
-    // So, we set to polarity to false.
+    // The first code to be executed for a given session must be positive.
+    this.generateContinuation(positive);
+
+    // The right hand side code will only execute after the left hand side jumps to it.
+    // Thus, we set the initial polarity to negative, so that it initially doesn't flip back when
+    // reading.
+    // It shouldn't flip back as the positive code has already run and written to the channel.
     this.putLabel(cutRhs);
     this.environment().setPolarity(node.getCh(), false);
-    this.generateContinuation(node.getRhs());
+    this.generateContinuation(negative);
 
     this.popScope();
     this.popWrappingComment();
