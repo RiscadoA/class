@@ -19,18 +19,31 @@ import pt.inescid.cllsj.ast.nodes.ASTSend;
 import pt.inescid.cllsj.ast.types.ASTType;
 
 public class Environment {
+  private Environment parent = null;
   private Map<String, Integer> indices = new HashMap<>();
   private Map<String, Boolean> polarity = new HashMap<>();
   private Map<String, String> sessionCSize = new HashMap<>();
 
-  public static Environment fromNode(ASTNode node) {
-    IndexAssigner assigner = new IndexAssigner();
+  public static Environment fromNode(ASTNode node, Environment parent) {
+    IndexAssigner assigner = new IndexAssigner(parent);
     node.accept(assigner);
     return assigner.env;
   }
 
+  public static Environment fromNode(ASTNode node) {
+    return fromNode(node, null);
+  }
+
+  public Environment getParent() {
+    return parent;
+  }
+
   public int getSize() {
     return indices.size();
+  }
+
+  public boolean isLocal(String session) {
+    return indices.containsKey(session);
   }
 
   public int getIndex(String session) {
@@ -38,6 +51,7 @@ public class Environment {
   }
 
   public boolean getPolarity(String session) {
+    if (!polarity.containsKey(session) && parent != null) return parent.getPolarity(session);
     return polarity.get(session);
   }
 
@@ -69,6 +83,10 @@ public class Environment {
   // Send left-hand-sides and replication right-hand-sides are ignored.
   private static class IndexAssigner extends ASTNodeVisitor {
     public Environment env = new Environment();
+
+    public IndexAssigner(Environment parent) {
+      env.parent = parent;
+    }
 
     @Override
     public void visit(ASTNode node) {

@@ -31,7 +31,7 @@ public class Generator extends ASTNodeVisitor {
     generator.putLine("struct record {");
     generator.indentLevel++;
     generator.putLine("void* cont;");
-    generator.putLine("struct record** env;");
+    generator.putLine("struct environment* env;");
     generator.putLine("unsigned char* read;");
     generator.putLine("unsigned char* write;");
     generator.putLine("int index;");
@@ -41,16 +41,23 @@ public class Generator extends ASTNodeVisitor {
     generator.putLine("struct task {");
     generator.indentLevel++;
     generator.putLine("void* cont;");
-    generator.putLine("struct record** env;");
+    generator.putLine("struct environment* env;");
     generator.putLine("struct task* next;");
+    generator.indentLevel--;
+    generator.putLine("};");
+    generator.putLine("");
+    generator.putLine("struct environment {");
+    generator.indentLevel++;
+    generator.putLine("struct environment* parent;");
+    generator.putLine("struct record* records[];");
     generator.indentLevel--;
     generator.putLine("};");
     generator.putLine("");
     generator.putLine("int main() {");
     generator.indentLevel++;
     generator.putLine("struct record* tmp_session;");
-    generator.putLine("struct record** env = NULL;");
-    generator.putLine("struct record** tmp_env;");
+    generator.putLine("struct environment* env = NULL;");
+    generator.putLine("struct environment* tmp_env;");
     generator.putLine("void* tmp_cont;");
     generator.putLine("struct task* next_task = NULL;");
     generator.putLine("struct task* tmp_task;");
@@ -368,13 +375,14 @@ public class Generator extends ASTNodeVisitor {
     String sendRhs = this.makeLabel("send_" + node.getChs() + "_" + node.getCho() + "_rhs");
 
     // We need a new, fresh environment for the send left hand side.
-    Environment env = Environment.fromNode(node.getLhs());
+    Environment env = Environment.fromNode(node.getLhs(), this.environment());
     env.insert(node.getCho(), node.getLhsType());
 
     // We initialize the new environment and record.
     this.environments.push(env);
     this.putLine("tmp_env = env;");
-    this.putLine("env = malloc(sizeof(struct record*) * (" + env.getSize() + "));");
+    this.putLine("env = " + this.allocEnvironment(env) + ";");
+    this.putLine("env->parent = tmp_env;");
     this.initSession(node.getCho());
     this.putLine(sessionEnv(node.getCho()) + " = env;");
     this.putLine(sessionCont(node.getCho()) + " = &&" + sendLhs + ";");
@@ -496,7 +504,7 @@ public class Generator extends ASTNodeVisitor {
   private void pushScope(ASTNode node) {
     if (this.environments.empty()) {
       this.environments.push(Environment.fromNode(node));
-      this.putLine("env = malloc(sizeof(struct record*) * " + this.environment().getSize() + ");");
+      this.putLine("env = " + this.allocEnvironment(this.environment()) + ";");
     } else {
       this.environments.push(this.environment());
     }
@@ -507,6 +515,10 @@ public class Generator extends ASTNodeVisitor {
     if (this.environments.empty()) {
       this.putLine("free(env);");
     }
+  }
+
+  private String allocEnvironment(Environment env) {
+    return "malloc(sizeof(struct environment) + sizeof(struct record*) * " + env.getSize() + ");";
   }
 
   private void initSession(String ch) {
@@ -525,7 +537,13 @@ public class Generator extends ASTNodeVisitor {
   }
 
   private String sessionPointer(String ch) {
-    return "env[" + environment().getIndex(ch) + " /*" + ch + "*/]";
+    Environment env = environment();
+    String envRef = "env";
+    while (!env.isLocal(ch)) {
+      envRef += "->parent";
+      env = env.getParent();
+    }
+    return envRef + "->records[" + env.getIndex(ch) + " /*" + ch + "*/]";
   }
 
   private String sessionCont(String ch) {
