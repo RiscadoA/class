@@ -4,6 +4,7 @@ import java.util.Map;
 import pt.inescid.cllsj.ast.ASTTypeVisitor;
 import pt.inescid.cllsj.ast.types.ASTBotT;
 import pt.inescid.cllsj.ast.types.ASTCaseT;
+import pt.inescid.cllsj.ast.types.ASTNotT;
 import pt.inescid.cllsj.ast.types.ASTOfferT;
 import pt.inescid.cllsj.ast.types.ASTOneT;
 import pt.inescid.cllsj.ast.types.ASTRecvT;
@@ -33,6 +34,11 @@ public class SizeCalculator extends ASTTypeVisitor {
   @Override
   public void visit(ASTCaseT type) {
     this.visitBranching(type.getcases());
+  }
+
+  @Override
+  public void visit(ASTNotT type) {
+    type.getin().accept(this);
   }
 
   @Override

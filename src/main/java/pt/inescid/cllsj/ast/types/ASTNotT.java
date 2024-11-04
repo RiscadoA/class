@@ -3,6 +3,7 @@ package pt.inescid.cllsj.ast.types;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.Trail;
+import pt.inescid.cllsj.ast.ASTTypeVisitor;
 
 public class ASTNotT extends ASTType {
   ASTType t;
@@ -60,5 +61,10 @@ public class ASTNotT extends ASTType {
 
   public int SetOffsets(int base, Env<EnvEntry> ep) throws Exception {
     return base;
+  }
+
+  @Override
+  public void accept(ASTTypeVisitor visitor) {
+    visitor.visit(this);
   }
 }
