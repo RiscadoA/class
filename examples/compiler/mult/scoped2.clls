@@ -1,10 +1,8 @@
-// examples to discuss 
-
 cut {
     close w
-    | w: ~close | // size calculator does not work in type ~ , reuse ASTCut.sessionsize ? 
+    | w: ~close |
     cut {
-	    send x(z. wait w; close z); wait x;()  // NB. w comes from outer scope
+	    send x(z. wait w; close z); wait x;()
 	    |x: recv wait; close|
 	    recv x(y); wait y; close x
     }

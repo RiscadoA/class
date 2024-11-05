@@ -1,5 +1,3 @@
-// examples to discuss 
-
 cut {
 	    send x(z.close z); recv x(v); wait v; wait x; ()
 	    |x: recv wait; send close; close|
