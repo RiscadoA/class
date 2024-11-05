@@ -98,7 +98,7 @@ public class Generator extends ASTNodeVisitor {
         : "Replicated session must have index 0 in it's environment";
 
     // We send the continuation to the session queue and flip to the other side of the session.
-    this.pushBang(node.getChr(), env.getSize(), replRhs);
+    this.pushBang(node.getChr(), env.getSize(), "env", replRhs);
     this.finalFlip(node.getChr());
 
     // We jump to the right hand side, so that we can generate the left hand side code here.
@@ -121,6 +121,7 @@ public class Generator extends ASTNodeVisitor {
     // The bang node has previously sent an environment size and a continuation to the session
     // queue. We first allocate a new environment with that size.
     this.putLine("tmp_env = " + allocEnvironment(peekBangEnvironmentSize(node.getChr())) + ";");
+    this.putLine("tmp_env->parent = " + peekBangEnvironmentParent(node.getChr()) + ";");
 
     // Then, we initialize the session with the new environment and continuation.
     String chiPtr = this.sessionPointer("tmp_env", 0, node.getChi());
@@ -518,10 +519,11 @@ public class Generator extends ASTNodeVisitor {
     return popLiteral(ch, "struct record*");
   }
 
-  // Creates a new statement which pushes an environment size and a continuation onto the session
+  // Creates a new statement which pushes an environment size, parent and a continuation onto the session
   // queue.
-  private void pushBang(String ch, int envSize, String cont) {
+  private void pushBang(String ch, int envSize, String parent, String cont) {
     pushLiteral(ch, "int", Integer.toString(envSize));
+    pushLiteral(ch, "struct environment*", parent);
     pushLiteral(ch, "void*", "&&" + cont);
   }
 
@@ -530,9 +532,14 @@ public class Generator extends ASTNodeVisitor {
     return peekLiteral(ch, "int", "0");
   }
 
+  // Creates a new expression which peeks a bang environment parent from the session queue.
+  private String peekBangEnvironmentParent(String ch) {
+    return peekLiteral(ch, "struct environment*", "sizeof(int)");
+  }
+
   // Creates a new expression which peeks a bang continuation from the session queue.
   private String peekBangContinuation(String ch) {
-    return peekLiteral(ch, "void*", "sizeof(int)");
+    return peekLiteral(ch, "void*", "sizeof(int) + sizeof(struct environment*)");
   }
 
   // Creates statements which pushes a literal onto the session queue.

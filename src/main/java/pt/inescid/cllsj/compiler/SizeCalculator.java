@@ -30,7 +30,7 @@ public class SizeCalculator extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTBangT type) {
-    size = "sizeof(int) + sizeof(void*)";
+    size = "sizeof(int) + sizeof(struct environment*) + sizeof(void*)";
   }
 
   @Override
@@ -72,7 +72,7 @@ public class SizeCalculator extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTWhyT type) {
-    size = "sizeof(int) + sizeof(void*)";
+    size = "sizeof(int) + sizeof(struct environment*) + sizeof(void*)";
   }
 
   private void visitBranching(Map<String, ASTType> branches) {
