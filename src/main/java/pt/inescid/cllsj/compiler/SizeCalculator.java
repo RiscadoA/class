@@ -2,6 +2,7 @@ package pt.inescid.cllsj.compiler;
 
 import java.util.Map;
 import pt.inescid.cllsj.ast.ASTTypeVisitor;
+import pt.inescid.cllsj.ast.types.ASTBangT;
 import pt.inescid.cllsj.ast.types.ASTBotT;
 import pt.inescid.cllsj.ast.types.ASTCaseT;
 import pt.inescid.cllsj.ast.types.ASTNotT;
@@ -10,6 +11,7 @@ import pt.inescid.cllsj.ast.types.ASTOneT;
 import pt.inescid.cllsj.ast.types.ASTRecvT;
 import pt.inescid.cllsj.ast.types.ASTSendT;
 import pt.inescid.cllsj.ast.types.ASTType;
+import pt.inescid.cllsj.ast.types.ASTWhyT;
 
 public class SizeCalculator extends ASTTypeVisitor {
   private String size = "";
@@ -24,6 +26,11 @@ public class SizeCalculator extends ASTTypeVisitor {
   public void visit(ASTType type) {
     throw new UnsupportedOperationException(
         "Cannot estimate value size of type " + type.getClass().getSimpleName());
+  }
+
+  @Override
+  public void visit(ASTBangT type) {
+    size = "sizeof(int) + sizeof(void*)";
   }
 
   @Override
@@ -61,6 +68,11 @@ public class SizeCalculator extends ASTTypeVisitor {
   public void visit(ASTSendT type) {
     size = "sizeof(struct record*) + ";
     size += calculate(type.getrhs());
+  }
+
+  @Override
+  public void visit(ASTWhyT type) {
+    size = "sizeof(int) + sizeof(void*)";
   }
 
   private void visitBranching(Map<String, ASTType> branches) {

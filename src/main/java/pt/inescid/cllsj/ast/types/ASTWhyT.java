@@ -3,6 +3,7 @@ package pt.inescid.cllsj.ast.types;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.Trail;
+import pt.inescid.cllsj.ast.ASTTypeVisitor;
 
 public class ASTWhyT extends ASTType {
   ASTType t;
@@ -47,5 +48,10 @@ public class ASTWhyT extends ASTType {
   public int SetOffsets(int base, Env<EnvEntry> e) throws Exception {
     // offset = base;
     return base + 1;
+  }
+
+  @Override
+  public void accept(ASTTypeVisitor visitor) {
+    visitor.visit(this);
   }
 }

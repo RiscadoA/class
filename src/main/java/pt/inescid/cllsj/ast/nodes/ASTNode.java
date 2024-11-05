@@ -272,7 +272,8 @@ public abstract class ASTNode {
         || it instanceof ASTSelect
         || it instanceof ASTCall
         || it instanceof ASTSendTy
-        || it instanceof ASTEmpty);
+        || it instanceof ASTEmpty
+        || it instanceof ASTBang);
   }
 
   public String getSubjectCh() {

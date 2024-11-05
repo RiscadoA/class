@@ -11,6 +11,14 @@ public abstract class ASTNodeVisitor {
     visit((ASTNode) node);
   }
 
+  public void visit(ASTBang node) {
+    visit((ASTNode) node);
+  }
+
+  public void visit(ASTCall node) {
+    visit((ASTNode) node);
+  }
+
   public void visit(ASTCase node) {
     visit((ASTNode) node);
   }
@@ -48,6 +56,10 @@ public abstract class ASTNodeVisitor {
   }
 
   public void visit(ASTSend node) {
+    visit((ASTNode) node);
+  }
+
+  public void visit(ASTWhy node) {
     visit((ASTNode) node);
   }
 }

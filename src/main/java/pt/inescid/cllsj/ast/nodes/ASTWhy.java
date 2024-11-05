@@ -15,6 +15,7 @@ import pt.inescid.cllsj.Server;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.SessionRecord;
 import pt.inescid.cllsj.TypeError;
+import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.types.ASTCoBasicType;
 import pt.inescid.cllsj.ast.types.ASTType;
 import pt.inescid.cllsj.ast.types.ASTWhyT;
@@ -27,6 +28,19 @@ public class ASTWhy extends ASTNode {
   public ASTWhy(String _ch, ASTNode _rhs) {
     ch = _ch;
     rhs = _rhs;
+  }
+
+  @Override
+  public String getSubjectCh() {
+    return ch;
+  }
+
+  public String getCh() {
+    return ch;
+  }
+
+  public ASTNode getRhs() {
+    return rhs;
   }
 
   public void ASTInsertPipe(Function<ASTNode, ASTNode> f, ASTNode from) throws Exception {
@@ -195,5 +209,10 @@ public class ASTWhy extends ASTNode {
       SessionRecord.freeSessionRecord(srec);
       return;
     }
+  }
+
+  @Override
+  public void accept(ASTNodeVisitor visitor) {
+    visitor.visit(this);
   }
 }

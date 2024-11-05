@@ -1,7 +1,7 @@
 cut {
     !a(b:wait);
     cut {
-        forward b c;
+        fwd b c
         |c:wait|
         wait c; ()
     }

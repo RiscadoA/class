@@ -6,6 +6,10 @@ public abstract class ASTTypeVisitor {
   // Catch all for types which do not have their own visit method
   public abstract void visit(ASTType type);
 
+  public void visit(ASTBangT type) {
+    visit((ASTType) type);
+  }
+
   public void visit(ASTBotT type) {
     visit((ASTType) type);
   }
@@ -31,6 +35,10 @@ public abstract class ASTTypeVisitor {
   }
 
   public void visit(ASTSendT type) {
+    visit((ASTType) type);
+  }
+
+  public void visit(ASTWhyT type) {
     visit((ASTType) type);
   }
 }

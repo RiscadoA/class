@@ -4,6 +4,8 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
 import pt.inescid.cllsj.ast.ASTNodeVisitor;
+import pt.inescid.cllsj.ast.nodes.ASTBang;
+import pt.inescid.cllsj.ast.nodes.ASTCall;
 import pt.inescid.cllsj.ast.nodes.ASTCase;
 import pt.inescid.cllsj.ast.nodes.ASTClose;
 import pt.inescid.cllsj.ast.nodes.ASTCoClose;
@@ -16,22 +18,21 @@ import pt.inescid.cllsj.ast.nodes.ASTNode;
 import pt.inescid.cllsj.ast.nodes.ASTRecv;
 import pt.inescid.cllsj.ast.nodes.ASTSelect;
 import pt.inescid.cllsj.ast.nodes.ASTSend;
+import pt.inescid.cllsj.ast.nodes.ASTWhy;
 import pt.inescid.cllsj.ast.types.ASTType;
 
 public class Environment {
-  private Environment parent = null;
+  private Environment parent;
   private Map<String, Integer> indices = new HashMap<>();
   private Map<String, Boolean> polarity = new HashMap<>();
   private Map<String, String> sessionCSize = new HashMap<>();
 
-  public static Environment fromNode(ASTNode node, Environment parent) {
-    IndexAssigner assigner = new IndexAssigner(parent);
-    node.accept(assigner);
-    return assigner.env;
+  public Environment() {
+    this(null);
   }
 
-  public static Environment fromNode(ASTNode node) {
-    return fromNode(node, null);
+  public Environment(Environment parent) {
+    this.parent = parent;
   }
 
   public Environment getParent() {
@@ -79,13 +80,17 @@ public class Environment {
     this.sessionCSize.put(session, SizeCalculator.calculate(cType));
   }
 
+  public void insertFromNode(ASTNode node) {
+    node.accept(new IndexAssigner(this));
+  }
+
   // A visitor which simply traverses the AST and assigns an index to each session created in it.
   // Send left-hand-sides and replication right-hand-sides are ignored.
   private static class IndexAssigner extends ASTNodeVisitor {
-    public Environment env = new Environment();
+    private Environment env;
 
-    public IndexAssigner(Environment parent) {
-      env.parent = parent;
+    public IndexAssigner(Environment env) {
+      this.env = env;
     }
 
     @Override
@@ -97,7 +102,16 @@ public class Environment {
     }
 
     @Override
+    public void visit(ASTBang node) {}
+
+    @Override
     public void visit(ASTExpr node) {}
+
+    @Override
+    public void visit(ASTCall node) {
+      env.insert(node.getChi(), node.getType());
+      node.getRhs().accept(this);
+    }
 
     @Override
     public void visit(ASTCase node) {
@@ -146,6 +160,11 @@ public class Environment {
 
     @Override
     public void visit(ASTSend node) {
+      node.getRhs().accept(this);
+    }
+
+    @Override
+    public void visit(ASTWhy node) {
       node.getRhs().accept(this);
     }
   }
