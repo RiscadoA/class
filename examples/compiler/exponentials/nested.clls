@@ -1,0 +1,15 @@
+cut {
+    !a(t:wait); wait t; ()
+    |a: ?close|
+    ?a;
+    cut {
+        !b(u:wait);
+        call a(x:close);
+        fwd u x
+        |b: ?close|
+        ?b;
+        call b(y:close);
+        call b(z:close);
+        par { close y || close z }
+    }
+}
