@@ -3,6 +3,8 @@ package pt.inescid.cllsj.compiler;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.stream.Collectors;
+import pt.inescid.cllsj.Env;
+import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.nodes.ASTBang;
 import pt.inescid.cllsj.ast.nodes.ASTCall;
@@ -26,13 +28,19 @@ public class Environment {
   private Map<String, Integer> indices = new HashMap<>();
   private Map<String, Boolean> polarity = new HashMap<>();
   private Map<String, String> sessionCSize = new HashMap<>();
+  private Env<EnvEntry> ep;
 
-  public Environment() {
-    this(null);
+  public Environment(Env<EnvEntry> ep) {
+    this(ep, null);
   }
 
-  public Environment(Environment parent) {
+  public Environment(Env<EnvEntry> ep, Environment parent) {
+    this.ep = ep;
     this.parent = parent;
+  }
+
+  public Env<EnvEntry> getEp() {
+    return ep;
   }
 
   public Environment getParent() {
@@ -65,7 +73,7 @@ public class Environment {
   }
 
   public Environment copy() {
-    Environment env = new Environment();
+    Environment env = new Environment(ep, parent);
     env.indices = this.indices;
     env.polarity =
         this.polarity.entrySet().stream()
@@ -81,7 +89,12 @@ public class Environment {
             + " already exists in the environment, generator assumes shadowing is not possible";
     this.indices.put(session, indices.size());
     this.polarity.put(session, true);
-    this.sessionCSize.put(session, SizeCalculator.calculate(cType));
+    try {
+      this.sessionCSize.put(session, SizeCalculator.calculate(cType.unfoldType(ep)));
+    } catch (Exception e) {
+      e.printStackTrace();
+      System.exit(1);
+    }
   }
 
   public void insertFromNode(ASTNode node) {

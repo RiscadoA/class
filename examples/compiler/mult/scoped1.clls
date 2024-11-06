@@ -1,5 +1,7 @@
-cut {
-	    send x(z.close z); recv x(v); wait v; wait x; ()
-	    |x: recv wait; send close; close|
-	    recv x(y); send x (z. fwd z y); close x
+proc main() {
+	cut {
+		send x(z.close z); recv x(v); wait v; wait x; ()
+		|x: recv wait; send close; close|
+		recv x(y); send x (z. fwd z y); close x
+	}
 };;

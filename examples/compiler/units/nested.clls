@@ -1,11 +1,13 @@
-cut {
+proc main() {
     cut {
-        wait b;
-        wait a;
-        ()
-        |a:close|
-        close a
+        cut {
+            wait b;
+            wait a;
+            ()
+            |a:close|
+            close a
+        }
+        |b:close|
+        close b
     }
-    |b:close|
-    close b
-}
+};;

@@ -581,6 +581,20 @@ List<ASTTypeDef> ld;
 {return n;}
 }
 
+ASTProgram Program() throws Exception:
+{List<ASTDList> typeDefs = new ArrayList<ASTDList>();
+List<ASTPList> procDefs = new ArrayList<ASTPList>();
+ASTNode nTypeDefs;
+ASTNode nProcDefs;
+}
+{
+  (
+    nTypeDefs = TypeD() <TERM> { typeDefs.add((ASTDList)nTypeDefs); }
+    | nProcDefs = ProcD() <TERM> { procDefs.add((ASTPList)nProcDefs); }
+  )*
+  { return new ASTProgram(typeDefs, procDefs); }
+}
+
 ASTTypeDef Type1D(boolean rec, boolean corec) throws Exception:
 {ASTType p1; Token c1;
 ASTTypeDef p;}

@@ -1,8 +1,10 @@
-cut {
-    !a(b:wait); wait b; ()
-    |a: ?close|
-    ?a;
-    call a(y:close);
-    call a(z:close);
-    par { close y || close z }
-}
+proc main() {
+    cut {
+        !a(b:wait); wait b; ()
+        |a: ?close|
+        ?a;
+        call a(y:close);
+        call a(z:close);
+        par { close y || close z }
+    }
+};;

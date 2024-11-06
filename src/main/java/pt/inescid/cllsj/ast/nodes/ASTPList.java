@@ -22,6 +22,10 @@ public class ASTPList extends ASTNode {
     ld = _lld;
   }
 
+  public List<ASTProcDef> getLd() {
+    return ld;
+  }
+
   public void ASTInsertPipe(Function<ASTNode, ASTNode> f, ASTNode from) throws Exception {
     throw new Exception("ASTInsertPipe: call not expected");
   }
@@ -61,11 +65,17 @@ public class ASTPList extends ASTNode {
 
   public Env<EnvEntry> definemany(
       Env<ASTType> ed, Env<ASTType> eg, Env<EnvEntry> ep, boolean unsafe) throws Exception {
+    return definemany(ed, eg, ep, unsafe, true);
+  }
+
+  public Env<EnvEntry> definemany(
+      Env<ASTType> ed, Env<ASTType> eg, Env<EnvEntry> ep, boolean unsafe, boolean print)
+      throws Exception {
     for (ASTProcDef d : ld) {
       ProcEntry pee = new ProcEntry(d);
       ep = ep.assoc(d.id, pee);
       // d.setEnv(ep);
-      if (!unsafe) System.out.println("Process " + d.id + ": defined.");
+      if (!unsafe && print) System.out.println("Process " + d.id + ": defined.");
       // d.getEnv().crawl();
     }
     return ep;

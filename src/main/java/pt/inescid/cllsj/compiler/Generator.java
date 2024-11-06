@@ -1,6 +1,12 @@
 package pt.inescid.cllsj.compiler;
 
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Set;
 import java.util.Stack;
+import pt.inescid.cllsj.Env;
+import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.nodes.ASTBang;
 import pt.inescid.cllsj.ast.nodes.ASTCall;
@@ -12,6 +18,8 @@ import pt.inescid.cllsj.ast.nodes.ASTEmpty;
 import pt.inescid.cllsj.ast.nodes.ASTFwd;
 import pt.inescid.cllsj.ast.nodes.ASTMix;
 import pt.inescid.cllsj.ast.nodes.ASTNode;
+import pt.inescid.cllsj.ast.nodes.ASTProcDef;
+import pt.inescid.cllsj.ast.nodes.ASTProgram;
 import pt.inescid.cllsj.ast.nodes.ASTRecv;
 import pt.inescid.cllsj.ast.nodes.ASTSelect;
 import pt.inescid.cllsj.ast.nodes.ASTSend;
@@ -23,8 +31,9 @@ public class Generator extends ASTNodeVisitor {
   private int labelIndex = 0;
   private Stack<Environment> environments = new Stack<>();
   private Stack<String> wrappingComments = new Stack<>();
+  private Map<String, Environment> procDefEnvs = new HashMap<>();
 
-  public static String generate(ASTNode ast) {
+  public static String generate(Env<EnvEntry> ep, ASTProgram program) {
     Generator generator = new Generator();
 
     generator.putLine("#include <stdlib.h>");
@@ -66,10 +75,47 @@ public class Generator extends ASTNodeVisitor {
     generator.putLine("next_task->cont = &&end;");
     generator.putLine("struct task* tmp_task;");
     generator.putLine("");
+    generator.putLine("goto run;");
 
-    ast.accept(generator);
+    Set<String> definedProcs = new HashSet<>();
+    for (ASTProcDef procDef : program.getProcDefs()) {
+      if (!definedProcs.add(procDef.getId())) {
+        throw new RuntimeException("Duplicate process definition: " + procDef.getId());
+      }
 
-    generator.putLine("end:");
+      if (procDef.getId().equals("main")
+          && procDef.getArgs().size() + procDef.getGArgs().size() > 0) {
+        throw new RuntimeException("Main process cannot have arguments");
+      }
+
+      // Setup process environment
+      Environment env = new Environment(ep);
+      for (int i = 0; i < procDef.getArgs().size(); i++) {
+        env.insert(procDef.getArgs().get(i), procDef.getArgTypes().get(i));
+      }
+      for (int i = 0; i < procDef.getGArgs().size(); i++) {
+        env.insert(procDef.getGArgs().get(i), procDef.getGArgTypes().get(i));
+      }
+      env.insertFromNode(procDef.getRhs());
+      generator.procDefEnvs.put(procDef.getId(), env);
+
+      generator.environments.push(env);
+      generator.putLine("");
+      generator.putLabel("proc_" + procDef.getId());
+      procDef.getRhs().accept(generator);
+      generator.environments.pop();
+    }
+
+    if (!definedProcs.contains("main")) {
+      throw new RuntimeException("No main process found");
+    }
+
+    generator.putLine("");
+    generator.putLabel("run");
+    generator.putLine(
+        "env = " + generator.allocEnvironment(generator.procDefEnvs.get("main").getSize()) + ";");
+    generator.putLine("goto proc_main;");
+    generator.putLabel("end");
     generator.putLine("return 0;");
     generator.indentLevel--;
     generator.putLine("}");
@@ -95,7 +141,7 @@ public class Generator extends ASTNodeVisitor {
     // We need a new, fresh environment for the replicated right hand side.
     // This new environment keeps a pointer to the parent environment, so that it can access any
     // exponential variables in the parent environment.
-    Environment env = new Environment(this.environment());
+    Environment env = new Environment(this.environment().getEp(), this.environment());
     env.insert(node.getChi(), node.getType());
     env.insertFromNode(node.getRhs());
     assert env.getIndex(node.getChi()) == 0
@@ -202,7 +248,6 @@ public class Generator extends ASTNodeVisitor {
   public void visit(ASTCut node) {
     this.pushWrappingComment("cut(" + node.getCh() + "):" + node.lineno);
     this.putPrint("cut(" + node.getCh() + "):" + node.lineno);
-    this.pushScope(node);
 
     // Initialize the cut session, with initial continuation pointing to the right hand side.
     String cutRhs = this.makeLabel("cut_" + node.getCh());
@@ -213,7 +258,7 @@ public class Generator extends ASTNodeVisitor {
     this.putLine(sessionIndex(chPtr) + " = " + environment().getIndex(node.getCh()) + ";");
 
     ASTNode positive, negative;
-    if (node.getChType().isPos()) {
+    if (node.getChType().isPosCatch(environment().getEp())) {
       positive = node.getRhs();
       negative = node.getLhs();
     } else {
@@ -233,7 +278,6 @@ public class Generator extends ASTNodeVisitor {
     this.environment().setPolarity(node.getCh(), false);
     this.generateContinuation(negative);
 
-    this.popScope();
     this.popWrappingComment();
   }
 
@@ -258,7 +302,7 @@ public class Generator extends ASTNodeVisitor {
 
     // Check which of the channels is positive.
     String negative, positive;
-    if (node.getCh2Type().isPos()) {
+    if (node.getCh2Type().isPosCatch(environment().getEp())) {
       positive = node.getCh2();
       negative = node.getCh1();
     } else {
@@ -596,24 +640,6 @@ public class Generator extends ASTNodeVisitor {
     putLine("goto *" + sessionCont("tmp_session") + ";");
 
     this.popWrappingComment();
-  }
-
-  private void pushScope(ASTNode node) {
-    if (this.environments.empty()) {
-      Environment env = new Environment();
-      env.insertFromNode(node);
-      this.environments.push(env);
-      this.putLine("env = " + this.allocEnvironment(this.environment().getSize()) + ";");
-    } else {
-      this.environments.push(this.environment());
-    }
-  }
-
-  private void popScope() {
-    this.environments.pop();
-    if (this.environments.empty()) {
-      this.putLine("free(env);");
-    }
   }
 
   private String allocEnvironment(int envSize) {

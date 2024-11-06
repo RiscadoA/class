@@ -1,14 +1,16 @@
-cut {
-    recv a(x);
-    par {
-        close x
-        ||
-        close a
+proc main() {
+    cut {
+        recv a(x);
+        par {
+            close x
+            ||
+            close a
+        }
+        |a:send wait; wait|
+        send a(y. wait y; ());
+        fwd a b
+        |b:wait|
+        wait b;
+        ()
     }
-    |a:send wait; wait|
-    send a(y. wait y; ());
-    fwd a b
-    |b:wait|
-    wait b;
-    ()
-}
+};;

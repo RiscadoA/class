@@ -9,6 +9,7 @@ import pt.inescid.cllsj.RVarEntry;
 import pt.inescid.cllsj.SyntaxError;
 import pt.inescid.cllsj.TypeEntry;
 import pt.inescid.cllsj.TypeError;
+import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.types.ASTCoRecT;
 import pt.inescid.cllsj.ast.types.ASTIdT;
 import pt.inescid.cllsj.ast.types.ASTType;
@@ -51,6 +52,26 @@ public class ASTProcDef extends ASTNode {
 
   public String getId() {
     return id;
+  }
+
+  public List<String> getArgs() {
+    return args;
+  }
+
+  public List<ASTType> getArgTypes() {
+    return argtypes;
+  }
+
+  public List<String> getGArgs() {
+    return gargs;
+  }
+
+  public List<ASTType> getGArgTypes() {
+    return gargtypes;
+  }
+
+  public ASTNode getRhs() {
+    return rhs;
   }
 
   public void ASTInsertPipe(Function<ASTNode, ASTNode> f, ASTNode from) throws Exception {
@@ -275,5 +296,10 @@ public class ASTProcDef extends ASTNode {
   }
 
   public void subs(String x, String y) { // implements x/y (substitutes y by x)
+  }
+
+  @Override
+  public void accept(ASTNodeVisitor visitor) {
+    visitor.visit(this);
   }
 }

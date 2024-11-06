@@ -1,16 +1,18 @@
-cut {
-    close a 
-    |a:wait| 
-    wait a;
-    close b
-    |b:wait|
-    par {
-        wait b;
-        ()
-        ||
-        wait c;
-        ()
+proc main() {
+    cut {
+        close a 
+        |a:wait| 
+        wait a;
+        close b
+        |b:wait|
+        par {
+            wait b;
+            ()
+            ||
+            wait c;
+            ()
+        }
+        |c:close|
+        close c 
     }
-    |c:close|
-    close c 
-}
+};;

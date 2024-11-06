@@ -1,9 +1,18 @@
-cut {
-    case x of {
-        |#C: close x
-        |#W: wait x; ()
+type close_or_wait {
+    choice of {
+        |#C: wait
+        |#W: close
     }
-    |x : choice of { |#C: wait |#W: close }|
-    #W x;
-    close x
-}
+};;
+
+proc main() {
+    cut {
+        case x of {
+            |#C: close x
+            |#W: wait x; ()
+        }
+        |x: close_or_wait|
+        #W x;
+        close x
+    }
+};;

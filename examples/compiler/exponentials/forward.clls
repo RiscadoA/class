@@ -1,13 +1,15 @@
-cut {
-    !a(b:wait);
+proc main() {
     cut {
-        fwd b c
-        |c:wait|
-        wait c; ()
+        !a(b:wait);
+        cut {
+            fwd b c
+            |c:wait|
+            wait c; ()
+        }
+        |a: ?close|
+        ?a;
+        call a(y:close);
+        call a(z:close);
+        par { close y || close z }
     }
-    |a: ?close|
-    ?a;
-    call a(y:close);
-    call a(z:close);
-    par { close y || close z }
-}
+};;

@@ -47,6 +47,14 @@ public abstract class ASTNodeVisitor {
     visit((ASTNode) node);
   }
 
+  public void visit(ASTProcDef node) {
+    visit((ASTNode) node);
+  }
+
+  public void visit(ASTProgram node) {
+    visit((ASTNode) node);
+  }
+
   public void visit(ASTRecv node) {
     visit((ASTNode) node);
   }

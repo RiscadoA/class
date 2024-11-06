@@ -1,10 +1,12 @@
-cut {
-	send x(z. recv z(w); wait w; close z);
-	wait x;
-	()
-	|x: recv send close; wait; close|
-	recv x(y);
-	send y(t. close t);
-	wait y;
-	close x
-}
+proc main() {
+	cut {
+		send x(z. recv z(w); wait w; close z);
+		wait x;
+		()
+		|x: recv send close; wait; close|
+		recv x(y);
+		send y(t. close t);
+		wait y;
+		close x
+	}
+};;

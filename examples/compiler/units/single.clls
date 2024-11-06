@@ -1,6 +1,8 @@
-cut {
-    close a
-    |a:wait|
-    wait a;
-    ()
-}
+proc main() {
+    cut {
+        close a
+        |a:wait|
+        wait a;
+        ()
+    }
+};;

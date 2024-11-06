@@ -20,6 +20,10 @@ public class ASTDList extends ASTNode {
     ld = _lld;
   }
 
+  public List<ASTTypeDef> getLd() {
+    return ld;
+  }
+
   public void ASTInsertPipe(Function<ASTNode, ASTNode> f, ASTNode from) throws Exception {
     throw new Exception("ASTInsertPipe: call not expected");
   }
@@ -58,9 +62,14 @@ public class ASTDList extends ASTNode {
 
   public Env<EnvEntry> definemany(Env<ASTType> ed, Env<ASTType> eg, Env<EnvEntry> ep)
       throws Exception {
+    return definemany(ed, eg, ep, true);
+  }
+
+  public Env<EnvEntry> definemany(Env<ASTType> ed, Env<ASTType> eg, Env<EnvEntry> ep, boolean print)
+      throws Exception {
     for (ASTTypeDef d : ld) {
       ep = ep.assoc(d.id, new TypeDefEntry(d));
-      System.out.println("Type " + d.id + ": defined.");
+      if (print) System.out.println("Type " + d.id + ": defined.");
     }
     return ep;
   }

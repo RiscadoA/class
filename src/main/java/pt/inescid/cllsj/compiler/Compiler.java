@@ -2,13 +2,14 @@ package pt.inescid.cllsj.compiler;
 
 import pt.inescid.cllsj.CLLSj;
 import pt.inescid.cllsj.Env;
-import pt.inescid.cllsj.ast.nodes.ASTNode;
+import pt.inescid.cllsj.EnvEntry;
+import pt.inescid.cllsj.ast.nodes.ASTProgram;
 
 public class Compiler {
   public static int compile() {
-    ASTNode ast;
+    ASTProgram ast;
     try {
-      ast = new CLLSj(System.in).Proc();
+      ast = new CLLSj(System.in).Program();
     } catch (Exception e) {
       System.err.println("Parsing error: " + e.getMessage());
       e.printStackTrace();
@@ -28,8 +29,11 @@ public class Compiler {
       return 1;
     }
 
+    Env<EnvEntry> ep = new Env<>();
+
     try {
-      ast.typecheck(new Env<>(), new Env<>(), new Env<>());
+      ast.typecheck(new Env<>(), new Env<>(), ep);
+      ep = ast.define(ep);
     } catch (Exception e) {
       System.err.println("Typechecking error: " + e.getMessage());
       e.printStackTrace();
@@ -38,7 +42,7 @@ public class Compiler {
 
     String output;
     try {
-      output = Generator.generate(ast);
+      output = Generator.generate(ep, ast);
     } catch (Exception e) {
       System.err.println("Generation error: " + e.getMessage());
       e.printStackTrace();

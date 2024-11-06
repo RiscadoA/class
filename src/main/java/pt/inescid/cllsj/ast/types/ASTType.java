@@ -221,9 +221,9 @@ public abstract class ASTType {
   //	return offset;
   // }
 
-  public boolean isPos() {
+  public boolean isPosCatch(Env<EnvEntry> ep) {
     try {
-      return isPos(null);
+      return isPos(ep);
     } catch (Exception e) {
       e.printStackTrace(System.out);
       System.exit(1);
