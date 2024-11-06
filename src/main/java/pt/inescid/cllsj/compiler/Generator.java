@@ -62,11 +62,15 @@ public class Generator extends ASTNodeVisitor {
     generator.putLine("struct environment* env = NULL;");
     generator.putLine("struct environment* tmp_env;");
     generator.putLine("void* tmp_cont;");
-    generator.putLine("struct task* next_task = NULL;");
+    generator.putLine("struct task* next_task = malloc(sizeof(struct task));");
+    generator.putLine("next_task->cont = &&end;");
     generator.putLine("struct task* tmp_task;");
     generator.putLine("");
+
     ast.accept(generator);
 
+    generator.putLine("end:");
+    generator.putLine("return 0;");
     generator.indentLevel--;
     generator.putLine("}");
 
@@ -237,18 +241,13 @@ public class Generator extends ASTNodeVisitor {
   public void visit(ASTEmpty node) {
     this.pushWrappingComment("empty:" + node.lineno);
 
-    putLine("if (next_task != NULL) {");
-    indentLevel++;
-    this.putPrint("empty(continue):" + node.lineno);
-    putLine("tmp_cont = next_task->cont;");
+    this.putPrint("empty():" + node.lineno);
+    putLine("tmp_task = next_task->next;");
     putLine("env = next_task->env;");
-    putLine("next_task = next_task->next;");
+    putLine("tmp_cont = next_task->cont;");
     putLine("free(next_task);");
+    putLine("next_task = tmp_task;");
     putLine("goto *tmp_cont;");
-    indentLevel--;
-    putLine("}");
-    this.putPrint("empty(done):" + node.lineno);
-    putLine("return 0;");
 
     this.popWrappingComment();
   }
@@ -312,7 +311,12 @@ public class Generator extends ASTNodeVisitor {
       // positive channel.
       this.putLine("tmp_session = " + positivePtr + ";");
       this.putLine(
-          sessionEnv(positivePtr) + "->records[" + sessionIndex(positivePtr) + "] = " + negativePtr + ";");
+          sessionEnv(positivePtr)
+              + "->records["
+              + sessionIndex(positivePtr)
+              + "] = "
+              + negativePtr
+              + ";");
       this.putLine("free(tmp_session);");
     } else {
       // We've previously read from the negative channel.
@@ -348,7 +352,12 @@ public class Generator extends ASTNodeVisitor {
         // old negative channel.
         this.putLine("tmp_session = " + negativePtr + ";");
         this.putLine(
-            sessionEnv(negativePtr) + "->records[" + sessionIndex(negativePtr) + "] = " + positivePtr + ";");
+            sessionEnv(negativePtr)
+                + "->records["
+                + sessionIndex(negativePtr)
+                + "] = "
+                + positivePtr
+                + ";");
         this.putLine("free(tmp_session);");
       } else {
         this.putPrint("fwd(R " + negative + ", R " + positive + "):" + node.lineno);
@@ -361,7 +370,12 @@ public class Generator extends ASTNodeVisitor {
         // old positive channel.
         this.putLine("tmp_session = " + positivePtr + ";");
         this.putLine(
-            sessionEnv(positivePtr) + "->records[" + sessionIndex(positivePtr) + "] = " + negativePtr + ";");
+            sessionEnv(positivePtr)
+                + "->records["
+                + sessionIndex(positivePtr)
+                + "] = "
+                + negativePtr
+                + ";");
         this.putLine("free(tmp_session);");
       }
     }
@@ -519,7 +533,8 @@ public class Generator extends ASTNodeVisitor {
     return popLiteral(ch, "struct record*");
   }
 
-  // Creates a new statement which pushes an environment size, parent and a continuation onto the session
+  // Creates a new statement which pushes an environment size, parent and a continuation onto the
+  // session
   // queue.
   private void pushBang(String ch, int envSize, String parent, String cont) {
     pushLiteral(ch, "int", Integer.toString(envSize));
