@@ -46,8 +46,16 @@ public class ASTRecv extends ASTNode {
     return chr;
   }
 
+  public String setChr(String ch) {
+    return chr = ch;
+  }
+
   public String getChi() {
     return chi;
+  }
+
+  public String setChi(String ch) {
+    return chi = ch;
   }
 
   public ASTType getChiType() {

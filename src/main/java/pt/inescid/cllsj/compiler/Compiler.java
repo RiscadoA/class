@@ -21,6 +21,14 @@ public class Compiler {
     }
 
     try {
+      SessionRenamer.execute(ast);
+    } catch (Exception e) {
+      System.err.println("Renaming error: " + e.getMessage());
+      e.printStackTrace();
+      return 1;
+    }
+
+    try {
       ast.typecheck(new Env<>(), new Env<>(), new Env<>());
     } catch (Exception e) {
       System.err.println("Typechecking error: " + e.getMessage());

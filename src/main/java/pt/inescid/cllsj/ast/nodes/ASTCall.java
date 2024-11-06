@@ -44,8 +44,16 @@ public class ASTCall extends ASTNode {
     return chr;
   }
 
+  public void setChr(String ch) {
+    chr = ch;
+  }
+
   public String getChi() {
     return chi;
+  }
+
+  public void setChi(String ch) {
+    chi = ch;
   }
 
   public ASTType getType() {

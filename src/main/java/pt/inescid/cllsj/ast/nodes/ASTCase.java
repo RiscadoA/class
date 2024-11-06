@@ -53,6 +53,10 @@ public class ASTCase extends ASTNode {
     return ch;
   }
 
+  public void setCh(String ch) {
+    this.ch = ch;
+  }
+
   public int getCaseCount() {
     return cases.size();
   }

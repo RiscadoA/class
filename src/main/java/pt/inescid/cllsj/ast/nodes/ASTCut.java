@@ -40,6 +40,10 @@ public class ASTCut extends ASTNode {
     return id;
   }
 
+  public void setCh(String ch) {
+    id = ch;
+  }
+
   public ASTType getChType() {
     return type;
   }

@@ -37,6 +37,10 @@ public class ASTClose extends ASTNode {
     return ch;
   }
 
+  public void setCh(String ch) {
+    this.ch = ch;
+  }
+
   public void ASTInsertPipe(Function<ASTNode, ASTNode> f, ASTNode from) throws Exception {
     throw new Exception("ASTInsertPipe: call not expected");
   }

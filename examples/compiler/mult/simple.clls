@@ -1,5 +1,5 @@
 cut {
-	send x(z. close z);
+	send x(y. close y);
 	wait x;
 	()
 	|x: recv wait; close|

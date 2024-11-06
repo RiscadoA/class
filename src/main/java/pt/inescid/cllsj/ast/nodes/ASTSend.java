@@ -50,8 +50,16 @@ public class ASTSend extends ASTNode {
     return chs;
   }
 
+  public void setChs(String chs) {
+    this.chs = chs;
+  }
+
   public String getCho() {
     return cho;
+  }
+
+  public void setCho(String cho) {
+    this.cho = cho;
   }
 
   public ASTType getLhsType() {

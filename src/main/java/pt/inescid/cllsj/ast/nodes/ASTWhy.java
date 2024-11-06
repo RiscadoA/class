@@ -39,6 +39,10 @@ public class ASTWhy extends ASTNode {
     return ch;
   }
 
+  public void setCh(String ch) {
+    this.ch = ch;
+  }
+
   public ASTNode getRhs() {
     return rhs;
   }
