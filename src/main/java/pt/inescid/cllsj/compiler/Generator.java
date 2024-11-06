@@ -439,21 +439,12 @@ public class Generator extends ASTNodeVisitor {
     String sendLhs = this.makeLabel("send_" + node.getChs() + "_" + node.getCho() + "_lhs");
     String sendRhs = this.makeLabel("send_" + node.getChs() + "_" + node.getCho() + "_rhs");
 
-    // We need a new, fresh environment for the send left hand side.
-    Environment env = new Environment(this.environment());
-    env.insert(node.getCho(), node.getLhsType());
-    env.insertFromNode(node.getLhs());
-
-    // We initialize the new environment and record.
-    this.environments.push(env);
-    this.putLine("tmp_env = " + this.allocEnvironment(env.getSize()) + ";");
-    this.putLine("tmp_env->parent = env;");
-    String choPtr = this.sessionPointer("tmp_env", 0, node.getCho());
-    this.initSession(choPtr, env.getSessionCSize(node.getCho()));
-    this.putLine(sessionEnv(choPtr) + " = tmp_env;");
+    // We initialize a new session record.
+    String choPtr = this.sessionPointer(node.getCho());
+    this.initSession(choPtr, environment().getSessionCSize(node.getCho()));
     this.putLine(sessionCont(choPtr) + " = &&" + sendLhs + ";");
-    this.putLine(sessionIndex(choPtr) + " = " + env.getIndex(node.getCho()) + ";");
-    this.environments.pop();
+    this.putLine(sessionEnv(choPtr) + " = env;");
+    this.putLine(sessionIndex(choPtr) + " = " + environment().getIndex(node.getCho()) + ";");
 
     // We send the session record to the session queue.
     this.pushRecord(node.getChs(), choPtr);
@@ -462,10 +453,8 @@ public class Generator extends ASTNodeVisitor {
     this.pushWrappingComment("closure(" + node.getCho() + "):" + node.lineno);
     this.putLine("goto " + sendRhs + ";");
     this.putLabel(sendLhs);
-    this.environments.push(env);
-    env.setPolarity(node.getCho(), false); // This won't ever be the first end point.
+    this.environment().setPolarity(node.getCho(), false); // This won't ever be the first end point.
     this.generateContinuation(node.getLhs());
-    this.environments.pop();
     this.popWrappingComment();
 
     // In the right hand side, we simply continue as usual.

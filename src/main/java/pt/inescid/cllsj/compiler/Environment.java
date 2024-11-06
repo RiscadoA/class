@@ -75,6 +75,10 @@ public class Environment {
   }
 
   public void insert(String session, ASTType cType) {
+    assert !this.indices.containsKey(session)
+        : "Session "
+            + session
+            + " already exists in the environment, generator assumes shadowing is not possible";
     this.indices.put(session, indices.size());
     this.polarity.put(session, true);
     this.sessionCSize.put(session, SizeCalculator.calculate(cType));
@@ -160,6 +164,8 @@ public class Environment {
 
     @Override
     public void visit(ASTSend node) {
+      env.insert(node.getCho(), node.getLhsType());
+      node.getLhs().accept(this);
       node.getRhs().accept(this);
     }
 
