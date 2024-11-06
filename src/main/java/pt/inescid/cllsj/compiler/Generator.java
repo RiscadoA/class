@@ -33,7 +33,7 @@ public class Generator extends ASTNodeVisitor {
   private Stack<String> wrappingComments = new Stack<>();
   private Map<String, Environment> procDefEnvs = new HashMap<>();
 
-  public static String generate(Env<EnvEntry> ep, ASTProgram program) {
+  public static String generate(String entryProcess, Env<EnvEntry> ep, ASTProgram program) {
     Generator generator = new Generator();
 
     generator.putLine("#include <stdlib.h>");
@@ -83,9 +83,9 @@ public class Generator extends ASTNodeVisitor {
         throw new RuntimeException("Duplicate process definition: " + procDef.getId());
       }
 
-      if (procDef.getId().equals("main")
+      if (procDef.getId().equals(entryProcess)
           && procDef.getArgs().size() + procDef.getGArgs().size() > 0) {
-        throw new RuntimeException("Main process cannot have arguments");
+        throw new RuntimeException("Entry process \"" + entryProcess + "\" cannot have arguments");
       }
 
       // Setup process environment
@@ -106,15 +106,17 @@ public class Generator extends ASTNodeVisitor {
       generator.environments.pop();
     }
 
-    if (!definedProcs.contains("main")) {
-      throw new RuntimeException("No main process found");
+    if (!definedProcs.contains(entryProcess)) {
+      throw new RuntimeException("Entry process process \"" + entryProcess + "\" found");
     }
 
     generator.putLine("");
     generator.putLabel("run");
     generator.putLine(
-        "env = " + generator.allocEnvironment(generator.procDefEnvs.get("main").getSize()) + ";");
-    generator.putLine("goto proc_main;");
+        "env = "
+            + generator.allocEnvironment(generator.procDefEnvs.get(entryProcess).getSize())
+            + ";");
+    generator.putLine("goto proc_" + entryProcess + ";");
     generator.putLabel("end");
     generator.putLine("return 0;");
     generator.indentLevel--;

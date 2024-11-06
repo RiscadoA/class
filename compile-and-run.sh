@@ -1,25 +1,48 @@
 #!/usr/bin/env bash
 
+CLLSflags=""
+Cflags=""
+debug=false
+
+while getopts ":dp:" opt; do
+    case $opt in
+        p)
+            CLLSflags="-p $OPTARG"
+            ;;
+        d)
+            Cflags="-g"
+            debug=true
+            ;;
+        \?)
+            echo "Invalid option: -$OPTARG" >&2
+            exit 1
+            ;;
+        :)
+            echo "Option -$OPTARG requires an argument." >&2
+            exit 1
+            ;;
+    esac
+done
+
+shift $((OPTIND-1))
+
+if [ -z $1 ]; then
+    echo "Usage: $0 [-d] [-p <process>] <file>" >&2
+    exit 1
+fi
+
 cfile=$(mktemp $(basename $1).XXXXX.c)
 pfile=$(mktemp $(basename $1).XXXXX)
 trap 'rm -f $cfile $pfile' EXIT
 
-if [ $# -eq 2 ] && [ $2 = "-d" ]; then
-    flags="-g"
-    debug="yes"
-else
-    flags=""
-    debug="no"
-fi
-
 echo "@@@@@@ Running the code generator..." &&
-./CLLSj -c < $1 > $cfile &&
+./CLLSj $CLLSflags -c < $1 > $cfile &&
 echo "@@@@@@ Generated C code:" &&
 cat $cfile &&
 echo "@@@@@@ Compiling the C code..." &&
-gcc $flags -o $pfile $cfile &&
+gcc $Cflags -o $pfile $cfile &&
 echo "@@@@@@ Running the executable:" &&
-if [ $debug = "yes" ]; then
+if [ $debug = true ]; then
     gdb ./$pfile
 else
     ./$pfile
