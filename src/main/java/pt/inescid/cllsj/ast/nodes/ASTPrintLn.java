@@ -40,6 +40,10 @@ public class ASTPrintLn extends ASTNode {
     return rhs;
   }
 
+  public boolean withNewLine() {
+    return nl;
+  }
+
   public void ASTInsertPipe(Function<ASTNode, ASTNode> f, ASTNode from) throws Exception {
     if (from == rhs) {
       ASTNode nnode = f.apply(from);

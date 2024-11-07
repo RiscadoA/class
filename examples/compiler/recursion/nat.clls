@@ -13,7 +13,7 @@ proc zero(n:Nat) {
 proc rec printNat(n:~Nat) {
     case n of {
         |#Z: println("Z"); wait n; ()
-        |#S: println("S"); printNat(n)
+        |#S: print("S "); printNat(n)
     }
 };;
 

@@ -502,7 +502,15 @@ public class Generator extends ASTNodeVisitor {
     }
 
     ASTString string = (ASTString) node.getExpr();
-    this.putPrint(string.getV());
+    if (this.trace) {
+      if (node.withNewLine()) {
+        this.putTrace("println(\"" + string.getV() + "\"):" + node.lineno);
+      } else {
+        this.putTrace("print(\"" + string.getV() + "\"):" + node.lineno);
+      }
+    } else {
+      this.putPrint(string.getV(), node.withNewLine());
+    }
     node.getRhs().accept(this);
 
     this.popWrappingComment();
@@ -790,12 +798,12 @@ public class Generator extends ASTNodeVisitor {
 
   private void putTrace(String msg) {
     if (this.trace) {
-      this.putPrint(msg);
+      this.putPrint(msg, true);
     }
   }
 
-  private void putPrint(String msg) {
-    this.putLine("puts(\"" + escapeString(msg) + "\");");
+  private void putPrint(String msg, boolean newline) {
+    this.putLine("fputs(\"" + escapeString(msg) + (newline ? "\\n" : "") + "\", stdout);");
   }
 
   // Adds an indented line to the generated code
@@ -825,7 +833,7 @@ public class Generator extends ASTNodeVisitor {
   }
 
   private String escapeString(String string) {
-    return string.replace("\\", "\\\\").replace("\"", "\\\"");
+    return string.replace("\\", "\\\\").replace("\"", "\\\"").replace("\n", "\\n");
   }
 
   private String makeLabel(String prefix) {
