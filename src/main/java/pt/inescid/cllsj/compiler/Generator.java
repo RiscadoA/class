@@ -19,11 +19,13 @@ import pt.inescid.cllsj.ast.nodes.ASTFwd;
 import pt.inescid.cllsj.ast.nodes.ASTId;
 import pt.inescid.cllsj.ast.nodes.ASTMix;
 import pt.inescid.cllsj.ast.nodes.ASTNode;
+import pt.inescid.cllsj.ast.nodes.ASTPrintLn;
 import pt.inescid.cllsj.ast.nodes.ASTProcDef;
 import pt.inescid.cllsj.ast.nodes.ASTProgram;
 import pt.inescid.cllsj.ast.nodes.ASTRecv;
 import pt.inescid.cllsj.ast.nodes.ASTSelect;
 import pt.inescid.cllsj.ast.nodes.ASTSend;
+import pt.inescid.cllsj.ast.nodes.ASTString;
 import pt.inescid.cllsj.ast.nodes.ASTWhy;
 
 public class Generator extends ASTNodeVisitor {
@@ -473,6 +475,21 @@ public class Generator extends ASTNodeVisitor {
     // The right hand side code won't run until an empty node pops it from the stack.
     this.putLabel(mixRhs);
     this.putPrint("mix(rhs):" + node.lineno);
+    node.getRhs().accept(this);
+
+    this.popWrappingComment();
+  }
+
+  @Override
+  public void visit(ASTPrintLn node) {
+    this.pushWrappingComment("println:" + node.lineno);
+
+    if (!(node.getExpr() instanceof ASTString)) {
+      throw new UnsupportedOperationException("Only string literals are supported in println for now");
+    }
+
+    ASTString string = (ASTString) node.getExpr();
+    this.putPrint(string.getV());
     node.getRhs().accept(this);
 
     this.popWrappingComment();

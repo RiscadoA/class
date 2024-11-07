@@ -18,6 +18,7 @@ import pt.inescid.cllsj.ast.nodes.ASTFwd;
 import pt.inescid.cllsj.ast.nodes.ASTId;
 import pt.inescid.cllsj.ast.nodes.ASTMix;
 import pt.inescid.cllsj.ast.nodes.ASTNode;
+import pt.inescid.cllsj.ast.nodes.ASTPrintLn;
 import pt.inescid.cllsj.ast.nodes.ASTRecv;
 import pt.inescid.cllsj.ast.nodes.ASTSelect;
 import pt.inescid.cllsj.ast.nodes.ASTSend;
@@ -172,6 +173,11 @@ public class Environment {
     @Override
     public void visit(ASTMix node) {
       node.getLhs().accept(this);
+      node.getRhs().accept(this);
+    }
+
+    @Override
+    public void visit(ASTPrintLn node) {
       node.getRhs().accept(this);
     }
 

@@ -13,6 +13,7 @@ import pt.inescid.cllsj.SessionClosure;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.TypeError;
 import pt.inescid.cllsj.Value;
+import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.types.ASTCoLBasicType;
 import pt.inescid.cllsj.ast.types.ASTCointT;
 import pt.inescid.cllsj.ast.types.ASTType;
@@ -29,6 +30,14 @@ public class ASTPrintLn extends ASTNode {
     rhs = _rhs;
     nl = _nl;
     promoted = false;
+  }
+
+  public ASTNode getExpr() {
+    return expr;
+  }
+
+  public ASTNode getRhs() {
+    return rhs;
   }
 
   public void ASTInsertPipe(Function<ASTNode, ASTNode> f, ASTNode from) throws Exception {
@@ -181,5 +190,10 @@ public class ASTPrintLn extends ASTNode {
       // p_cont.frame = frame;
       p_cont.epnm = ep;
     }
+  }
+
+  @Override
+  public void accept(ASTNodeVisitor visitor) {
+    visitor.visit(this);
   }
 }

@@ -51,6 +51,10 @@ public abstract class ASTNodeVisitor {
     visit((ASTNode) node);
   }
 
+  public void visit(ASTPrintLn node) {
+    visit((ASTNode) node);
+  }
+
   public void visit(ASTProcDef node) {
     visit((ASTNode) node);
   }
@@ -69,6 +73,10 @@ public abstract class ASTNodeVisitor {
 
   public void visit(ASTSend node) {
     visit((ASTNode) node);
+  }
+
+  public void visit(ASTString node) {
+    visit((ASTExpr) node);
   }
 
   public void visit(ASTVId node) {
