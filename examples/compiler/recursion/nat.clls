@@ -1,0 +1,26 @@
+type rec Nat {
+    choice of {
+        |#Z: close
+        |#S: Nat
+    }
+};;
+
+proc zero(n:Nat) {
+    #Z n;
+    close n
+};;
+
+proc rec printNat(n:~Nat) {
+    case n of {
+        |#Z: println("Z"); wait n; ()
+        |#S: println("S"); printNat(n)
+    }
+};;
+
+proc main() {
+    cut {
+        #S n; #Z n; close n
+        |n:~Nat|
+        printNat(n)
+    }
+};;

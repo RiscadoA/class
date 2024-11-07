@@ -7,6 +7,7 @@ import pt.inescid.cllsj.KindError;
 import pt.inescid.cllsj.Trail;
 import pt.inescid.cllsj.TypeDefEntry;
 import pt.inescid.cllsj.TypeEntry;
+import pt.inescid.cllsj.ast.ASTTypeVisitor;
 
 // strategy for lazy unfolding:
 // unfold type acts as identity on all types except idT
@@ -297,5 +298,10 @@ public class ASTIdT extends ASTType {
   public int SetOffsets(int base, Env<EnvEntry> ep) throws Exception {
     // offset = base+10; // must redo
     return base + 10;
+  }
+
+  @Override
+  public void accept(ASTTypeVisitor visitor) {
+    visitor.visit(this);
   }
 }

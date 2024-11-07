@@ -22,6 +22,7 @@ import pt.inescid.cllsj.ast.nodes.ASTPrintLn;
 import pt.inescid.cllsj.ast.nodes.ASTRecv;
 import pt.inescid.cllsj.ast.nodes.ASTSelect;
 import pt.inescid.cllsj.ast.nodes.ASTSend;
+import pt.inescid.cllsj.ast.nodes.ASTUnfold;
 import pt.inescid.cllsj.ast.nodes.ASTWhy;
 import pt.inescid.cllsj.ast.types.ASTType;
 
@@ -196,6 +197,11 @@ public class Environment {
     public void visit(ASTSend node) {
       env.insert(node.getCho(), node.getLhsType());
       node.getLhs().accept(this);
+      node.getRhs().accept(this);
+    }
+
+    @Override
+    public void visit(ASTUnfold node) {
       node.getRhs().accept(this);
     }
 

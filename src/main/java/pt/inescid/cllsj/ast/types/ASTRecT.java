@@ -3,6 +3,7 @@ package pt.inescid.cllsj.ast.types;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.Trail;
+import pt.inescid.cllsj.ast.ASTTypeVisitor;
 
 public class ASTRecT extends ASTType {
   String id;
@@ -12,6 +13,10 @@ public class ASTRecT extends ASTType {
   public ASTRecT(String _id, ASTType _t) {
     t = _t;
     id = _id;
+  }
+
+  public String getid() {
+    return id;
   }
 
   public ASTType getin() {
@@ -65,5 +70,10 @@ public class ASTRecT extends ASTType {
   public int SetOffsets(int base, Env<EnvEntry> ep) throws Exception {
     // offset = base;
     return t.SetOffsets(base + 1, ep);
+  }
+
+  @Override
+  public void accept(ASTTypeVisitor visitor) {
+    visitor.visit(this);
   }
 }

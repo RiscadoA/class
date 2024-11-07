@@ -79,6 +79,10 @@ public abstract class ASTNodeVisitor {
     visit((ASTExpr) node);
   }
 
+  public void visit(ASTUnfold node) {
+    visit((ASTNode) node);
+  }
+
   public void visit(ASTVId node) {
     visit((ASTExpr) node);
   }

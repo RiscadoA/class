@@ -18,6 +18,14 @@ public abstract class ASTTypeVisitor {
     visit((ASTType) type);
   }
 
+  public void visit(ASTCoRecT type) {
+    visit((ASTType) type);
+  }
+
+  public void visit(ASTIdT type) {
+    visit((ASTType) type);
+  }
+
   public void visit(ASTNotT type) {
     visit((ASTType) type);
   }
@@ -27,6 +35,10 @@ public abstract class ASTTypeVisitor {
   }
 
   public void visit(ASTOneT type) {
+    visit((ASTType) type);
+  }
+
+  public void visit(ASTRecT type) {
     visit((ASTType) type);
   }
 

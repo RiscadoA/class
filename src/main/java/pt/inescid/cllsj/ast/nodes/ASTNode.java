@@ -273,7 +273,8 @@ public abstract class ASTNode {
         || it instanceof ASTCall
         || it instanceof ASTSendTy
         || it instanceof ASTEmpty
-        || it instanceof ASTBang);
+        || it instanceof ASTBang
+        || (it instanceof ASTUnfold && ((ASTUnfold) it).rec));
   }
 
   public String getSubjectCh() {

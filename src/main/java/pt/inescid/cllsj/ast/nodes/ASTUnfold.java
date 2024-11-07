@@ -17,6 +17,7 @@ import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.SessionFieldUnfold;
 import pt.inescid.cllsj.SessionRecord;
 import pt.inescid.cllsj.TypeError;
+import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.types.ASTCoAffineT;
 import pt.inescid.cllsj.ast.types.ASTCoRecT;
 import pt.inescid.cllsj.ast.types.ASTRecT;
@@ -37,8 +38,29 @@ public class ASTUnfold extends ASTNode {
     rhs = _rhs;
   }
 
+  @Override
+  public String getSubjectCh() {
+    return ch;
+  }
+
+  public String getCh() {
+    return ch;
+  }
+
+  public void setCh(String ch) {
+    this.ch = ch;
+  }
+
+  public ASTNode getRhs() {
+    return rhs;
+  }
+
   public void setrhs(ASTType r) {
     tyrhs = r;
+  }
+
+  public ASTType getRhsType() {
+    return tyrhs;
   }
 
   public void ASTInsertPipe(Function<ASTNode, ASTNode> f, ASTNode from) throws Exception {
@@ -326,5 +348,10 @@ public class ASTUnfold extends ASTNode {
   public void show() {
     System.out.println(this + " " + ch + " " + anc);
     rhs.show();
+  }
+
+  @Override
+  public void accept(ASTNodeVisitor visitor) {
+    visitor.visit(this);
   }
 }

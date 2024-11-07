@@ -26,6 +26,7 @@ import pt.inescid.cllsj.ast.nodes.ASTRecv;
 import pt.inescid.cllsj.ast.nodes.ASTSelect;
 import pt.inescid.cllsj.ast.nodes.ASTSend;
 import pt.inescid.cllsj.ast.nodes.ASTString;
+import pt.inescid.cllsj.ast.nodes.ASTUnfold;
 import pt.inescid.cllsj.ast.nodes.ASTWhy;
 
 public class Generator extends ASTNodeVisitor {
@@ -139,7 +140,7 @@ public class Generator extends ASTNodeVisitor {
   @Override
   public void visit(ASTBang node) {
     this.pushWrappingComment("!(" + node.getChr() + "):" + node.lineno);
-    this.putPrint("!(" + node.getChr() + "):" + node.lineno);
+    this.putTrace("!(" + node.getChr() + "):" + node.lineno);
 
     String replRhs = this.makeLabel("repl_" + node.getChr() + "_" + node.getChi() + "_rhs");
 
@@ -171,7 +172,7 @@ public class Generator extends ASTNodeVisitor {
   @Override
   public void visit(ASTCall node) {
     this.pushWrappingComment("call(" + node.getChr() + ", " + node.getChi() + "):" + node.lineno);
-    this.putPrint("call(" + node.getChr() + ", " + node.getChi() + "):" + node.lineno);
+    this.putTrace("call(" + node.getChr() + ", " + node.getChi() + "):" + node.lineno);
 
     // The bang node has previously sent an environment size and a continuation to the session
     // queue. We first allocate a new environment with that size.
@@ -209,7 +210,7 @@ public class Generator extends ASTNodeVisitor {
 
       this.environments.push(this.environment().copy());
       this.pushWrappingComment("case" + label + "(" + node.getCh() + "):" + node.lineno);
-      this.putPrint("case" + label + "(" + node.getCh() + "):" + node.lineno);
+      this.putTrace("case" + label + "(" + node.getCh() + "):" + node.lineno);
       this.generateContinuation(node.getCase(label));
       this.popWrappingComment();
       this.environments.pop();
@@ -226,7 +227,7 @@ public class Generator extends ASTNodeVisitor {
   @Override
   public void visit(ASTClose node) {
     this.pushWrappingComment("close(" + node.getCh() + "):" + node.lineno);
-    this.putPrint("close(" + node.getCh() + "):" + node.lineno);
+    this.putTrace("close(" + node.getCh() + "):" + node.lineno);
 
     // Push a close token onto the session queue and flip to the other side of the session.
     this.pushClose(node.getCh());
@@ -238,7 +239,7 @@ public class Generator extends ASTNodeVisitor {
   @Override
   public void visit(ASTCoClose node) {
     this.pushWrappingComment("coclose(" + node.getCh() + "):" + node.lineno);
-    this.putPrint("coclose(" + node.getCh() + "):" + node.lineno);
+    this.putTrace("coclose(" + node.getCh() + "):" + node.lineno);
 
     // Pop a close token from the session queue, terminate the session, and generate the
     // continuation.
@@ -252,7 +253,7 @@ public class Generator extends ASTNodeVisitor {
   @Override
   public void visit(ASTCut node) {
     this.pushWrappingComment("cut(" + node.getCh() + "):" + node.lineno);
-    this.putPrint("cut(" + node.getCh() + "):" + node.lineno);
+    this.putTrace("cut(" + node.getCh() + "):" + node.lineno);
 
     // Initialize the cut session, with initial continuation pointing to the right hand side.
     String cutRhs = this.makeLabel("cut_" + node.getCh());
@@ -290,7 +291,7 @@ public class Generator extends ASTNodeVisitor {
   public void visit(ASTEmpty node) {
     this.pushWrappingComment("empty:" + node.lineno);
 
-    this.putPrint("empty():" + node.lineno);
+    this.putTrace("empty():" + node.lineno);
     putLine("tmp_task = next_task->next;");
     putLine("env = next_task->env;");
     putLine("tmp_cont = next_task->cont;");
@@ -328,7 +329,7 @@ public class Generator extends ASTNodeVisitor {
       this.putLine("tmp_cont = " + sessionCont(negativePtr) + ";");
 
       if (this.environment().getPolarity(positive)) {
-        this.putPrint("fwd(W " + negative + ", W " + positive + "):" + node.lineno);
+        this.putTrace("fwd(W " + negative + ", W " + positive + "):" + node.lineno);
 
         // We've previously written to the positive channel.
         // Thus, the positive channel might have data on its buffer that it still hasn't read.
@@ -344,7 +345,7 @@ public class Generator extends ASTNodeVisitor {
         this.beginLine(sessionWrite(negativePtr) + " += ");
         this.endLine(sessionWrite(positivePtr) + " - " + sessionRead(positivePtr) + ";");
       } else {
-        this.putPrint("fwd(W " + negative + ", R " + positive + "):" + node.lineno);
+        this.putTrace("fwd(W " + negative + ", R " + positive + "):" + node.lineno);
 
         // We've previously read from the positive channel.
         // Thus, since we're now writing to it, we must have already read all the data sent by it.
@@ -378,7 +379,7 @@ public class Generator extends ASTNodeVisitor {
       this.putLine("tmp_cont = " + sessionCont(positivePtr) + ";");
 
       if (this.environment().getPolarity(positive)) {
-        this.putPrint("fwd(R " + negative + ", W " + positive + "):" + node.lineno);
+        this.putTrace("fwd(R " + negative + ", W " + positive + "):" + node.lineno);
 
         // We've previously written to the positive channel.
         // Thus, the positive channel might have data on its buffer that it still hasn't read.
@@ -409,7 +410,7 @@ public class Generator extends ASTNodeVisitor {
                 + ";");
         this.putLine("free(tmp_session);");
       } else {
-        this.putPrint("fwd(R " + negative + ", R " + positive + "):" + node.lineno);
+        this.putTrace("fwd(R " + negative + ", R " + positive + "):" + node.lineno);
 
         // We've previously read from the positive channel.
         // Thus, since we're now writing to it, we must have already read all the data sent by it.
@@ -436,18 +437,26 @@ public class Generator extends ASTNodeVisitor {
   @Override
   public void visit(ASTId node) {
     this.pushWrappingComment("id(" + node.getId() + "):" + node.lineno);
-    this.putPrint("id(" + node.getId() + "):" + node.lineno);
+    this.putTrace("id(" + node.getId() + "):" + node.lineno);
 
     // We first initialize a new environment for the process.
     Environment env = this.procDefEnvs.get(node.getId());
     this.putLine("tmp_env = " + allocEnvironment(env.getSize()) + ";");
     for (int i = 0; i < node.getPars().size(); ++i) {
       int envI = i;
-      this.putLine(sessionPointer("tmp_env", envI, env.getName(envI)) + " = " + sessionPointer(node.getPars().get(i)) + ";");
+      this.putLine(
+          sessionPointer("tmp_env", envI, env.getName(envI))
+              + " = "
+              + sessionPointer(node.getPars().get(i))
+              + ";");
     }
     for (int i = 0; i < node.getGPars().size(); ++i) {
       int envI = i + node.getPars().size();
-      this.putLine(sessionPointer("tmp_env", envI, env.getName(envI)) + " = " + sessionPointer(node.getGPars().get(i)) + ";");
+      this.putLine(
+          sessionPointer("tmp_env", envI, env.getName(envI))
+              + " = "
+              + sessionPointer(node.getGPars().get(i))
+              + ";");
     }
 
     // Then we switch to that environment and jump to the process code.
@@ -460,7 +469,7 @@ public class Generator extends ASTNodeVisitor {
   @Override
   public void visit(ASTMix node) {
     this.pushWrappingComment("mix:" + node.lineno);
-    this.putPrint("mix(lhs):" + node.lineno);
+    this.putTrace("mix(lhs):" + node.lineno);
 
     // We push the continuation for the right hand side to the global stack,
     // and generate code for the left hand side.
@@ -474,7 +483,7 @@ public class Generator extends ASTNodeVisitor {
 
     // The right hand side code won't run until an empty node pops it from the stack.
     this.putLabel(mixRhs);
-    this.putPrint("mix(rhs):" + node.lineno);
+    this.putTrace("mix(rhs):" + node.lineno);
     node.getRhs().accept(this);
 
     this.popWrappingComment();
@@ -485,7 +494,8 @@ public class Generator extends ASTNodeVisitor {
     this.pushWrappingComment("println:" + node.lineno);
 
     if (!(node.getExpr() instanceof ASTString)) {
-      throw new UnsupportedOperationException("Only string literals are supported in println for now");
+      throw new UnsupportedOperationException(
+          "Only string literals are supported in println for now");
     }
 
     ASTString string = (ASTString) node.getExpr();
@@ -498,7 +508,7 @@ public class Generator extends ASTNodeVisitor {
   @Override
   public void visit(ASTRecv node) {
     this.pushWrappingComment("recv(" + node.getChr() + ", " + node.getChi() + "):" + node.lineno);
-    this.putPrint("recv(" + node.getChr() + ", " + node.getChi() + "):" + node.lineno);
+    this.putTrace("recv(" + node.getChr() + ", " + node.getChi() + "):" + node.lineno);
 
     // We simply pop the record from the queue and store it in the environment.
     this.putLine(this.sessionPointer(node.getChi()) + " = " + this.popRecord(node.getChr()) + ";");
@@ -510,7 +520,7 @@ public class Generator extends ASTNodeVisitor {
   @Override
   public void visit(ASTSelect node) {
     this.pushWrappingComment("select" + node.getLabel() + "(" + node.getCh() + "):" + node.lineno);
-    this.putPrint("select" + node.getLabel() + "(" + node.getCh() + "):" + node.lineno);
+    this.putTrace("select" + node.getLabel() + "(" + node.getCh() + "):" + node.lineno);
 
     // Push the label's index onto the session queue.
     this.pushLabel(node.getCh(), node.getLabelIndex(), node.getLabel());
@@ -522,7 +532,7 @@ public class Generator extends ASTNodeVisitor {
   @Override
   public void visit(ASTSend node) {
     this.pushWrappingComment("send(" + node.getChs() + "):" + node.lineno);
-    this.putPrint("send(" + node.getChs() + "):" + node.lineno);
+    this.putTrace("send(" + node.getChs() + "):" + node.lineno);
 
     String sendLhs = this.makeLabel("send_" + node.getChs() + "_" + node.getCho() + "_lhs");
     String sendRhs = this.makeLabel("send_" + node.getChs() + "_" + node.getCho() + "_rhs");
@@ -553,9 +563,38 @@ public class Generator extends ASTNodeVisitor {
   }
 
   @Override
+  public void visit(ASTUnfold node) {
+    String unfoldType = node.rec ? "unfold-send" : "unfold-recv";
+    this.pushWrappingComment(unfoldType + "(" + node.getCh() + "):" + node.lineno);
+    this.putTrace(unfoldType + "(" + node.getCh() + "):" + node.lineno);
+
+    // We either push or pop an unfold token onto the session queue, depending on the side we're on.
+    if (node.rec) {
+      this.pushUnfold(node.getCh());
+
+      // If we're writing, we must give a chance for the other side to read anything we've written before.
+      this.flip(node.getCh());
+    } else {
+      this.popUnfold(node.getCh());
+    }
+
+    // Now, we reset our buffer pointers, since we're recursing.
+    String ptr = this.sessionPointer(node.getCh());
+    if (node.rec) {
+      this.putLine(sessionWrite(ptr) + " = " + sessionBuffer(ptr) + ";");
+    } else {
+      this.putLine(sessionRead(ptr) + " = " + sessionBuffer(ptr) + ";");
+    }
+
+    this.generateContinuation(node.getRhs());
+
+    this.popWrappingComment();
+  }
+
+  @Override
   public void visit(ASTWhy node) {
     this.pushWrappingComment("?(" + node.getCh() + "):" + node.lineno);
-    this.putPrint("?(" + node.getCh() + "):" + node.lineno);
+    this.putTrace("?(" + node.getCh() + "):" + node.lineno);
 
     // This node doesn't really do anything - the continuation sent by the bang node will never be
     // popped.
@@ -588,6 +627,14 @@ public class Generator extends ASTNodeVisitor {
 
   private void popClose(String ch) {
     // The close token is zero-sized, so we don't actually do anything.
+  }
+
+  private void pushUnfold(String ch) {
+    // The unfold token is zero-sized, so we don't actually do anything.
+  }
+
+  private void popUnfold(String ch) {
+    // The unfold token is zero-sized, so we don't actually do anything.
   }
 
   // Creates a new statement which pushes a label onto the session queue.
@@ -660,7 +707,7 @@ public class Generator extends ASTNodeVisitor {
 
   private void flip(String ch) {
     this.pushWrappingComment("flip(" + ch + ")");
-    putPrint("flip(" + ch + ")");
+    putTrace("flip(" + ch + ")");
 
     String label = makeLabel("flip_" + ch);
     putLine("tmp_env = " + sessionEnv(sessionPointer(ch)) + ";");
@@ -677,7 +724,7 @@ public class Generator extends ASTNodeVisitor {
 
   private void finalFlip(String ch) {
     this.pushWrappingComment("finalFlip(" + ch + ")");
-    putPrint("finalFlip(" + ch + ")");
+    putTrace("finalFlip(" + ch + ")");
 
     putLine("tmp_session = " + sessionPointer(ch) + ";");
     putLine("env = " + sessionEnv("tmp_session") + ";");
@@ -696,13 +743,11 @@ public class Generator extends ASTNodeVisitor {
 
   private void initSession(String ptr, String size) {
     putLine(ptr + " = malloc(sizeof(struct record) + (" + size + "));");
-    putLine(
-        sessionWrite(ptr)
-            + " = "
-            + sessionRead(ptr)
-            + " = (unsigned char*)"
-            + ptr
-            + " + sizeof(struct record);");
+    putLine(sessionRead(ptr) + " = " + sessionWrite(ptr) + " = " + sessionBuffer(ptr) + ";");
+  }
+
+  private String sessionBuffer(String ptr) {
+    return "((unsigned char*)" + ptr + " + sizeof(struct record))";
   }
 
   private String sessionPointer(String ch) {
@@ -737,6 +782,10 @@ public class Generator extends ASTNodeVisitor {
 
   private String sessionIndex(String ptr) {
     return ptr + "->index";
+  }
+
+  private void putTrace(String msg) {
+    putPrint(msg);
   }
 
   private void putPrint(String msg) {
