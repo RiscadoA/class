@@ -93,10 +93,13 @@ public class CLLSj {
     if (args.length > 0) {
       String entryProcess = "main";
       boolean failed = true;
+      boolean trace = false;
 
       for (int i = 0; i < args.length; i++) {
         if (args[i].equals("-c")) {
           failed = false;
+        } else if (args[i].equals("-t")) {
+          trace = true;
         } else if (args[i].equals("-p")) {
           if (i + 1 >= args.length) {
             failed = true;
@@ -112,11 +115,11 @@ public class CLLSj {
       }
 
       if (failed) {
-        System.err.println("Usage: CLLSj [-c] [-p <entry-process>]");
+        System.err.println("Usage: CLLSj [-c] [-t] [-p <entry-process>]");
         System.exit(1);
       }
 
-      System.exit(Compiler.compile(entryProcess));
+      System.exit(Compiler.compile(entryProcess, trace));
     }
 
     //System.out.println("maximum pool size = " + ((ThreadPoolExecutor) threadPool).getMaximumPoolSize() );

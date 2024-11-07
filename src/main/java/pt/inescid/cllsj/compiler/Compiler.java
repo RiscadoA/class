@@ -6,7 +6,7 @@ import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.ast.nodes.ASTProgram;
 
 public class Compiler {
-  public static int compile(String entryProcess) {
+  public static int compile(String entryProcess, boolean trace) {
     ASTProgram ast;
     try {
       ast = new CLLSj(System.in).Program();
@@ -42,7 +42,7 @@ public class Compiler {
 
     String output;
     try {
-      output = Generator.generate(entryProcess, ep, ast);
+      output = Generator.generate(entryProcess, ep, ast, trace);
     } catch (Exception e) {
       System.err.println("Generation error: " + e.getMessage());
       e.printStackTrace();

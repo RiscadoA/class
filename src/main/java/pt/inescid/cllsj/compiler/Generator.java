@@ -36,9 +36,12 @@ public class Generator extends ASTNodeVisitor {
   private Stack<Environment> environments = new Stack<>();
   private Stack<String> wrappingComments = new Stack<>();
   private Map<String, Environment> procDefEnvs = new HashMap<>();
+  private boolean trace = false;
 
-  public static String generate(String entryProcess, Env<EnvEntry> ep, ASTProgram program) {
+  public static String generate(
+      String entryProcess, Env<EnvEntry> ep, ASTProgram program, boolean trace) {
     Generator generator = new Generator();
+    generator.trace = trace;
 
     generator.putLine("#include <stdlib.h>");
     generator.putLine("#include <stdio.h>");
@@ -572,7 +575,8 @@ public class Generator extends ASTNodeVisitor {
     if (node.rec) {
       this.pushUnfold(node.getCh());
 
-      // If we're writing, we must give a chance for the other side to read anything we've written before.
+      // If we're writing, we must give a chance for the other side to read anything we've written
+      // before.
       this.flip(node.getCh());
     } else {
       this.popUnfold(node.getCh());
@@ -785,11 +789,13 @@ public class Generator extends ASTNodeVisitor {
   }
 
   private void putTrace(String msg) {
-    putPrint(msg);
+    if (this.trace) {
+      this.putPrint(msg);
+    }
   }
 
   private void putPrint(String msg) {
-    putLine("puts(\"" + escapeString(msg) + "\");");
+    this.putLine("puts(\"" + escapeString(msg) + "\");");
   }
 
   // Adds an indented line to the generated code

@@ -4,14 +4,17 @@ CLLSflags=""
 Cflags=""
 debug=false
 
-while getopts ":dp:" opt; do
+while getopts ":dtp:" opt; do
     case $opt in
         p)
-            CLLSflags="-p $OPTARG"
+            CLLSflags="$CLLSflags -p $OPTARG"
             ;;
         d)
             Cflags="-g"
             debug=true
+            ;;
+        t)
+            CLLSflags="$CLLSflags -t"
             ;;
         \?)
             echo "Invalid option: -$OPTARG" >&2
@@ -27,7 +30,7 @@ done
 shift $((OPTIND-1))
 
 if [ -z $1 ]; then
-    echo "Usage: $0 [-d] [-p <process>] <file>" >&2
+    echo "Usage: $0 [-d] [-t] [-p <process>] <file>" >&2
     exit 1
 fi
 
