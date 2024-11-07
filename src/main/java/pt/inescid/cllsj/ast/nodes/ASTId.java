@@ -18,6 +18,7 @@ import pt.inescid.cllsj.SessionRecord;
 import pt.inescid.cllsj.Trail;
 import pt.inescid.cllsj.TypeEntry;
 import pt.inescid.cllsj.TypeError;
+import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.types.ASTBangT;
 import pt.inescid.cllsj.ast.types.ASTCoAffineT;
 import pt.inescid.cllsj.ast.types.ASTCoRecT;
@@ -47,6 +48,22 @@ public class ASTId extends ASTNode {
     tpars = new ArrayList<ASTType>();
     exprs = new ArrayList<ASTExpr>();
     gexprs = new ArrayList<ASTExpr>();
+  }
+
+  public List<ASTExpr> getExprs() {
+    return exprs;
+  }
+
+  public List<ASTExpr> getGExprs() {
+    return gexprs;
+  }
+
+  public List<String> getPars() {
+    return pars;
+  }
+
+  public List<String> getGPars() {
+    return gpars;
   }
 
   public String getId() {
@@ -621,5 +638,10 @@ public class ASTId extends ASTNode {
       p_cont.epnm = epDef;
 
     } else throw new SAMError("Line " + lineno + " :" + " " + id + " not a process id.");
+  }
+
+  @Override
+  public void accept(ASTNodeVisitor visitor) {
+    visitor.visit(this);
   }
 }

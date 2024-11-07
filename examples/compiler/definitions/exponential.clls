@@ -1,0 +1,17 @@
+proc exp_apply(x:wait; a:close) {
+    call a(y);
+    fwd x y
+};;
+
+proc main() {
+    cut {
+        !a(x:wait); wait x; ()
+        |a:?close|
+        ?a;
+        cut {
+            close b
+            |b:wait|
+            exp_apply(b; a) 
+        }
+    }
+};;

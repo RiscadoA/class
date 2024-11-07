@@ -1,0 +1,17 @@
+proc wait_and_close(x:close, y:wait) {
+    wait y;
+    close x
+};;
+
+proc main() {
+    cut {
+        close a
+        |a:wait|
+        cut {
+            wait_and_close(b, a)
+            |b:wait|
+            wait b;
+            ()
+        }
+    }
+};;

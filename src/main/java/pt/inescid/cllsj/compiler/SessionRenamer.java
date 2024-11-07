@@ -13,6 +13,7 @@ import pt.inescid.cllsj.ast.nodes.ASTCut;
 import pt.inescid.cllsj.ast.nodes.ASTEmpty;
 import pt.inescid.cllsj.ast.nodes.ASTExpr;
 import pt.inescid.cllsj.ast.nodes.ASTFwd;
+import pt.inescid.cllsj.ast.nodes.ASTId;
 import pt.inescid.cllsj.ast.nodes.ASTMix;
 import pt.inescid.cllsj.ast.nodes.ASTNode;
 import pt.inescid.cllsj.ast.nodes.ASTProcDef;
@@ -20,6 +21,7 @@ import pt.inescid.cllsj.ast.nodes.ASTProgram;
 import pt.inescid.cllsj.ast.nodes.ASTRecv;
 import pt.inescid.cllsj.ast.nodes.ASTSelect;
 import pt.inescid.cllsj.ast.nodes.ASTSend;
+import pt.inescid.cllsj.ast.nodes.ASTVId;
 import pt.inescid.cllsj.ast.nodes.ASTWhy;
 
 public class SessionRenamer extends ASTNodeVisitor {
@@ -93,12 +95,28 @@ public class SessionRenamer extends ASTNodeVisitor {
   public void visit(ASTEmpty node) {}
 
   @Override
-  public void visit(ASTExpr node) {}
-
-  @Override
   public void visit(ASTFwd node) {
     node.setCh1(rename(node.getCh1()));
     node.setCh2(rename(node.getCh2()));
+  }
+
+  @Override
+  public void visit(ASTId node) {
+    for (ASTExpr expr : node.getExprs()) {
+      expr.accept(this);
+    }
+
+    for (ASTExpr expr : node.getGExprs()) {
+      expr.accept(this);
+    }
+
+    for (int i = 0; i < node.getPars().size(); i++) {
+      node.getPars().set(i, rename(node.getPars().get(i)));
+    }
+
+    for (int i = 0; i < node.getGPars().size(); i++) {
+      node.getGPars().set(i, rename(node.getGPars().get(i)));
+    }
   }
 
   @Override
@@ -150,6 +168,11 @@ public class SessionRenamer extends ASTNodeVisitor {
     node.setCho(introduce(node.getCho()));
     node.getLhs().accept(this);
     node.getRhs().accept(this);
+  }
+
+  @Override
+  public void visit(ASTVId node) {
+    node.setCh(rename(node.getCh()));
   }
 
   @Override

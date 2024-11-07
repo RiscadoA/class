@@ -43,6 +43,10 @@ public abstract class ASTNodeVisitor {
     visit((ASTNode) node);
   }
 
+  public void visit(ASTId node) {
+    visit((ASTNode) node);
+  }
+
   public void visit(ASTMix node) {
     visit((ASTNode) node);
   }
@@ -65,6 +69,10 @@ public abstract class ASTNodeVisitor {
 
   public void visit(ASTSend node) {
     visit((ASTNode) node);
+  }
+
+  public void visit(ASTVId node) {
+    visit((ASTExpr) node);
   }
 
   public void visit(ASTWhy node) {

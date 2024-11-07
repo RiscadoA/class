@@ -1,0 +1,15 @@
+proc foo(a:close) {
+    close a
+};;
+
+proc bar(a:wait) {
+    wait a; ()
+};;
+
+proc main() {
+    cut {
+        bar(x)
+        |x:close|
+        foo(x)
+    }
+};;

@@ -13,6 +13,7 @@ import pt.inescid.cllsj.SessionClosure;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.SessionRecord;
 import pt.inescid.cllsj.Value;
+import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.types.ASTCoAffineT;
 import pt.inescid.cllsj.ast.types.ASTCoLBasicType;
 import pt.inescid.cllsj.ast.types.ASTType;
@@ -27,6 +28,14 @@ public class ASTVId extends ASTExpr {
 
   public ASTVId(String _ch) {
     ch = _ch;
+  }
+
+  public String getCh() {
+    return ch;
+  }
+
+  public void setCh(String ch) {
+    this.ch = ch;
   }
 
   public void ASTInsertWhyNot(String _ch, ASTType _t, ASTNode here) throws Exception {
@@ -192,5 +201,10 @@ public class ASTVId extends ASTExpr {
       sref.incOffset();
       return sval;
     }
+  }
+
+  @Override
+  public void accept(ASTNodeVisitor visitor) {
+    visitor.visit(this);
   }
 }

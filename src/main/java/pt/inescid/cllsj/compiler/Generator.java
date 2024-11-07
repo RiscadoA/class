@@ -16,6 +16,7 @@ import pt.inescid.cllsj.ast.nodes.ASTCoClose;
 import pt.inescid.cllsj.ast.nodes.ASTCut;
 import pt.inescid.cllsj.ast.nodes.ASTEmpty;
 import pt.inescid.cllsj.ast.nodes.ASTFwd;
+import pt.inescid.cllsj.ast.nodes.ASTId;
 import pt.inescid.cllsj.ast.nodes.ASTMix;
 import pt.inescid.cllsj.ast.nodes.ASTNode;
 import pt.inescid.cllsj.ast.nodes.ASTProcDef;
@@ -428,6 +429,30 @@ public class Generator extends ASTNodeVisitor {
 
     this.putLine("env = tmp_env;");
     this.putLine("goto *tmp_cont;");
+  }
+
+  @Override
+  public void visit(ASTId node) {
+    this.pushWrappingComment("id(" + node.getId() + "):" + node.lineno);
+    this.putPrint("id(" + node.getId() + "):" + node.lineno);
+
+    // We first initialize a new environment for the process.
+    Environment env = this.procDefEnvs.get(node.getId());
+    this.putLine("tmp_env = " + allocEnvironment(env.getSize()) + ";");
+    for (int i = 0; i < node.getPars().size(); ++i) {
+      int envI = i;
+      this.putLine(sessionPointer("tmp_env", envI, env.getName(envI)) + " = " + sessionPointer(node.getPars().get(i)) + ";");
+    }
+    for (int i = 0; i < node.getGPars().size(); ++i) {
+      int envI = i + node.getPars().size();
+      this.putLine(sessionPointer("tmp_env", envI, env.getName(envI)) + " = " + sessionPointer(node.getGPars().get(i)) + ";");
+    }
+
+    // Then we switch to that environment and jump to the process code.
+    this.putLine("env = tmp_env;");
+    this.putLine("goto proc_" + node.getId() + ";");
+
+    this.popWrappingComment();
   }
 
   @Override

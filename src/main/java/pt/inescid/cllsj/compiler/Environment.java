@@ -15,6 +15,7 @@ import pt.inescid.cllsj.ast.nodes.ASTCut;
 import pt.inescid.cllsj.ast.nodes.ASTEmpty;
 import pt.inescid.cllsj.ast.nodes.ASTExpr;
 import pt.inescid.cllsj.ast.nodes.ASTFwd;
+import pt.inescid.cllsj.ast.nodes.ASTId;
 import pt.inescid.cllsj.ast.nodes.ASTMix;
 import pt.inescid.cllsj.ast.nodes.ASTNode;
 import pt.inescid.cllsj.ast.nodes.ASTRecv;
@@ -57,6 +58,13 @@ public class Environment {
 
   public int getIndex(String session) {
     return indices.get(session);
+  }
+
+  public String getName(int index) {
+    for (Map.Entry<String, Integer> entry : indices.entrySet()) {
+      if (entry.getValue() == index) return entry.getKey();
+    }
+    return null;
   }
 
   public boolean getPolarity(String session) {
@@ -157,6 +165,9 @@ public class Environment {
 
     @Override
     public void visit(ASTFwd node) {}
+
+    @Override
+    public void visit(ASTId node) {}
 
     @Override
     public void visit(ASTMix node) {
