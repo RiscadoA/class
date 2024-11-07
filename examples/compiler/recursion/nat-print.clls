@@ -19,7 +19,7 @@ proc rec printNat(n:~Nat) {
 
 proc main() {
     cut {
-        #S n; #Z n; close n
+        #S n; #S n; zero(n)
         |n:~Nat|
         printNat(n)
     }

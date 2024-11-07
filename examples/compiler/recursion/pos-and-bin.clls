@@ -1,0 +1,92 @@
+type rec Pos {
+    choice of {
+        |#O: close
+        |#S: Pos
+    }
+};;
+
+type rec Bin {
+    choice of {
+        |#O: close
+        |#D0: Bin
+        |#D1: Bin
+    }
+};;
+
+proc rec duplBin(n:~Bin, m:Bin, o:Bin) {
+    case n of {
+        |#O: wait n; #O m; #O o; par { close m || close o }
+        |#D0: #D0 m; #D0 o; duplBin(n, m, o)
+        |#D1: #D1 m; #D1 o; duplBin(n, m, o)
+    }
+};;
+
+proc rec printPos(n:~Pos) {
+    case n of {
+        |#O: println("O"); wait n; ()
+        |#S: print("S "); printPos(n)
+    }
+};;
+
+proc rec printBin(n:~Bin) {
+    case n of {
+        |#O: println("1"); wait n; ()
+        |#D0: print("0 "); printBin(n)
+        |#D1: print("1 "); printBin(n)
+    }
+};;
+
+proc rec incBin(n:~Bin, m:Bin) {
+    case n of {
+        |#O: wait n; #D0 m; #O m; close m
+        |#D0: #D1 m; fwd n m
+        |#D1: #D0 m; incBin(n, m)
+    }
+};;
+
+proc rec doublePos(n:~Pos, m:Pos) {
+    case n of {
+        |#O: wait n; #S m; #O m; close m
+        |#S: #S m; #S m; doublePos(n, m)
+    }
+};;
+
+proc rec Bin2Pos(n:~Bin, m:Pos) {
+    case n of {
+        |#O: wait n; #O m; close m
+        |#D0:
+            cut {
+                Bin2Pos(n, x)
+                |x:~Pos|
+                doublePos(x, m)
+            }
+        |#D1:
+            cut {
+                Bin2Pos(n, x)
+                |x:~Pos|
+                doublePos(x, y)
+                |y:~Pos|
+                #S m; fwd y m
+            }
+    }
+};;
+
+proc main() {
+    cut {
+        #D1 n; #D0 n; #O n; close n // 101
+        |n:~Bin|
+        incBin(n, m) // 110
+        |m:~Bin|
+        cut {
+            duplBin(m, t, u)
+            |t:~Bin|
+            println("Little endian binary:");
+            printBin(t)
+        }
+        |u:~Bin|
+        Bin2Pos(u, v)
+        |v:~Pos|
+        println("Unary:");
+        printPos(v)
+    }
+};;
