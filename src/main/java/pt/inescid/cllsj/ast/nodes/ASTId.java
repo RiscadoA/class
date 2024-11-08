@@ -66,6 +66,10 @@ public class ASTId extends ASTNode {
     return gpars;
   }
 
+  public List<ASTType> getTPars() {
+    return tpars;
+  }
+
   public String getId() {
     return id;
   }

@@ -37,6 +37,7 @@ public class Environment {
   private Map<String, Integer> indices = new HashMap<>();
   private Map<String, Polarity> polarity = new HashMap<>();
   private Map<String, String> sessionCSize = new HashMap<>();
+  private Map<String, Integer> typeVarIndices = new HashMap<>();
   private Env<EnvEntry> ep;
 
   public Environment(Env<EnvEntry> ep) {
@@ -80,8 +81,23 @@ public class Environment {
     return polarity.get(session);
   }
 
-  public String getSessionCSize(String session) {
-    return sessionCSize.get(session);
+  public String getSessionCSize(String env, String session) {
+    return sessionCSize
+        .get(session)
+        .replace("$ENV$", env)
+        .replace("$SIZE$", Integer.toString(this.getSize()));
+  }
+
+  public Integer getTypeVarCount() {
+    return typeVarIndices.size();
+  }
+
+  public Map<String, Integer> getTypeVarIndices() {
+    return typeVarIndices;
+  }
+
+  public Integer getTypeVarIndex(String typeVar) {
+    return typeVarIndices.get(typeVar);
   }
 
   public void setPolarity(String session, Polarity polarity) {
@@ -104,13 +120,23 @@ public class Environment {
             + session
             + " already exists in the environment, generator assumes shadowing is not possible";
     this.indices.put(session, indices.size());
-    this.polarity.put(session, true);
-    try {
-      this.sessionCSize.put(session, SizeCalculator.calculate(cType.unfoldType(ep)));
-    } catch (Exception e) {
-      e.printStackTrace();
-      System.exit(1);
+    this.polarity.put(session, Polarity.UNKNOWN);
+
+    Map<String, String> typeVarSizes = new HashMap<>();
+    for (Map.Entry<String, Integer> entry : typeVarIndices.entrySet()) {
+      typeVarSizes.put(
+          entry.getKey(), "ENV_TYPE_VAR($ENV$, $SIZE$, " + entry.getValue() + ").size");
     }
+
+    this.sessionCSize.put(session, SizeCalculator.calculate(ep, cType, typeVarSizes));
+  }
+
+  public void insertTypeVar(String typeVar) {
+    assert !this.typeVarIndices.containsKey(typeVar)
+        : "Type variable "
+            + typeVar
+            + " already exists in the environment, generator assumes shadowing is not possible";
+    this.typeVarIndices.put(typeVar, typeVarIndices.size());
   }
 
   public void insertFromNode(ASTNode node) {

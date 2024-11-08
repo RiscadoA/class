@@ -35,15 +35,19 @@ public class SessionRenamer extends ASTNodeVisitor {
     node.accept(new SessionRenamer());
   }
 
+  private String sanitize(String session) {
+    return session.replace("$", "gen");
+  }
+
   private String introduce(String session) {
     Integer occurences = this.occurrences.compute(session, (k, v) -> v == null ? 1 : v + 1);
-    return session + "_" + occurences;
+    return sanitize(session) + "_" + occurences;
   }
 
   private String rename(String session) {
     Integer occurences = this.occurrences.get(session);
     assert occurences != null : "Session " + session + " was not introduced";
-    return session + "_" + occurences;
+    return sanitize(session) + "_" + occurences;
   }
 
   @Override

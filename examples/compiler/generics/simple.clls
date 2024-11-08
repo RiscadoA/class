@@ -1,0 +1,13 @@
+proc forward<X>(x:~X, y:X){
+    fwd x y
+};;
+
+proc main() {
+    cut {
+        wait x; ()
+        |x:close|
+        forward<wait>(x, y)
+        |y:close|
+        close y
+    }
+};;

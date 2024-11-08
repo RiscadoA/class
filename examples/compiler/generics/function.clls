@@ -1,0 +1,47 @@
+type rec Nat {
+    choice of {
+        |#Z: close
+        |#S: Nat
+    }
+};;
+
+type Function(A, B) {
+  recv ~A; B
+};;
+
+proc apply<A, B>(f:~Function(A, B), x:~A, y:B) {
+   send f(x); fwd f y
+};;
+
+proc rec doubleNat(x:~Nat, y:Nat) {
+    case x of {
+        |#Z: wait x; #Z y; close y
+        |#S: #S y; #S y; doubleNat(x, y)
+    }
+};;
+
+proc rec printNat(n:~Nat) {
+    case n of {
+        |#Z: println("Z"); wait n; ()
+        |#S: print("S "); printNat(n)
+    }
+};;
+
+proc mkDoubleNat(f:Function(Nat, Nat)) {
+    recv f(n);
+    doubleNat(n, f)
+};;
+
+proc main() {
+    cut {
+        #S n; #Z n; close n
+        |n:~Nat|
+        cut {
+            mkDoubleNat(f)
+            |f:~Function(Nat, Nat)|
+            apply<Nat, Nat>(f, n, m)
+        }
+        |m:~Nat|
+        printNat(m)
+    }
+};;

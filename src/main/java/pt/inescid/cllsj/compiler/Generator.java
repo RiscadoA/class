@@ -7,6 +7,7 @@ import java.util.Set;
 import java.util.Stack;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
+import pt.inescid.cllsj.TypeEntry;
 import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.nodes.ASTBang;
 import pt.inescid.cllsj.ast.nodes.ASTCall;
@@ -29,6 +30,7 @@ import pt.inescid.cllsj.ast.nodes.ASTString;
 import pt.inescid.cllsj.ast.nodes.ASTUnfold;
 import pt.inescid.cllsj.ast.nodes.ASTWhy;
 import pt.inescid.cllsj.ast.types.ASTIdT;
+import pt.inescid.cllsj.ast.types.ASTType;
 import pt.inescid.cllsj.compiler.Environment.Polarity;
 
 public class Generator extends ASTNodeVisitor {
@@ -60,6 +62,13 @@ public class Generator extends ASTNodeVisitor {
     generator.indentLevel--;
     generator.putLine("};");
     generator.putLine("");
+    generator.putLine("struct type_var {");
+    generator.indentLevel++;
+    generator.putLine("int size;");
+    generator.putLine("unsigned char polarity;");
+    generator.indentLevel--;
+    generator.putLine("};");
+    generator.putLine("");
     generator.putLine("struct task {");
     generator.indentLevel++;
     generator.putLine("void* cont;");
@@ -71,9 +80,13 @@ public class Generator extends ASTNodeVisitor {
     generator.putLine("struct environment {");
     generator.indentLevel++;
     generator.putLine("struct environment* parent;");
-    generator.putLine("struct record* records[];");
     generator.indentLevel--;
     generator.putLine("};");
+    generator.putLine("");
+    generator.putLine(
+        "#define ENV_RECORD(env, i) (*(struct record**)(((unsigned char*)env) + sizeof(struct environment) + sizeof(struct record*) * i))");
+    generator.putLine(
+        "#define ENV_TYPE_VAR(env, r, i) (*(struct type_var*)(((unsigned char*)env) + sizeof(struct environment) + sizeof(struct record*) * r + sizeof(struct type_var) * i))");
     generator.putLine("");
     generator.putLine("int main() {");
     generator.indentLevel++;
@@ -98,8 +111,16 @@ public class Generator extends ASTNodeVisitor {
         throw new RuntimeException("Entry process \"" + entryProcess + "\" cannot have arguments");
       }
 
+      Env<EnvEntry> procEp = ep;
+      for (String arg : procDef.getTArgs()) {
+        procEp = procEp.assoc(arg, new TypeEntry(new ASTIdT(arg)));
+      }
+
       // Setup process environment
-      Environment env = new Environment(ep);
+      Environment env = new Environment(procEp);
+      for (String arg : procDef.getTArgs()) {
+        env.insertTypeVar(arg);
+      }
       for (int i = 0; i < procDef.getArgs().size(); i++) {
         env.insert(procDef.getArgs().get(i), procDef.getArgTypes().get(i));
       }
@@ -120,12 +141,11 @@ public class Generator extends ASTNodeVisitor {
       throw new RuntimeException("Entry process process \"" + entryProcess + "\" found");
     }
 
+    Environment env = generator.procDefEnvs.get(entryProcess);
     generator.putLine("");
     generator.putLabel("run");
     generator.putLine(
-        "env = "
-            + generator.allocEnvironment(generator.procDefEnvs.get(entryProcess).getSize())
-            + ";");
+        "env = " + generator.allocEnvironment(env.getSize(), env.getTypeVarCount()) + ";");
     generator.putLine("goto proc_" + entryProcess + ";");
     generator.putLabel("end");
     generator.putLine("return 0;");
@@ -180,14 +200,18 @@ public class Generator extends ASTNodeVisitor {
     this.pushWrappingComment("call(" + node.getChr() + ", " + node.getChi() + "):" + node.lineno);
     this.putTrace("call(" + node.getChr() + ", " + node.getChi() + "):" + node.lineno);
 
+    // TODO: handle type variables in bangs and calls
+
     // The bang node has previously sent an environment size and a continuation to the session
     // queue. We first allocate a new environment with that size.
-    this.putLine("tmp_env = " + allocEnvironment(peekBangEnvironmentSize(node.getChr())) + ";");
+    this.putLine(
+        "tmp_env = " + allocEnvironment(peekBangEnvironmentSize(node.getChr()), "0") + ";");
     this.putLine("tmp_env->parent = " + peekBangEnvironmentParent(node.getChr()) + ";");
 
     // Then, we initialize the session with the new environment and continuation.
     String chiPtr = this.sessionPointer("tmp_env", 0, node.getChi());
-    this.initSession(chiPtr, SizeCalculator.calculate(node.getType()));
+    this.initSession(
+        chiPtr, SizeCalculator.calculate(new Env<>(), node.getType(), new HashMap<>()));
     this.putLine(sessionEnv(chiPtr) + " = tmp_env;");
     this.putLine(sessionCont(chiPtr) + " = " + peekBangContinuation(node.getChr()) + ";");
     this.putLine(sessionIndex(chiPtr) + " = 0;");
@@ -264,7 +288,7 @@ public class Generator extends ASTNodeVisitor {
     // Initialize the cut session, with initial continuation pointing to the right hand side.
     String cutRhs = this.makeLabel("cut_" + node.getCh());
     String chPtr = this.sessionPointer(node.getCh());
-    this.initSession(chPtr, environment().getSessionCSize(node.getCh()));
+    this.initSession(chPtr, environment().getSessionCSize("env", node.getCh()));
     this.putLine(sessionCont(chPtr) + " = &&" + cutRhs + ";");
     this.putLine(sessionEnv(chPtr) + " = env;");
     this.putLine(sessionIndex(chPtr) + " = " + environment().getIndex(node.getCh()) + ";");
@@ -308,24 +332,11 @@ public class Generator extends ASTNodeVisitor {
     this.popWrappingComment();
   }
 
-  @Override
-  public void visit(ASTFwd node) {
-    this.pushWrappingComment("fwd(" + node.getCh1() + ", " + node.getCh2() + "):" + node.lineno);
-
-    // Check which of the channels is positive.
-    String negative, positive;
-    if (node.getCh2Type().isPosCatch(environment().getEp())) {
-      positive = node.getCh2();
-      negative = node.getCh1();
-    } else {
-      positive = node.getCh1();
-      negative = node.getCh2();
-    }
-
+  private void fwdUtil(ASTFwd node, String positive, String negative) {
     String negativePtr = this.sessionPointer(negative);
     String positivePtr = this.sessionPointer(positive);
 
-    this.branchOnPolarity(
+    this.branchOnSessionPolarity(
         negative,
         () -> {
           // We've previously written to the negative channel.
@@ -337,7 +348,7 @@ public class Generator extends ASTNodeVisitor {
           this.putLine("tmp_env = " + sessionEnv(negativePtr) + ";");
           this.putLine("tmp_cont = " + sessionCont(negativePtr) + ";");
 
-          this.branchOnPolarity(
+          this.branchOnSessionPolarity(
               positive,
               () -> {
                 this.putTrace("fwd(W " + negative + ", W " + positive + "):" + node.lineno);
@@ -399,7 +410,7 @@ public class Generator extends ASTNodeVisitor {
           this.putLine("tmp_env = " + sessionEnv(positivePtr) + ";");
           this.putLine("tmp_cont = " + sessionCont(positivePtr) + ";");
 
-          this.branchOnPolarity(
+          this.branchOnSessionPolarity(
               positive,
               () -> {
                 this.putTrace("fwd(R " + negative + ", W " + positive + "):" + node.lineno);
@@ -464,6 +475,20 @@ public class Generator extends ASTNodeVisitor {
 
     this.putLine("env = tmp_env;");
     this.putLine("goto *tmp_cont;");
+  }
+
+  @Override
+  public void visit(ASTFwd node) {
+    this.pushWrappingComment("fwd(" + node.getCh1() + ", " + node.getCh2() + "):" + node.lineno);
+
+    this.branchOnTypePolarity(
+        node.getCh2Type(),
+        () -> {
+          fwdUtil(node, node.getCh2(), node.getCh1());
+        },
+        () -> {
+          fwdUtil(node, node.getCh1(), node.getCh2());
+        });
 
     this.popWrappingComment();
   }
@@ -475,7 +500,37 @@ public class Generator extends ASTNodeVisitor {
 
     // We first initialize a new environment for the process.
     Environment env = this.procDefEnvs.get(node.getId());
-    this.putLine("tmp_env = " + allocEnvironment(env.getSize()) + ";");
+    this.putLine("tmp_env = " + allocEnvironment(env.getSize(), env.getTypeVarCount()) + ";");
+
+    // Add the sizes of the type variables to the environment.
+    Map<String, String> typeVarSizes = new HashMap<>();
+    for (Map.Entry<String, Integer> typeVar : environment().getTypeVarIndices().entrySet()) {
+      typeVarSizes.put(
+          typeVar.getKey(),
+          "ENV_TYPE_VAR(env, " + environment().getSize() + ", " + typeVar.getValue() + ").size");
+    }
+    for (int i = 0; i < node.getTPars().size(); ++i) {
+      ASTType type = node.getTPars().get(i);
+      this.beginLine("ENV_TYPE_VAR(tmp_env, " + env.getSize() + ", " + i + ").size = ");
+      this.endLine(SizeCalculator.calculate(environment().getEp(), type, typeVarSizes) + ";");
+      this.beginLine("ENV_TYPE_VAR(tmp_env, " + env.getSize() + ", " + i + ").polarity = ");
+
+      if (type instanceof ASTIdT && typeVarSizes.containsKey(((ASTIdT) type).getid())) {
+        String id = ((ASTIdT) type).getid();
+        this.endLine(
+            "ENV_TYPE_VAR(env, "
+                + environment().getSize()
+                + ", "
+                + environment().getTypeVarIndex(id)
+                + " /*" + id + "*/).polarity;");
+      } else if (type.isPosCatch(environment().getEp())) {
+        this.endLine("1;");
+      } else {
+        this.endLine("0;");
+      }
+    }
+
+    // Add the linear arguments to the environment.
     for (int i = 0; i < node.getPars().size(); ++i) {
       int envI = i;
       String ptr = sessionPointer(node.getPars().get(i));
@@ -492,6 +547,8 @@ public class Generator extends ASTNodeVisitor {
           break;
       }
     }
+
+    // Add the exponential arguments to the environment.
     for (int i = 0; i < node.getGPars().size(); ++i) {
       int envI = i + node.getPars().size();
       this.putLine(
@@ -589,7 +646,7 @@ public class Generator extends ASTNodeVisitor {
 
     // We initialize a new session record.
     String choPtr = this.sessionPointer(node.getCho());
-    this.initSession(choPtr, environment().getSessionCSize(node.getCho()));
+    this.initSession(choPtr, environment().getSessionCSize("env", node.getCho()));
     this.putLine(sessionCont(choPtr) + " = &&" + sendLhs + ";");
     this.putLine(sessionEnv(choPtr) + " = env;");
     this.putLine(sessionIndex(choPtr) + " = " + environment().getIndex(node.getCho()) + ";");
@@ -665,7 +722,7 @@ public class Generator extends ASTNodeVisitor {
     String ch = node.getSubjectCh();
     if (ch != null) {
       if (!node.isPos()) {
-        this.branchOnPolarity(
+        this.branchOnSessionPolarity(
             ch,
             () -> {
               // If we were writing to the session, then if we going to read now, we must pass
@@ -797,12 +854,16 @@ public class Generator extends ASTNodeVisitor {
     this.popWrappingComment();
   }
 
-  private String allocEnvironment(int envSize) {
-    return this.allocEnvironment(Integer.toString(envSize));
+  private String allocEnvironment(int recordCount, int typeVarCount) {
+    return this.allocEnvironment(Integer.toString(recordCount), Integer.toString(typeVarCount));
   }
 
-  private String allocEnvironment(String envSize) {
-    return "malloc(sizeof(struct environment) + sizeof(struct record*) * (" + envSize + "));";
+  private String allocEnvironment(String envSize, String typeVarCount) {
+    return "malloc(sizeof(struct environment) + sizeof(struct record*) * ("
+        + envSize
+        + ") + sizeof(struct type_var) * ("
+        + typeVarCount
+        + "))";
   }
 
   private void initSession(String ptr, String size) {
@@ -825,7 +886,7 @@ public class Generator extends ASTNodeVisitor {
   }
 
   private String sessionPointer(String env, int ch, String chName) {
-    return env + "->records[" + ch + " /*" + chName + "*/]";
+    return "ENV_RECORD(" + env + ", " + ch + " /*" + chName + "*/)";
   }
 
   private String sessionCont(String ptr) {
@@ -852,7 +913,33 @@ public class Generator extends ASTNodeVisitor {
     return ptr + "->polarity";
   }
 
-  private void branchOnPolarity(String ch, Runnable onWrite, Runnable onRead) {
+  private void branchOnTypePolarity(ASTType type, Runnable onWrite, Runnable onRead) {
+    if (type instanceof ASTIdT) {
+      // We need to do it at runtime, as we don't know the type of the variable at compile time.
+      this.putLine(
+          "if ("
+              + "ENV_TYPE_VAR(env, "
+              + environment().getSize()
+              + ", "
+              + environment().getTypeVarIndex(((ASTIdT) type).getid())
+              + ").polarity"
+              + ") {");
+      this.indentLevel += 1;
+      onWrite.run();
+      this.indentLevel -= 1;
+      this.putLine("} else {");
+      this.indentLevel += 1;
+      onRead.run();
+      this.indentLevel -= 1;
+      this.putLine("}");
+    } else if (type.isPosCatch(environment().getEp())) {
+      onWrite.run();
+    } else {
+      onRead.run();
+    }
+  }
+
+  private void branchOnSessionPolarity(String ch, Runnable onWrite, Runnable onRead) {
     switch (this.environment().getPolarity(ch)) {
       case UNKNOWN:
         this.putLine("if (" + sessionPolarity(sessionPointer(ch)) + ") {");

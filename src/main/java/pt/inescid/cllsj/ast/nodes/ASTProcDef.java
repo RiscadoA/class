@@ -54,6 +54,10 @@ public class ASTProcDef extends ASTNode {
     return id;
   }
 
+  public List<String> getTArgs() {
+    return targs;
+  }
+
   public List<String> getArgs() {
     return args;
   }
