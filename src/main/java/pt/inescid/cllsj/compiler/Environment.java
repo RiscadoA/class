@@ -27,9 +27,15 @@ import pt.inescid.cllsj.ast.nodes.ASTWhy;
 import pt.inescid.cllsj.ast.types.ASTType;
 
 public class Environment {
+  public enum Polarity {
+    UNKNOWN,
+    WRITE,
+    READ
+  }
+
   private Environment parent;
   private Map<String, Integer> indices = new HashMap<>();
-  private Map<String, Boolean> polarity = new HashMap<>();
+  private Map<String, Polarity> polarity = new HashMap<>();
   private Map<String, String> sessionCSize = new HashMap<>();
   private Env<EnvEntry> ep;
 
@@ -69,7 +75,7 @@ public class Environment {
     return null;
   }
 
-  public boolean getPolarity(String session) {
+  public Polarity getPolarity(String session) {
     if (!polarity.containsKey(session) && parent != null) return parent.getPolarity(session);
     return polarity.get(session);
   }
@@ -78,7 +84,7 @@ public class Environment {
     return sessionCSize.get(session);
   }
 
-  public void setPolarity(String session, boolean polarity) {
+  public void setPolarity(String session, Polarity polarity) {
     this.polarity.put(session, polarity);
   }
 
@@ -87,7 +93,7 @@ public class Environment {
     env.indices = this.indices;
     env.polarity =
         this.polarity.entrySet().stream()
-            .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue().booleanValue()));
+            .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue()));
     env.sessionCSize = this.sessionCSize;
     return env;
   }

@@ -1,6 +1,5 @@
 package pt.inescid.cllsj.compiler;
 
-import java.util.HashMap;
 import java.util.Map;
 import pt.inescid.cllsj.ast.ASTTypeVisitor;
 import pt.inescid.cllsj.ast.types.ASTBangT;
@@ -20,10 +19,6 @@ import pt.inescid.cllsj.ast.types.ASTWhyT;
 public class SizeCalculator extends ASTTypeVisitor {
   private String size = "";
   private Map<String, String> vars;
-
-  public static String calculate(ASTType type) {
-    return calculate(type, new HashMap<>());
-  }
 
   public static String calculate(ASTType type, Map<String, String> vars) {
     SizeCalculator calculator = new SizeCalculator(vars);
