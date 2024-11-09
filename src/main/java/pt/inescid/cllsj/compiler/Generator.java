@@ -200,8 +200,6 @@ public class Generator extends ASTNodeVisitor {
     this.pushWrappingComment("call(" + node.getChr() + ", " + node.getChi() + "):" + node.lineno);
     this.putTrace("call(" + node.getChr() + ", " + node.getChi() + "):" + node.lineno);
 
-    // TODO: handle type variables in bangs and calls
-
     // The bang node has previously sent an environment size and a continuation to the session
     // queue. We first allocate a new environment with that size.
     this.putLine(
@@ -504,10 +502,13 @@ public class Generator extends ASTNodeVisitor {
 
     // Add the sizes of the type variables to the environment.
     Map<String, String> typeVarSizes = new HashMap<>();
-    for (Map.Entry<String, Integer> typeVar : environment().getTypeVarIndices().entrySet()) {
-      typeVarSizes.put(
-          typeVar.getKey(),
-          "ENV_TYPE_VAR(env, " + environment().getSize() + ", " + typeVar.getValue() + ").size");
+    Environment parent = environment();
+    while (parent != null) {
+      for (Map.Entry<String, Integer> var : environment().getTypeVarIndices().entrySet()) {
+        if (!typeVarSizes.containsKey(var.getKey())) {
+          typeVarSizes.put(var.getKey(), typeVar(var.getKey()) + ".size");
+        }
+      }
     }
     for (int i = 0; i < node.getTPars().size(); ++i) {
       ASTType type = node.getTPars().get(i);
@@ -517,12 +518,7 @@ public class Generator extends ASTNodeVisitor {
 
       if (type instanceof ASTIdT && typeVarSizes.containsKey(((ASTIdT) type).getid())) {
         String id = ((ASTIdT) type).getid();
-        this.endLine(
-            "ENV_TYPE_VAR(env, "
-                + environment().getSize()
-                + ", "
-                + environment().getTypeVarIndex(id)
-                + " /*" + id + "*/).polarity;");
+        this.endLine(typeVar(id) + ".polarity;");
       } else if (type.isPosCatch(environment().getEp())) {
         this.endLine("1;");
       } else {
@@ -913,17 +909,30 @@ public class Generator extends ASTNodeVisitor {
     return ptr + "->polarity";
   }
 
+  private String typeVar(String name) {
+    Environment env = environment();
+    String envRef = "env";
+
+    while (!env.getTypeVarIndices().containsKey(name)) {
+      envRef += "->parent";
+      env = env.getParent();
+    }
+
+    return "ENV_TYPE_VAR("
+        + envRef
+        + ", "
+        + env.getSize()
+        + ", "
+        + env.getTypeVarIndex(name)
+        + " /*"
+        + name
+        + "*/)";
+  }
+
   private void branchOnTypePolarity(ASTType type, Runnable onWrite, Runnable onRead) {
     if (type instanceof ASTIdT) {
       // We need to do it at runtime, as we don't know the type of the variable at compile time.
-      this.putLine(
-          "if ("
-              + "ENV_TYPE_VAR(env, "
-              + environment().getSize()
-              + ", "
-              + environment().getTypeVarIndex(((ASTIdT) type).getid())
-              + ").polarity"
-              + ") {");
+      this.putLine("if (" + typeVar(((ASTIdT) type).getid()) + ".polarity) {");
       this.indentLevel += 1;
       onWrite.run();
       this.indentLevel -= 1;

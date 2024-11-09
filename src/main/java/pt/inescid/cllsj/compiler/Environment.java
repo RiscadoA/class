@@ -123,9 +123,21 @@ public class Environment {
     this.polarity.put(session, Polarity.UNKNOWN);
 
     Map<String, String> typeVarSizes = new HashMap<>();
-    for (Map.Entry<String, Integer> entry : typeVarIndices.entrySet()) {
-      typeVarSizes.put(
-          entry.getKey(), "ENV_TYPE_VAR($ENV$, $SIZE$, " + entry.getValue() + ").size");
+    String envRef = "$ENV$";
+    String size = "$SIZE$";
+    Environment env = this;
+    while (env != null) {
+      for (Map.Entry<String, Integer> entry : env.typeVarIndices.entrySet()) {
+        if (!typeVarSizes.containsKey(entry.getKey())) {
+          typeVarSizes.put(
+              entry.getKey(),
+              "ENV_TYPE_VAR(" + envRef + ", " + size + ", " + entry.getValue() + ").size");
+        }
+      }
+
+      envRef = envRef + "->parent";
+      env = env.parent;
+      if (env != null) size = Integer.toString(env.getSize());
     }
 
     this.sessionCSize.put(session, SizeCalculator.calculate(ep, cType, typeVarSizes));

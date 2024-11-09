@@ -1,0 +1,25 @@
+proc foo<A>(f: ?recv ~A;close, g: !A) {
+    ?f;
+    !g(x:A);
+    call f(fl);
+    recv fl(y);
+    par { close fl || fwd x y }
+};;
+
+proc main() {
+    cut {
+        cut {
+            !f(fl);
+            send fl(x. wait x; ());
+            wait fl;
+            ()
+            |f: ?recv ~wait;close|
+            foo<wait>(f, a)
+        }
+        |a: ?close|
+        ?a;
+        call a(x);
+        call a(y);
+        par { close x || close y }
+    }
+};;

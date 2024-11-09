@@ -46,7 +46,9 @@ public class SessionRenamer extends ASTNodeVisitor {
 
   private String rename(String session) {
     Integer occurences = this.occurrences.get(session);
-    assert occurences != null : "Session " + session + " was not introduced";
+    if (occurences == null) {
+      throw new IllegalStateException("Session " + session + " was not introduced");
+    }
     return sanitize(session) + "_" + occurences;
   }
 
