@@ -616,6 +616,10 @@ public class Generator extends ASTNodeVisitor {
 
     // We simply pop the record from the queue and store it in the environment.
     this.putLine(this.sessionPointer(node.getChi()) + " = " + this.popRecord(node.getChr()) + ";");
+    this.environment()
+        .setPolarity(
+            node.getChi(),
+            Polarity.WRITE); // If we're going to read it, we must jump to the other side first.
     this.generateContinuation(node.getRhs());
 
     this.popWrappingComment();
