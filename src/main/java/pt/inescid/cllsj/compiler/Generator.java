@@ -509,6 +509,7 @@ public class Generator extends ASTNodeVisitor {
           typeVarSizes.put(var.getKey(), typeVar(var.getKey()) + ".size");
         }
       }
+      parent = parent.getParent();
     }
     for (int i = 0; i < node.getTPars().size(); ++i) {
       ASTType type = node.getTPars().get(i);
