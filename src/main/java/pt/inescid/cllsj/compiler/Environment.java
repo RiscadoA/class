@@ -111,6 +111,7 @@ public class Environment {
         this.polarity.entrySet().stream()
             .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue()));
     env.sessionCSize = this.sessionCSize;
+    env.typeVarIndices = this.typeVarIndices;
     return env;
   }
 
