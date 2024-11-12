@@ -340,8 +340,7 @@ public class Generator extends ASTNodeVisitor {
           // We've previously written to the negative channel.
           // Thus, the negative channel may have data on its buffer that it still hasn't read.
           // We pass control to the negative channel, so that it can read that data that is already
-          // in
-          // the buffer.
+          // in the buffer.
 
           this.putLine("tmp_env = " + sessionEnv(negativePtr) + ";");
           this.putLine("tmp_cont = " + sessionCont(negativePtr) + ";");
@@ -356,10 +355,8 @@ public class Generator extends ASTNodeVisitor {
                 // read.
                 //
                 // In this case, we should append what we've already written in the positive channel
-                // to
-                // the negative channel's buffer - basically pretending that it was written by the
-                // negative
-                // channel.
+                // to the negative channel's buffer - basically pretending that it was written by the
+                // negative channel.
 
                 this.beginLine("memcpy(" + sessionWrite(negativePtr) + ", ");
                 this.continueLine(sessionRead(positivePtr) + ", ");
@@ -373,19 +370,17 @@ public class Generator extends ASTNodeVisitor {
 
                 // We've previously read from the positive channel.
                 // Thus, since we're now writing to it, we must have already read all the data sent
-                // by it.
-                // So, we can ignore the contents of the positive channel's buffer, and do nothing.
+                // by it. So, we can ignore the contents of the positive channel's buffer, and do nothing.
               });
 
           // We need to set the continuation of the negative channel to the continuation of the
-          // positive
-          // channel.
+          // positive channel.
           this.putLine(sessionEnv(negativePtr) + " = " + sessionEnv(positivePtr) + ";");
           this.putLine(sessionCont(negativePtr) + " = " + sessionCont(positivePtr) + ";");
+          this.putLine(sessionIndex(negativePtr) + " = " + sessionIndex(positivePtr) + ";");
 
           // We make the positive channel bindings point to the negative channel, and terminate the
-          // old
-          // positive channel.
+          // old positive channel.
           this.putLine("tmp_session = " + positivePtr + ";");
           this.putLine(
               "ENV_RECORD("
@@ -432,6 +427,7 @@ public class Generator extends ASTNodeVisitor {
                 // negative channel.
                 this.putLine(sessionEnv(positivePtr) + " = " + sessionEnv(negativePtr) + ";");
                 this.putLine(sessionCont(positivePtr) + " = " + sessionCont(negativePtr) + ";");
+                this.putLine(sessionIndex(positivePtr) + " = " + sessionIndex(negativePtr) + ";");
 
                 // We make the negative channel bindings point to the positive channel, and
                 // terminate the
@@ -452,12 +448,10 @@ public class Generator extends ASTNodeVisitor {
 
                 // We've previously read from the positive channel.
                 // Thus, since we're now writing to it, we must have already read all the data sent
-                // by it.
-                // So, we can ignore the contents of the positive channel's buffer.
+                // by it. So, we can ignore the contents of the positive channel's buffer.
 
                 // We make the positive channel bindings point to the negative channel, and
-                // terminate the
-                // old positive channel.
+                // terminate the old positive channel.
                 this.putLine("tmp_session = " + positivePtr + ";");
                 this.putLine(
                     "ENV_RECORD("
