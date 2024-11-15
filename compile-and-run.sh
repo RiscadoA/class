@@ -16,7 +16,7 @@ while getopts ":dtp:" opt; do
         t)
             CLLSflags="$CLLSflags -t"
             ;;
-        \?)
+       \?)
             echo "Invalid option: -$OPTARG" >&2
             exit 1
             ;;
@@ -26,6 +26,8 @@ while getopts ":dtp:" opt; do
             ;;
     esac
 done
+
+echo $ofile
 
 shift $((OPTIND-1))
 

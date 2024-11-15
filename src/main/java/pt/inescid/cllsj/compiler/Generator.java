@@ -355,7 +355,8 @@ public class Generator extends ASTNodeVisitor {
                 // read.
                 //
                 // In this case, we should append what we've already written in the positive channel
-                // to the negative channel's buffer - basically pretending that it was written by the
+                // to the negative channel's buffer - basically pretending that it was written by
+                // the
                 // negative channel.
 
                 this.beginLine("memcpy(" + sessionWrite(negativePtr) + ", ");
@@ -370,7 +371,8 @@ public class Generator extends ASTNodeVisitor {
 
                 // We've previously read from the positive channel.
                 // Thus, since we're now writing to it, we must have already read all the data sent
-                // by it. So, we can ignore the contents of the positive channel's buffer, and do nothing.
+                // by it. So, we can ignore the contents of the positive channel's buffer, and do
+                // nothing.
               });
 
           // We need to set the continuation of the negative channel to the continuation of the
