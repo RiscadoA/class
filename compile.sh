@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 CLLSflags=""
-Cflags="-O2"
+Cflags="-O1"
 debug=false
 
 while getopts ":dtp:" opt; do

@@ -1,6 +1,6 @@
 proc main() {
     cut {
-        !a(b:wait); wait b; ()
+        !a(b:wait); wait b; println("x");()
         |a: ?close|
         ?a;
         call a(y:close);
