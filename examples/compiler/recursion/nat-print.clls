@@ -83,7 +83,7 @@ proc main2() {
     }
 };;
 
-proc main() {
+proc main3() {
     cut {
         #S n; #S n; #S n; zero(n)
         |n:~Nat|
@@ -92,5 +92,15 @@ proc main() {
         mul(n,m,r)
         |r:~Nat|
         printNat(r)
+    }
+};;
+
+proc main() {
+    par {
+        println("main1:"); main1()
+        ||
+        println("main2:"); main2()
+        ||
+        println("main3:"); main3()
     }
 };;
