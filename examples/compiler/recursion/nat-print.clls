@@ -17,10 +17,10 @@ proc rec printNat(n:~Nat) {
     }
 };;
 
-proc rec add(n:~Nat,m:~Nat,r:Nat) {
+proc rec add(n:~Nat, m:~Nat, r:Nat) {
     case n of {
         |#Z: wait n; fwd m r
-        |#S: #S r; add(n,m,r)
+        |#S: #S r; add(n, m, r)
 	}
 };;
 
@@ -37,18 +37,18 @@ proc rec drop(n:~Nat) {
 
 proc rec copy(n:~Nat, d:send Nat;Nat) {
     case n of {
-        |#Z: wait n; send d (z.zero(z)); zero(d)
+        |#Z: wait n; send d (z. zero(z)); zero(d)
         |#S: cut {
-		copy(n,d0)
-		| d0: ~send Nat; Nat|
-		recv d0(c0);
-		send d (s.#S s; fwd c0 s);
-		#S d; fwd d0 d
-            }
+            copy(n, d0)
+            |d0: ~send Nat; Nat|
+            recv d0(c0);
+            send d(s. #S s; fwd c0 s);
+            #S d; fwd d0 d
+        }
 	}
 };;
 
-proc unsafe_rec mul(n:~Nat,m:~Nat,r:Nat) {
+proc unsafe_rec mul(n:~Nat, m:~Nat, r:Nat) {
     case n of {
         |#Z: wait n; #Z r; par { drop (m) || close r }
         |#S: cut {
@@ -74,12 +74,12 @@ proc main1() {
 
 proc main2() {
     cut {
-        #S n; #S n;  #S n; #S n; zero(n)
+        #S n; #S n; #S n; #S n; zero(n)
         |n:~Nat|
         copy(n,d0)
         |d0:~send Nat;Nat|
-	recv d0(n0);
-	par { printNat(n0) || printNat(d0) }
+	    recv d0(n0);
+	    par { printNat(n0) || printNat(d0) }
     }
 };;
 
@@ -89,7 +89,7 @@ proc main3() {
         |n:~Nat|
         #S m; #S m; #S m; zero(m)
         |m:~Nat|
-        mul(n,m,r)
+        mul(n, m, r)
         |r:~Nat|
         printNat(r)
     }
