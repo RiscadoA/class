@@ -1,3 +1,4 @@
+
 type rec Nat {
     choice of {
         |#Z: close
