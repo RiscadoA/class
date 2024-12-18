@@ -2,7 +2,6 @@ package pt.inescid.cllsj.compiler;
 
 import java.util.HashMap;
 import java.util.Map;
-import java.util.stream.Collectors;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.ast.ASTNodeVisitor;
@@ -27,15 +26,8 @@ import pt.inescid.cllsj.ast.nodes.ASTWhy;
 import pt.inescid.cllsj.ast.types.ASTType;
 
 public class Environment {
-  public enum Polarity {
-    UNKNOWN,
-    WRITE,
-    READ
-  }
-
   private Environment parent;
   private Map<String, Integer> indices = new HashMap<>();
-  private Map<String, Polarity> polarity = new HashMap<>();
   private Map<String, String> sessionCSize = new HashMap<>();
   private Map<String, Integer> typeVarIndices = new HashMap<>();
   private Env<EnvEntry> ep;
@@ -76,11 +68,6 @@ public class Environment {
     return null;
   }
 
-  public Polarity getPolarity(String session) {
-    if (!polarity.containsKey(session) && parent != null) return parent.getPolarity(session);
-    return polarity.get(session);
-  }
-
   public String getSessionCSize(String env, String session) {
     return sessionCSize
         .get(session)
@@ -100,28 +87,12 @@ public class Environment {
     return typeVarIndices.get(typeVar);
   }
 
-  public void setPolarity(String session, Polarity polarity) {
-    this.polarity.put(session, polarity);
-  }
-
-  public Environment copy() {
-    Environment env = new Environment(ep, parent);
-    env.indices = this.indices;
-    env.polarity =
-        this.polarity.entrySet().stream()
-            .collect(Collectors.toMap(Map.Entry::getKey, e -> e.getValue()));
-    env.sessionCSize = this.sessionCSize;
-    env.typeVarIndices = this.typeVarIndices;
-    return env;
-  }
-
   public void insert(String session, ASTType cType) {
     assert !this.indices.containsKey(session)
         : "Session "
             + session
             + " already exists in the environment, generator assumes shadowing is not possible";
     this.indices.put(session, indices.size());
-    this.polarity.put(session, Polarity.UNKNOWN);
 
     Map<String, String> typeVarSizes = new HashMap<>();
     String envRef = "$ENV$";

@@ -66,6 +66,10 @@ public class ASTRecv extends ASTNode {
     return rhs;
   }
 
+  public ASTType getRhsType() {
+    return tyrhs;
+  }
+
   public void ASTInsertPipe(Function<ASTNode, ASTNode> f, ASTNode from) throws Exception {
     if (from == rhs) {
       ASTNode nnode = f.apply(from);

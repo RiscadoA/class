@@ -31,7 +31,6 @@ import pt.inescid.cllsj.ast.nodes.ASTUnfold;
 import pt.inescid.cllsj.ast.nodes.ASTWhy;
 import pt.inescid.cllsj.ast.types.ASTIdT;
 import pt.inescid.cllsj.ast.types.ASTType;
-import pt.inescid.cllsj.compiler.Environment.Polarity;
 
 public class Generator extends ASTNodeVisitor {
   private String generatedCode = "";
@@ -58,7 +57,6 @@ public class Generator extends ASTNodeVisitor {
     generator.putLine("unsigned char* read;");
     generator.putLine("unsigned char* write;");
     generator.putLine("int index;");
-    generator.putLine("unsigned char polarity;");
     generator.indentLevel--;
     generator.putLine("};");
     generator.putLine("");
@@ -133,7 +131,7 @@ public class Generator extends ASTNodeVisitor {
       generator.environments.push(env);
       generator.putLine("");
       generator.putLabel("proc_" + procDef.getId());
-      generator.generateContinuation(procDef.getRhs());
+      procDef.getRhs().accept(generator);
       generator.environments.pop();
     }
 
@@ -187,8 +185,7 @@ public class Generator extends ASTNodeVisitor {
     this.pushWrappingComment("closure!(" + node.getChi() + "):" + node.lineno);
     this.putLabel(replRhs);
     this.environments.push(env);
-    env.setPolarity(node.getChi(), Polarity.READ); // This won't ever be the first end point.
-    this.generateContinuation(node.getRhs());
+    node.getRhs().accept(this);
     this.environments.pop();
     this.popWrappingComment();
 
@@ -217,8 +214,14 @@ public class Generator extends ASTNodeVisitor {
     // We also set the record pointer of the current environment to point to the new session.
     this.putLine(sessionPointer(node.getChi()) + " = " + chiPtr + ";");
 
+    // If we're reading from the channel, we pass control to the other side first.
+    if (!node.getType().isPosCatch(environment().getEp())) {
+      // If we'll be reading from the channel, we pass control to the other side first.
+      this.flip(node.getChi(), "polarity");
+    }
+
     // Finally, we generate the continuation, as usual.
-    this.generateContinuation(node.getRhs());
+    node.getRhs().accept(this);
 
     this.popWrappingComment();
   }
@@ -236,12 +239,10 @@ public class Generator extends ASTNodeVisitor {
       this.putLine("case " + i + ":");
       this.indentLevel++;
 
-      this.environments.push(this.environment().copy());
       this.pushWrappingComment("case" + label + "(" + node.getCh() + "):" + node.lineno);
       this.putTrace("case" + label + "(" + node.getCh() + "):" + node.lineno);
-      this.generateContinuation(node.getCase(label));
+      node.getCase(label).accept(this);
       this.popWrappingComment();
-      this.environments.pop();
 
       this.indentLevel--;
     }
@@ -273,7 +274,7 @@ public class Generator extends ASTNodeVisitor {
     // continuation.
     this.popClose(node.getCh());
     this.putLine("free(" + this.sessionPointer(node.getCh()) + ");");
-    this.generateContinuation(node.getRhs());
+    node.getRhs().accept(this);
 
     this.popWrappingComment();
   }
@@ -301,16 +302,11 @@ public class Generator extends ASTNodeVisitor {
     }
 
     // The first code to be executed for a given session must be positive.
-    this.environment().setPolarity(node.getCh(), Polarity.WRITE);
-    this.generateContinuation(positive);
+    positive.accept(this);
 
     // The right hand side code will only execute after the left hand side jumps to it.
-    // Thus, we set the initial polarity to negative, so that it initially doesn't flip back when
-    // reading.
-    // It shouldn't flip back as the positive code has already run and written to the channel.
     this.putLabel(cutRhs);
-    this.environment().setPolarity(node.getCh(), Polarity.READ);
-    this.generateContinuation(negative);
+    negative.accept(this);
 
     this.popWrappingComment();
   }
@@ -334,138 +330,44 @@ public class Generator extends ASTNodeVisitor {
     String negativePtr = this.sessionPointer(negative);
     String positivePtr = this.sessionPointer(positive);
 
-    this.branchOnSessionPolarity(
-        negative,
-        () -> {
-          // We've previously written to the negative channel.
-          // Thus, the negative channel may have data on its buffer that it still hasn't read.
-          // We pass control to the negative channel, so that it can read that data that is already
-          // in the buffer.
+    // Since the negative session has a negative type, we must have previously flipped to it, and
+    // are now reading the data it has written.
+    //
+    // Since the positive session has a positive type, we might have already written data to it.
+    //
+    // Thus, we should jump to the positive session's endpoint, and make sure that it first reads
+    // the data we wrote to it, and after that, it reads the data already in the negative session's
+    // buffer.
 
-          this.putLine("tmp_env = " + sessionEnv(negativePtr) + ";");
-          this.putLine("tmp_cont = " + sessionCont(negativePtr) + ";");
+    this.putTrace("fwd(-" + negative + ", +" + positive + "):" + node.lineno);
+    this.putLine("tmp_env = " + sessionEnv(positivePtr) + ";");
+    this.putLine("tmp_cont = " + sessionCont(positivePtr) + ";");
 
-          this.branchOnSessionPolarity(
-              positive,
-              () -> {
-                this.putTrace("fwd(W " + negative + ", W " + positive + "):" + node.lineno);
+    // Append the negative session's buffer to the positive session's buffer.
+    this.beginLine("memcpy(" + sessionWrite(positivePtr) + ", ");
+    this.continueLine(sessionRead(negativePtr) + ", ");
+    this.endLine(sessionWrite(negativePtr) + " - " + sessionRead(negativePtr) + ");");
+    this.beginLine(sessionWrite(positivePtr) + " += ");
+    this.endLine(sessionWrite(negativePtr) + " - " + sessionRead(negativePtr) + ";");
 
-                // We've previously written to the positive channel.
-                // Thus, the positive channel might have data on its buffer that it still hasn't
-                // read.
-                //
-                // In this case, we should append what we've already written in the positive channel
-                // to the negative channel's buffer - basically pretending that it was written by
-                // the
-                // negative channel.
+    // Set the continuation of the positive channel to the continuation of the negative channel.
+    this.putLine(sessionEnv(positivePtr) + " = " + sessionEnv(negativePtr) + ";");
+    this.putLine(sessionCont(positivePtr) + " = " + sessionCont(negativePtr) + ";");
+    this.putLine(sessionIndex(positivePtr) + " = " + sessionIndex(negativePtr) + ";");
 
-                this.beginLine("memcpy(" + sessionWrite(negativePtr) + ", ");
-                this.continueLine(sessionRead(positivePtr) + ", ");
-                this.endLine(sessionWrite(positivePtr) + " - " + sessionRead(positivePtr) + ");");
-
-                this.beginLine(sessionWrite(negativePtr) + " += ");
-                this.endLine(sessionWrite(positivePtr) + " - " + sessionRead(positivePtr) + ";");
-              },
-              () -> {
-                this.putTrace("fwd(W " + negative + ", R " + positive + "):" + node.lineno);
-
-                // We've previously read from the positive channel.
-                // Thus, since we're now writing to it, we must have already read all the data sent
-                // by it. So, we can ignore the contents of the positive channel's buffer, and do
-                // nothing.
-              });
-
-          // We need to set the continuation of the negative channel to the continuation of the
-          // positive channel.
-          this.putLine(sessionEnv(negativePtr) + " = " + sessionEnv(positivePtr) + ";");
-          this.putLine(sessionCont(negativePtr) + " = " + sessionCont(positivePtr) + ";");
-          this.putLine(sessionIndex(negativePtr) + " = " + sessionIndex(positivePtr) + ";");
-
-          // We make the positive channel bindings point to the negative channel, and terminate the
-          // old positive channel.
-          this.putLine("tmp_session = " + positivePtr + ";");
-          this.putLine(
-              "ENV_RECORD("
-                  + sessionEnv(positivePtr)
-                  + ", "
-                  + sessionIndex(positivePtr)
-                  + ") = "
-                  + negativePtr
-                  + ";");
-          this.putLine("free(tmp_session);");
-        },
-        () -> {
-          // We've previously read from the negative channel.
-          // Thus, data meant for the positive channel will already have been pushed to the negative
-          // channel's buffer.
-          // We pass control to the positive channel, so that it can read that data that is already
-          // in
-          // the buffer.
-
-          this.putLine("tmp_env = " + sessionEnv(positivePtr) + ";");
-          this.putLine("tmp_cont = " + sessionCont(positivePtr) + ";");
-
-          this.branchOnSessionPolarity(
-              positive,
-              () -> {
-                this.putTrace("fwd(R " + negative + ", W " + positive + "):" + node.lineno);
-
-                // We've previously written to the positive channel.
-                // Thus, the positive channel might have data on its buffer that it still hasn't
-                // read.
-                // In this case, we should append the extra data from the negative channel's buffer
-                // to the
-                // positive channel's buffer.
-
-                this.beginLine("memcpy(" + sessionWrite(positivePtr) + ", ");
-                this.continueLine(sessionRead(negativePtr) + ", ");
-                this.endLine(sessionWrite(negativePtr) + " - " + sessionRead(negativePtr) + ");");
-
-                this.beginLine(sessionWrite(positivePtr) + " += ");
-                this.endLine(sessionWrite(negativePtr) + " - " + sessionRead(negativePtr) + ";");
-
-                // We need to set the continuation of the positive channel to the continuation of
-                // the
-                // negative channel.
-                this.putLine(sessionEnv(positivePtr) + " = " + sessionEnv(negativePtr) + ";");
-                this.putLine(sessionCont(positivePtr) + " = " + sessionCont(negativePtr) + ";");
-                this.putLine(sessionIndex(positivePtr) + " = " + sessionIndex(negativePtr) + ";");
-
-                // We make the negative channel bindings point to the positive channel, and
-                // terminate the
-                // old negative channel.
-                this.putLine("tmp_session = " + negativePtr + ";");
-                this.putLine(
-                    "ENV_RECORD("
-                        + sessionEnv(negativePtr)
-                        + ", "
-                        + sessionIndex(negativePtr)
-                        + ") = "
-                        + positivePtr
-                        + ";");
-                this.putLine("free(tmp_session);");
-              },
-              () -> {
-                this.putTrace("fwd(R " + negative + ", R " + positive + "):" + node.lineno);
-
-                // We've previously read from the positive channel.
-                // Thus, since we're now writing to it, we must have already read all the data sent
-                // by it. So, we can ignore the contents of the positive channel's buffer.
-
-                // We make the positive channel bindings point to the negative channel, and
-                // terminate the old positive channel.
-                this.putLine("tmp_session = " + positivePtr + ";");
-                this.putLine(
-                    "ENV_RECORD("
-                        + sessionEnv(positivePtr)
-                        + ", "
-                        + sessionIndex(positivePtr)
-                        + ") = "
-                        + negativePtr
-                        + ";");
-                this.putLine("free(tmp_session);");
-              });
-        });
+    // We make the negative channel bindings point to the positive channel, and
+    // terminate the
+    // old negative channel.
+    this.putLine("tmp_session = " + negativePtr + ";");
+    this.putLine(
+        "ENV_RECORD("
+            + sessionEnv(negativePtr)
+            + ", "
+            + sessionIndex(negativePtr)
+            + ") = "
+            + positivePtr
+            + ";");
+    this.putLine("free(tmp_session);");
 
     this.putLine("env = tmp_env;");
     this.putLine("goto *tmp_cont;");
@@ -528,17 +430,6 @@ public class Generator extends ASTNodeVisitor {
       int envI = i;
       String ptr = sessionPointer(node.getPars().get(i));
       this.putLine(sessionPointer("tmp_env", envI, env.getName(envI)) + " = " + ptr + ";");
-
-      switch (this.environment().getPolarity(node.getPars().get(i))) {
-        case UNKNOWN:
-          break; // The session polarity is already stored in the record.
-        case WRITE:
-          this.putLine(sessionPolarity(ptr) + " = 1;");
-          break;
-        case READ:
-          this.putLine(sessionPolarity(ptr) + " = 0;");
-          break;
-      }
     }
 
     // Add the exponential arguments to the environment.
@@ -612,11 +503,12 @@ public class Generator extends ASTNodeVisitor {
 
     // We simply pop the record from the queue and store it in the environment.
     this.putLine(this.sessionPointer(node.getChi()) + " = " + this.popRecord(node.getChr()) + ";");
-    this.environment()
-        .setPolarity(
-            node.getChi(),
-            Polarity.WRITE); // If we're going to read it, we must jump to the other side first.
-    this.generateContinuation(node.getRhs());
+    if (!node.getChiType().isPosCatch(environment().getEp())) {
+      // If we'll be reading from the channel, we pass control to the other side first.
+      this.flip(node.getChi(), "polarity");
+    }
+
+    node.getRhs().accept(this);
 
     this.popWrappingComment();
   }
@@ -628,7 +520,11 @@ public class Generator extends ASTNodeVisitor {
 
     // Push the label's index onto the session queue.
     this.pushLabel(node.getCh(), node.getLabelIndex(), node.getLabel());
-    this.generateContinuation(node.getRhs());
+
+    if (!node.getRhsType().isPosCatch(environment().getEp())) {
+      this.flip(node.getCh(), "polarity");
+    }
+    node.getRhs().accept(this);
 
     this.popWrappingComment();
   }
@@ -655,14 +551,15 @@ public class Generator extends ASTNodeVisitor {
     this.pushWrappingComment("closure(" + node.getCho() + "):" + node.lineno);
     this.putLine("goto " + sendRhs + ";");
     this.putLabel(sendLhs);
-    this.environment()
-        .setPolarity(node.getCho(), Polarity.READ); // This won't ever be the first end point.
-    this.generateContinuation(node.getLhs());
+    node.getLhs().accept(this);
     this.popWrappingComment();
 
     // In the right hand side, we simply continue as usual.
     this.putLabel(sendRhs);
-    this.generateContinuation(node.getRhs());
+    if (!node.getRhsType().isPosCatch(environment().getEp())) {
+      this.flip(node.getChs(), "polarity");
+    }
+    node.getRhs().accept(this);
 
     this.popWrappingComment();
   }
@@ -696,7 +593,13 @@ public class Generator extends ASTNodeVisitor {
       this.putLine(sessionRead(ptr) + " = " + sessionBuffer(ptr) + ";");
     }
 
-    this.generateContinuation(node.getRhs());
+    // If we are the positive side and the next operation will be negative, we must flip.
+    if (node.rec && !node.getRhsType().isPosCatch(environment().getEp())) {
+      this.flip(node.getCh(), "polarity");
+    }
+
+    node.getRhs().accept(this);
+    ;
 
     this.popWrappingComment();
   }
@@ -709,33 +612,9 @@ public class Generator extends ASTNodeVisitor {
     // This node doesn't really do anything - the continuation sent by the bang node will never be
     // popped.
     // Future call nodes will simply peek the continuation from the queue.
-
-    this.generateContinuation(node.getRhs());
+    node.getRhs().accept(this);
 
     this.popWrappingComment();
-  }
-
-  private void generateContinuation(ASTNode node) {
-    String ch = node.getSubjectCh();
-    if (ch != null) {
-      if (!node.isPos()) {
-        this.branchOnSessionPolarity(
-            ch,
-            () -> {
-              // If we were writing to the session, then if we going to read now, we must pass
-              // control to the other side.
-              this.flip(ch, "polarity");
-            },
-            () -> {
-              // If we were alraedy reading from the session, we can continue doing so.
-            });
-      }
-
-      // Update polarity for future continuations.
-      this.environment().setPolarity(ch, node.isPos() ? Polarity.WRITE : Polarity.READ);
-    }
-
-    node.accept(this);
   }
 
   private void pushClose(String ch) {
@@ -946,28 +825,6 @@ public class Generator extends ASTNodeVisitor {
       onWrite.run();
     } else {
       onRead.run();
-    }
-  }
-
-  private void branchOnSessionPolarity(String ch, Runnable onWrite, Runnable onRead) {
-    switch (this.environment().getPolarity(ch)) {
-      case UNKNOWN:
-        this.putLine("if (" + sessionPolarity(sessionPointer(ch)) + ") {");
-        this.indentLevel += 1;
-        onWrite.run();
-        this.indentLevel -= 1;
-        this.putLine("} else {");
-        this.indentLevel += 1;
-        onRead.run();
-        this.indentLevel -= 1;
-        this.putLine("}");
-        break;
-      case WRITE:
-        onWrite.run();
-        break;
-      case READ:
-        onRead.run();
-        break;
     }
   }
 

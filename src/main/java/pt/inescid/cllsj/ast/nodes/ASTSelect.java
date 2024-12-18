@@ -60,6 +60,10 @@ public class ASTSelect extends ASTNode {
     return rhs;
   }
 
+  public ASTType getRhsType() {
+    return contType;
+  }
+
   public void ASTInsertPipe(Function<ASTNode, ASTNode> f, ASTNode from) throws Exception {
     if (from == rhs) {
       ASTNode nnode = f.apply(from);

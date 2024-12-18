@@ -74,6 +74,10 @@ public class ASTSend extends ASTNode {
     return rhs;
   }
 
+  public ASTType getRhsType() {
+    return tys_rhs;
+  }
+
   public void ASTInsertPipe(Function<ASTNode, ASTNode> f, ASTNode from) throws Exception {
     if (from == lhs) {
       ASTNode nnode = f.apply(from);
