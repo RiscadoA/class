@@ -62,7 +62,7 @@ else
 fi
 
 echo "@@@@@@ Generating C code to $cfile..." &&
-./CLLSj $CLLSflags -c < $1 > $cfile &&
+./CLLSj $CLLSflags -c $1 > $cfile &&
 echo "@@@@@@ Compiling $cfile to $pfile..." && 
 gcc $Cflags -o $pfile $cfile 
 

@@ -1,29 +1,26 @@
 package pt.inescid.cllsj.ast.nodes;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 import java.util.function.Function;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
-import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.types.ASTType;
 
-public class ASTProgram extends ASTNode {
-  private List<ASTDList> dLists = new ArrayList<>();
-  private List<ASTPList> pLists = new ArrayList<>();
-  private List<ASTTypeDef> typeDefs = new ArrayList<>();
-  private List<ASTProcDef> procDefs = new ArrayList<>();
+public class ASTProgramWithIncludes extends ASTNode {
+  private List<ASTInclude> incs;
+  private List<ASTDList> dLists;
+  private List<ASTPList> pLists;
 
-  public ASTProgram(List<ASTDList> typeDefs, List<ASTPList> procDefs) {
-    for (ASTDList dList : typeDefs) {
-      this.dLists.add(dList);
-      this.typeDefs.addAll(dList.getLd());
-    }
-    for (ASTPList pList : procDefs) {
-      this.pLists.add(pList);
-      this.procDefs.addAll(pList.getLd());
-    }
+  public ASTProgramWithIncludes(
+      List<ASTInclude> incs, List<ASTDList> dLists, List<ASTPList> pLists) {
+    this.incs = incs;
+    this.dLists = dLists;
+    this.pLists = pLists;
+  }
+
+  public List<ASTInclude> getIncs() {
+    return incs;
   }
 
   public List<ASTDList> getDLists() {
@@ -32,14 +29,6 @@ public class ASTProgram extends ASTNode {
 
   public List<ASTPList> getPLists() {
     return pLists;
-  }
-
-  public List<ASTTypeDef> getTypeDefs() {
-    return typeDefs;
-  }
-
-  public List<ASTProcDef> getProcDefs() {
-    return procDefs;
   }
 
   public void ASTInsertPipe(Function<ASTNode, ASTNode> f, ASTNode from) throws Exception {
@@ -67,24 +56,11 @@ public class ASTProgram extends ASTNode {
   }
 
   public void typecheck(Env<ASTType> ed, Env<ASTType> eg, Env<EnvEntry> ep) throws Exception {
-    for (ASTDList dList : dLists) {
-      dList.typecheckmany(ed, eg, ep);
-      ep = dList.definemany(ed, eg, ep, false);
-    }
-    for (ASTPList pList : pLists) {
-      pList.typecheckmany(ed, eg, ep);
-      ep = pList.definemany(ed, eg, ep, false, false);
-    }
+    throw new Exception("Unexpected call: typecheck");
   }
 
   public Env<EnvEntry> define(Env<EnvEntry> ep) throws Exception {
-    for (ASTDList dList : dLists) {
-      ep = dList.definemany(null, null, ep, false);
-    }
-    for (ASTPList pList : pLists) {
-      ep = pList.definemany(null, null, ep, false, false);
-    }
-    return ep;
+    throw new Exception("Unexpected call: define");
   }
 
   public ASTNode subst(Env<ASTType> e) {
@@ -100,10 +76,5 @@ public class ASTProgram extends ASTNode {
 
   public Set<String> fnLinear(Set<String> s) {
     return s;
-  }
-
-  @Override
-  public void accept(ASTNodeVisitor visitor) {
-    visitor.visit(this);
   }
 }

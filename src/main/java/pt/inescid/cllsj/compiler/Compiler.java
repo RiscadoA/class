@@ -1,15 +1,23 @@
 package pt.inescid.cllsj.compiler;
 
+import java.io.FileInputStream;
+import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 import pt.inescid.cllsj.CLLSj;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
+import pt.inescid.cllsj.ast.nodes.ASTDList;
+import pt.inescid.cllsj.ast.nodes.ASTInclude;
+import pt.inescid.cllsj.ast.nodes.ASTPList;
 import pt.inescid.cllsj.ast.nodes.ASTProgram;
+import pt.inescid.cllsj.ast.nodes.ASTProgramWithIncludes;
 
 public class Compiler {
-  public static int compile(String entryProcess, boolean trace) {
+  public static int compile(String path, String entryProcess, boolean trace) {
     ASTProgram ast;
     try {
-      ast = new CLLSj(System.in).Program();
+      ast = Compiler.parse(Path.of(path));
     } catch (Exception e) {
       System.err.println("Parsing error: " + e.getMessage());
       e.printStackTrace();
@@ -51,5 +59,35 @@ public class Compiler {
 
     System.out.println(output);
     return 0;
+  }
+
+  private static ASTProgram parse(Path path) throws Exception {
+    FileInputStream stream = new FileInputStream(path.toFile());
+    ASTProgramWithIncludes astWithIncs = new CLLSj(stream).Program();
+    if (astWithIncs == null) {
+      return null;
+    }
+
+    // Parse each of the includes.
+    List<ASTDList> dLists = new ArrayList<>();
+    List<ASTPList> pLists = new ArrayList<>();
+
+    for (ASTInclude inc : astWithIncs.getIncs()) {
+      Path incPath = path.getParent().resolve(inc.getFn());
+      ASTProgram incAst = parse(incPath);
+      if (incAst == null) {
+        return null;
+      }
+
+      // Add the type definitions and procedure definitions from the include to the main AST.
+      dLists.addAll(incAst.getDLists());
+      pLists.addAll(incAst.getPLists());
+    }
+
+
+    dLists.addAll(astWithIncs.getDLists());
+    pLists.addAll(astWithIncs.getPLists());
+
+    return new ASTProgram(dLists, pLists);
   }
 }
