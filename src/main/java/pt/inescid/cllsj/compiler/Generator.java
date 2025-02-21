@@ -30,6 +30,7 @@ import pt.inescid.cllsj.ast.nodes.ASTString;
 import pt.inescid.cllsj.ast.nodes.ASTUnfold;
 import pt.inescid.cllsj.ast.nodes.ASTWhy;
 import pt.inescid.cllsj.ast.types.ASTIdT;
+import pt.inescid.cllsj.ast.types.ASTNotT;
 import pt.inescid.cllsj.ast.types.ASTType;
 
 public class Generator extends ASTNodeVisitor {
@@ -215,10 +216,10 @@ public class Generator extends ASTNodeVisitor {
     this.putLine(sessionPointer(node.getChi()) + " = " + chiPtr + ";");
 
     // If we're reading from the channel, we pass control to the other side first.
-    if (!node.getType().isPosCatch(environment().getEp())) {
+    this.branchOnTypePolarity(node.getType(), () -> {}, () -> {
       // If we'll be reading from the channel, we pass control to the other side first.
       this.flip(node.getChi(), "polarity");
-    }
+    });
 
     // Finally, we generate the continuation, as usual.
     node.getRhs().accept(this);
@@ -285,28 +286,31 @@ public class Generator extends ASTNodeVisitor {
     this.putTrace("cut(" + node.getCh() + "):" + node.lineno);
 
     // Initialize the cut session, with initial continuation pointing to the right hand side.
-    String cutRhs = this.makeLabel("cut_" + node.getCh());
+    String cutLhs = this.makeLabel("cut_lhs_" + node.getCh());
+    String cutRhs = this.makeLabel("cut_rhs_" + node.getCh());
     String chPtr = this.sessionPointer(node.getCh());
     this.initSession(chPtr, environment().getSessionCSize("env", node.getCh()));
-    this.putLine(sessionCont(chPtr) + " = &&" + cutRhs + ";");
     this.putLine(sessionEnv(chPtr) + " = env;");
     this.putLine(sessionIndex(chPtr) + " = " + environment().getIndex(node.getCh()) + ";");
 
-    ASTNode positive, negative;
-    if (node.getChType().isPosCatch(environment().getEp())) {
-      positive = node.getRhs();
-      negative = node.getLhs();
-    } else {
-      positive = node.getLhs();
-      negative = node.getRhs();
-    }
+    // The first code to be executed for a given session must be positive.
+    // Thus, if the session is positive, we execute first the right hand side.
+    // Otherwise, we execute first the left hand side.
+    this.branchOnTypePolarity(node.getChType(), () -> {
+      this.putLine(sessionCont(chPtr) + " = &&" + cutLhs + ";");
+      this.putLine("goto " + cutRhs + ";");
+    }, () -> {
+      this.putLine(sessionCont(chPtr) + " = &&" + cutRhs + ";");
+      this.putLine("goto " + cutLhs + ";");
+    });
 
     // The first code to be executed for a given session must be positive.
-    positive.accept(this);
+    this.putLabel(cutLhs);
+    node.getLhs().accept(this);
 
     // The right hand side code will only execute after the left hand side jumps to it.
     this.putLabel(cutRhs);
-    negative.accept(this);
+    node.getRhs().accept(this);
 
     this.popWrappingComment();
   }
@@ -503,10 +507,10 @@ public class Generator extends ASTNodeVisitor {
 
     // We simply pop the record from the queue and store it in the environment.
     this.putLine(this.sessionPointer(node.getChi()) + " = " + this.popRecord(node.getChr()) + ";");
-    if (!node.getChiType().isPosCatch(environment().getEp())) {
+    this.branchOnTypePolarity(node.getChiType(), () -> {}, () -> {
       // If we'll be reading from the channel, we pass control to the other side first.
       this.flip(node.getChi(), "polarity");
-    }
+    });
 
     node.getRhs().accept(this);
 
@@ -520,10 +524,9 @@ public class Generator extends ASTNodeVisitor {
 
     // Push the label's index onto the session queue.
     this.pushLabel(node.getCh(), node.getLabelIndex(), node.getLabel());
-
-    if (!node.getRhsType().isPosCatch(environment().getEp())) {
+    this.branchOnTypePolarity(node.getRhsType(), () -> {}, () -> {
       this.flip(node.getCh(), "polarity");
-    }
+    });
     node.getRhs().accept(this);
 
     this.popWrappingComment();
@@ -556,9 +559,9 @@ public class Generator extends ASTNodeVisitor {
 
     // In the right hand side, we simply continue as usual.
     this.putLabel(sendRhs);
-    if (!node.getRhsType().isPosCatch(environment().getEp())) {
+    this.branchOnTypePolarity(node.getRhsType(), () -> {}, () -> {
       this.flip(node.getChs(), "polarity");
-    }
+    });
     node.getRhs().accept(this);
 
     this.popWrappingComment();
@@ -594,12 +597,13 @@ public class Generator extends ASTNodeVisitor {
     }
 
     // If we are the positive side and the next operation will be negative, we must flip.
-    if (node.rec && !node.getRhsType().isPosCatch(environment().getEp())) {
-      this.flip(node.getCh(), "polarity");
+    if (node.rec) {
+      this.branchOnTypePolarity(node.getRhsType(), () -> {}, () -> {
+        this.flip(node.getCh(), "polarity");
+      });
     }
 
     node.getRhs().accept(this);
-    ;
 
     this.popWrappingComment();
   }
@@ -785,10 +789,6 @@ public class Generator extends ASTNodeVisitor {
     return ptr + "->index";
   }
 
-  private String sessionPolarity(String ptr) {
-    return ptr + "->polarity";
-  }
-
   private String typeVar(String name) {
     Environment env = environment();
     String envRef = "env";
@@ -796,6 +796,9 @@ public class Generator extends ASTNodeVisitor {
     while (!env.getTypeVarIndices().containsKey(name)) {
       envRef += "->parent";
       env = env.getParent();
+      if (env == null) {
+        throw new RuntimeException("Type variable " + name + " not found in environment");
+      }
     }
 
     return "ENV_TYPE_VAR("
@@ -810,9 +813,25 @@ public class Generator extends ASTNodeVisitor {
   }
 
   private void branchOnTypePolarity(ASTType type, Runnable onWrite, Runnable onRead) {
+    boolean negated = false;
+    if (type instanceof ASTNotT) {
+      type = ((ASTNotT) type).getin();
+      assert type instanceof ASTIdT; // Type checker should guarantee this, right?
+      negated = true;
+    }
+
+    if (type instanceof ASTIdT) {
+      try {
+        type = type.unfoldType(environment().getEp());
+      } catch (Exception e) {
+        e.printStackTrace(System.out);
+        System.exit(1);
+      }
+    }
+
     if (type instanceof ASTIdT) {
       // We need to do it at runtime, as we don't know the type of the variable at compile time.
-      this.putLine("if (" + typeVar(((ASTIdT) type).getid()) + ".polarity) {");
+      this.putLine("if (" + (negated ? "!" : "") + typeVar(((ASTIdT) type).getid()) + ".polarity) {");
       this.indentLevel += 1;
       onWrite.run();
       this.indentLevel -= 1;
@@ -821,7 +840,7 @@ public class Generator extends ASTNodeVisitor {
       onRead.run();
       this.indentLevel -= 1;
       this.putLine("}");
-    } else if (type.isPosCatch(environment().getEp())) {
+    } else if (negated ^ type.isPosCatch(environment().getEp())) {
       onWrite.run();
     } else {
       onRead.run();
