@@ -4,7 +4,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Stack;
-
 import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.nodes.ASTBang;
 import pt.inescid.cllsj.ast.nodes.ASTCall;
@@ -44,13 +43,15 @@ public class SessionRenamer extends ASTNodeVisitor {
 
   private String introduce(String session) {
     Integer occurences = this.occurrences.compute(session, (k, v) -> v == null ? 1 : v + 1);
-    current.compute(session, (k, v) -> {
-      if (v == null) {
-        v = new Stack<>();
-      }
-      v.push(occurences);
-      return v;
-    });
+    current.compute(
+        session,
+        (k, v) -> {
+          if (v == null) {
+            v = new Stack<>();
+          }
+          v.push(occurences);
+          return v;
+        });
     return sanitize(session) + "_" + occurences;
   }
 

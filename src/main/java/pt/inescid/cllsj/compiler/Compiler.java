@@ -3,6 +3,7 @@ package pt.inescid.cllsj.compiler;
 import java.io.FileInputStream;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -64,12 +65,15 @@ public class Compiler {
   }
 
   private static ASTProgram parse(Path path) throws Exception {
-    return parse(path, new HashSet<>());
+    HashSet<String> included = new HashSet<>();
+    included.add(path.toAbsolutePath().normalize().toString());
+    return parse(path, included);
   }
 
   private static ASTProgram parse(Path path, Set<String> included) throws Exception {
     FileInputStream stream = new FileInputStream(path.toFile());
     ASTProgramWithIncludes astWithIncs = new CLLSj(stream).Program();
+    stream.close();
     if (astWithIncs == null) {
       return null;
     }
@@ -80,7 +84,7 @@ public class Compiler {
 
     for (ASTInclude inc : astWithIncs.getIncs()) {
       Path incPath = path.getParent().resolve(inc.getFn());
-      if (!included.add(incPath.toString())) {
+      if (!included.add(incPath.toAbsolutePath().normalize().toString())) {
         continue;
       }
 
