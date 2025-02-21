@@ -1,7 +1,9 @@
 include "../traits/cloner.clls";;
 include "../traits/dropper.clls";;
+include "../traits/comparer.clls";;
 include "string.clls";;
 include "iter.clls";;
+include "maybe.clls";;
 
 type rec Nat {
     choice of {
@@ -72,6 +74,51 @@ proc rec dropper_nat(dropper: Dropper(Nat)) {
     }
 };;
 
+proc rec compare_nat(x: ~Nat, y: ~Nat, out: Order) {
+    case x of {
+        |#z:
+            wait x;
+            case y of {
+                |#z:
+                    wait y;
+                    #eq out; close out
+                |#s:
+                    #lt out;
+                    cut {
+                        wait drop_out;
+                        close out
+                        |drop_out: close|
+                        drop_nat(y, drop_out)
+                    }
+            }
+        |#s:
+            case y of {
+                |#z:
+                    wait y;
+                    #gt out;
+                    cut {
+                        wait drop_out;
+                        close out
+                        |drop_out: close|
+                        drop_nat(x, drop_out)
+                    }
+                |#s:
+                    compare_nat(x, y, out)
+            }
+    }
+};;
+
+proc rec comparer_nat(cmp: Comparer(Nat)) {
+    case cmp of {
+        |#close: close cmp
+        |#compare:
+            recv cmp(x);
+            recv cmp(y);
+            send cmp(out. compare_nat(x, y, out));
+            comparer_nat(cmp)
+    }
+};;
+
 // ------------------------------- Constructors -------------------------------
 
 proc zero_nat(out: Nat) {
@@ -84,6 +131,17 @@ proc rec add_nat(x: ~Nat, y: ~Nat, out: Nat) {
     case x of {
         |#z: wait x; fwd y out
         |#s: #s out; add_nat(x, y, out)
+    }
+};;
+
+proc rec sub_nat(x: ~Nat, y: ~Nat, out: Maybe(Nat)) {
+    case y of {
+        |#z: wait y; #some out; fwd x out
+        |#s:
+            case x of {
+                |#z: wait x; #none out; drop_nat(y, out)
+                |#s: sub_nat(x, y, out)
+            }
     }
 };;
 
@@ -108,6 +166,77 @@ proc rec mul_nat(x: ~Nat, y: ~Nat, out: Nat) {
                     add_nat(y2, acc, out)
                 }
             }
+    }
+};;
+
+proc rec div_nat_aux(gas: ~Nat, x: ~Nat, y: ~Nat, out: Maybe(send Nat; Nat)) {
+    case gas of {
+        |#z:
+            wait gas;
+            cut {
+                drop_nat(x, drop_x)
+                |drop_x: wait|
+                wait drop_x;
+                drop_nat(y, drop_y)
+                |drop_y: wait|
+                wait drop_y;
+                #none out; close out
+            }
+        |#s:
+            cut {
+                clone_nat(y, y2)
+                |y2: recv ~Nat; ~Nat|
+                recv y2(y1);
+                cut {
+                    clone_nat(x, x2)
+                    |x2: recv ~Nat; ~Nat|
+                    recv x2(x1);
+                    cut {
+                        sub_nat(x1, y1, res)
+                        |res: ~Maybe(Nat)|
+                        case res of {
+                            |#none:
+                                cut {
+                                    drop_nat(gas, drop_gas)
+                                    |drop_gas: wait|
+                                    wait drop_gas;
+                                    wait res;
+                                    #some out; send out(q. #z q; drop_nat(y2, q)); // Quotient = 0
+                                    fwd x2 out // Remainder = x
+                                }
+                            |#some:
+                                cut {
+                                    drop_nat(x2, drop_done)
+                                    |drop_done: wait|
+                                    wait drop_done;
+                                    div_nat_aux(gas, res, y2, rem)
+                                    |rem: ~Maybe(send Nat; Nat)|
+                                    case rem of {
+                                        |#none: wait rem; #none out; close out
+                                        |#some:
+                                            recv rem(quot);
+                                            #some out; send out(q. #s q; fwd quot q); // Quotient = 1 + recursion result
+                                            fwd rem out // Remainder = recursion result
+                                    }
+                                }
+                        }
+                    }
+                }
+            }
+    }
+};;
+
+// Outputs the quotient and remainder of the division of two natural numbers.
+proc rec div_nat(x: ~Nat, y: ~Nat, out: Maybe(send Nat; Nat)) {
+    cut {
+        clone_nat(x, x2)
+        |x2: recv ~Nat; ~Nat|
+        recv x2(x1);
+        cut {
+            #s gas; fwd gas x2
+            |gas: ~Nat|
+            div_nat_aux(gas, x1, y, out)
+        }
     }
 };;
 
@@ -219,5 +348,36 @@ proc test_iter_nat() {
         into_string_iter_nat(ni, s)
         |s: ~String|
         print_string_end(s)
+    }
+};;
+
+proc test_div_nat() {
+    cut {
+        send xy(x. #s x; #s x; #s x; #s x; #s x; zero_nat(x));
+        send xy(y. #s y; #s y; zero_nat(y));
+        close xy
+        |xy: recv ~Nat; recv ~Nat; wait|
+        recv xy(x);
+        recv xy(y);
+        wait xy;
+        div_nat(x, y, rem)
+        |rem: ~Maybe(send Nat; Nat)|
+        case rem of {
+            |#none: wait rem; println("Division by zero"); ()
+            |#some:
+                recv rem(quot);
+                cut {
+                    #next strs; send strs(s. #q s; #sp s; empty_string(s));
+                    #next strs; send strs(s. into_string_nat(quot, s));
+                    #next strs; send strs(s. #nl s; #r s; #sp s; empty_string(s));
+                    #next strs; send strs(s. into_string_nat(rem, s));
+                    #next strs; send strs(s. #nl s; empty_string(s));
+                    #close strs; close strs
+                    |strs: ~Iter(String)|
+                    join_string_iter(strs, str)
+                    |str: ~String|
+                    print_string_end(str)
+                }
+        }
     }
 };;

@@ -1,0 +1,73 @@
+include "bool.clls";;
+
+type Order {
+    choice of {
+        |#gt: close
+        |#eq: close
+        |#lt: close
+    }
+};;
+
+// ------------------------------- Constructors -------------------------------
+
+proc gt(order: Order) {
+    #gt order; close order
+};;
+
+proc eq(order: Order) {
+    #eq order; close order
+};;
+
+proc lt(order: Order) {
+    #lt order; close order
+};;
+
+// -------------------------------- Operators ---------------------------------
+
+proc is_gt(order: ~Order, out: Bool) {
+    case order of {
+        |#gt: wait order; true_bool(out)
+        |#eq: wait order; false_bool(out)
+        |#lt: wait order; false_bool(out)
+    }
+};;
+
+proc is_eq(order: ~Order, out: Bool) {
+    case order of {
+        |#gt: wait order; false_bool(out)
+        |#eq: wait order; true_bool(out)
+        |#lt: wait order; false_bool(out)
+    }
+};;
+
+proc is_lt(order: ~Order, out: Bool) {
+    case order of {
+        |#gt: wait order; false_bool(out)
+        |#eq: wait order; false_bool(out)
+        |#lt: wait order; true_bool(out)
+    }
+};;
+
+proc is_ge(order: ~Order, out: Bool) {
+    case order of {
+        |#gt: wait order; true_bool(out)
+        |#eq: wait order; true_bool(out)
+        |#lt: wait order; false_bool(out)
+    }
+};;
+
+proc is_le(order: ~Order, out: Bool) {
+    case order of {
+        |#gt: wait order; false_bool(out)
+        |#eq: wait order; true_bool(out)
+        |#lt: wait order; true_bool(out)
+    }
+};;
+
+proc is_neq(order: ~Order, out: Bool) {
+    case order of {
+        |#gt: wait order; true_bool(out)
+        |#eq: wait order; false_bool(out)
+        |#lt: wait order; true_bool(out)
+    }
+};;

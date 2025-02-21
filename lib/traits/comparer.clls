@@ -1,0 +1,8 @@
+include "../data/order.clls";;
+
+type corec Comparer(T) {
+    offer of {
+        |#close: close
+        |#compare: recv ~T; recv ~T; send Order; Comparer(T)
+    }
+};;

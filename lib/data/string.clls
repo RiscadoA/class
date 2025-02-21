@@ -297,6 +297,18 @@ proc string_gen(gen: Gen(String), string: ~String) {
     }
 };;
 
+proc join_string_iter(iter: ~Iter(String), out: String) {
+    cut {
+        fold_join_string(fold)
+        |fold: ~IterFold(String, String)|
+        cut {
+            empty_string(acc)
+            |acc: ~String|
+            fold_iter<String, String>(iter, fold, acc, out)
+        }
+    }
+};;
+
 // --------------------------------- Examples ---------------------------------
 
 proc hello_string(s: String) {
