@@ -1,0 +1,223 @@
+include "../traits/cloner.clls";;
+include "../traits/dropper.clls";;
+include "string.clls";;
+include "iter.clls";;
+
+type rec Nat {
+    choice of {
+        |#z: close
+        |#s: Nat
+    }
+};;
+
+// ---------------------------------- Traits ----------------------------------
+
+proc rec clone_nat(nat: ~Nat, out: send Nat; Nat) {
+    case nat of {
+        |#z:
+            wait nat;
+            send out(n. #z n; close n);
+            #z out; close out
+        |#s:
+            cut {
+                clone_nat(nat, acc)
+                |acc: recv ~Nat; ~Nat|
+                recv acc(n);
+                send out(m. #s m; fwd m n);
+                #s out; fwd out acc
+            }
+    }
+};;
+
+proc rec cloner_nat(cloner: Cloner(Nat)) {
+    case cloner of {
+        |#close: close cloner
+        |#clone:
+            recv cloner(nat);
+            cut {
+                recv nat1(nat2);
+                send cloner(nat1);
+                send cloner(nat2);
+                cloner_nat(cloner)
+                |nat1: send Nat; Nat|
+                clone_nat(nat, nat1)
+            }
+        |#fork:
+            send cloner(c. cloner_nat(c));
+            cloner_nat(cloner)
+    }
+};;
+
+proc rec drop_nat(nat: ~Nat, out: close) {
+    case nat of {
+        |#z: fwd nat out
+        |#s: drop_nat(nat, out)
+    }
+};;
+
+proc rec dropper_nat(dropper: Dropper(Nat)) {
+    case dropper of {
+        |#close: close dropper
+        |#drop:
+            recv dropper(nat);
+            cut {
+                wait out;
+                dropper_nat(dropper)
+                |out: close|
+                drop_nat(nat, out)
+            }
+        |#fork:
+            send dropper(d. dropper_nat(d));
+            dropper_nat(dropper)
+    }
+};;
+
+// ------------------------------- Constructors -------------------------------
+
+proc zero_nat(out: Nat) {
+    #z out; close out
+};;
+
+// -------------------------------- Operators ---------------------------------
+
+proc rec add_nat(x: ~Nat, y: ~Nat, out: Nat) {
+    case x of {
+        |#z: wait x; fwd y out
+        |#s: #s out; add_nat(x, y, out)
+    }
+};;
+
+proc rec mul_nat(x: ~Nat, y: ~Nat, out: Nat) {
+    case x of {
+        |#z:
+            wait x;
+            cut {
+                drop_nat(y, drop_out)
+                |drop_out: wait|
+                wait drop_out;
+                #z out; close out
+            }
+        |#s:
+            cut {
+                clone_nat(y, y2)
+                |y2: recv ~Nat; ~Nat|
+                recv y2(y1);
+                cut {
+                    mul_nat(x, y1, acc)
+                    |acc: ~Nat|
+                    add_nat(y2, acc, out)
+                }
+            }
+    }
+};;
+
+proc rec fold_add_nat(fold: IterFold(Nat, Nat)) {
+    case fold of {
+        |#close: close fold
+        |#next:
+            recv fold(nat);
+            recv fold(acc);
+            send fold(new_acc. add_nat(nat, acc, new_acc));
+            fold_add_nat(fold)
+    }
+};;
+
+proc rec map_inc_nat(map: IterMap(Nat, Nat)) {
+    case map of {
+        |#close: close map
+        |#next:
+            recv map(nat);
+            send map(n. #s n; fwd n nat);
+            map_inc_nat(map)
+    }
+};;
+
+proc rec into_string_nat(nat: ~Nat, out: String) {
+    case nat of {
+        |#z: wait nat; #d0 out; #eof out; close out
+        |#s: #s out; into_string_nat(nat, out)
+    }
+};;
+
+proc rec map_into_string_nat(map: IterMap(Nat, String)) {
+    case map of {
+        |#close: close map
+        |#next:
+            recv map(nat);
+            cut {
+                into_string_nat(nat, str)
+                |str: ~String|
+                send map(str);
+                map_into_string_nat(map)
+            }
+    }
+};;
+
+// Produces an iterator of all natural numbers less than the given natural natural.
+proc rec iter_nat(nat: ~Nat, out: Iter(Nat)) {
+    case nat of {
+        |#z: wait nat; #close out; close out
+        |#s:
+            #next out; send out(m. #z m; close m);
+            cut {
+                iter_nat(nat, acc)
+                |acc: ~Iter(Nat)|
+                cut {
+                    map_inc_nat(inc_nat)
+                    |inc_nat: ~IterMap(Nat, Nat)|
+                    map_iter<Nat, Nat>(acc, inc_nat, out)
+                }
+            }
+    }
+};;
+
+// Produces a space separated string with a newline from an iterator of natural numbers.
+proc into_string_iter_nat(ni: ~Iter(Nat), out: String) {
+    cut {
+        cut {
+            map_into_string_nat(map)
+            |map: ~IterMap(Nat, String)|
+            map_iter<Nat, String>(ni, map, si)
+        }
+        |si: ~Iter(String)|
+        cut {
+            cut {
+                #sp sep; empty_string(sep)
+                |sep: ~String|
+                string_gen(gen, sep)
+            }
+            |gen: ~Gen(String)|
+            intersperse_iter<String>(si, gen, si2)
+        }
+        |si2: ~Iter(String)|
+        cut {
+            fold_join_string(fold)
+            |fold: ~IterFold(String, String)|
+            cut {
+                empty_string(acc)
+                |acc: ~String|
+                fold_iter<String, String>(si2, fold, acc, s)
+            }
+        }
+        |s: ~String|
+        cut {
+            #nl nl; empty_string(nl)
+            |nl: ~String|
+            join_string(s, nl, out)
+        }
+    }
+};;
+
+// --------------------------------- Examples ---------------------------------
+
+proc test_iter_nat() {
+    cut {
+        #s n; #s n; #s n; zero_nat(n)
+        |n: ~Nat|
+        iter_nat(n, ni)
+        |ni: ~Iter(Nat)|
+        into_string_iter_nat(ni, s)
+        |s: ~String|
+        print_string_end(s)
+    }
+};;

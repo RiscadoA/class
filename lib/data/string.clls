@@ -193,7 +193,7 @@ proc print_string_end(string: ~String) {
     }
 };;
 
-proc concat_string(left: ~String, right: ~String, out: String) {
+proc join_string(left: ~String, right: ~String, out: String) {
     cut {
         iter_string(left, left_iter)
         |left_iter: ~Iter(Char)|
@@ -273,6 +273,30 @@ proc rec dropper_string(dropper: Dropper(String)) {
     }
 };;
 
+// -------------------------------- Utilities ---------------------------------
+
+proc rec fold_join_string(fold: IterFold(String, String)) {
+    case fold of {
+        |#close: close fold
+        |#next:
+            recv fold(string);
+            recv fold(acc);
+            send fold(new_acc. join_string(acc, string, new_acc));
+            fold_join_string(fold)
+    }
+};;
+
+proc string_gen(gen: Gen(String), string: ~String) {
+    cut {
+        cloner_string(cloner)
+        |cloner: ~Cloner(String)|
+        cloning_gen<String>(gen, cloner, string, dropper)
+        |dropper: recv ~String; close|
+        recv dropper(s);
+        drop_string(s, dropper)
+    }
+};;
+
 // --------------------------------- Examples ---------------------------------
 
 proc hello_string(s: String) {
@@ -292,13 +316,13 @@ proc hello_world_string(s: String) {
         cut {
             #sp world; world_string(world)
             |world: ~String|
-            concat_string(hello, world, hello_world)
+            join_string(hello, world, hello_world)
         }
         |hello_world: ~String|
         cut {
             #nl nl; empty_string(nl)
             |nl: ~String|
-            concat_string(hello_world, nl, s)
+            join_string(hello_world, nl, s)
         }
     }
 };;
@@ -331,5 +355,27 @@ proc test_string_clone() {
         |s1: recv ~String; ~String|
         recv s1(s2);
         par { print_string_end(s1) || print_string_end(s2) }
+    }
+};;
+
+proc test_string_gen() {
+    cut {
+        hello_world_string(s)
+        |s: ~String|
+        string_gen(g, s)
+        |g: ~Gen(String)|
+        #next g; recv g(s1);
+        #next g; recv g(s2);
+        #next g; recv g(s3);
+        #close g; wait g;
+        cut {
+            print_string(s1, done1)
+            |done1: wait|
+            wait done1;
+            print_string(s2, done2)
+            |done2: wait|
+            wait done2;
+            print_string_end(s3)
+        }
     }
 };;

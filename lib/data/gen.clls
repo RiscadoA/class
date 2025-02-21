@@ -1,0 +1,23 @@
+include "../traits/cloner.clls";;
+
+// Generates a stream of values of type T, as requested by the consumer.
+type corec Gen(T) {
+    offer of {
+        |#close: close
+        |#next: send T; Gen(T)
+    }
+};;
+
+proc rec cloning_gen<T>(gen: Gen(T), cloner: ~Cloner(T), value: ~T, done: send T; wait) {
+    case gen of {
+        |#close:
+            #close cloner; wait cloner;
+            send done(value); wait done;
+            close gen
+        |#next:
+            #clone cloner; send cloner(value);
+            recv cloner(v1); recv cloner(v2);
+            send gen(v1);
+            cloning_gen<T>(gen, cloner, v2, done)
+    }
+};;

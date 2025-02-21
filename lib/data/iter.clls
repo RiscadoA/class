@@ -1,5 +1,7 @@
 include "../traits/cloner.clls";;
 include "../traits/dropper.clls";;
+include "gen.clls";;
+include "bool.clls";;
 
 type rec Iter(T) {
     choice of {
@@ -17,8 +19,8 @@ type corec IterMap(T, U) {
 
 type corec IterFold(T, U) {
     offer of {
-        |#close: U
-        |#next: recv ~T; IterFold(T, U)
+        |#close: close
+        |#next: recv ~T; recv ~U; send U; IterFold(T, U)
     }
 };;
 
@@ -71,15 +73,54 @@ proc rec map_iter<T, U>(iter: ~Iter(T), map: ~IterMap(T, U), out: Iter(U)) {
     }
 };;
 
-proc rec fold_iter<T, U>(iter: ~Iter(T), fold: ~IterFold(T, U), out: U) {
+proc rec fold_iter<T, U>(iter: ~Iter(T), fold: ~IterFold(T, U), base: ~U, out: U) {
     case iter of {
         |#close:
             wait iter;
-            #close fold; fwd fold out
+            #close fold; wait fold;
+            fwd base out
         |#next:
             recv iter(t);
-            #next fold; send fold(t);
-            fold_iter<T, U>(iter, fold, out)
+            #next fold; send fold(t); send fold(base); recv fold(acc);
+            fold_iter<T, U>(iter, fold, acc, out)
+    }
+};;
+
+proc rec intersperse_iter_aux<T>(iter: ~Iter(T), separator: ~Gen(T), out: Iter(T), first: ~Bool) {
+    case iter of {
+        |#close:
+            wait iter;
+            #close separator; wait separator;
+            #close out; drop_bool(first, out)
+        |#next:
+            recv iter(t);
+            case first of {
+                |#true:
+                    wait first;
+                    #next out; send out(t);
+                    cut {
+                        false_bool(first)
+                        |first: ~Bool|
+                        intersperse_iter_aux<T>(iter, separator, out, first)
+                    }
+                |#false:
+                    wait first;
+                    #next separator; recv separator(s);
+                    #next out; send out(s); #next out; send out(t);
+                    cut {
+                        false_bool(first)
+                        |first: ~Bool|
+                        intersperse_iter_aux<T>(iter, separator, out, first)
+                    }
+            }
+    }
+};;
+
+proc rec intersperse_iter<T>(iter: ~Iter(T), separator: ~Gen(T), out: Iter(T)) {
+    cut {
+        intersperse_iter_aux<T>(iter, separator, out, first)
+        |first: Bool|
+        true_bool(first)
     }
 };;
 
