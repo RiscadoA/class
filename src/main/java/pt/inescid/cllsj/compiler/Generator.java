@@ -137,7 +137,7 @@ public class Generator extends ASTNodeVisitor {
     }
 
     if (!definedProcs.contains(entryProcess)) {
-      throw new RuntimeException("Entry process process \"" + entryProcess + "\" found");
+      throw new RuntimeException("Entry process process \"" + entryProcess + "\" not found");
     }
 
     Environment env = generator.procDefEnvs.get(entryProcess);

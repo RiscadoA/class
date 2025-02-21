@@ -3,6 +3,8 @@ package pt.inescid.cllsj.compiler;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Stack;
+
 import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.nodes.ASTBang;
 import pt.inescid.cllsj.ast.nodes.ASTCall;
@@ -30,6 +32,7 @@ import pt.inescid.cllsj.ast.nodes.ASTWhy;
 public class SessionRenamer extends ASTNodeVisitor {
   // How many different occurrences of each session name have been found
   private Map<String, Integer> occurrences = new HashMap<>();
+  private Map<String, Stack<Integer>> current = new HashMap<>();
 
   public static void execute(ASTNode node) {
     node.accept(new SessionRenamer());
@@ -41,15 +44,33 @@ public class SessionRenamer extends ASTNodeVisitor {
 
   private String introduce(String session) {
     Integer occurences = this.occurrences.compute(session, (k, v) -> v == null ? 1 : v + 1);
+    current.compute(session, (k, v) -> {
+      if (v == null) {
+        v = new Stack<>();
+      }
+      v.push(occurences);
+      return v;
+    });
     return sanitize(session) + "_" + occurences;
   }
 
-  private String rename(String session) {
-    Integer occurences = this.occurrences.get(session);
+  private void leave_scope(String session) {
+    Stack<Integer> occurences = this.current.get(session);
     if (occurences == null) {
       throw new IllegalStateException("Session " + session + " was not introduced");
     }
-    return sanitize(session) + "_" + occurences;
+    occurences.pop();
+    if (occurences.isEmpty()) {
+      this.current.remove(session);
+    }
+  }
+
+  private String rename(String session) {
+    Stack<Integer> occurences = this.current.get(session);
+    if (occurences == null || occurences.isEmpty()) {
+      throw new IllegalStateException("Session " + session + " was not introduced");
+    }
+    return sanitize(session) + "_" + occurences.lastElement();
   }
 
   @Override
@@ -62,16 +83,20 @@ public class SessionRenamer extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTBang node) {
+    String chi = node.getChi();
     node.setChr(rename(node.getChr()));
-    node.setChi(introduce(node.getChi()));
+    node.setChi(introduce(chi));
     node.getRhs().accept(this);
+    leave_scope(chi);
   }
 
   @Override
   public void visit(ASTCall node) {
+    String chi = node.getChi();
     node.setChr(rename(node.getChr()));
-    node.setChi(introduce(node.getChi()));
+    node.setChi(introduce(chi));
     node.getRhs().accept(this);
+    leave_scope(chi);
   }
 
   @Override
@@ -95,9 +120,11 @@ public class SessionRenamer extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTCut node) {
-    node.setCh(introduce(node.getCh()));
+    String ch = node.getCh();
+    node.setCh(introduce(ch));
     node.getLhs().accept(this);
     node.getRhs().accept(this);
+    leave_scope(ch);
   }
 
   @Override
@@ -166,9 +193,11 @@ public class SessionRenamer extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTRecv node) {
+    String chi = node.getChi();
     node.setChr(rename(node.getChr()));
-    node.setChi(introduce(node.getChi()));
+    node.setChi(introduce(chi));
     node.getRhs().accept(this);
+    leave_scope(chi);
   }
 
   @Override
@@ -179,10 +208,12 @@ public class SessionRenamer extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTSend node) {
+    String cho = node.getCho();
     node.setChs(rename(node.getChs()));
-    node.setCho(introduce(node.getCho()));
+    node.setCho(introduce(cho));
     node.getLhs().accept(this);
     node.getRhs().accept(this);
+    leave_scope(cho);
   }
 
   @Override

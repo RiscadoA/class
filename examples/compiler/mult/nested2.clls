@@ -1,0 +1,21 @@
+proc main() {
+    cut {
+        recv x(y);
+        send y(z.
+            recv z(w);
+            wait w;
+            close z
+        );
+        wait x;
+        wait y;
+        ()
+        |x: send recv send close; wait; close; close|
+        send x(y.
+            recv y(z);
+            send z(w. close w);
+            wait z;
+            close y
+        );
+        close x
+    }
+};;
