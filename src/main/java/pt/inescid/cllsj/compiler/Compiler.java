@@ -3,7 +3,9 @@ package pt.inescid.cllsj.compiler;
 import java.io.FileInputStream;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import pt.inescid.cllsj.CLLSj;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
@@ -62,6 +64,10 @@ public class Compiler {
   }
 
   private static ASTProgram parse(Path path) throws Exception {
+    return parse(path, new HashSet<>());
+  }
+
+  private static ASTProgram parse(Path path, Set<String> included) throws Exception {
     FileInputStream stream = new FileInputStream(path.toFile());
     ASTProgramWithIncludes astWithIncs = new CLLSj(stream).Program();
     if (astWithIncs == null) {
@@ -74,7 +80,11 @@ public class Compiler {
 
     for (ASTInclude inc : astWithIncs.getIncs()) {
       Path incPath = path.getParent().resolve(inc.getFn());
-      ASTProgram incAst = parse(incPath);
+      if (!included.add(incPath.toString())) {
+        continue;
+      }
+
+      ASTProgram incAst = parse(incPath, included);
       if (incAst == null) {
         return null;
       }
@@ -83,7 +93,6 @@ public class Compiler {
       dLists.addAll(incAst.getDLists());
       pLists.addAll(incAst.getPLists());
     }
-
 
     dLists.addAll(astWithIncs.getDLists());
     pLists.addAll(astWithIncs.getPLists());
