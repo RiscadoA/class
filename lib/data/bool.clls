@@ -1,0 +1,108 @@
+include "../traits/cloner.clls";;
+include "../traits/dropper.clls";;
+
+type Bool {
+    choice of {
+        |#true: close
+        |#false: close
+    }
+};;
+
+// ------------------------------- Constructors -------------------------------
+
+proc true_bool(bool: Bool) {
+    #true bool; close bool
+};;
+
+proc false_bool(bool: Bool) {
+    #false bool; close bool
+};;
+
+// ---------------------------------- Traits ----------------------------------
+
+proc clone_bool(bool: ~Bool, out: send Bool; Bool) {
+    case bool of {
+        |#true: wait bool; send out(b. true_bool(b)); true_bool(out)
+        |#false: wait bool; send out(b. false_bool(b)); false_bool(out)
+    }
+};;
+
+proc rec cloner_bool(cloner: Cloner(Bool)) {
+    case cloner of {
+        |#close: close cloner
+        |#clone:
+            recv cloner(bool);
+            cut {
+                recv bool1(bool2);
+                send cloner(bool1);
+                send cloner(bool2);
+                cloner_bool(cloner)
+                |bool1: send Bool; Bool|
+                clone_bool(bool, bool1)
+            }
+        |#fork:
+            send cloner(c. cloner_bool(c));
+            cloner_bool(cloner)
+    }
+};;
+
+proc drop_bool(bool: ~Bool, out: close) {
+    case bool of {
+        |#true: fwd bool out
+        |#false: fwd bool out
+    }
+};;
+
+proc rec dropper_bool(dropper: Dropper(Bool)) {
+    case dropper of {
+        |#close: close dropper
+        |#drop:
+            recv dropper(bool);
+            cut {
+                wait drop_out;
+                dropper_bool(dropper)
+                |drop_out: close|
+                drop_bool(bool, drop_out)
+            }
+        |#fork:
+            send dropper(d. dropper_bool(d));
+            dropper_bool(dropper)
+    }
+};;
+
+// -------------------------------- Operators ---------------------------------
+
+proc not_bool(bool: ~Bool, out: Bool) {
+    case bool of {
+        |#true: wait bool; false_bool(out)
+        |#false: wait bool; true_bool(out)
+    }
+};;
+
+proc and_bool(left: ~Bool, right: ~Bool, out: Bool) {
+    case left of {
+        |#true: wait left; fwd right out
+        |#false:
+            wait left;
+            cut {
+                wait drop_out;
+                false_bool(out)
+                |drop_out: close|
+                drop_bool(right, drop_out)
+            }
+    }
+};;
+
+proc or_bool(left: ~Bool, right: ~Bool, out: Bool) {
+    case left of {
+        |#true:
+            wait left;
+            cut {
+                wait drop_out;
+                true_bool(out)
+                |drop_out: close|
+                drop_bool(right, drop_out)
+            }
+        |#false: wait left; fwd right out
+    }
+};;

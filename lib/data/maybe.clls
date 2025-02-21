@@ -1,0 +1,85 @@
+include "../traits/cloner.clls";;
+include "../traits/dropper.clls";;
+
+type Maybe(T) {
+    choice of {
+        |#some: T
+        |#none: close
+    }
+};;
+
+// ------------------------------- Constructors -------------------------------
+
+proc none<T>(maybe: Maybe(T)) {
+    #none maybe; close maybe
+};;
+
+// ---------------------------------- Traits ----------------------------------
+
+proc clone_maybe<T>(maybe: ~Maybe(T), cloner: ~Cloner(T), out: send Maybe(T); Maybe(T)) {
+    case maybe of {
+        |#some:
+            #clone cloner; send cloner(maybe); recv cloner(v1); recv cloner(v2);
+            #close cloner; wait cloner;
+            send out(m. #some m; fwd m v1);
+            #some out; fwd out v2
+        |#none:
+            wait maybe;
+            #close cloner; wait cloner;
+            send out(m. #none m; close m);
+            #none out; close out
+    }
+};;
+
+proc rec cloner_maybe<T>(cloner: Cloner(Maybe(T)), val_cloner: ~Cloner(T)) {
+    case cloner of {
+        |#close: #close val_cloner; wait val_cloner; close cloner
+        |#clone:
+            #fork val_cloner; recv val_cloner(val_cloner2);
+            recv cloner(maybe);
+            cut {
+                recv maybe1(maybe2);
+                send cloner(maybe1);
+                send cloner(maybe2);
+                cloner_maybe<T>(cloner, val_cloner)
+                |maybe1: send Maybe(T); Maybe(T)|
+                clone_maybe<T>(maybe, val_cloner2, maybe1)
+            }
+        |#fork:
+            #fork val_cloner; recv val_cloner(val_cloner2);
+            send cloner(c. cloner_maybe<T>(c, val_cloner));
+            cloner_maybe<T>(cloner, val_cloner2)
+    }
+};;
+
+proc drop_maybe<T>(maybe: ~Maybe(T), dropper: ~Dropper(T), out: close) {
+    case maybe of {
+        |#none:
+            wait maybe;
+            #close dropper; wait dropper;
+            close out
+        |#some:
+            #drop dropper; send dropper(maybe);
+            #close dropper; wait dropper;
+            close out
+    }
+};;
+
+proc rec dropper_maybe<T>(dropper: Dropper(Maybe(T)), val_dropper: ~Dropper(T)) {
+    case dropper of {
+        |#close: #close val_dropper; wait val_dropper; close dropper
+        |#drop:
+            #fork val_dropper; recv val_dropper(val_dropper2);
+            recv dropper(maybe);
+            cut {
+                wait done;
+                dropper_maybe<T>(dropper, val_dropper)
+                |done: close|
+                drop_maybe<T>(maybe, val_dropper2, done)
+            }
+        |#fork:
+            #fork val_dropper; recv val_dropper(val_dropper2);
+            send dropper(c. dropper_maybe<T>(c, val_dropper));
+            dropper_maybe<T>(dropper, val_dropper2)
+    }
+};;

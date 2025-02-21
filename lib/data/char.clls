@@ -1,0 +1,218 @@
+include "../traits/cloner.clls";;
+include "../traits/dropper.clls";;
+
+type Char {
+    choice of {
+        |#a: close
+        |#b: close
+        |#c: close
+        |#d: close
+        |#e: close
+        |#f: close
+        |#g: close
+        |#h: close
+        |#i: close
+        |#j: close
+        |#k: close
+        |#l: close
+        |#m: close
+        |#n: close
+        |#o: close
+        |#p: close
+        |#q: close
+        |#r: close
+        |#s: close
+        |#t: close
+        |#u: close
+        |#v: close
+        |#w: close
+        |#x: close
+        |#y: close
+        |#z: close
+        |#d0: close
+        |#d1: close
+        |#d2: close
+        |#d3: close
+        |#d4: close
+        |#d5: close
+        |#d6: close
+        |#d7: close
+        |#d8: close
+        |#d9: close
+
+        |#sp: close // Space
+        |#nl: close // New line
+    }
+};;
+
+// -------------------------------- Operators ---------------------------------
+
+proc print_char(char: ~Char, out: close) {
+    case char of {
+        |#a: print("a"); fwd char out
+        |#b: print("b"); fwd char out
+        |#c: print("c"); fwd char out
+        |#d: print("d"); fwd char out
+        |#e: print("e"); fwd char out
+        |#f: print("f"); fwd char out
+        |#g: print("g"); fwd char out
+        |#h: print("h"); fwd char out
+        |#i: print("i"); fwd char out
+        |#j: print("j"); fwd char out
+        |#k: print("k"); fwd char out
+        |#l: print("l"); fwd char out
+        |#m: print("m"); fwd char out
+        |#n: print("n"); fwd char out
+        |#o: print("o"); fwd char out
+        |#p: print("p"); fwd char out
+        |#q: print("q"); fwd char out
+        |#r: print("r"); fwd char out
+        |#s: print("s"); fwd char out
+        |#t: print("t"); fwd char out
+        |#u: print("u"); fwd char out
+        |#v: print("v"); fwd char out
+        |#w: print("w"); fwd char out
+        |#x: print("x"); fwd char out
+        |#y: print("y"); fwd char out
+        |#z: print("z"); fwd char out
+        |#d0: print("0"); fwd char out
+        |#d1: print("1"); fwd char out
+        |#d2: print("2"); fwd char out
+        |#d3: print("3"); fwd char out
+        |#d4: print("4"); fwd char out
+        |#d5: print("5"); fwd char out
+        |#d6: print("6"); fwd char out
+        |#d7: print("7"); fwd char out
+        |#d8: print("8"); fwd char out
+        |#d9: print("9"); fwd char out
+
+        |#sp: print(" "); fwd char out
+        |#nl: println(""); fwd char out
+    }
+};;
+
+// ---------------------------------- Traits ----------------------------------
+
+proc clone_char(char: ~Char, out: send Char; Char) {
+    case char of {
+        |#a: wait char; send out(c. #a c; close c); #a out; close out
+        |#b: wait char; send out(c. #b c; close c); #b out; close out
+        |#c: wait char; send out(c. #c c; close c); #c out; close out
+        |#d: wait char; send out(c. #d c; close c); #d out; close out
+        |#e: wait char; send out(c. #e c; close c); #e out; close out
+        |#f: wait char; send out(c. #f c; close c); #f out; close out
+        |#g: wait char; send out(c. #g c; close c); #g out; close out
+        |#h: wait char; send out(c. #h c; close c); #h out; close out
+        |#i: wait char; send out(c. #i c; close c); #i out; close out
+        |#j: wait char; send out(c. #j c; close c); #j out; close out
+        |#k: wait char; send out(c. #k c; close c); #k out; close out
+        |#l: wait char; send out(c. #l c; close c); #l out; close out
+        |#m: wait char; send out(c. #m c; close c); #m out; close out
+        |#n: wait char; send out(c. #n c; close c); #n out; close out
+        |#o: wait char; send out(c. #o c; close c); #o out; close out
+        |#p: wait char; send out(c. #p c; close c); #p out; close out
+        |#q: wait char; send out(c. #q c; close c); #q out; close out
+        |#r: wait char; send out(c. #r c; close c); #r out; close out
+        |#s: wait char; send out(c. #s c; close c); #s out; close out
+        |#t: wait char; send out(c. #t c; close c); #t out; close out
+        |#u: wait char; send out(c. #u c; close c); #u out; close out
+        |#v: wait char; send out(c. #v c; close c); #v out; close out
+        |#w: wait char; send out(c. #w c; close c); #w out; close out
+        |#x: wait char; send out(c. #x c; close c); #x out; close out
+        |#y: wait char; send out(c. #y c; close c); #y out; close out
+        |#z: wait char; send out(c. #z c; close c); #z out; close out
+        |#d0: wait char; send out(c. #d0 c; close c); #d0 out; close out
+        |#d1: wait char; send out(c. #d1 c; close c); #d1 out; close out
+        |#d2: wait char; send out(c. #d2 c; close c); #d2 out; close out
+        |#d3: wait char; send out(c. #d3 c; close c); #d3 out; close out
+        |#d4: wait char; send out(c. #d4 c; close c); #d4 out; close out
+        |#d5: wait char; send out(c. #d5 c; close c); #d5 out; close out
+        |#d6: wait char; send out(c. #d6 c; close c); #d6 out; close out
+        |#d7: wait char; send out(c. #d7 c; close c); #d7 out; close out
+        |#d8: wait char; send out(c. #d8 c; close c); #d8 out; close out
+        |#d9: wait char; send out(c. #d9 c; close c); #d9 out; close out
+
+        |#sp: wait char; send out(c. #sp c; close c); #sp out; close out
+        |#nl: wait char; send out(c. #nl c; close c); #nl out; close out
+    }
+};;
+
+proc rec cloner_char(cloner: Cloner(Char)) {
+    case cloner of {
+        |#close: close cloner
+        |#clone:
+            recv cloner(char);
+            cut {
+                recv char1(char2);
+                send cloner(char1);
+                send cloner(char2);
+                cloner_char(cloner)
+                |char1: send Char; Char|
+                clone_char(char, char1)
+            }
+        |#fork:
+            send cloner(c. cloner_char(c));
+            cloner_char(cloner)
+    }
+};;
+
+proc drop_char(char: ~Char, out: close) {
+    case char of {
+        |#a: fwd char out
+        |#b: fwd char out
+        |#c: fwd char out
+        |#d: fwd char out
+        |#e: fwd char out
+        |#f: fwd char out
+        |#g: fwd char out
+        |#h: fwd char out
+        |#i: fwd char out
+        |#j: fwd char out
+        |#k: fwd char out
+        |#l: fwd char out
+        |#m: fwd char out
+        |#n: fwd char out
+        |#o: fwd char out
+        |#p: fwd char out
+        |#q: fwd char out
+        |#r: fwd char out
+        |#s: fwd char out
+        |#t: fwd char out
+        |#u: fwd char out
+        |#v: fwd char out
+        |#w: fwd char out
+        |#x: fwd char out
+        |#y: fwd char out
+        |#z: fwd char out
+        |#d0: fwd char out
+        |#d1: fwd char out
+        |#d2: fwd char out
+        |#d3: fwd char out
+        |#d4: fwd char out
+        |#d5: fwd char out
+        |#d6: fwd char out
+        |#d7: fwd char out
+        |#d8: fwd char out
+        |#d9: fwd char out
+
+        |#sp: fwd char out
+        |#nl: fwd char out
+    }
+};;
+
+proc rec dropper_char(dropper: Dropper(Char)) {
+    case dropper of {
+        |#close: close dropper
+        |#drop:
+            recv dropper(char);
+            cut {
+                wait drop_out;
+                dropper_char(dropper)
+                |drop_out: close|
+                drop_char(char, drop_out)
+            }
+        |#fork:
+            send dropper(d. dropper_char(d));
+            dropper_char(dropper)
+    }
+};;

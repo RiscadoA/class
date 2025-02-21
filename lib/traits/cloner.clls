@@ -1,0 +1,7 @@
+type corec Cloner(T) {
+    offer of {
+        |#close: close
+        |#clone: recv ~T; send T; send T; Cloner(T)
+        |#fork: send Cloner(T); Cloner(T)
+    }
+};;

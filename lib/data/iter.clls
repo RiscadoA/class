@@ -1,0 +1,158 @@
+include "../traits/cloner.clls";;
+include "../traits/dropper.clls";;
+
+type rec Iter(T) {
+    choice of {
+        |#close: close
+        |#next: send T; Iter(T)
+    }
+};;
+
+type corec IterMap(T, U) {
+    offer of {
+        |#close: close
+        |#next: recv ~T; send U; IterMap(T, U)
+    }
+};;
+
+type corec IterFold(T, U) {
+    offer of {
+        |#close: U
+        |#next: recv ~T; IterFold(T, U)
+    }
+};;
+
+// ------------------------------- Constructors -------------------------------
+
+proc empty_iter<T>(iter: Iter(T)) {
+    #close iter; close iter
+};;
+
+// -------------------------------- Operators ---------------------------------
+
+proc rec join_iter<T>(head: ~Iter(T), tail: ~Iter(T), out: Iter(T)) {
+    case head of {
+        |#close:
+            wait head;
+            fwd out tail
+        |#next:
+            recv head(v);
+            #next out; send out(v);
+            join_iter<T>(head, tail, out)
+    }
+};;
+
+proc rec flatten_iter<T>(iters: ~Iter(Iter(T)), out: Iter(T)) {
+    case iters of {
+        |#close:
+            wait iters;
+            #close out; close out
+        |#next:
+            recv iters(head);
+            cut {
+                join_iter<T>(head, middle, out)
+                |middle: Iter(T)|
+                flatten_iter<T>(iters, middle)
+            }
+    }
+};;
+
+proc rec map_iter<T, U>(iter: ~Iter(T), map: ~IterMap(T, U), out: Iter(U)) {
+    case iter of {
+        |#close:
+            wait iter;
+            #close map; wait map;
+            #close out; close out
+        |#next:
+            recv iter(t);
+            #next map; send map(t); recv map(u);
+            #next out; send out(u);
+            map_iter<T, U>(iter, map, out)
+    }
+};;
+
+proc rec fold_iter<T, U>(iter: ~Iter(T), fold: ~IterFold(T, U), out: U) {
+    case iter of {
+        |#close:
+            wait iter;
+            #close fold; fwd fold out
+        |#next:
+            recv iter(t);
+            #next fold; send fold(t);
+            fold_iter<T, U>(iter, fold, out)
+    }
+};;
+
+// ---------------------------------- Traits ----------------------------------
+
+proc rec clone_iter<T>(iter: ~Iter(T), cloner: ~Cloner(T), out: send Iter(T); Iter(T)) {
+    case iter of {
+        |#close:
+            wait iter;
+            #close cloner; wait cloner;
+            send out(i. #close i; close i);
+            #close out; close out
+        |#next:
+            recv iter(v);
+            #clone cloner; send cloner(v); recv cloner(v1); recv cloner(v2);
+            cut {
+                clone_iter<T>(iter, cloner, acc)
+                |acc: recv ~Iter(T); ~Iter(T)|
+                recv acc(i1); send out(i. #next i; send i(v1); fwd i i1);
+                #next out; send out(v2); fwd out acc
+            }
+    }
+};;
+
+proc rec cloner_iter<T>(cloner: Cloner(Iter(T)), val_cloner: ~Cloner(T)) {
+    case cloner of {
+        |#close: #close val_cloner; wait val_cloner; close cloner
+        |#clone:
+            #fork val_cloner; recv val_cloner(val_cloner2);
+            recv cloner(iter);
+            cut {
+                recv iter1(iter2);
+                send cloner(iter1);
+                send cloner(iter2);
+                cloner_iter<T>(cloner, val_cloner)
+                |iter1: send Iter(T); Iter(T)|
+                clone_iter<T>(iter, val_cloner2, iter1)
+            }
+        |#fork:
+            #fork val_cloner; recv val_cloner(val_cloner2);
+            send cloner(c. cloner_iter<T>(c, val_cloner));
+            cloner_iter<T>(cloner, val_cloner2)
+    }
+};;
+
+proc rec drop_iter<T>(iter: ~Iter(T), dropper: ~Dropper(T), out: close) {
+    case iter of {
+        |#close:
+            wait iter;
+            #close dropper; wait dropper;
+            close out
+        |#next:
+            recv iter(v);
+            #drop dropper; send dropper(v);
+            drop_iter<T>(iter, dropper, out)
+    }
+};;
+
+proc rec dropper_iter<T>(dropper: Dropper(Iter(T)), val_dropper: ~Dropper(T)) {
+    case dropper of {
+        |#close: #close val_dropper; wait val_dropper; close dropper
+        |#drop:
+            #fork val_dropper; recv val_dropper(val_dropper2);
+            recv dropper(iter);
+            cut {
+                wait done;
+                dropper_iter<T>(dropper, val_dropper)
+                |done: close|
+                drop_iter<T>(iter, val_dropper2, done)
+            }
+        |#fork:
+            #fork val_dropper; recv val_dropper(val_dropper2);
+            send dropper(c. dropper_iter<T>(c, val_dropper));
+            dropper_iter<T>(dropper, val_dropper2)
+    }
+};;

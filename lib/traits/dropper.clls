@@ -1,0 +1,7 @@
+type corec Dropper(T) {
+    offer of {
+        |#close: close
+        |#drop: recv ~T; Dropper(T)
+        |#fork: send Dropper(T); Dropper(T)
+    }
+};;

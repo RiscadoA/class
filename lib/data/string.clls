@@ -1,0 +1,335 @@
+include "../traits/cloner.clls";;
+include "../traits/dropper.clls";;
+include "char.clls";;
+include "iter.clls";;
+
+type rec String {
+    choice of {
+        |#a: String
+        |#b: String
+        |#c: String
+        |#d: String
+        |#e: String
+        |#f: String
+        |#g: String
+        |#h: String
+        |#i: String
+        |#j: String
+        |#k: String
+        |#l: String
+        |#m: String
+        |#n: String
+        |#o: String
+        |#p: String
+        |#q: String
+        |#r: String
+        |#s: String
+        |#t: String
+        |#u: String
+        |#v: String
+        |#w: String
+        |#x: String
+        |#y: String
+        |#z: String
+        |#d0: String
+        |#d1: String
+        |#d2: String
+        |#d3: String
+        |#d4: String
+        |#d5: String
+        |#d6: String
+        |#d7: String
+        |#d8: String
+        |#d9: String
+
+        |#sp: String // Space
+        |#nl: String // New line
+
+        |#eof: close
+    }
+};;
+
+// ------------------------------- Constructors -------------------------------
+
+proc rec collect_string(iter: ~Iter(Char), out: String) {
+    case iter of {
+        |#close:
+            wait iter;
+            #eof out; close out
+        |#next:
+            recv iter(char);
+            case char of {
+                |#a: wait char; #a out; collect_string(iter, out)
+                |#b: wait char; #b out; collect_string(iter, out)
+                |#c: wait char; #c out; collect_string(iter, out)
+                |#d: wait char; #d out; collect_string(iter, out)
+                |#e: wait char; #e out; collect_string(iter, out)
+                |#f: wait char; #f out; collect_string(iter, out)
+                |#g: wait char; #g out; collect_string(iter, out)
+                |#h: wait char; #h out; collect_string(iter, out)
+                |#i: wait char; #i out; collect_string(iter, out)
+                |#j: wait char; #j out; collect_string(iter, out)
+                |#k: wait char; #k out; collect_string(iter, out)
+                |#l: wait char; #l out; collect_string(iter, out)
+                |#m: wait char; #m out; collect_string(iter, out)
+                |#n: wait char; #n out; collect_string(iter, out)
+                |#o: wait char; #o out; collect_string(iter, out)
+                |#p: wait char; #p out; collect_string(iter, out)
+                |#q: wait char; #q out; collect_string(iter, out)
+                |#r: wait char; #r out; collect_string(iter, out)
+                |#s: wait char; #s out; collect_string(iter, out)
+                |#t: wait char; #t out; collect_string(iter, out)
+                |#u: wait char; #u out; collect_string(iter, out)
+                |#v: wait char; #v out; collect_string(iter, out)
+                |#w: wait char; #w out; collect_string(iter, out)
+                |#x: wait char; #x out; collect_string(iter, out)
+                |#y: wait char; #y out; collect_string(iter, out)
+                |#z: wait char; #z out; collect_string(iter, out)
+                |#d0: wait char; #d0 out; collect_string(iter, out)
+                |#d1: wait char; #d1 out; collect_string(iter, out)
+                |#d2: wait char; #d2 out; collect_string(iter, out)
+                |#d3: wait char; #d3 out; collect_string(iter, out)
+                |#d4: wait char; #d4 out; collect_string(iter, out)
+                |#d5: wait char; #d5 out; collect_string(iter, out)
+                |#d6: wait char; #d6 out; collect_string(iter, out)
+                |#d7: wait char; #d7 out; collect_string(iter, out)
+                |#d8: wait char; #d8 out; collect_string(iter, out)
+                |#d9: wait char; #d9 out; collect_string(iter, out)
+
+                |#sp: wait char; #sp out; collect_string(iter, out)
+                |#nl: wait char; #nl out; collect_string(iter, out)
+            }
+    }
+};;
+
+proc empty_string(out: String) {
+    #eof out; close out
+};;
+
+proc unit_string(char: ~Char, out: String) {
+    cut {
+        #next iter; send iter(char);
+        #close iter; close iter
+        |iter: ~Iter(Char)|
+        collect_string(iter, out)
+    }
+};;
+
+// -------------------------------- Operators ---------------------------------
+
+proc rec iter_string(string: ~String, out: Iter(Char)) {
+    case string of {
+        |#a: #next out; send out(c. #a c; close c); iter_string(string, out)
+        |#b: #next out; send out(c. #b c; close c); iter_string(string, out)
+        |#c: #next out; send out(c. #c c; close c); iter_string(string, out)
+        |#d: #next out; send out(c. #d c; close c); iter_string(string, out)
+        |#e: #next out; send out(c. #e c; close c); iter_string(string, out)
+        |#f: #next out; send out(c. #f c; close c); iter_string(string, out)
+        |#g: #next out; send out(c. #g c; close c); iter_string(string, out)
+        |#h: #next out; send out(c. #h c; close c); iter_string(string, out)
+        |#i: #next out; send out(c. #i c; close c); iter_string(string, out)
+        |#j: #next out; send out(c. #j c; close c); iter_string(string, out)
+        |#k: #next out; send out(c. #k c; close c); iter_string(string, out)
+        |#l: #next out; send out(c. #l c; close c); iter_string(string, out)
+        |#m: #next out; send out(c. #m c; close c); iter_string(string, out)
+        |#n: #next out; send out(c. #n c; close c); iter_string(string, out)
+        |#o: #next out; send out(c. #o c; close c); iter_string(string, out)
+        |#p: #next out; send out(c. #p c; close c); iter_string(string, out)
+        |#q: #next out; send out(c. #q c; close c); iter_string(string, out)
+        |#r: #next out; send out(c. #r c; close c); iter_string(string, out)
+        |#s: #next out; send out(c. #s c; close c); iter_string(string, out)
+        |#t: #next out; send out(c. #t c; close c); iter_string(string, out)
+        |#u: #next out; send out(c. #u c; close c); iter_string(string, out)
+        |#v: #next out; send out(c. #v c; close c); iter_string(string, out)
+        |#w: #next out; send out(c. #w c; close c); iter_string(string, out)
+        |#x: #next out; send out(c. #x c; close c); iter_string(string, out)
+        |#y: #next out; send out(c. #y c; close c); iter_string(string, out)
+        |#z: #next out; send out(c. #z c; close c); iter_string(string, out)
+        |#d0: #next out; send out(c. #d0 c; close c); iter_string(string, out)
+        |#d1: #next out; send out(c. #d1 c; close c); iter_string(string, out)
+        |#d2: #next out; send out(c. #d2 c; close c); iter_string(string, out)
+        |#d3: #next out; send out(c. #d3 c; close c); iter_string(string, out)
+        |#d4: #next out; send out(c. #d4 c; close c); iter_string(string, out)
+        |#d5: #next out; send out(c. #d5 c; close c); iter_string(string, out)
+        |#d6: #next out; send out(c. #d6 c; close c); iter_string(string, out)
+        |#d7: #next out; send out(c. #d7 c; close c); iter_string(string, out)
+        |#d8: #next out; send out(c. #d8 c; close c); iter_string(string, out)
+        |#d9: #next out; send out(c. #d9 c; close c); iter_string(string, out)
+
+        |#sp: #next out; send out(c. #sp c; close c); iter_string(string, out)
+        |#nl: #next out; send out(c. #nl c; close c); iter_string(string, out)
+
+        |#eof: wait string; #close out; close out
+    }
+};;
+
+proc rec print_string_aux(iter: ~Iter(Char), done: close) {
+    case iter of {
+        |#close: fwd iter done
+        |#next:
+            recv iter(char);
+            cut {
+                print_char(char, char_done)
+                |char_done: wait|
+                wait char_done;
+                print_string_aux(iter, done)
+            }
+    }
+};;
+
+proc print_string(string: ~String, done: close) {
+    cut {
+        iter_string(string, iter)
+        |iter: ~Iter(Char)|
+        print_string_aux(iter, done)
+    }
+};;
+
+proc print_string_end(string: ~String) {
+    cut {
+        print_string(string, done)
+        |done: wait|
+        wait done; ()
+    }
+};;
+
+proc concat_string(left: ~String, right: ~String, out: String) {
+    cut {
+        iter_string(left, left_iter)
+        |left_iter: ~Iter(Char)|
+        cut {
+            join_iter<Char>(left_iter, right_iter, iter)
+            |iter: ~Iter(Char)|
+            collect_string(iter, out)
+        }
+        |right_iter: Iter(Char)|
+        iter_string(right, right_iter)
+    }
+};;
+
+// ---------------------------------- Traits ----------------------------------
+
+proc clone_string(string: ~String, out: send String; String) {
+    cut {
+        iter_string(string, iter)
+        |iter: ~Iter(Char)|
+        cut {
+            cloner_char(cloner)
+            |cloner: ~Cloner(Char)|
+            clone_iter<Char>(iter, cloner, iter1)
+        }
+        |iter1: recv ~Iter(Char); ~Iter(Char)|
+        recv iter1(iter2);
+        send out(s. collect_string(iter1, s));
+        collect_string(iter2, out)
+    }
+};;
+
+proc rec cloner_string(cloner: Cloner(String)) {
+    case cloner of {
+        |#close: close cloner
+        |#clone:
+            recv cloner(string);
+            cut {
+                recv string1(string2);
+                send cloner(string1);
+                send cloner(string2);
+                cloner_string(cloner)
+                |string1: send String; String|
+                clone_string(string, string1)
+            }
+        |#fork:
+            send cloner(c. cloner_string(c));
+            cloner_string(cloner)
+    }
+};;
+
+proc rec drop_string(string: ~String, out: close) {
+    cut {
+        iter_string(string, iter)
+        |iter: ~Iter(Char)|
+        cut {
+            dropper_char(dropper)
+            |dropper: ~Dropper(Char)|
+            drop_iter<Char>(iter, dropper, out)
+        }
+    }
+};;
+
+proc rec dropper_string(dropper: Dropper(String)) {
+    case dropper of {
+        |#close: close dropper
+        |#drop:
+            recv dropper(string);
+            cut {
+                wait drop_out;
+                dropper_string(dropper)
+                |drop_out: close|
+                drop_string(string, drop_out)
+            }
+        |#fork:
+            send dropper(d. dropper_string(d));
+            dropper_string(dropper)
+    }
+};;
+
+// --------------------------------- Examples ---------------------------------
+
+proc hello_string(s: String) {
+    #h s; #e s; #l s; #l s; #o s;
+    #eof s; close s
+};;
+
+proc world_string(s: String) {
+    #w s; #o s; #r s; #l s; #d s;
+    #eof s; close s
+};;
+
+proc hello_world_string(s: String) {
+    cut {
+        hello_string(hello)
+        |hello: ~String|
+        cut {
+            #sp world; world_string(world)
+            |world: ~String|
+            concat_string(hello, world, hello_world)
+        }
+        |hello_world: ~String|
+        cut {
+            #nl nl; empty_string(nl)
+            |nl: ~String|
+            concat_string(hello_world, nl, s)
+        }
+    }
+};;
+
+proc test_string_hello_world() {
+    cut {
+        hello_world_string(s)
+        |s: ~String|
+        print_string_end(s)
+    }
+};;
+
+proc test_string_iter_collect() {
+    cut {
+        hello_world_string(s)
+        |s: ~String|
+        iter_string(s, iter)
+        |iter: ~Iter(Char)|
+        collect_string(iter, s)
+        |s: ~String|
+        print_string_end(s)
+    }
+};;
+
+proc test_string_clone() {
+    cut {
+        hello_world_string(s)
+        |s: ~String|
+        clone_string(s, s1)
+        |s1: recv ~String; ~String|
+        recv s1(s2);
+        par { print_string_end(s1) || print_string_end(s2) }
+    }
+};;
