@@ -136,6 +136,22 @@ proc rec intersperse_iter<T>(iter: ~Iter(T), separator: ~Gen(T), out: Iter(T)) {
     }
 };;
 
+proc rec rev_iter<T>(iter: ~Iter(T), out: Iter(T)) {
+    case iter of {
+        |#close:
+            wait iter; #close out; close out
+        |#next: recv iter(t); cut {
+            #next single; send single(t); #close single; close single
+            |single: ~Iter(T)|
+            cut {
+                rev_iter<T>(iter, acc)
+                |acc: ~Iter(T)|
+                join_iter<T>(acc, single, out)
+            }
+        }
+    }
+};;
+
 // ---------------------------------- Traits ----------------------------------
 
 proc rec clone_iter<T>(iter: ~Iter(T), cloner: ~Cloner(T), out: send Iter(T); Iter(T)) {

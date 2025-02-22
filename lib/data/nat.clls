@@ -127,6 +127,46 @@ proc zero_nat(out: Nat) {
     #z out; close out
 };;
 
+proc one_nat(out: Nat) {
+    #s out; zero_nat(out)
+};;
+
+proc two_nat(out: Nat) {
+    #s out; one_nat(out)
+};;
+
+proc three_nat(out: Nat) {
+    #s out; two_nat(out)
+};;
+
+proc four_nat(out: Nat) {
+    #s out; three_nat(out)
+};;
+
+proc five_nat(out: Nat) {
+    #s out; four_nat(out)
+};;
+
+proc six_nat(out: Nat) {
+    #s out; five_nat(out)
+};;
+
+proc seven_nat(out: Nat) {
+    #s out; six_nat(out)
+};;
+
+proc eight_nat(out: Nat) {
+    #s out; seven_nat(out)
+};;
+
+proc nine_nat(out: Nat) {
+    #s out; eight_nat(out)
+};;
+
+proc ten_nat(out: Nat) {
+    #s out; nine_nat(out)
+};;
+
 // -------------------------------- Operators ---------------------------------
 
 proc rec add_nat(x: ~Nat, y: ~Nat, out: Nat) {
@@ -168,6 +208,22 @@ proc rec mul_nat(x: ~Nat, y: ~Nat, out: Nat) {
                     add_nat(y2, acc, out)
                 }
             }
+    }
+};;
+
+proc mul_nat_10(x: ~Nat, out: Nat) {
+    cut {
+        ten_nat(ten)
+        |ten: ~Nat|
+        mul_nat(x, ten, out)
+    }
+};;
+
+proc mul_nat_10_plus(x: ~Nat, y: ~Nat, out: Nat) {
+    cut {
+        mul_nat_10(x, mul)
+        |mul: ~Nat|
+        add_nat(y, mul, out)
     }
 };;
 
@@ -242,6 +298,19 @@ proc rec div_nat(x: ~Nat, y: ~Nat, out: Maybe(send Nat; Nat)) {
     }
 };;
 
+proc div_nat_10(x: ~Nat, out: send Nat; Nat) {
+    cut {
+        ten_nat(ten)
+        |ten: ~Nat|
+        div_nat(x, ten, res)
+        |res: ~Maybe(send Nat; Nat)|
+        case res of {
+            |#none: wait res; send out(q. #z q; close q); #z out; close out
+            |#some: fwd res out
+        }
+    }
+};;
+
 proc rec fold_add_nat(fold: IterFold(Nat, Nat)) {
     case fold of {
         |#close: close fold
@@ -311,31 +380,9 @@ proc into_string_iter_nat(ni: ~Iter(Nat), out: String) {
             map_iter<Nat, String>(ni, map, si)
         }
         |si: ~Iter(String)|
-        cut {
-            cut {
-                #sp sep; empty_string(sep)
-                |sep: ~String|
-                string_gen(gen, sep)
-            }
-            |gen: ~Gen(String)|
-            intersperse_iter<String>(si, gen, si2)
-        }
-        |si2: ~Iter(String)|
-        cut {
-            fold_join_string(fold)
-            |fold: ~IterFold(String, String)|
-            cut {
-                empty_string(acc)
-                |acc: ~String|
-                fold_iter<String, String>(si2, fold, acc, s)
-            }
-        }
+        intersperse_space_string_iter(si, s)
         |s: ~String|
-        cut {
-            #nl nl; empty_string(nl)
-            |nl: ~String|
-            join_string(s, nl, out)
-        }
+        append_newline_string(s, out)
     }
 };;
 
@@ -545,23 +592,5 @@ proc test_is_prime_nat() {
             |#true: wait is_prime; println("Prime"); ()
             |#false: wait is_prime; println("Not prime"); ()
         }
-    }
-};;
-
-proc test_find_primes_nat() {
-    cut {
-        // Find all primes under 50
-        #s nat; #s nat; #s nat; #s nat; #s nat; #s nat; #s nat; #s nat; #s nat; #s nat;
-        #s nat; #s nat; #s nat; #s nat; #s nat; #s nat; #s nat; #s nat; #s nat; #s nat;
-        #s nat; #s nat; #s nat; #s nat; #s nat; #s nat; #s nat; #s nat; #s nat; #s nat;
-        #s nat; #s nat; #s nat; #s nat; #s nat; #s nat; #s nat; #s nat; #s nat; #s nat;
-        #s nat; #s nat; #s nat; #s nat; #s nat; #s nat; #s nat; #s nat; #s nat; #s nat;
-        zero_nat(nat)
-        |nat: ~Nat|
-        iter_primes_nat(nat, primes)
-        |primes: ~Iter(Nat)|
-        into_string_iter_nat(primes, s)
-        |s: ~String|
-        print_string_end(s)
     }
 };;

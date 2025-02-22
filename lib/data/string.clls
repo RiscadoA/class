@@ -207,6 +207,16 @@ proc join_string(left: ~String, right: ~String, out: String) {
     }
 };;
 
+proc rev_string(string: ~String, out: String) {
+    cut {
+        iter_string(string, iter1)
+        |iter1: ~Iter(Char)|
+        rev_iter<Char>(iter1, iter2)
+        |iter2: ~Iter(Char)|
+        collect_string(iter2, out)
+    }
+};;
+
 // ---------------------------------- Traits ----------------------------------
 
 proc clone_string(string: ~String, out: send String; String) {
@@ -306,6 +316,38 @@ proc join_string_iter(iter: ~Iter(String), out: String) {
             |acc: ~String|
             fold_iter<String, String>(iter, fold, acc, out)
         }
+    }
+};;
+
+proc intersperse_space_string_iter(iter: ~Iter(String), out: String) {
+    cut {
+        cut {
+            cut {
+                #sp sep; empty_string(sep)
+                |sep: ~String|
+                string_gen(gen, sep)
+            }
+            |gen: ~Gen(String)|
+            intersperse_iter<String>(iter, gen, iter2)
+        }
+        |iter2: ~Iter(String)|
+        cut {
+            fold_join_string(fold)
+            |fold: ~IterFold(String, String)|
+            cut {
+                empty_string(acc)
+                |acc: ~String|
+                fold_iter<String, String>(iter2, fold, acc, out)
+            }
+        }
+    }
+};;
+
+proc append_newline_string(string: ~String, out: String) {
+    cut {
+        #nl nl; empty_string(nl)
+        |nl: ~String|
+        join_string(string, nl, out)
     }
 };;
 

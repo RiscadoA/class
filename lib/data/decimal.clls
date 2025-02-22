@@ -1,0 +1,238 @@
+include "nat.clls";;
+include "string.clls";;
+
+type rec Decimal {
+    choice of {
+        |#d0: close
+        |#x10p0: Decimal
+        |#x10p1: Decimal
+        |#x10p2: Decimal
+        |#x10p3: Decimal
+        |#x10p4: Decimal
+        |#x10p5: Decimal
+        |#x10p6: Decimal
+        |#x10p7: Decimal
+        |#x10p8: Decimal
+        |#x10p9: Decimal
+    }
+};;
+
+// -------------------------------- Conversion --------------------------------
+
+proc rec from_nat_decimal_aux(gas: ~Nat, nat: ~Nat, out: Decimal) {
+    case gas of {
+        |#z: wait gas; #d0 out; drop_nat(nat, out)
+        |#s: case nat of {
+            |#z: wait nat; #d0 out; drop_nat(gas, out)
+            |#s: cut {
+                #s nat2; fwd nat nat2
+                |nat2: ~Nat|
+                div_nat_10(nat2, rem)
+                |rem: recv ~Nat; ~Nat|
+                recv rem(quot);
+                cut {
+                    from_nat_decimal_aux(gas, quot, acc)
+                    |acc: ~Decimal|
+                    case rem of {
+                        |#z: wait rem; #x10p0 out; fwd acc out
+                        |#s: case rem of { |#z: wait rem; #x10p1 out; fwd acc out
+                        |#s: case rem of { |#z: wait rem; #x10p2 out; fwd acc out
+                        |#s: case rem of { |#z: wait rem; #x10p3 out; fwd acc out
+                        |#s: case rem of { |#z: wait rem; #x10p4 out; fwd acc out
+                        |#s: case rem of { |#z: wait rem; #x10p5 out; fwd acc out
+                        |#s: case rem of { |#z: wait rem; #x10p6 out; fwd acc out
+                        |#s: case rem of { |#z: wait rem; #x10p7 out; fwd acc out
+                        |#s: case rem of { |#z: wait rem; #x10p8 out; fwd acc out
+                        |#s: case rem of { |#z: wait rem; #x10p9 out; fwd acc out
+                        |#s:
+                            // Should be unreachable, but we need to satisfy the type checker
+                            cut {
+                                drop_nat(rem, drop_done)
+                                |drop_done: wait|
+                                wait drop_done;
+                                fwd acc out
+                            }
+                    }}}}}}}}}}
+                }
+            } 
+        }
+    }
+};;
+
+proc from_nat_decimal(nat: ~Nat, out: Decimal) {
+    cut {
+        clone_nat(nat, nat1)
+        |nat1: recv ~Nat; ~Nat|
+        recv nat1(nat2);
+        cut {
+            #s gas; fwd nat1 gas
+            |gas: ~Nat|
+            from_nat_decimal_aux(gas, nat2, out)
+        }
+    }
+};;
+
+proc rec into_nat_decimal(dec: ~Decimal, out: Nat) {
+    case dec of {
+        |#d0: wait dec; #z out; close out
+        |#x10p0: cut { into_nat_decimal(dec, acc) |acc: ~Nat| mul_nat_10_plus(acc, x, out) |x: Nat| zero_nat(x) }
+        |#x10p1: cut { into_nat_decimal(dec, acc) |acc: ~Nat| mul_nat_10_plus(acc, x, out) |x: Nat| one_nat(x) }
+        |#x10p2: cut { into_nat_decimal(dec, acc) |acc: ~Nat| mul_nat_10_plus(acc, x, out) |x: Nat| two_nat(x) }
+        |#x10p3: cut { into_nat_decimal(dec, acc) |acc: ~Nat| mul_nat_10_plus(acc, x, out) |x: Nat| three_nat(x) }
+        |#x10p4: cut { into_nat_decimal(dec, acc) |acc: ~Nat| mul_nat_10_plus(acc, x, out) |x: Nat| four_nat(x) }
+        |#x10p5: cut { into_nat_decimal(dec, acc) |acc: ~Nat| mul_nat_10_plus(acc, x, out) |x: Nat| five_nat(x) }
+        |#x10p6: cut { into_nat_decimal(dec, acc) |acc: ~Nat| mul_nat_10_plus(acc, x, out) |x: Nat| six_nat(x) }
+        |#x10p7: cut { into_nat_decimal(dec, acc) |acc: ~Nat| mul_nat_10_plus(acc, x, out) |x: Nat| seven_nat(x) }
+        |#x10p8: cut { into_nat_decimal(dec, acc) |acc: ~Nat| mul_nat_10_plus(acc, x, out) |x: Nat| eight_nat(x) }
+        |#x10p9: cut { into_nat_decimal(dec, acc) |acc: ~Nat| mul_nat_10_plus(acc, x, out) |x: Nat| nine_nat(x) }
+    }
+};;
+
+// -------------------------------- Operators ---------------------------------
+
+proc rec into_string_decimal_aux2(dec: ~Decimal, out: String) {
+    case dec of {
+        |#d0: wait dec; empty_string(out)
+        |#x10p0: #d0 out; into_string_decimal_aux2(dec, out)
+        |#x10p1: #d1 out; into_string_decimal_aux2(dec, out)
+        |#x10p2: #d2 out; into_string_decimal_aux2(dec, out)
+        |#x10p3: #d3 out; into_string_decimal_aux2(dec, out)
+        |#x10p4: #d4 out; into_string_decimal_aux2(dec, out)
+        |#x10p5: #d5 out; into_string_decimal_aux2(dec, out)
+        |#x10p6: #d6 out; into_string_decimal_aux2(dec, out)
+        |#x10p7: #d7 out; into_string_decimal_aux2(dec, out)
+        |#x10p8: #d8 out; into_string_decimal_aux2(dec, out)
+        |#x10p9: #d9 out; into_string_decimal_aux2(dec, out)
+    }
+};;
+
+proc into_string_decimal_aux1(dec: ~Decimal, out: String) {
+    cut {
+        into_string_decimal_aux2(dec, s)
+        |s: ~String|
+        rev_string(s, out)
+    }
+};;
+
+proc into_string_decimal(dec: ~Decimal, out: String) {
+    case dec of {
+        |#d0: wait dec; #d0 out; empty_string(out)
+        |#x10p0: cut { #x10p0 d; fwd dec d |d: ~Decimal| into_string_decimal_aux1(d, out) }
+        |#x10p1: cut { #x10p1 d; fwd dec d |d: ~Decimal| into_string_decimal_aux1(d, out) }
+        |#x10p2: cut { #x10p2 d; fwd dec d |d: ~Decimal| into_string_decimal_aux1(d, out) }
+        |#x10p3: cut { #x10p3 d; fwd dec d |d: ~Decimal| into_string_decimal_aux1(d, out) }
+        |#x10p4: cut { #x10p4 d; fwd dec d |d: ~Decimal| into_string_decimal_aux1(d, out) }
+        |#x10p5: cut { #x10p5 d; fwd dec d |d: ~Decimal| into_string_decimal_aux1(d, out) }
+        |#x10p6: cut { #x10p6 d; fwd dec d |d: ~Decimal| into_string_decimal_aux1(d, out) }
+        |#x10p7: cut { #x10p7 d; fwd dec d |d: ~Decimal| into_string_decimal_aux1(d, out) }
+        |#x10p8: cut { #x10p8 d; fwd dec d |d: ~Decimal| into_string_decimal_aux1(d, out) }
+        |#x10p9: cut { #x10p9 d; fwd dec d |d: ~Decimal| into_string_decimal_aux1(d, out) }
+    }
+};;
+
+proc rec map_into_string_decimal(map: IterMap(Decimal, String)) {
+    case map of {
+        |#close: close map
+        |#next:
+            recv map(dec);
+            send map(str. into_string_decimal(dec, str));
+            map_into_string_decimal(map)
+    }
+};;
+
+proc rec map_from_nat_decimal(map: IterMap(Nat, Decimal)) {
+    case map of {
+        |#close: close map
+        |#next:
+            recv map(nat);
+            send map(dec. from_nat_decimal(nat, dec));
+            map_from_nat_decimal(map)
+    }
+};;
+
+proc into_decimal_string_iter_nat(iter: ~Iter(Nat), out: String) {
+    cut {
+        cut {
+            map_from_nat_decimal(map)
+            |map: ~IterMap(Nat, Decimal)|
+            map_iter<Nat, Decimal>(iter, map, dec_iter)
+        }
+        |dec_iter: ~Iter(Decimal)|
+        cut {
+            map_into_string_decimal(map)
+            |map: ~IterMap(Decimal, String)|
+            map_iter<Decimal, String>(dec_iter, map, str_iter)
+        }
+        |str_iter: ~Iter(String)|
+        intersperse_space_string_iter(str_iter, s)
+        |s: ~String|
+        append_newline_string(s, out)
+    }
+};;
+
+// --------------------------------- Examples ---------------------------------
+
+proc test_into_nat_decimal() {
+    cut {
+        #x10p1 d; #x10p1 d; #d0 d; close d
+        |d: ~Decimal|
+        into_nat_decimal(d, n)
+        |n: ~Nat|
+        into_string_nat(n, s)
+        |s: ~String|
+        print_string_end(s)
+    }
+};;
+
+proc test_into_from_nat_decimal() {
+    cut {
+        #x10p5 d; #x10p1 d; #d0 d; close d
+        |d: ~Decimal|
+        into_nat_decimal(d, n)
+        |n: ~Nat|
+        from_nat_decimal(n, d)
+        |d: ~Decimal|
+        into_string_decimal(d, s)
+        |s: ~String|
+        print_string_end(s)
+    }
+};;
+
+proc test_into_string_decimal() {
+    cut {
+        #x10p1 d; #x10p0 d; #x10p2 d; #d0 d; close d
+        |d: ~Decimal|
+        into_string_decimal(d, s)
+        |s: ~String|
+        print_string_end(s)
+    }
+};;
+
+proc test_iter_nat_decimal() {
+    cut {
+        #x10p0 d; #x10p0 d; #x10p1 d; #d0 d; close d
+        |d: ~Decimal|
+        into_nat_decimal(d, n)
+        |n: ~Nat|
+        iter_nat(n, ns)
+        |ns: ~Iter(Nat)|
+        into_decimal_string_iter_nat(ns, s)
+        |s: ~String|
+        print_string_end(s)
+    }
+};;
+
+proc test_find_primes_dec() {
+    cut {
+        // Find all primes under 500
+        #x10p0 d; #x10p0 d; #x10p5 d; #d0 d; close d
+        |d: ~Decimal|
+        into_nat_decimal(d, n)
+        |n: ~Nat|
+        iter_primes_nat(n, primes)
+        |primes: ~Iter(Nat)|
+        into_decimal_string_iter_nat(primes, s)
+        |s: ~String|
+        print_string_end(s)
+    }
+};;
