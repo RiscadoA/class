@@ -4,6 +4,8 @@ include "../traits/comparer.clls";;
 include "string.clls";;
 include "iter.clls";;
 include "maybe.clls";;
+include "bool.clls";;
+include "gen.clls";;
 
 type rec Nat {
     choice of {
@@ -337,6 +339,156 @@ proc into_string_iter_nat(ni: ~Iter(Nat), out: String) {
     }
 };;
 
+proc nat_gen(gen: Gen(Nat), nat: ~Nat) {
+    cut {
+        cloner_nat(cloner)
+        |cloner: ~Cloner(Nat)|
+        cloning_gen<Nat>(gen, cloner, nat, dropper)
+        |dropper: recv ~Nat; close|
+        recv dropper(n);
+        drop_nat(n, dropper)
+    }
+};;
+
+proc is_divisible_nat_pair(x: ~Nat, y: ~Nat, out: Bool) {
+    cut {
+        div_nat(x, y, rem)
+        |rem: ~Maybe(send Nat; Nat)|
+        case rem of {
+            |#none: wait rem; #false out; close out
+            |#some:
+                recv rem(quot);
+                case rem of {
+                    |#z: wait rem; #true out; drop_nat(quot, out)
+                    |#s:
+                        cut {
+                            drop_nat(quot, quot_done)
+                            |quot_done: wait|
+                            wait quot_done;
+                            #false out;
+                            drop_nat(rem, out)
+                        }
+                }
+        }
+    }
+};;
+
+proc rec is_divisible_nat_fold(fold: IterFold(Nat, Bool), natg: ~Gen(Nat)) {
+    case fold of {
+        |#close: #close natg; wait natg; close fold
+        |#next:
+            recv fold(divisor);
+            recv fold(acc);
+            case acc of {
+                |#true:
+                    wait acc;
+                    send fold(b. true_bool(b));
+                    cut {
+                        drop_nat(divisor, drop_done)
+                        |drop_done: wait|
+                        wait drop_done;
+                        is_divisible_nat_fold(fold, natg)
+                    }
+                |#false:
+                    wait acc;
+                    #next natg; recv natg(nat);
+                    cut {
+                        is_divisible_nat_pair(nat, divisor, is_divisible)
+                        |is_divisible: ~Bool|
+                        send fold(is_divisible);
+                        is_divisible_nat_fold(fold, natg)
+                    }
+            }
+    }
+};;
+
+proc skip_one_iter_nat(iter: ~Iter(Nat), out: Iter(Nat)) {
+    case iter of {
+        |#close: wait iter; #close out; close out
+        |#next:
+            recv iter(nat);
+            cut {
+                drop_nat(nat, drop_done)
+                |drop_done: wait|
+                wait drop_done;
+                fwd iter out
+            }
+    }
+};;
+
+proc is_prime_nat(nat: ~Nat, out: Bool) {
+    cut {
+        nat_gen(natg, nat)
+        |natg: ~Gen(Nat)|
+        #next natg; recv natg(n);
+        send pipe(larger_than_one. cut {
+            iter_nat(n, all)
+            |all: ~Iter(Nat)|
+            skip_one_iter_nat(all, larger_than_zero)
+            |larger_than_zero: ~Iter(Nat)|
+            skip_one_iter_nat(larger_than_zero, larger_than_one)
+        });
+        send pipe(f. is_divisible_nat_fold(f, natg));
+        send pipe(b. false_bool(b));
+        close pipe
+        |pipe: recv ~Iter(Nat); recv ~IterFold(Nat, Bool); recv ~Bool; wait|
+        recv pipe(ns);
+        recv pipe(fold);
+        recv pipe(base);
+        wait pipe;
+        fold_iter<Nat, Bool>(ns, fold, base, is_divisible)
+        |is_divisible: ~Bool|
+        not_bool(is_divisible, out)
+    }
+};;
+
+proc rec iter_primes_nat_aux(nats: ~Iter(Nat), out: Iter(Nat)) {
+    case nats of {
+        |#close: wait nats; #close out; close out
+        |#next:
+            recv nats(nat);
+            cut {
+                clone_nat(nat, nat1)
+                |nat1: recv ~Nat; ~Nat|
+                recv nat1(nat2);
+                send pipe(b. is_prime_nat(nat1, b));
+                send pipe(nat2);
+                close pipe
+                |pipe: recv ~Bool; recv ~Nat; wait|
+                recv pipe(is_prime);
+                recv pipe(nat);
+                wait pipe;
+                case is_prime of {
+                    |#true:
+                        wait is_prime;
+                        #next out; send out(nat);
+                        iter_primes_nat_aux(nats, out)
+                    |#false:
+                        wait is_prime;
+                        cut {
+                            drop_nat(nat, drop_done)
+                            |drop_done: wait|
+                            wait drop_done;
+                            iter_primes_nat_aux(nats, out)
+                        }
+                }
+            }
+    }
+};;
+
+// Generates an iterator over all prime numbers less than the given natural number.
+proc iter_primes_nat(nat: ~Nat, out: Iter(Nat)) {
+    cut {
+        iter_nat(nat, all)
+        |all: ~Iter(Nat)|
+        skip_one_iter_nat(all, larger_than_zero)
+        |larger_than_zero: ~Iter(Nat)|
+        skip_one_iter_nat(larger_than_zero, larger_than_one)
+        |larger_than_one: ~Iter(Nat)|
+        iter_primes_nat_aux(larger_than_one, out)
+    }
+};;
+
 // --------------------------------- Examples ---------------------------------
 
 proc test_iter_nat() {
@@ -379,5 +531,37 @@ proc test_div_nat() {
                     print_string_end(str)
                 }
         }
+    }
+};;
+
+proc test_is_prime_nat() {
+    cut {
+        // 11 is prime
+        #s nat; #s nat; #s nat; #s nat; #s nat; #s nat; #s nat; #s nat; #s nat; #s nat; #s nat; zero_nat(nat)
+        |nat: ~Nat|
+        is_prime_nat(nat, is_prime)
+        |is_prime: ~Bool|
+        case is_prime of {
+            |#true: wait is_prime; println("Prime"); ()
+            |#false: wait is_prime; println("Not prime"); ()
+        }
+    }
+};;
+
+proc test_find_primes_nat() {
+    cut {
+        // Find all primes under 50
+        #s nat; #s nat; #s nat; #s nat; #s nat; #s nat; #s nat; #s nat; #s nat; #s nat;
+        #s nat; #s nat; #s nat; #s nat; #s nat; #s nat; #s nat; #s nat; #s nat; #s nat;
+        #s nat; #s nat; #s nat; #s nat; #s nat; #s nat; #s nat; #s nat; #s nat; #s nat;
+        #s nat; #s nat; #s nat; #s nat; #s nat; #s nat; #s nat; #s nat; #s nat; #s nat;
+        #s nat; #s nat; #s nat; #s nat; #s nat; #s nat; #s nat; #s nat; #s nat; #s nat;
+        zero_nat(nat)
+        |nat: ~Nat|
+        iter_primes_nat(nat, primes)
+        |primes: ~Iter(Nat)|
+        into_string_iter_nat(primes, s)
+        |s: ~String|
+        print_string_end(s)
     }
 };;

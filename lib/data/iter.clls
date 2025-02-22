@@ -2,6 +2,7 @@ include "../traits/cloner.clls";;
 include "../traits/dropper.clls";;
 include "gen.clls";;
 include "bool.clls";;
+include "maybe.clls";;
 
 type rec Iter(T) {
     choice of {
@@ -31,6 +32,17 @@ proc empty_iter<T>(iter: Iter(T)) {
 };;
 
 // -------------------------------- Operators ---------------------------------
+
+proc next_iter<T>(iter: ~Iter(T), out: Maybe(send T; Iter(T))) {
+    case iter of {
+        |#close:
+            wait iter;
+            #none out; close out
+        |#next:
+            recv iter(v);
+            #some out; send out(v); fwd out iter
+    }
+};;
 
 proc rec join_iter<T>(head: ~Iter(T), tail: ~Iter(T), out: Iter(T)) {
     case head of {
