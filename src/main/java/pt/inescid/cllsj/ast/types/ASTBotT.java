@@ -7,7 +7,9 @@ import pt.inescid.cllsj.ast.ASTTypeVisitor;
 
 public class ASTBotT extends ASTType {
 
-  public boolean equalst(ASTType t, Env<EnvEntry> e, boolean lit, Trail trail) {
+  public boolean equalst(ASTType t, Env<EnvEntry> e, boolean lit, Trail trail) throws Exception {
+    t = t.unfoldType(e);
+    t = ASTType.unfoldRec(t);
     return (t instanceof ASTBotT);
   }
 
