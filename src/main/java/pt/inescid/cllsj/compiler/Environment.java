@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
+import pt.inescid.cllsj.TypeEntry;
 import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.nodes.ASTBang;
 import pt.inescid.cllsj.ast.nodes.ASTCall;
@@ -18,11 +19,13 @@ import pt.inescid.cllsj.ast.nodes.ASTId;
 import pt.inescid.cllsj.ast.nodes.ASTMix;
 import pt.inescid.cllsj.ast.nodes.ASTNode;
 import pt.inescid.cllsj.ast.nodes.ASTPrintLn;
+import pt.inescid.cllsj.ast.nodes.ASTProcDef;
 import pt.inescid.cllsj.ast.nodes.ASTRecv;
 import pt.inescid.cllsj.ast.nodes.ASTSelect;
 import pt.inescid.cllsj.ast.nodes.ASTSend;
 import pt.inescid.cllsj.ast.nodes.ASTUnfold;
 import pt.inescid.cllsj.ast.nodes.ASTWhy;
+import pt.inescid.cllsj.ast.types.ASTIdT;
 import pt.inescid.cllsj.ast.types.ASTType;
 
 public class Environment {
@@ -32,13 +35,32 @@ public class Environment {
   private Map<String, Integer> typeVarIndices = new HashMap<>();
   private Env<EnvEntry> ep;
 
-  public Environment(Env<EnvEntry> ep) {
-    this(ep, null);
-  }
-
   public Environment(Env<EnvEntry> ep, Environment parent) {
     this.ep = ep;
     this.parent = parent;
+  }
+
+  public Environment(Env<EnvEntry> ep, ASTProcDef procDef) {
+    // Add entries for the type arguments of the process.
+    for (String arg : procDef.getTArgs()) {
+      ep = ep.assoc(arg, new TypeEntry(new ASTIdT(arg)));
+    }
+    this.ep = ep;
+    this.parent = null;
+
+    // Add all arguments to the environment.
+    for (String arg : procDef.getTArgs()) {
+      insertTypeVar(arg);
+    }
+    for (int i = 0; i < procDef.getArgs().size(); i++) {
+      insert(procDef.getArgs().get(i), procDef.getArgTypes().get(i));
+    }
+    for (int i = 0; i < procDef.getGArgs().size(); i++) {
+      insert(procDef.getGArgs().get(i), procDef.getGArgTypes().get(i));
+    }
+
+    // Add all sessions ocurring in the process definition to the environment.
+    insertFromNode(procDef.getRhs());
   }
 
   public Env<EnvEntry> getEp() {

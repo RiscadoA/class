@@ -2,11 +2,12 @@
 
 CLLSflags=""
 Cflags=""
+onlyir=false
 debug=false
 run=false
 ofile=""
 
-while getopts ":dOtrp:o:" opt; do
+while getopts ":dOtirp:o:" opt; do
     case $opt in
         d)
             Cflags="-g"
@@ -17,6 +18,10 @@ while getopts ":dOtrp:o:" opt; do
             ;;
         t)
             CLLSflags="$CLLSflags -t"
+            ;;
+        i)
+            onlyir=true
+            CLLSflags="$CLLSflags -i"
             ;;
         r)
             run=true
@@ -54,23 +59,30 @@ fi
 if [ -z $ofile ]; then
     basename=$(basename $1)
     cfile=bin/${basename%.*}.c
+    irfile=bin/${basename%.*}.ir
     pfile=bin/${basename%.*}
     mkdir -p bin
 else
     cfile=$ofile.c
+    irfile=$ofile.ir
     pfile=$ofile
 fi
 
-echo "@@@@@@ Generating C code to $cfile..." &&
-./CLLSj $CLLSflags -c $1 > $cfile &&
-echo "@@@@@@ Compiling $cfile to $pfile..." && 
-gcc $Cflags -o $pfile $cfile 
+if [ $onlyir = true ]; then
+    echo "@@@@@@ Generating IR code to $irfile..." &&
+    ./CLLSj $CLLSflags -c $1 > $irfile
+else
+    echo "@@@@@@ Generating C code to $cfile..." &&
+    ./CLLSj $CLLSflags -c $1 > $cfile &&
+    echo "@@@@@@ Compiling $cfile to $pfile..." && 
+    gcc $Cflags -o $pfile $cfile &&
 
-if [ $run = true ]; then
-    echo "@@@@@@ Running $pfile:" &&
-    if [ $debug = true ]; then
-        gdb ./$pfile
-    else
-        ./$pfile
+    if [ $run = true ]; then
+        echo "@@@@@@ Running $pfile:" &&
+        if [ $debug = true ]; then
+            gdb ./$pfile
+        else
+            ./$pfile
+        fi
     fi
 fi

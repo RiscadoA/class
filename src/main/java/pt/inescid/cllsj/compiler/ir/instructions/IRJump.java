@@ -2,10 +2,10 @@ package pt.inescid.cllsj.compiler.ir.instructions;
 
 import pt.inescid.cllsj.compiler.ir.IRVisitor;
 
-public class IRNewTask extends IRInstruction {
+public class IRJump extends IRInstruction {
   private String label;
 
-  public IRNewTask(String label) {
+  public IRJump(String label) {
     this.label = label;
   }
 
@@ -20,6 +20,6 @@ public class IRNewTask extends IRInstruction {
 
   @Override
   public String toString() {
-    return "newTask(" + label + ")";
+    return "jump(" + label + ")";
   }
 }

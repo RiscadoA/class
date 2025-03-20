@@ -1,25 +1,33 @@
 package pt.inescid.cllsj.compiler.ir;
 
+import java.util.HashMap;
 import java.util.Map;
 
 public class IRProgram {
-    private Map<String, IRProcess> processes;
+  private Map<String, IRProcess> processes;
 
-    public IRProgram(Map<String, IRProcess> processes) {
-        this.processes = processes;
-    }
+  public IRProgram() {
+    this.processes = new HashMap<>();
+  }
 
-    public Map<String, IRProcess> getProcesses() {
-        return processes;
-    }
+  public void addProcess(String name, IRProcess process) {
+    processes.put(name, process);
+  }
 
-    @Override
-    public String toString() {
-        String result = "";
-        for (Map.Entry<String, IRProcess> entry : processes.entrySet()) {
-            result += entry.getKey() + ":\n";
-            result += entry.getValue().toString().indent(4);
-        }
-        return result;
+  public Map<String, IRProcess> getProcesses() {
+    return processes;
+  }
+
+  @Override
+  public String toString() {
+    String result = "";
+    for (Map.Entry<String, IRProcess> entry : processes.entrySet()) {
+      if (!result.isEmpty()) {
+        result += "\n";
+      }
+      result += entry.getKey() + ":\n";
+      result += entry.getValue().toString() + "\n";
     }
+    return result;
+  }
 }

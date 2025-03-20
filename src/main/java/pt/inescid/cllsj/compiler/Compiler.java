@@ -3,7 +3,6 @@ package pt.inescid.cllsj.compiler;
 import java.io.FileInputStream;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -15,9 +14,10 @@ import pt.inescid.cllsj.ast.nodes.ASTInclude;
 import pt.inescid.cllsj.ast.nodes.ASTPList;
 import pt.inescid.cllsj.ast.nodes.ASTProgram;
 import pt.inescid.cllsj.ast.nodes.ASTProgramWithIncludes;
+import pt.inescid.cllsj.compiler.ir.IRProgram;
 
 public class Compiler {
-  public static int compile(String path, String entryProcess, boolean trace) {
+  public static int compile(String path, String entryProcess, boolean trace, boolean onlyIR) {
     ASTProgram ast;
     try {
       ast = Compiler.parse(Path.of(path));
@@ -51,11 +51,25 @@ public class Compiler {
       return 1;
     }
 
+    IRProgram ir;
+    try {
+      ir = IRGenerator.generate(ep, ast);
+    } catch (Exception e) {
+      System.err.println("IR generation error: " + e.getMessage());
+      e.printStackTrace();
+      return 1;
+    }
+
+    if (onlyIR) {
+      System.out.print(ir.toString());
+      return 0;
+    }
+
     String output;
     try {
-      output = Generator.generate(entryProcess, ep, ast, trace);
+      output = CGenerator.generate(ir, entryProcess, trace);
     } catch (Exception e) {
-      System.err.println("Generation error: " + e.getMessage());
+      System.err.println("C Generation error: " + e.getMessage());
       e.printStackTrace();
       return 1;
     }

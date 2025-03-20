@@ -302,6 +302,10 @@ public class ASTProcDef extends ASTNode {
   public void subs(String x, String y) { // implements x/y (substitutes y by x)
   }
 
+  public boolean hasArguments() {
+    return !args.isEmpty() || !gargs.isEmpty() || !targs.isEmpty();
+  }
+
   @Override
   public void accept(ASTNodeVisitor visitor) {
     visitor.visit(this);

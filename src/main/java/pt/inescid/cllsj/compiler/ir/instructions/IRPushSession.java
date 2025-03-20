@@ -3,29 +3,29 @@ package pt.inescid.cllsj.compiler.ir.instructions;
 import pt.inescid.cllsj.compiler.ir.IRVisitor;
 
 public class IRPushSession extends IRInstruction {
-    private int record;
-    private int argRecord;
+  private int record;
+  private int argRecord;
 
-    public IRPushSession(int record, int argRecord) {
-        this.record = record;
-        this.argRecord = argRecord;
-    }
+  public IRPushSession(int record, int argRecord) {
+    this.record = record;
+    this.argRecord = argRecord;
+  }
 
-    public int getRecord() {
-        return record;
-    }
+  public int getRecord() {
+    return record;
+  }
 
-    public int getArgRecord() {
-        return argRecord;
-    }
+  public int getArgRecord() {
+    return argRecord;
+  }
 
-    @Override
-    public void accept(IRVisitor visitor) {
-        visitor.visit(this);
-    }
+  @Override
+  public void accept(IRVisitor visitor) {
+    visitor.visit(this);
+  }
 
-    @Override
-    public String toString() {
-        return "pushSession(" + record + ", " + argRecord + ")";
-    }
+  @Override
+  public String toString() {
+    return "pushSession(" + record + ", " + argRecord + ")";
+  }
 }

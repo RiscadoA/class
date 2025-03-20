@@ -1,32 +1,42 @@
 package pt.inescid.cllsj.compiler.ir;
 
+import java.util.ArrayList;
 import java.util.List;
-
 import pt.inescid.cllsj.compiler.ir.instructions.IRInstruction;
 
 public class IRBlock {
-    private List<IRInstruction> instructions;
+  private String label;
+  private List<IRInstruction> instructions;
 
-    public IRBlock(List<IRInstruction> instructions) {
-        this.instructions = instructions;
-    }
+  public IRBlock(String label) {
+    this.label = label;
+    this.instructions = new ArrayList<>();
+  }
 
-    public List<IRInstruction> getInstructions() {
-        return instructions;
-    }
+  public String getLabel() {
+    return label;
+  }
 
-    public void accept(IRVisitor visitor) {
-        for (IRInstruction instruction : instructions) {
-            instruction.accept(visitor);
-        }
-    }
+  public List<IRInstruction> getInstructions() {
+    return instructions;
+  }
 
-    @Override
-    public String toString() {
-        String result = "";
-        for (IRInstruction instruction : instructions) {
-            result += instruction.toString() + "\n";
-        }
-        return result;
+  public void add(IRInstruction instruction) {
+    instructions.add(instruction);
+  }
+
+  @Override
+  public String toString() {
+    String result = "";
+    if (label != null) {
+      result += label + ":";
     }
+    for (IRInstruction instruction : instructions) {
+      if (!result.isEmpty()) {
+        result += "\n";
+      }  
+      result += "    " + instruction.toString();
+    }
+    return result;
+  }
 }
