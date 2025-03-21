@@ -8,6 +8,7 @@ import pt.inescid.cllsj.Server;
 import pt.inescid.cllsj.TypeError;
 import pt.inescid.cllsj.VBool;
 import pt.inescid.cllsj.Value;
+import pt.inescid.cllsj.ast.ASTExprVisitor;
 import pt.inescid.cllsj.ast.types.ASTBotT;
 import pt.inescid.cllsj.ast.types.ASTCoLboolT;
 import pt.inescid.cllsj.ast.types.ASTCoLstringT;
@@ -21,6 +22,14 @@ public class ASTNEq extends ASTExpr {
   public ASTNEq(ASTExpr _lhs, ASTExpr _rhs) {
     lhs = _lhs;
     rhs = _rhs;
+  }
+
+  public ASTExpr getLhs() {
+    return lhs;
+  }
+
+  public ASTExpr getRhs() {
+    return rhs;
   }
 
   public void ASTupdCont(ASTNode newCont, ASTNode caller) throws Exception {
@@ -73,5 +82,10 @@ public class ASTNEq extends ASTExpr {
     Value vleft = lhs.eval(ed, eg);
     Value vright = rhs.eval(ed, eg);
     return new VBool(!vleft.equal(vright));
+  }
+
+  @Override
+  public void accept(ASTExprVisitor visitor) {
+    visitor.visit(this);
   }
 }

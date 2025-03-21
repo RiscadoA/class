@@ -1,14 +1,14 @@
 package pt.inescid.cllsj.compiler.ir.expressions;
 
 import pt.inescid.cllsj.compiler.ir.IRExpressionVisitor;
-import pt.inescid.cllsj.compiler.ir.type.IRIntT;
+import pt.inescid.cllsj.compiler.ir.type.IRBoolT;
 import pt.inescid.cllsj.compiler.ir.type.IRType;
 
-public class IRDiv extends IRExpression {
+public class IROr extends IRExpression {
   private final IRExpression lhs;
   private final IRExpression rhs;
 
-  public IRDiv(IRExpression lhs, IRExpression rhs) {
+  public IROr(IRExpression lhs, IRExpression rhs) {
     this.lhs = lhs;
     this.rhs = rhs;
   }
@@ -28,11 +28,11 @@ public class IRDiv extends IRExpression {
 
   @Override
   public IRType getType() {
-    return new IRIntT();
+    return new IRBoolT();
   }
 
   @Override
   public String toString() {
-    return "(" + lhs + " / " + rhs + ")";
+    return "(" + lhs + " or " + rhs + ")";
   }
 }

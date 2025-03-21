@@ -8,6 +8,7 @@ import pt.inescid.cllsj.Server;
 import pt.inescid.cllsj.TypeError;
 import pt.inescid.cllsj.VBool;
 import pt.inescid.cllsj.Value;
+import pt.inescid.cllsj.ast.ASTExprVisitor;
 import pt.inescid.cllsj.ast.types.ASTCoLboolT;
 import pt.inescid.cllsj.ast.types.ASTType;
 
@@ -17,6 +18,10 @@ public class ASTNot extends ASTExpr {
 
   public ASTNot(ASTExpr _ex) {
     ex = _ex;
+  }
+
+  public ASTExpr getExpr() {
+    return ex;
   }
 
   public void typecheck(Env<ASTType> ed, Env<ASTType> eg, Env<EnvEntry> ep) throws Exception {}
@@ -55,5 +60,10 @@ public class ASTNot extends ASTExpr {
   public Value eval(Env<LinSession> ed, Env<Server> eg) throws Exception {
     VBool vex = (VBool) ex.eval(ed, eg);
     return new VBool(!vex.get());
+  }
+
+  @Override
+  public void accept(ASTExprVisitor visitor) {
+    visitor.visit(this);
   }
 }

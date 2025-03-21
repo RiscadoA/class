@@ -1,6 +1,7 @@
 package pt.inescid.cllsj.compiler.ir.expressions;
 
 import pt.inescid.cllsj.compiler.ir.IRExpressionVisitor;
+import pt.inescid.cllsj.compiler.ir.type.IRIntT;
 import pt.inescid.cllsj.compiler.ir.type.IRType;
 
 public class IRMul extends IRExpression {
@@ -27,11 +28,11 @@ public class IRMul extends IRExpression {
 
   @Override
   public IRType getType() {
-    return lhs.getType();
+    return new IRIntT();
   }
 
   @Override
   public String toString() {
-    return lhs + " * " + rhs;
+    return "(" + lhs + " * " + rhs + ")";
   }
 }

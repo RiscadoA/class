@@ -3,52 +3,12 @@ package pt.inescid.cllsj.compiler;
 import java.util.ArrayList;
 import java.util.Map;
 import java.util.Optional;
-import pt.inescid.cllsj.compiler.ir.IRBlock;
-import pt.inescid.cllsj.compiler.ir.IRExpressionVisitor;
-import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
-import pt.inescid.cllsj.compiler.ir.IRProcess;
-import pt.inescid.cllsj.compiler.ir.IRProgram;
-import pt.inescid.cllsj.compiler.ir.IRTypeVisitor;
-import pt.inescid.cllsj.compiler.ir.expressions.IRAdd;
-import pt.inescid.cllsj.compiler.ir.expressions.IRBool;
-import pt.inescid.cllsj.compiler.ir.expressions.IRDiv;
-import pt.inescid.cllsj.compiler.ir.expressions.IRExpression;
-import pt.inescid.cllsj.compiler.ir.expressions.IRInt;
-import pt.inescid.cllsj.compiler.ir.expressions.IRMul;
-import pt.inescid.cllsj.compiler.ir.expressions.IRString;
-import pt.inescid.cllsj.compiler.ir.expressions.IRSub;
-import pt.inescid.cllsj.compiler.ir.expressions.IRVar;
-import pt.inescid.cllsj.compiler.ir.instructions.IRBranchOnPolarity;
-import pt.inescid.cllsj.compiler.ir.instructions.IRCallProcess;
+import pt.inescid.cllsj.compiler.ir.*;
+import pt.inescid.cllsj.compiler.ir.expressions.*;
+import pt.inescid.cllsj.compiler.ir.instructions.*;
 import pt.inescid.cllsj.compiler.ir.instructions.IRCallProcess.LinearArgument;
 import pt.inescid.cllsj.compiler.ir.instructions.IRCallProcess.TypeArgument;
-import pt.inescid.cllsj.compiler.ir.instructions.IRFlip;
-import pt.inescid.cllsj.compiler.ir.instructions.IRForward;
-import pt.inescid.cllsj.compiler.ir.instructions.IRFreeSession;
-import pt.inescid.cllsj.compiler.ir.instructions.IRInstruction;
-import pt.inescid.cllsj.compiler.ir.instructions.IRJump;
-import pt.inescid.cllsj.compiler.ir.instructions.IRNewSession;
-import pt.inescid.cllsj.compiler.ir.instructions.IRNewTask;
-import pt.inescid.cllsj.compiler.ir.instructions.IRNextTask;
-import pt.inescid.cllsj.compiler.ir.instructions.IRPopClose;
-import pt.inescid.cllsj.compiler.ir.instructions.IRPopSession;
-import pt.inescid.cllsj.compiler.ir.instructions.IRPopTag;
-import pt.inescid.cllsj.compiler.ir.instructions.IRPrint;
-import pt.inescid.cllsj.compiler.ir.instructions.IRPushClose;
-import pt.inescid.cllsj.compiler.ir.instructions.IRPushExpression;
-import pt.inescid.cllsj.compiler.ir.instructions.IRPushSession;
-import pt.inescid.cllsj.compiler.ir.instructions.IRPushTag;
-import pt.inescid.cllsj.compiler.ir.instructions.IRReturn;
-import pt.inescid.cllsj.compiler.ir.type.IRBoolT;
-import pt.inescid.cllsj.compiler.ir.type.IRCloseT;
-import pt.inescid.cllsj.compiler.ir.type.IRExponentialT;
-import pt.inescid.cllsj.compiler.ir.type.IRIntT;
-import pt.inescid.cllsj.compiler.ir.type.IRRecT;
-import pt.inescid.cllsj.compiler.ir.type.IRSessionT;
-import pt.inescid.cllsj.compiler.ir.type.IRStringT;
-import pt.inescid.cllsj.compiler.ir.type.IRTagT;
-import pt.inescid.cllsj.compiler.ir.type.IRType;
-import pt.inescid.cllsj.compiler.ir.type.IRVarT;
+import pt.inescid.cllsj.compiler.ir.type.*;
 
 public class CGenerator extends IRInstructionVisitor {
   private static final String TMP_TASK = "tmp_task";
@@ -200,6 +160,15 @@ public class CGenerator extends IRInstructionVisitor {
     gen.putStatement("char* str = malloc(12)");
     gen.putStatement("sprintf(str, \"%d\", value)");
     gen.putStatement("return str");
+    gen.decIndent();
+    gen.putLine("}");
+    gen.putBlankLine();
+    gen.putLine("int string_equal(char* str1, char* str2) {");
+    gen.incIndent();
+    gen.putStatement("int result = strcmp(str1, str2) == 0");
+    gen.putStatement("free(str1)");
+    gen.putStatement("free(str2)");
+    gen.putStatement("return result");
     gen.decIndent();
     gen.putLine("}");
     gen.putBlankLine();
@@ -907,6 +876,40 @@ public class CGenerator extends IRInstructionVisitor {
     @Override
     public void visit(IRDiv expr) {
       binary("/", expr.getLhs(), expr.getRhs());
+    }
+
+    @Override
+    public void visit(IREq expr) {
+      if (expr.getLhs() instanceof IRString || expr.getRhs() instanceof IRString) {
+        code += "string_equal(" + expressionToString(expr.getLhs()) + ", " + expressionToString(expr.getRhs()) + ")";
+      } else {
+        binary("==", expr.getLhs(), expr.getRhs());
+      }
+    }
+
+    @Override
+    public void visit(IRLt expr) {
+      binary("<", expr.getLhs(), expr.getRhs());
+    }
+
+    @Override
+    public void visit(IRGt expr) {
+      binary(">", expr.getLhs(), expr.getRhs());
+    }
+
+    @Override
+    public void visit(IRAnd expr) {
+      binary("&&", expr.getLhs(), expr.getRhs());
+    }
+
+    @Override
+    public void visit(IROr expr) {
+      binary("||", expr.getLhs(), expr.getRhs());
+    }
+
+    @Override
+    public void visit(IRNot expr) {
+      code += "!(" + expression(expr.getInner()) + ")";
     }
   }
 

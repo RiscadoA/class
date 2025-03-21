@@ -32,6 +32,6 @@ public class IRAdd extends IRExpression {
 
   @Override
   public String toString() {
-    return lhs + " + " + rhs;
+    return "(" + lhs + " + " + rhs + ")";
   }
 }

@@ -9,6 +9,7 @@ import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.TypeError;
 import pt.inescid.cllsj.VBool;
 import pt.inescid.cllsj.Value;
+import pt.inescid.cllsj.ast.ASTExprVisitor;
 import pt.inescid.cllsj.ast.types.ASTBotT;
 import pt.inescid.cllsj.ast.types.ASTCoLboolT;
 import pt.inescid.cllsj.ast.types.ASTType;
@@ -20,6 +21,14 @@ public class ASTAnd extends ASTExpr {
   public ASTAnd(ASTExpr _lhs, ASTExpr _rhs) {
     lhs = _lhs;
     rhs = _rhs;
+  }
+
+  public ASTExpr getLhs() {
+    return lhs;
+  }
+
+  public ASTExpr getRhs() {
+    return rhs;
   }
 
   public void ASTupdCont(ASTNode newCont, ASTNode caller) throws Exception {
@@ -75,5 +84,10 @@ public class ASTAnd extends ASTExpr {
     VBool vleft = (VBool) lhs.sameval(ed);
     VBool vright = (VBool) rhs.sameval(ed);
     return new VBool(vleft.get() && vright.get());
+  }
+
+  @Override
+  public void accept(ASTExprVisitor visitor) {
+    visitor.visit(this);
   }
 }

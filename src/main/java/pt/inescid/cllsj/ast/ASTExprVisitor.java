@@ -37,4 +37,32 @@ public abstract class ASTExprVisitor {
   public void visit(ASTDiv expr) {
     visit((ASTExpr) expr);
   }
+
+  public void visit(ASTEq expr) {
+    visit((ASTExpr) expr);
+  }
+
+  public void visit(ASTNEq expr) {
+    visit((ASTExpr) expr);
+  }
+
+  public void visit(ASTLt expr) {
+    visit((ASTExpr) expr);
+  }
+
+  public void visit(ASTGt expr) {
+    visit((ASTExpr) expr);
+  }
+
+  public void visit(ASTAnd expr) {
+    visit((ASTExpr) expr);
+  }
+
+  public void visit(ASTOr expr) {
+    visit((ASTExpr) expr);
+  }
+
+  public void visit(ASTNot expr) {
+    visit((ASTExpr) expr);
+  }
 }

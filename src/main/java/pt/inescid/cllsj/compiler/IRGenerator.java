@@ -11,6 +11,7 @@ import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.ast.ASTExprVisitor;
 import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.nodes.ASTAdd;
+import pt.inescid.cllsj.ast.nodes.ASTAnd;
 import pt.inescid.cllsj.ast.nodes.ASTBang;
 import pt.inescid.cllsj.ast.nodes.ASTBool;
 import pt.inescid.cllsj.ast.nodes.ASTCall;
@@ -21,13 +22,19 @@ import pt.inescid.cllsj.ast.nodes.ASTCoExpr;
 import pt.inescid.cllsj.ast.nodes.ASTCut;
 import pt.inescid.cllsj.ast.nodes.ASTDiv;
 import pt.inescid.cllsj.ast.nodes.ASTEmpty;
+import pt.inescid.cllsj.ast.nodes.ASTEq;
 import pt.inescid.cllsj.ast.nodes.ASTExpr;
 import pt.inescid.cllsj.ast.nodes.ASTFwd;
+import pt.inescid.cllsj.ast.nodes.ASTGt;
 import pt.inescid.cllsj.ast.nodes.ASTId;
 import pt.inescid.cllsj.ast.nodes.ASTInt;
+import pt.inescid.cllsj.ast.nodes.ASTLt;
 import pt.inescid.cllsj.ast.nodes.ASTMix;
 import pt.inescid.cllsj.ast.nodes.ASTMul;
+import pt.inescid.cllsj.ast.nodes.ASTNEq;
 import pt.inescid.cllsj.ast.nodes.ASTNode;
+import pt.inescid.cllsj.ast.nodes.ASTNot;
+import pt.inescid.cllsj.ast.nodes.ASTOr;
 import pt.inescid.cllsj.ast.nodes.ASTPrintLn;
 import pt.inescid.cllsj.ast.nodes.ASTProcDef;
 import pt.inescid.cllsj.ast.nodes.ASTProgram;
@@ -47,11 +54,17 @@ import pt.inescid.cllsj.compiler.ir.IRBlock;
 import pt.inescid.cllsj.compiler.ir.IRProcess;
 import pt.inescid.cllsj.compiler.ir.IRProgram;
 import pt.inescid.cllsj.compiler.ir.expressions.IRAdd;
+import pt.inescid.cllsj.compiler.ir.expressions.IRAnd;
 import pt.inescid.cllsj.compiler.ir.expressions.IRBool;
 import pt.inescid.cllsj.compiler.ir.expressions.IRDiv;
+import pt.inescid.cllsj.compiler.ir.expressions.IREq;
 import pt.inescid.cllsj.compiler.ir.expressions.IRExpression;
+import pt.inescid.cllsj.compiler.ir.expressions.IRGt;
 import pt.inescid.cllsj.compiler.ir.expressions.IRInt;
+import pt.inescid.cllsj.compiler.ir.expressions.IRLt;
 import pt.inescid.cllsj.compiler.ir.expressions.IRMul;
+import pt.inescid.cllsj.compiler.ir.expressions.IRNot;
+import pt.inescid.cllsj.compiler.ir.expressions.IROr;
 import pt.inescid.cllsj.compiler.ir.expressions.IRString;
 import pt.inescid.cllsj.compiler.ir.expressions.IRSub;
 import pt.inescid.cllsj.compiler.ir.expressions.IRVar;
@@ -565,6 +578,41 @@ public class IRGenerator extends ASTNodeVisitor {
     @Override
     public void visit(ASTDiv expr) {
       ir = new IRDiv(expression(expr.getLhs()), expression(expr.getRhs()));
+    }
+
+    @Override
+    public void visit(ASTEq expr) {
+      ir = new IREq(expression(expr.getLhs()), expression(expr.getRhs()));
+    }
+
+    @Override
+    public void visit(ASTNEq expr) {
+      ir = new IRNot(new IREq(expression(expr.getLhs()), expression(expr.getRhs())));
+    }
+
+    @Override
+    public void visit(ASTLt expr) {
+      ir = new IRLt(expression(expr.getLhs()), expression(expr.getRhs()));
+    }
+
+    @Override
+    public void visit(ASTGt expr) {
+      ir = new IRGt(expression(expr.getLhs()), expression(expr.getRhs()));
+    }
+
+    @Override
+    public void visit(ASTAnd expr) {
+      ir = new IRAnd(expression(expr.getLhs()), expression(expr.getRhs()));
+    }
+
+    @Override
+    public void visit(ASTOr expr) {
+      ir = new IROr(expression(expr.getLhs()), expression(expr.getRhs()));
+    }
+
+    @Override
+    public void visit(ASTNot expr) {
+      ir = new IRNot(expression(expr.getExpr()));
     }
   }
 }
