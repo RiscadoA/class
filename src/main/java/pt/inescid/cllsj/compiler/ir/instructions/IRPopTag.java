@@ -4,20 +4,38 @@ import java.util.Map;
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 
 public class IRPopTag extends IRInstruction {
-  private int record;
-  private Map<Integer, String> labels; // Labels to jump to for each tag.
+  public static class Case {
+    private String label;
+    private int endPoints;
 
-  public IRPopTag(int record, Map<Integer, String> labels) {
+    public Case(String label, int endPoints) {
+      this.label = label;
+      this.endPoints = endPoints;
+    }
+
+    public String getLabel() {
+      return label;
+    }
+
+    public int getEndPoints() {
+      return endPoints;
+    }
+  }
+
+  private int record;
+  private Map<Integer, Case> cases; // Cases for each tag.
+
+  public IRPopTag(int record, Map<Integer, Case> cases) {
     this.record = record;
-    this.labels = labels;
+    this.cases = cases;
   }
 
   public int getRecord() {
     return record;
   }
 
-  public Map<Integer, String> getLabels() {
-    return labels;
+  public Map<Integer, Case> getCases() {
+    return cases;
   }
 
   @Override
@@ -28,8 +46,8 @@ public class IRPopTag extends IRInstruction {
   @Override
   public String toString() {
     String str = "popTag(" + record;
-    for (Map.Entry<Integer, String> entry : this.labels.entrySet()) {
-      str += ", " + entry.getKey() + " -> " + entry.getValue();
+    for (Map.Entry<Integer, Case> entry : this.cases.entrySet()) {
+      str += ", " + entry.getKey() + " -> " + entry.getValue().label + " (" + entry.getValue().endPoints + ")";
     }
     return str + ")";
   }

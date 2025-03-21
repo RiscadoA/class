@@ -16,6 +16,7 @@ import pt.inescid.cllsj.compiler.ir.instructions.IRPopTag;
 import pt.inescid.cllsj.compiler.ir.instructions.IRPushClose;
 import pt.inescid.cllsj.compiler.ir.instructions.IRPushSession;
 import pt.inescid.cllsj.compiler.ir.instructions.IRPushTag;
+import pt.inescid.cllsj.compiler.ir.instructions.IRReturn;
 
 public abstract class IRInstructionVisitor {
   // Catch all for instructions which do not have their own visit method
@@ -62,6 +63,10 @@ public abstract class IRInstructionVisitor {
   }
 
   public void visit(IRFlip instruction) {
+    visit((IRInstruction) instruction);
+  }
+
+  public void visit(IRReturn instruction) {
     visit((IRInstruction) instruction);
   }
 

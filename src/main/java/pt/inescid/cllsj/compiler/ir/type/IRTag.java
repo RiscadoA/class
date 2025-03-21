@@ -22,10 +22,10 @@ public class IRTag extends IRType {
 
     @Override
     public String toString() {
-        String result = "tag {";
+        String result = "tag";
         for (int i = 0; i < choices.size(); i++) {
-            result += " " + i + ": " + choices.get(i);
+            result += " { " + i + ": " + choices.get(i) + " }";
         }
-        return result + " }";
+        return result;
     }
 }

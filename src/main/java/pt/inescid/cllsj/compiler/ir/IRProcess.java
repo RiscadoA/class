@@ -7,13 +7,15 @@ public class IRProcess {
   private boolean hasArguments;
   private int recordCount;
   private int typeCount;
+  private int endPoints;
   private IRBlock entry;
   private List<IRBlock> blocks;
 
-  public IRProcess(boolean hasArguments, int recordCount, int typeCount) {
+  public IRProcess(boolean hasArguments, int recordCount, int typeCount, int endPoints) {
     this.hasArguments = hasArguments;
     this.recordCount = recordCount;
     this.typeCount = typeCount;
+    this.endPoints = endPoints;
     this.entry = new IRBlock(null);
     this.blocks = new ArrayList<>();
   }
@@ -28,6 +30,10 @@ public class IRProcess {
 
   public int getTypeCount() {
     return typeCount;
+  }
+
+  public int getEndPoints() {
+    return endPoints;
   }
 
   public IRBlock getEntry() {

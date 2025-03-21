@@ -3,8 +3,6 @@ package pt.inescid.cllsj.compiler;
 import java.util.ArrayList;
 import java.util.List;
 
-import pt.inescid.cllsj.Env;
-import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.ast.ASTTypeVisitor;
 import pt.inescid.cllsj.ast.types.ASTBotT;
 import pt.inescid.cllsj.ast.types.ASTCaseT;
@@ -66,7 +64,7 @@ public class ASTIntoIRType extends ASTTypeVisitor {
     public void visit(ASTCaseT type) {
         List<IRType> choices = new ArrayList<>();
         for (int i = 0; i < type.getcases().size(); i++) {
-            ir = new IRSession(ASTIntoIRType.convert(env, type.getCaseType(type.getLabel(i))));
+            choices.add(new IRSession(ASTIntoIRType.convert(env, type.getCaseType(type.getLabel(i)))));
         }
         ir = new IRTag(choices);
     }
@@ -75,7 +73,7 @@ public class ASTIntoIRType extends ASTTypeVisitor {
     public void visit(ASTOfferT type) {
         List<IRType> choices = new ArrayList<>();
         for (int i = 0; i < type.getcases().size(); i++) {
-            ir = new IRSession(ASTIntoIRType.convert(env, type.getCaseType(type.getLabel(i))));
+            choices.add(new IRSession(ASTIntoIRType.convert(env, type.getCaseType(type.getLabel(i)))));
         }
         ir = new IRTag(choices);
     }

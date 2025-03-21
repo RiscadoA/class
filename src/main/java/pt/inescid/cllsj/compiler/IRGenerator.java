@@ -9,6 +9,9 @@ import java.util.Stack;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.ast.ASTNodeVisitor;
+import pt.inescid.cllsj.ast.nodes.ASTBang;
+import pt.inescid.cllsj.ast.nodes.ASTCall;
+import pt.inescid.cllsj.ast.nodes.ASTCase;
 import pt.inescid.cllsj.ast.nodes.ASTClose;
 import pt.inescid.cllsj.ast.nodes.ASTCoClose;
 import pt.inescid.cllsj.ast.nodes.ASTCut;
@@ -17,10 +20,14 @@ import pt.inescid.cllsj.ast.nodes.ASTFwd;
 import pt.inescid.cllsj.ast.nodes.ASTId;
 import pt.inescid.cllsj.ast.nodes.ASTMix;
 import pt.inescid.cllsj.ast.nodes.ASTNode;
+import pt.inescid.cllsj.ast.nodes.ASTPrintLn;
 import pt.inescid.cllsj.ast.nodes.ASTProcDef;
 import pt.inescid.cllsj.ast.nodes.ASTProgram;
 import pt.inescid.cllsj.ast.nodes.ASTRecv;
+import pt.inescid.cllsj.ast.nodes.ASTSelect;
 import pt.inescid.cllsj.ast.nodes.ASTSend;
+import pt.inescid.cllsj.ast.nodes.ASTUnfold;
+import pt.inescid.cllsj.ast.nodes.ASTWhy;
 import pt.inescid.cllsj.ast.types.ASTIdT;
 import pt.inescid.cllsj.ast.types.ASTNotT;
 import pt.inescid.cllsj.ast.types.ASTType;
@@ -38,8 +45,11 @@ import pt.inescid.cllsj.compiler.ir.instructions.IRNewTask;
 import pt.inescid.cllsj.compiler.ir.instructions.IRNextTask;
 import pt.inescid.cllsj.compiler.ir.instructions.IRPopClose;
 import pt.inescid.cllsj.compiler.ir.instructions.IRPopSession;
+import pt.inescid.cllsj.compiler.ir.instructions.IRPopTag;
 import pt.inescid.cllsj.compiler.ir.instructions.IRPushClose;
 import pt.inescid.cllsj.compiler.ir.instructions.IRPushSession;
+import pt.inescid.cllsj.compiler.ir.instructions.IRPushTag;
+import pt.inescid.cllsj.compiler.ir.instructions.IRReturn;
 import pt.inescid.cllsj.compiler.ir.instructions.IRCall.LinearArgument;
 import pt.inescid.cllsj.compiler.ir.instructions.IRCall.TypeArgument;
 import pt.inescid.cllsj.compiler.ir.type.IRType;
@@ -65,58 +75,6 @@ public class IRGenerator extends ASTNodeVisitor {
     return gen.program;
   }
 
-  private static class Polarity {
-    private final Optional<String> id;
-    private final boolean polarity;
-
-    public Polarity(ASTType type, Env<EnvEntry> ep) {
-      boolean dual = false;
-      if (type instanceof ASTNotT) {
-        type = ((ASTNotT) type).getin();
-        assert type instanceof ASTIdT; // Type checker should guarantee this, right?
-        dual = true;
-      }
-  
-      if (type instanceof ASTIdT) {
-        try {
-          type = type.unfoldType(ep);
-        } catch (Exception e) {
-          e.printStackTrace(System.err);
-          System.exit(1);
-        }
-
-        id = Optional.of(((ASTIdT) type).getid());
-        polarity = dual;
-      } else {
-        id = Optional.empty();
-        polarity = dual ^ type.isPosCatch(ep);
-      }
-    }
-
-    public boolean isKnown() {
-      return id.isEmpty();
-    }
-
-    public boolean isPositive() {
-      assert isKnown();
-      return polarity;
-    }
-
-    public boolean isDual() {
-      assert !isKnown();
-      return polarity;
-    }
-
-    public boolean isPositiveOrDual() {
-      return polarity;
-    }
-
-    public String getTypeId() {
-      assert !isKnown();
-      return id.get();
-    }
-  }
-
   // ==================================== AST node visitors =====================================
 
   private void visit(IRBlock block, ASTNode node) {
@@ -138,7 +96,7 @@ public class IRGenerator extends ASTNodeVisitor {
   @Override
   public void visit(ASTProcDef node) {
     Environment env = processEnvironments.get(node.getId());
-    process = new IRProcess(node.hasArguments(), env.getSize(), env.getTypeVarCount());
+    process = new IRProcess(node.hasArguments(), env.getSize(), env.getTypeVarCount(), countEndPoints(node.getRhs()));
     program.addProcess(node.getId(), process);
     environments.push(env);
     visit(process.getEntry(), node.getRhs());
@@ -195,7 +153,7 @@ public class IRGenerator extends ASTNodeVisitor {
   @Override
   public void visit(ASTClose node) {
     block.add(new IRPushClose(record(node.getCh())));
-    block.add(new IRFlip(record(node.getCh())));
+    block.add(new IRReturn(record(node.getCh())));
   }
 
   @Override
@@ -246,6 +204,41 @@ public class IRGenerator extends ASTNodeVisitor {
   }
 
   @Override
+  public void visit(ASTSelect node) {
+    IRBlock rhs = process.addBlock("select_rhs");
+
+    block.add(new IRPushTag(record(node.getCh()), node.getLabelIndex()));
+
+    // Flip if the remainder of the session type is negative.
+    branchOnPolarity(node.getRhsType(),
+      () -> {
+        block.add(new IRJump(rhs.getLabel()));
+      }, () -> {
+        block.add(new IRFlip(record(node.getCh())));
+        block.add(new IRJump(rhs.getLabel()));
+      });
+
+    visit(rhs, node.getRhs());
+  }
+
+  @Override
+  public void visit(ASTCase node) {
+    Map<Integer, IRPopTag.Case> cases = new HashMap<>();
+    block.add(new IRPopTag(record(node.getCh()), cases));
+
+    for (int i = 0; i < node.getCaseCount(); ++i) {
+      ASTNode caseNode = node.getCase(node.getCaseLabelFromIndex(i));
+      // We don't count the root path, as that's already accounted for in the process
+      int endPointCount = countEndPoints(caseNode) - 1; 
+
+      IRBlock block = process.addBlock("case_" + node.getCaseLabelFromIndex(i).substring(1));
+      cases.put(i, new IRPopTag.Case(block.getLabel(), endPointCount));
+
+      visit(block, caseNode);
+    }
+  }
+
+  @Override
   public void visit(ASTId node) {
     List<LinearArgument> linearArguments = new ArrayList<>();
     List<TypeArgument> typeArguments = new ArrayList<>();
@@ -266,6 +259,60 @@ public class IRGenerator extends ASTNodeVisitor {
   }
 
   // ======================================== Utilities =========================================
+
+  private static class Polarity {
+    private final Optional<String> id;
+    private final boolean polarity;
+
+    public Polarity(ASTType type, Env<EnvEntry> ep) {
+      boolean dual = false;
+      if (type instanceof ASTNotT) {
+        type = ((ASTNotT) type).getin();
+        assert type instanceof ASTIdT; // Type checker should guarantee this, right?
+        dual = true;
+      }
+  
+      if (type instanceof ASTIdT) {
+        try {
+          type = type.unfoldType(ep);
+        } catch (Exception e) {
+          e.printStackTrace(System.err);
+          System.exit(1);
+        }
+      }
+
+      if (type instanceof ASTIdT) {
+        id = Optional.of(((ASTIdT) type).getid());
+        polarity = dual;
+      } else {
+        id = Optional.empty();
+        polarity = dual ^ type.isPosCatch(ep);
+      }
+    }
+
+    public boolean isKnown() {
+      return id.isEmpty();
+    }
+
+    public boolean isPositive() {
+      assert isKnown();
+      return polarity;
+    }
+
+    public boolean isDual() {
+      assert !isKnown();
+      return polarity;
+    }
+
+    public boolean isPositiveOrDual() {
+      return polarity;
+    }
+
+    public String getTypeId() {
+      assert !isKnown();
+      return id.get();
+    }
+  }
 
   private Polarity polarity(ASTType type) {
     return new Polarity(type, environment().getEp());
@@ -311,5 +358,109 @@ public class IRGenerator extends ASTNodeVisitor {
     }
 
     return environment().getTypeVarIndex(name);
+  }
+
+  private int countEndPoints(ASTNode node) {
+    EndPointCounter counter = new EndPointCounter();
+    node.accept(counter);
+    return counter.count;
+  }
+
+  private static class EndPointCounter extends ASTNodeVisitor {
+    private int count = 1;
+
+    @Override
+    public void visit(ASTNode node) {
+      throw new UnsupportedOperationException(
+          "Unsupported AST node: " + node.getClass().getSimpleName());
+    }
+
+    @Override
+    public void visit(ASTCut node) {
+      count += 1;
+      node.getLhs().accept(this);
+      node.getRhs().accept(this);
+    }
+
+    @Override
+    public void visit(ASTMix node) {
+      count += 1;
+      node.getLhs().accept(this);
+      node.getRhs().accept(this);
+    }
+
+    @Override
+    public void visit(ASTEmpty node) {
+      // Done
+    }
+
+    @Override
+    public void visit(ASTClose node) {
+      // Done
+    }
+
+    @Override
+    public void visit(ASTId node) {
+      // Done
+    }
+
+    @Override
+    public void visit(ASTFwd node) {
+      // Done
+    }
+
+    @Override
+    public void visit(ASTCoClose node) {
+      node.getRhs().accept(this);
+    }
+
+    @Override
+    public void visit(ASTSelect node) {
+      node.getRhs().accept(this);
+    }
+
+    @Override
+    public void visit(ASTCase node) {
+      for (int i = 0; i < node.getCaseCount(); ++i) {
+        node.getCase(node.getCaseLabelFromIndex(i)).accept(this);
+      }
+    }
+
+    @Override
+    public void visit(ASTSend node) {
+      count += 1;
+      node.getLhs().accept(this);
+      node.getRhs().accept(this);
+    }
+
+    @Override
+    public void visit(ASTRecv node) {
+      node.getRhs().accept(this);
+    }
+
+    @Override
+    public void visit(ASTPrintLn node) {
+      node.getRhs().accept(this);
+    }
+
+    @Override
+    public void visit(ASTUnfold node) {
+      node.getRhs().accept(this);
+    }
+
+    @Override
+    public void visit(ASTCall node) {
+      node.getRhs().accept(this);
+    }
+
+    @Override
+    public void visit(ASTBang node) {
+      node.getRhs().accept(this);
+    }
+
+    @Override
+    public void visit(ASTWhy node) {
+      node.getRhs().accept(this);
+    }
   }
 }

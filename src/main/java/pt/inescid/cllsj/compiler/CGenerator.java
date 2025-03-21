@@ -1,7 +1,6 @@
 package pt.inescid.cllsj.compiler;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import pt.inescid.cllsj.compiler.ir.IRBlock;
@@ -25,6 +24,7 @@ import pt.inescid.cllsj.compiler.ir.instructions.IRPopTag;
 import pt.inescid.cllsj.compiler.ir.instructions.IRPushClose;
 import pt.inescid.cllsj.compiler.ir.instructions.IRPushSession;
 import pt.inescid.cllsj.compiler.ir.instructions.IRPushTag;
+import pt.inescid.cllsj.compiler.ir.instructions.IRReturn;
 import pt.inescid.cllsj.compiler.ir.instructions.IRCall.LinearArgument;
 import pt.inescid.cllsj.compiler.ir.instructions.IRCall.TypeArgument;
 import pt.inescid.cllsj.compiler.ir.type.IRClose;
@@ -51,6 +51,7 @@ public class CGenerator extends IRInstructionVisitor {
   private int envSize;
   private Optional<String> blockName;
   private boolean trace;
+  private boolean entryCall = true;
 
   public static String generate(IRProgram ir, String entryProcess, boolean trace) {
     final CGenerator gen = new CGenerator(ir, trace);
@@ -86,6 +87,7 @@ public class CGenerator extends IRInstructionVisitor {
     // Define the environment struct.
     gen.putLine("struct environment {");
     gen.incIndent();
+    gen.putLine("int end_points;");
     gen.decIndent();
     gen.putLine("};");
     gen.putBlankLine();
@@ -100,7 +102,7 @@ public class CGenerator extends IRInstructionVisitor {
     gen.putLine("};");
     gen.putBlankLine();
 
-    // Utility macro for accessing records on a given environment.
+    // Utility macro for accessing recordvisitors on a given environment.
     gen.put("#define RECORD(env, rec) (*(struct record**)(");
     gen.put("(char*)(env) + ");
     gen.put("sizeof(struct environment) + ");
@@ -113,7 +115,7 @@ public class CGenerator extends IRInstructionVisitor {
     gen.put("#define TYPE(env, size, ty) (*(struct type*)(");
     gen.put("(char*)(env) + ");
     gen.put("sizeof(struct environment) + ");
-    gen.put("sizeof(struct record*) * size +");
+    gen.put("sizeof(struct record*) * size + ");
     gen.put("sizeof(struct type) * ty");
     gen.put("))");
     gen.putLineEnd();
@@ -228,6 +230,11 @@ public class CGenerator extends IRInstructionVisitor {
     IRProcess process = ir.getProcesses().get(instruction.getProcessName());
 
     if (instruction.getLinearArguments().isEmpty()) {
+      if (!entryCall) {
+        putIf("--" + endPoints() + " == 0", () -> putFreeEnvironment(ENV));
+      } else {
+        entryCall = false;
+      }
       putAllocEnvironment(ENV, process);
     } else {
       putAssign(TMP_ENV, ENV);
@@ -250,8 +257,11 @@ public class CGenerator extends IRInstructionVisitor {
         }
         putAssign(typeSize(ENV, arg.getTargetType()), size(arg.getSourceType()));
       }
+
+      putIf("--" + endPoints(TMP_ENV) + " == 0", () -> putFreeEnvironment(TMP_ENV));
     }
 
+    putAssign(endPoints(), process.getEndPoints());
     putConstantGoto("proc_" + instruction.getProcessName());
   }
 
@@ -292,6 +302,9 @@ public class CGenerator extends IRInstructionVisitor {
         record(recordContEnv(i.getNegRecord()), recordContRecord(i.getNegRecord())),
         record(i.getPosRecord()));
 
+    // Decrement the end points and free the environment if necessary.
+    putIf("--" + endPoints() + " == 0", () -> putFreeEnvironment(ENV));
+
     // Finally, free the negative record and jump to the continuation.
     putFreeRecord(TMP_RECORD);
     putAssign(ENV, TMP_ENV);
@@ -315,6 +328,23 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   @Override
+  public void visit(IRReturn i) {
+    putAssign(TMP_CONT, recordCont(i.getRecord()));
+    putIfElse(
+      "--" + endPoints() + " == 0",
+      () -> {
+        putAssign(TMP_ENV, recordContEnv(i.getRecord()));
+        putFreeEnvironment(ENV);
+        putAssign(ENV, TMP_ENV);
+        putComputedGoto(TMP_CONT);
+      },
+      () -> {
+        putAssign(ENV, recordContEnv(i.getRecord()));
+        putComputedGoto(TMP_CONT);
+      });
+  }
+
+  @Override
   public void visit(IRPopSession instruction) {
     putAssign(record(instruction.getArgRecord()), popRecord(instruction.getRecord()));
   }
@@ -329,10 +359,17 @@ public class CGenerator extends IRInstructionVisitor {
     putLine("switch (" + popTag(instruction.getRecord()) + ") {");
     incIndent();
 
-    for (Map.Entry<Integer, String> entry : instruction.getLabels().entrySet()) {
+    // We'll take the end points of all other cases for each case, since these paths won't be taken
+    Integer totalEndPoints = 0;
+    for (Map.Entry<Integer, IRPopTag.Case> entry : instruction.getCases().entrySet()) {
+      totalEndPoints += entry.getValue().getEndPoints();
+    }
+
+    for (Map.Entry<Integer, IRPopTag.Case> entry : instruction.getCases().entrySet()) {
       putLine("case " + entry.getKey() + ":");
       incIndent();
-      putConstantGoto(blockLabel(entry.getValue()));
+      putAssign(endPoints(), endPoints() + " - " + (totalEndPoints - entry.getValue().getEndPoints()));
+      putConstantGoto(blockLabel(entry.getValue().getLabel()));
       decIndent();
     }
 
@@ -373,6 +410,7 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRNextTask instruction) {
+    putIf("--" + endPoints() + " == 0", () -> putFreeEnvironment(ENV));
     putAssign(TMP_TASK, TASK);
     putAssign(TASK, taskNext(TASK));
     putAssign(TMP_CONT, taskCont(TMP_TASK));
@@ -397,15 +435,10 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRBranchOnPolarity instruction) {
-    putLine("if (" + typePolarity(ENV, instruction.getType()) + ") {");
-    incIndent();
-    putConstantGoto(blockLabel(instruction.getPosLabel()));
-    decIndent();
-    putLine("} else {");
-    incIndent();
-    putConstantGoto(blockLabel(instruction.getNegLabel()));
-    decIndent();
-    putLine("}");
+    putIfElse(
+      typePolarity(ENV, instruction.getType()),
+      () -> putConstantGoto(blockLabel(instruction.getPosLabel())),
+      () -> putConstantGoto(blockLabel(instruction.getNegLabel())));
   }
 
   // =============================== Expression building helpers ================================
@@ -420,6 +453,14 @@ public class CGenerator extends IRInstructionVisitor {
 
   private String taskContEnv(String task) {
     return task + "->cont_env";
+  }
+
+  private String endPoints(String env) {
+    return env + "->end_points";
+  }
+
+  private String endPoints() {
+    return endPoints(ENV);
   }
 
   private String typePolarity(String env, int ty) {
@@ -515,6 +556,9 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   private void putFreeEnvironment(String var) {
+    if (trace) {
+      putPrintLn("[endCall(" + procName + ")]");
+    }
     putLine("free(" + var + ");");
   }
 
@@ -574,6 +618,26 @@ public class CGenerator extends IRInstructionVisitor {
 
   private void putComputedGoto(String address) {
     putStatement("goto *" + address);
+  }
+
+  private void putIf(String condition, Runnable then) {
+    putLine("if (" + condition + ") {");
+    incIndent();
+    then.run();
+    decIndent();
+    putLine("}");
+  }
+
+  private void putIfElse(String condition, Runnable then, Runnable otherwise) {
+    putLine("if (" + condition + ") {");
+    incIndent();
+    then.run();
+    decIndent();
+    putLine("} else {");
+    incIndent();
+    otherwise.run();
+    decIndent();
+    putLine("}");
   }
 
   private void putStatement(String statement) {
