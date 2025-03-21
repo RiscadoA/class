@@ -1,7 +1,8 @@
 package pt.inescid.cllsj.compiler.ir;
 
 import pt.inescid.cllsj.compiler.ir.instructions.IRBranchOnPolarity;
-import pt.inescid.cllsj.compiler.ir.instructions.IRCall;
+import pt.inescid.cllsj.compiler.ir.instructions.IRCallExponential;
+import pt.inescid.cllsj.compiler.ir.instructions.IRCallProcess;
 import pt.inescid.cllsj.compiler.ir.instructions.IRFlip;
 import pt.inescid.cllsj.compiler.ir.instructions.IRForward;
 import pt.inescid.cllsj.compiler.ir.instructions.IRFreeSession;
@@ -11,9 +12,13 @@ import pt.inescid.cllsj.compiler.ir.instructions.IRNewSession;
 import pt.inescid.cllsj.compiler.ir.instructions.IRNewTask;
 import pt.inescid.cllsj.compiler.ir.instructions.IRNextTask;
 import pt.inescid.cllsj.compiler.ir.instructions.IRPopClose;
+import pt.inescid.cllsj.compiler.ir.instructions.IRPopExponential;
 import pt.inescid.cllsj.compiler.ir.instructions.IRPopSession;
 import pt.inescid.cllsj.compiler.ir.instructions.IRPopTag;
+import pt.inescid.cllsj.compiler.ir.instructions.IRPrint;
 import pt.inescid.cllsj.compiler.ir.instructions.IRPushClose;
+import pt.inescid.cllsj.compiler.ir.instructions.IRPushExponential;
+import pt.inescid.cllsj.compiler.ir.instructions.IRPushExpression;
 import pt.inescid.cllsj.compiler.ir.instructions.IRPushSession;
 import pt.inescid.cllsj.compiler.ir.instructions.IRPushTag;
 import pt.inescid.cllsj.compiler.ir.instructions.IRReturn;
@@ -74,7 +79,7 @@ public abstract class IRInstructionVisitor {
     visit((IRInstruction) instruction);
   }
 
-  public void visit(IRCall instruction) {
+  public void visit(IRCallProcess instruction) {
     visit((IRInstruction) instruction);
   }
 
@@ -83,6 +88,26 @@ public abstract class IRInstructionVisitor {
   }
 
   public void visit(IRBranchOnPolarity instruction) {
+    visit((IRInstruction) instruction);
+  }
+
+  public void visit(IRPushExponential instruction) {
+    visit((IRInstruction) instruction);
+  }
+
+  public void visit(IRPopExponential instruction) {
+    visit((IRInstruction) instruction);
+  }
+
+  public void visit(IRCallExponential instruction) {
+    visit((IRInstruction) instruction);
+  }
+
+  public void visit(IRPrint instruction) {
+    visit((IRInstruction) instruction);
+  }
+
+  public void visit(IRPushExpression instruction) {
     visit((IRInstruction) instruction);
   }
 }

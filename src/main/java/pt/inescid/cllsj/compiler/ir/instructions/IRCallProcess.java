@@ -1,12 +1,11 @@
 package pt.inescid.cllsj.compiler.ir.instructions;
 
 import java.util.List;
-
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 import pt.inescid.cllsj.compiler.ir.type.IRType;
-import pt.inescid.cllsj.compiler.ir.type.IRVar;
+import pt.inescid.cllsj.compiler.ir.type.IRVarT;
 
-public class IRCall extends IRInstruction {
+public class IRCallProcess extends IRInstruction {
   public static class LinearArgument {
     private int sourceRecord;
     private int targetRecord;
@@ -50,9 +49,9 @@ public class IRCall extends IRInstruction {
     public boolean isDual() {
       return isDual;
     }
-    
+
     public boolean isPositive() {
-      assert !(sourceType instanceof IRVar);
+      assert !(sourceType instanceof IRVarT);
       return isDual;
     }
   }
@@ -61,7 +60,8 @@ public class IRCall extends IRInstruction {
   private List<LinearArgument> linearArguments;
   private List<TypeArgument> typeArguments;
 
-  public IRCall(String processName, List<LinearArgument> linearArguments, List<TypeArgument> typeArguments) {
+  public IRCallProcess(
+      String processName, List<LinearArgument> linearArguments, List<TypeArgument> typeArguments) {
     this.processName = processName;
     this.linearArguments = linearArguments;
     this.typeArguments = typeArguments;
@@ -92,7 +92,7 @@ public class IRCall extends IRInstruction {
         str += ", ";
       }
 
-      if (arg.getSourceType() instanceof IRVar) {
+      if (arg.getSourceType() instanceof IRVarT) {
         if (arg.isDual()) {
           str += "dual ";
         }

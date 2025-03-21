@@ -4,12 +4,24 @@ import java.util.ArrayList;
 import java.util.Map;
 import java.util.Optional;
 import pt.inescid.cllsj.compiler.ir.IRBlock;
+import pt.inescid.cllsj.compiler.ir.IRExpressionVisitor;
+import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 import pt.inescid.cllsj.compiler.ir.IRProcess;
 import pt.inescid.cllsj.compiler.ir.IRProgram;
 import pt.inescid.cllsj.compiler.ir.IRTypeVisitor;
-import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
+import pt.inescid.cllsj.compiler.ir.expressions.IRAdd;
+import pt.inescid.cllsj.compiler.ir.expressions.IRBool;
+import pt.inescid.cllsj.compiler.ir.expressions.IRDiv;
+import pt.inescid.cllsj.compiler.ir.expressions.IRExpression;
+import pt.inescid.cllsj.compiler.ir.expressions.IRInt;
+import pt.inescid.cllsj.compiler.ir.expressions.IRMul;
+import pt.inescid.cllsj.compiler.ir.expressions.IRString;
+import pt.inescid.cllsj.compiler.ir.expressions.IRSub;
+import pt.inescid.cllsj.compiler.ir.expressions.IRVar;
 import pt.inescid.cllsj.compiler.ir.instructions.IRBranchOnPolarity;
-import pt.inescid.cllsj.compiler.ir.instructions.IRCall;
+import pt.inescid.cllsj.compiler.ir.instructions.IRCallProcess;
+import pt.inescid.cllsj.compiler.ir.instructions.IRCallProcess.LinearArgument;
+import pt.inescid.cllsj.compiler.ir.instructions.IRCallProcess.TypeArgument;
 import pt.inescid.cllsj.compiler.ir.instructions.IRFlip;
 import pt.inescid.cllsj.compiler.ir.instructions.IRForward;
 import pt.inescid.cllsj.compiler.ir.instructions.IRFreeSession;
@@ -21,18 +33,22 @@ import pt.inescid.cllsj.compiler.ir.instructions.IRNextTask;
 import pt.inescid.cllsj.compiler.ir.instructions.IRPopClose;
 import pt.inescid.cllsj.compiler.ir.instructions.IRPopSession;
 import pt.inescid.cllsj.compiler.ir.instructions.IRPopTag;
+import pt.inescid.cllsj.compiler.ir.instructions.IRPrint;
 import pt.inescid.cllsj.compiler.ir.instructions.IRPushClose;
+import pt.inescid.cllsj.compiler.ir.instructions.IRPushExpression;
 import pt.inescid.cllsj.compiler.ir.instructions.IRPushSession;
 import pt.inescid.cllsj.compiler.ir.instructions.IRPushTag;
 import pt.inescid.cllsj.compiler.ir.instructions.IRReturn;
-import pt.inescid.cllsj.compiler.ir.instructions.IRCall.LinearArgument;
-import pt.inescid.cllsj.compiler.ir.instructions.IRCall.TypeArgument;
-import pt.inescid.cllsj.compiler.ir.type.IRClose;
-import pt.inescid.cllsj.compiler.ir.type.IRRec;
-import pt.inescid.cllsj.compiler.ir.type.IRSession;
-import pt.inescid.cllsj.compiler.ir.type.IRTag;
+import pt.inescid.cllsj.compiler.ir.type.IRBoolT;
+import pt.inescid.cllsj.compiler.ir.type.IRCloseT;
+import pt.inescid.cllsj.compiler.ir.type.IRExponentialT;
+import pt.inescid.cllsj.compiler.ir.type.IRIntT;
+import pt.inescid.cllsj.compiler.ir.type.IRRecT;
+import pt.inescid.cllsj.compiler.ir.type.IRSessionT;
+import pt.inescid.cllsj.compiler.ir.type.IRStringT;
+import pt.inescid.cllsj.compiler.ir.type.IRTagT;
 import pt.inescid.cllsj.compiler.ir.type.IRType;
-import pt.inescid.cllsj.compiler.ir.type.IRVar;
+import pt.inescid.cllsj.compiler.ir.type.IRVarT;
 
 public class CGenerator extends IRInstructionVisitor {
   private static final String TMP_TASK = "tmp_task";
@@ -84,9 +100,21 @@ public class CGenerator extends IRInstructionVisitor {
     gen.putLine("};");
     gen.putBlankLine();
 
+    // Define the exponential struct.
+    gen.putLine("struct exponential {");
+    gen.incIndent();
+    gen.putLine("struct exponential* parent;");
+    gen.putLine("void* cont;");
+    gen.putLine("int record_count;");
+    gen.putLine("int ref_count;");
+    gen.decIndent();
+    gen.putLine("};");
+    gen.putBlankLine();
+
     // Define the environment struct.
     gen.putLine("struct environment {");
     gen.incIndent();
+    gen.putLine("struct exponential* exp;");
     gen.putLine("int end_points;");
     gen.decIndent();
     gen.putLine("};");
@@ -140,6 +168,42 @@ public class CGenerator extends IRInstructionVisitor {
     gen.putLineEnd();
     gen.putBlankLine();
 
+    // Functions used for operations on string expressions.
+    gen.putLine("char* string_create(const char* str) {");
+    gen.incIndent();
+    gen.putLine("char* clone = malloc(strlen(str) + 1);");
+    gen.putStatement("strcpy(clone, str)");
+    gen.putStatement("return clone");
+    gen.decIndent();
+    gen.putLine("}");
+    gen.putBlankLine();
+    gen.putLine("char* string_concat(char* str1, char* str2) {");
+    gen.incIndent();
+    gen.putStatement("char* concat = malloc(strlen(str1) + strlen(str2) + 1)");
+    gen.putStatement("strcpy(concat, str1)");
+    gen.putStatement("strcat(concat, str2)");
+    gen.putStatement("free(str1)");
+    gen.putStatement("free(str2)");
+    gen.putStatement("return concat");
+    gen.decIndent();
+    gen.putLine("}");
+    gen.putBlankLine();
+    gen.putLine("void string_print(const char* fmt, char* str) {");
+    gen.incIndent();
+    gen.putStatement("printf(fmt, str)");
+    gen.putStatement("free(str)");
+    gen.decIndent();
+    gen.putLine("}");
+    gen.putBlankLine();
+    gen.putLine("char* string_from_int(int value) {");
+    gen.incIndent();
+    gen.putStatement("char* str = malloc(12)");
+    gen.putStatement("sprintf(str, \"%d\", value)");
+    gen.putStatement("return str");
+    gen.decIndent();
+    gen.putLine("}");
+    gen.putBlankLine();
+
     // Main function.
     gen.putLine("int main() {");
     gen.incIndent();
@@ -165,7 +229,7 @@ public class CGenerator extends IRInstructionVisitor {
     if (ir.getProcesses().get(entryProcess).hasArguments()) {
       throw new RuntimeException("Entry process cannot have arguments: " + entryProcess);
     }
-    gen.visitInstruction(new IRCall(entryProcess, new ArrayList<>(), new ArrayList<>()));
+    gen.visitInstruction(new IRCallProcess(entryProcess, new ArrayList<>(), new ArrayList<>()));
 
     // Generate code for each process.
     for (Map.Entry<String, IRProcess> procEntry : ir.getProcesses().entrySet()) {
@@ -226,7 +290,7 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   @Override
-  public void visit(IRCall instruction) {
+  public void visit(IRCallProcess instruction) {
     IRProcess process = ir.getProcesses().get(instruction.getProcessName());
 
     if (instruction.getLinearArguments().isEmpty()) {
@@ -247,10 +311,11 @@ public class CGenerator extends IRInstructionVisitor {
 
       // Store the polarities of the type arguments in the new environment
       for (TypeArgument arg : instruction.getTypeArguments()) {
-        if (arg.getSourceType() instanceof IRVar) {
-          IRVar source = (IRVar) arg.getSourceType();
+        if (arg.getSourceType() instanceof IRVarT) {
+          IRVarT source = (IRVarT) arg.getSourceType();
           String op = arg.isDual() ? "!" : "";
-          putAssign(typePolarity(ENV, arg.getTargetType()), op + typePolarity(TMP_ENV, source.getType()));
+          putAssign(
+              typePolarity(ENV, arg.getTargetType()), op + typePolarity(TMP_ENV, source.getType()));
         } else {
           String lit = arg.isPositive() ? "1" : "0";
           putAssign(typePolarity(ENV, arg.getTargetType()), lit);
@@ -331,17 +396,17 @@ public class CGenerator extends IRInstructionVisitor {
   public void visit(IRReturn i) {
     putAssign(TMP_CONT, recordCont(i.getRecord()));
     putIfElse(
-      "--" + endPoints() + " == 0",
-      () -> {
-        putAssign(TMP_ENV, recordContEnv(i.getRecord()));
-        putFreeEnvironment(ENV);
-        putAssign(ENV, TMP_ENV);
-        putComputedGoto(TMP_CONT);
-      },
-      () -> {
-        putAssign(ENV, recordContEnv(i.getRecord()));
-        putComputedGoto(TMP_CONT);
-      });
+        "--" + endPoints() + " == 0",
+        () -> {
+          putAssign(TMP_ENV, recordContEnv(i.getRecord()));
+          putFreeEnvironment(ENV);
+          putAssign(ENV, TMP_ENV);
+          putComputedGoto(TMP_CONT);
+        },
+        () -> {
+          putAssign(ENV, recordContEnv(i.getRecord()));
+          putComputedGoto(TMP_CONT);
+        });
   }
 
   @Override
@@ -368,7 +433,8 @@ public class CGenerator extends IRInstructionVisitor {
     for (Map.Entry<Integer, IRPopTag.Case> entry : instruction.getCases().entrySet()) {
       putLine("case " + entry.getKey() + ":");
       incIndent();
-      putAssign(endPoints(), endPoints() + " - " + (totalEndPoints - entry.getValue().getEndPoints()));
+      putAssign(
+          endPoints(), endPoints() + " - " + (totalEndPoints - entry.getValue().getEndPoints()));
       putConstantGoto(blockLabel(entry.getValue().getLabel()));
       decIndent();
     }
@@ -436,9 +502,22 @@ public class CGenerator extends IRInstructionVisitor {
   @Override
   public void visit(IRBranchOnPolarity instruction) {
     putIfElse(
-      typePolarity(ENV, instruction.getType()),
-      () -> putConstantGoto(blockLabel(instruction.getPosLabel())),
-      () -> putConstantGoto(blockLabel(instruction.getNegLabel())));
+        typePolarity(ENV, instruction.getType()),
+        () -> putConstantGoto(blockLabel(instruction.getPosLabel())),
+        () -> putConstantGoto(blockLabel(instruction.getNegLabel())));
+  }
+
+  @Override
+  public void visit(IRPrint instruction) {
+    generatePrint(instruction.getExpression(), instruction.hasNewLine());
+  }
+
+  @Override
+  public void visit(IRPushExpression instruction) {
+    putPush(
+        instruction.getRecord(),
+        type(instruction.getExpression().getType()),
+        expression(instruction.getExpression()));
   }
 
   // =============================== Expression building helpers ================================
@@ -525,6 +604,10 @@ public class CGenerator extends IRInstructionVisitor {
 
   private String pop(int index, String type) {
     return "POP(" + index + ", " + type + ")";
+  }
+
+  private String pop(int index, IRType type) {
+    return pop(index, type(type));
   }
 
   private String popTag(int index) {
@@ -701,18 +784,18 @@ public class CGenerator extends IRInstructionVisitor {
     }
 
     @Override
-    public void visit(IRClose type) {
+    public void visit(IRCloseT type) {
       size += "0";
     }
 
     @Override
-    public void visit(IRSession type) {
+    public void visit(IRSessionT type) {
       size += "sizeof(struct record*) + ";
       type.getCont().accept(this);
     }
 
     @Override
-    public void visit(IRTag type) {
+    public void visit(IRTagT type) {
       size += "sizeof(unsigned char)";
       for (IRType choice : type.getChoices()) {
         size += " + (";
@@ -722,13 +805,196 @@ public class CGenerator extends IRInstructionVisitor {
     }
 
     @Override
-    public void visit(IRRec type) {
+    public void visit(IRRecT type) {
       type.accept(this);
     }
 
     @Override
-    public void visit(IRVar type) {
+    public void visit(IRVarT type) {
       size += typeSize(ENV, type.getType());
+    }
+
+    @Override
+    public void visit(IRIntT type) {
+      size += "sizeof(int)";
+    }
+
+    @Override
+    public void visit(IRBoolT type) {
+      size += "sizeof(unsigned char)";
+    }
+
+    @Override
+    public void visit(IRStringT type) {
+      size += "sizeof(char*)";
+    }
+  }
+
+  // ========================== Visitor used to generate expression code ==========================
+
+  private String expression(IRExpression expr) {
+    ExpressionGenerator gen = new ExpressionGenerator();
+    expr.accept(gen);
+    return gen.code;
+  }
+
+  private String expressionToString(IRExpression expr) {
+    if (expr.getType() instanceof IRIntT) {
+      return "string_from_int(" + expression(expr) + ")";
+    } else if (expr.getType() instanceof IRBoolT) {
+      return expression(expr) + " ? \"true\" : \"false\"";
+    } else {
+      return expression(expr);
+    }
+  }
+
+  private class ExpressionGenerator extends IRExpressionVisitor {
+    private String code = "";
+
+    private void binary(String op, IRExpression lhs, IRExpression rhs) {
+      code += "(";
+      lhs.accept(this);
+      code += " " + op + " ";
+      rhs.accept(this);
+      code += ")";
+    }
+
+    @Override
+    public void visit(IRExpression expr) {
+      throw new UnsupportedOperationException(
+          "Unsupported expression: " + expr.getClass().getName());
+    }
+
+    @Override
+    public void visit(IRInt expr) {
+      code += expr.getValue();
+    }
+
+    @Override
+    public void visit(IRBool expr) {
+      code += expr.getValue() ? "1" : "0";
+    }
+
+    @Override
+    public void visit(IRString expr) {
+      code += "string_create(\"" + expr.getEscapedValue() + "\")";
+    }
+
+    @Override
+    public void visit(IRVar expr) {
+      code += pop(expr.getRecord(), expr.getType());
+    }
+
+    @Override
+    public void visit(IRAdd expr) {
+      if (expr.getType() instanceof IRStringT) {
+        code += "string_concat(" + expressionToString(expr.getLhs()) + ", " + expressionToString(expr.getRhs()) + ")";
+      } else {
+        binary("+", expr.getLhs(), expr.getRhs());
+      }
+    }
+
+    @Override
+    public void visit(IRSub expr) {
+      binary("-", expr.getLhs(), expr.getRhs());
+    }
+
+    @Override
+    public void visit(IRMul expr) {
+      binary("*", expr.getLhs(), expr.getRhs());
+    }
+
+    @Override
+    public void visit(IRDiv expr) {
+      binary("/", expr.getLhs(), expr.getRhs());
+    }
+  }
+
+  // ========================= Visitor used to get C types from IR types ==========================
+
+  private String type(IRType type) {
+    TypeGenerator tGen = new TypeGenerator();
+    type.accept(tGen);
+    return tGen.code;
+  }
+
+  private class TypeGenerator extends IRTypeVisitor {
+    private String code;
+
+    @Override
+    public void visit(IRType type) {
+      throw new UnsupportedOperationException("Unsupported type: " + type.getClass().getName());
+    }
+
+    @Override
+    public void visit(IRIntT type) {
+      code = "int";
+    }
+
+    @Override
+    public void visit(IRBoolT type) {
+      code = "unsigned char";
+    }
+
+    @Override
+    public void visit(IRStringT type) {
+      code = "char*";
+    }
+
+    @Override
+    public void visit(IRSessionT type) {
+      code = "struct record*";
+    }
+
+    @Override
+    public void visit(IRExponentialT type) {
+      code = "struct exponential*";
+    }
+
+    @Override
+    public void visit(IRTagT type) {
+      code = "unsigned char";
+    }
+  }
+
+  // ========================= Visitor used to generate print statements ==========================
+
+  private void generatePrint(IRExpression expr, boolean newLine) {
+    PrintGenerator pGen = new PrintGenerator(expr, newLine);
+    expr.getType().accept(pGen);
+  }
+
+  private class PrintGenerator extends IRTypeVisitor {
+    private IRExpression expr;
+    private boolean newLine;
+
+    public PrintGenerator(IRExpression expr, boolean newLine) {
+      this.expr = expr;
+      this.newLine = newLine;
+    }
+
+    private String nl() {
+      return newLine ? "\\n" : "";
+    }
+
+    @Override
+    public void visit(IRType type) {
+      throw new UnsupportedOperationException("Non-printable type: " + type.getClass().getName());
+    }
+
+    @Override
+    public void visit(IRIntT type) {
+      putStatement("printf(\"%d" + nl() + "\", " + expression(expr) + ")");
+    }
+
+    @Override
+    public void visit(IRBoolT type) {
+      putStatement("printf(\"%s" + nl() + "\", " + expression(expr) + " ? \"true\" : \"false\")");
+    }
+
+    @Override
+    public void visit(IRStringT type) {
+      putStatement("string_print(\"%s" + nl() + "\", " + expression(expr) + ")");
     }
   }
 }

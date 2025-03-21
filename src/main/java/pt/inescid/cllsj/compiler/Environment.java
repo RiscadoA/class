@@ -11,15 +11,16 @@ import pt.inescid.cllsj.ast.nodes.ASTCall;
 import pt.inescid.cllsj.ast.nodes.ASTCase;
 import pt.inescid.cllsj.ast.nodes.ASTClose;
 import pt.inescid.cllsj.ast.nodes.ASTCoClose;
+import pt.inescid.cllsj.ast.nodes.ASTCoExpr;
 import pt.inescid.cllsj.ast.nodes.ASTCut;
 import pt.inescid.cllsj.ast.nodes.ASTEmpty;
-import pt.inescid.cllsj.ast.nodes.ASTExpr;
 import pt.inescid.cllsj.ast.nodes.ASTFwd;
 import pt.inescid.cllsj.ast.nodes.ASTId;
 import pt.inescid.cllsj.ast.nodes.ASTMix;
 import pt.inescid.cllsj.ast.nodes.ASTNode;
 import pt.inescid.cllsj.ast.nodes.ASTPrintLn;
 import pt.inescid.cllsj.ast.nodes.ASTProcDef;
+import pt.inescid.cllsj.ast.nodes.ASTPromoCoExpr;
 import pt.inescid.cllsj.ast.nodes.ASTRecv;
 import pt.inescid.cllsj.ast.nodes.ASTSelect;
 import pt.inescid.cllsj.ast.nodes.ASTSend;
@@ -31,7 +32,6 @@ import pt.inescid.cllsj.ast.types.ASTType;
 public class Environment {
   private Environment parent;
   private Map<String, Integer> indices = new HashMap<>();
-  private Map<String, String> sessionCSize = new HashMap<>();
   private Map<String, Integer> typeVarIndices = new HashMap<>();
   private Env<EnvEntry> ep;
 
@@ -91,10 +91,7 @@ public class Environment {
   }
 
   public String getSessionCSize(String env, String session) {
-    return sessionCSize
-        .get(session)
-        .replace("$ENV$", env)
-        .replace("$SIZE$", Integer.toString(this.getSize()));
+    return null;
   }
 
   public Integer getTypeVarCount() {
@@ -133,8 +130,6 @@ public class Environment {
       env = env.parent;
       if (env != null) size = Integer.toString(env.getSize());
     }
-
-    this.sessionCSize.put(session, SizeCalculator.calculate(ep, cType, typeVarSizes));
   }
 
   public void insertTypeVar(String typeVar) {
@@ -168,9 +163,6 @@ public class Environment {
 
     @Override
     public void visit(ASTBang node) {}
-
-    @Override
-    public void visit(ASTExpr node) {}
 
     @Override
     public void visit(ASTCall node) {
@@ -247,5 +239,11 @@ public class Environment {
     public void visit(ASTWhy node) {
       node.getRhs().accept(this);
     }
+
+    @Override
+    public void visit(ASTCoExpr node) {}
+
+    @Override
+    public void visit(ASTPromoCoExpr node) {}
   }
 }

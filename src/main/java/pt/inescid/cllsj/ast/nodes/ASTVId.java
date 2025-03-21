@@ -13,7 +13,7 @@ import pt.inescid.cllsj.SessionClosure;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.SessionRecord;
 import pt.inescid.cllsj.Value;
-import pt.inescid.cllsj.ast.ASTNodeVisitor;
+import pt.inescid.cllsj.ast.ASTExprVisitor;
 import pt.inescid.cllsj.ast.types.ASTCoAffineT;
 import pt.inescid.cllsj.ast.types.ASTCoLBasicType;
 import pt.inescid.cllsj.ast.types.ASTType;
@@ -23,11 +23,16 @@ import pt.inescid.cllsj.ast.types.ASTWhyT;
 public class ASTVId extends ASTExpr {
 
   String ch;
+  ASTType ty;
 
   boolean linId;
 
   public ASTVId(String _ch) {
     ch = _ch;
+  }
+
+  public ASTType getType() {
+    return ty;
   }
 
   public String getCh() {
@@ -71,8 +76,6 @@ public class ASTVId extends ASTExpr {
 
   public ASTType etypecheck(Env<ASTType> ed, Env<ASTType> eg, Env<EnvEntry> ep, boolean lin)
       throws Exception {
-    ASTType ty;
-
     // System.out.println("VID typecheck "+ch+" "+lin);
 
     if (lin) {
@@ -204,7 +207,7 @@ public class ASTVId extends ASTExpr {
   }
 
   @Override
-  public void accept(ASTNodeVisitor visitor) {
+  public void accept(ASTExprVisitor visitor) {
     visitor.visit(this);
   }
 }

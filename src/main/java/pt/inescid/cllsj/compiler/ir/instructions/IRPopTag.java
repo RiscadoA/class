@@ -47,7 +47,14 @@ public class IRPopTag extends IRInstruction {
   public String toString() {
     String str = "popTag(" + record;
     for (Map.Entry<Integer, Case> entry : this.cases.entrySet()) {
-      str += ", " + entry.getKey() + " -> " + entry.getValue().label + " (" + entry.getValue().endPoints + ")";
+      str +=
+          ", "
+              + entry.getKey()
+              + " -> "
+              + entry.getValue().label
+              + " ("
+              + entry.getValue().endPoints
+              + ")";
     }
     return str + ")";
   }

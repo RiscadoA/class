@@ -32,7 +32,7 @@ public class ASTPrintLn extends ASTNode {
     promoted = false;
   }
 
-  public ASTNode getExpr() {
+  public ASTExpr getExpr() {
     return expr;
   }
 

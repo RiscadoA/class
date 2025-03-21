@@ -6,11 +6,6 @@ public abstract class ASTNodeVisitor {
   // Catch all for nodes which do not have their own visit method
   public abstract void visit(ASTNode node);
 
-  // Catch all for expression nodes which do not have their own visit method
-  public void visit(ASTExpr node) {
-    visit((ASTNode) node);
-  }
-
   public void visit(ASTBang node) {
     visit((ASTNode) node);
   }
@@ -75,19 +70,19 @@ public abstract class ASTNodeVisitor {
     visit((ASTNode) node);
   }
 
-  public void visit(ASTString node) {
-    visit((ASTExpr) node);
-  }
-
   public void visit(ASTUnfold node) {
     visit((ASTNode) node);
   }
 
-  public void visit(ASTVId node) {
-    visit((ASTExpr) node);
+  public void visit(ASTWhy node) {
+    visit((ASTNode) node);
   }
 
-  public void visit(ASTWhy node) {
+  public void visit(ASTCoExpr node) {
+    visit((ASTNode) node);
+  }
+
+  public void visit(ASTPromoCoExpr node) {
     visit((ASTNode) node);
   }
 }

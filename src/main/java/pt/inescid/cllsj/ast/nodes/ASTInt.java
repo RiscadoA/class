@@ -8,6 +8,7 @@ import pt.inescid.cllsj.Server;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.VInt;
 import pt.inescid.cllsj.Value;
+import pt.inescid.cllsj.ast.ASTExprVisitor;
 import pt.inescid.cllsj.ast.types.ASTLCointT;
 import pt.inescid.cllsj.ast.types.ASTType;
 
@@ -17,6 +18,10 @@ public class ASTInt extends ASTExpr {
 
   public ASTInt(int _v) {
     v = _v;
+  }
+
+  public int getValue() {
+    return v;
   }
 
   public void ASTInsertUse(String ch, ASTNode here, Boolean disCont) throws Exception {
@@ -63,5 +68,10 @@ public class ASTInt extends ASTExpr {
 
   public Value sameval(Env<SessionField> ed) throws Exception {
     return new VInt(v);
+  }
+
+  @Override
+  public void accept(ASTExprVisitor visitor) {
+    visitor.visit(this);
   }
 }

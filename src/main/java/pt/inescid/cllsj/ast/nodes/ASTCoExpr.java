@@ -17,6 +17,7 @@ import pt.inescid.cllsj.SessionValue;
 import pt.inescid.cllsj.Trail;
 import pt.inescid.cllsj.TypeError;
 import pt.inescid.cllsj.Value;
+import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.types.ASTBasicType;
 import pt.inescid.cllsj.ast.types.ASTType;
 
@@ -28,6 +29,18 @@ public class ASTCoExpr extends ASTNode {
   public ASTCoExpr(String _ch, ASTExpr _expr) {
     expr = _expr;
     ch = _ch;
+  }
+
+  public void setCh(String _ch) {
+    ch = _ch;
+  }
+
+  public String getCh() {
+    return ch;
+  }
+
+  public ASTExpr getExpr() {
+    return expr;
   }
 
   public void ASTInsertPipe(Function<ASTNode, ASTNode> f, ASTNode from) throws Exception {
@@ -160,5 +173,9 @@ public class ASTCoExpr extends ASTNode {
     } else {
       int u = 0 / 0;
     }
+  }
+
+  public void accept(ASTNodeVisitor v) {
+    v.visit(this);
   }
 }

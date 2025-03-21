@@ -503,12 +503,12 @@ public class Generator extends ASTNodeVisitor {
     ASTString string = (ASTString) node.getExpr();
     if (this.trace) {
       if (node.withNewLine()) {
-        this.putTrace("println(\"" + string.getV() + "\"):" + node.lineno);
+        this.putTrace("println(\"" + string.getValue() + "\"):" + node.lineno);
       } else {
-        this.putTrace("print(\"" + string.getV() + "\"):" + node.lineno);
+        this.putTrace("print(\"" + string.getValue() + "\"):" + node.lineno);
       }
     } else {
-      this.putPrint(string.getV(), node.withNewLine());
+      this.putPrint(string.getValue(), node.withNewLine());
     }
     node.getRhs().accept(this);
 

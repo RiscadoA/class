@@ -34,7 +34,7 @@ public class IRBlock {
     for (IRInstruction instruction : instructions) {
       if (!result.isEmpty()) {
         result += "\n";
-      }  
+      }
       result += "    " + instruction.toString();
     }
     return result;

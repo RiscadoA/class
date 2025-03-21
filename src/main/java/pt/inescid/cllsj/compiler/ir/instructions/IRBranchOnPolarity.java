@@ -22,7 +22,7 @@ public class IRBranchOnPolarity extends IRInstruction {
   }
 
   public String getPosLabel() {
-      return posLabel;
+    return posLabel;
   }
 
   @Override
