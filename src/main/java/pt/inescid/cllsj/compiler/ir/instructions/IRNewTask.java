@@ -1,6 +1,6 @@
 package pt.inescid.cllsj.compiler.ir.instructions;
 
-import pt.inescid.cllsj.compiler.ir.IRVisitor;
+import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 
 public class IRNewTask extends IRInstruction {
   private String label;
@@ -14,7 +14,7 @@ public class IRNewTask extends IRInstruction {
   }
 
   @Override
-  public void accept(IRVisitor visitor) {
+  public void accept(IRInstructionVisitor visitor) {
     visitor.visit(this);
   }
 

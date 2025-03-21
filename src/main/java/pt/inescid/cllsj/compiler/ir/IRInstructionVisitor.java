@@ -17,7 +17,7 @@ import pt.inescid.cllsj.compiler.ir.instructions.IRPushClose;
 import pt.inescid.cllsj.compiler.ir.instructions.IRPushSession;
 import pt.inescid.cllsj.compiler.ir.instructions.IRPushTag;
 
-public abstract class IRVisitor {
+public abstract class IRInstructionVisitor {
   // Catch all for instructions which do not have their own visit method
   public abstract void visit(IRInstruction instruction);
 

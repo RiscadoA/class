@@ -7,7 +7,8 @@ import java.util.Optional;
 import pt.inescid.cllsj.compiler.ir.IRBlock;
 import pt.inescid.cllsj.compiler.ir.IRProcess;
 import pt.inescid.cllsj.compiler.ir.IRProgram;
-import pt.inescid.cllsj.compiler.ir.IRVisitor;
+import pt.inescid.cllsj.compiler.ir.IRTypeVisitor;
+import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 import pt.inescid.cllsj.compiler.ir.instructions.IRBranchOnPolarity;
 import pt.inescid.cllsj.compiler.ir.instructions.IRCall;
 import pt.inescid.cllsj.compiler.ir.instructions.IRFlip;
@@ -26,8 +27,14 @@ import pt.inescid.cllsj.compiler.ir.instructions.IRPushSession;
 import pt.inescid.cllsj.compiler.ir.instructions.IRPushTag;
 import pt.inescid.cllsj.compiler.ir.instructions.IRCall.LinearArgument;
 import pt.inescid.cllsj.compiler.ir.instructions.IRCall.TypeArgument;
+import pt.inescid.cllsj.compiler.ir.type.IRClose;
+import pt.inescid.cllsj.compiler.ir.type.IRRec;
+import pt.inescid.cllsj.compiler.ir.type.IRSession;
+import pt.inescid.cllsj.compiler.ir.type.IRTag;
+import pt.inescid.cllsj.compiler.ir.type.IRType;
+import pt.inescid.cllsj.compiler.ir.type.IRVar;
 
-public class CGenerator extends IRVisitor {
+public class CGenerator extends IRInstructionVisitor {
   private static final String TMP_TASK = "tmp_task";
   private static final String TMP_ENV = "tmp_env";
   private static final String TMP_CONT = "tmp_cont";
@@ -71,6 +78,7 @@ public class CGenerator extends IRVisitor {
     gen.putLine("struct type {");
     gen.incIndent();
     gen.putLine("char polarity;");
+    gen.putLine("unsigned long size;");
     gen.decIndent();
     gen.putLine("};");
     gen.putBlankLine();
@@ -155,7 +163,7 @@ public class CGenerator extends IRVisitor {
     if (ir.getProcesses().get(entryProcess).hasArguments()) {
       throw new RuntimeException("Entry process cannot have arguments: " + entryProcess);
     }
-    (new IRCall(entryProcess, new ArrayList<>(), new ArrayList<>())).accept(gen);
+    gen.visitInstruction(new IRCall(entryProcess, new ArrayList<>(), new ArrayList<>()));
 
     // Generate code for each process.
     for (Map.Entry<String, IRProcess> procEntry : ir.getProcesses().entrySet()) {
@@ -196,13 +204,17 @@ public class CGenerator extends IRVisitor {
     this.blockName = Optional.ofNullable(block.getLabel());
 
     for (IRInstruction instruction : block.getInstructions()) {
-      if (trace) {
-        putPrintLn(instruction.toString());
-      } else {
-        putLine("/* " + instruction.toString() + " */");
-      }
-      instruction.accept(this);
+      visitInstruction(instruction);
     }
+  }
+
+  private void visitInstruction(IRInstruction instruction) {
+    if (trace) {
+      putPrintLn(instruction.toString());
+    } else {
+      putLine("/* " + instruction.toString() + " */");
+    }
+    instruction.accept(this);
   }
 
   @Override
@@ -228,13 +240,15 @@ public class CGenerator extends IRVisitor {
 
       // Store the polarities of the type arguments in the new environment
       for (TypeArgument arg : instruction.getTypeArguments()) {
-        if (arg.getSourceType().isPresent()) {
+        if (arg.getSourceType() instanceof IRVar) {
+          IRVar source = (IRVar) arg.getSourceType();
           String op = arg.isDual() ? "!" : "";
-          putAssign(typePolarity(ENV, arg.getTargetType()), op + typePolarity(TMP_ENV, arg.getSourceType().get()));
+          putAssign(typePolarity(ENV, arg.getTargetType()), op + typePolarity(TMP_ENV, source.getType()));
         } else {
-          String lit = arg.getSourcePolarity() ? "1" : "0";
+          String lit = arg.isPositive() ? "1" : "0";
           putAssign(typePolarity(ENV, arg.getTargetType()), lit);
         }
+        putAssign(typeSize(ENV, arg.getTargetType()), size(arg.getSourceType()));
       }
     }
 
@@ -343,7 +357,7 @@ public class CGenerator extends IRVisitor {
 
   @Override
   public void visit(IRNewSession instruction) {
-    putAllocRecord(record(instruction.getRecord()), instruction.getSize());
+    putAllocRecord(record(instruction.getRecord()), instruction.getType());
     putAssign(
         recordCont(instruction.getRecord()), labelAddress(blockLabel(instruction.getLabel())));
     putAssign(recordContEnv(instruction.getRecord()), ENV);
@@ -410,6 +424,10 @@ public class CGenerator extends IRVisitor {
 
   private String typePolarity(String env, int ty) {
     return type(env, ty) + ".polarity";
+  }
+
+  private String typeSize(String env, int ty) {
+    return type(env, ty) + ".size";
   }
 
   private String type(String env, int ty) {
@@ -484,7 +502,7 @@ public class CGenerator extends IRVisitor {
     return "block_" + procName + "_" + label;
   }
 
-  // ================================ Statement building helpers ================================
+  // ================================= Statement building helpers =================================
 
   private void putAllocEnvironment(String var, IRProcess process) {
     putAssign(
@@ -500,8 +518,8 @@ public class CGenerator extends IRVisitor {
     putLine("free(" + var + ");");
   }
 
-  private void putAllocRecord(String var, int size) {
-    putAssign(var, "malloc(sizeof(struct record) + " + size + ")");
+  private void putAllocRecord(String var, IRType type) {
+    putAssign(var, "malloc(sizeof(struct record) + " + size(type) + ")");
   }
 
   private void putFreeRecord(String var) {
@@ -599,6 +617,54 @@ public class CGenerator extends IRVisitor {
       return type + "_" + genLabelCountInBlock++ + "_proc_" + procName;
     } else {
       return type + "_" + genLabelCountInBlock++ + "_block_" + procName + "_" + blockName.get();
+    }
+  }
+
+  // ========================== Type visitor used to determine type size ==========================
+
+  private String size(IRType type) {
+    SizeCalculator calc = new SizeCalculator();
+    type.accept(calc);
+    return calc.size;
+  }
+
+  private class SizeCalculator extends IRTypeVisitor {
+    private String size = "";
+
+    @Override
+    public void visit(IRType type) {
+      throw new UnsupportedOperationException("Unsupported type: " + type.getClass().getName());
+    }
+
+    @Override
+    public void visit(IRClose type) {
+      size += "0";
+    }
+
+    @Override
+    public void visit(IRSession type) {
+      size += "sizeof(struct record*) + ";
+      type.getCont().accept(this);
+    }
+
+    @Override
+    public void visit(IRTag type) {
+      size += "sizeof(unsigned char)";
+      for (IRType choice : type.getChoices()) {
+        size += " + (";
+        choice.accept(this);
+        size += ")";
+      }
+    }
+
+    @Override
+    public void visit(IRRec type) {
+      type.accept(this);
+    }
+
+    @Override
+    public void visit(IRVar type) {
+      size += typeSize(ENV, type.getType());
     }
   }
 }

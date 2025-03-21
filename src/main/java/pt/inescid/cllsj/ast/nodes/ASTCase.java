@@ -179,7 +179,7 @@ public class ASTCase extends ASTNode {
     ty = ASTType.unfoldRecInfer(ty, this, ch, ep);
     if (ty instanceof ASTOfferT) {
       ASTOfferT tyr = (ASTOfferT) ty;
-      HashMap<String, ASTType> tcase = tyr.getcases();
+      Map<String, ASTType> tcase = tyr.getcases();
 
       for (Iterator<String> itCasesTyp = tcase.keySet().iterator(); itCasesTyp.hasNext(); ) {
         String lab = itCasesTyp.next();

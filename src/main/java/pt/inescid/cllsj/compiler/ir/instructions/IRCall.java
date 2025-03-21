@@ -1,9 +1,10 @@
 package pt.inescid.cllsj.compiler.ir.instructions;
 
 import java.util.List;
-import java.util.Optional;
 
-import pt.inescid.cllsj.compiler.ir.IRVisitor;
+import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
+import pt.inescid.cllsj.compiler.ir.type.IRType;
+import pt.inescid.cllsj.compiler.ir.type.IRVar;
 
 public class IRCall extends IRInstruction {
   public static class LinearArgument {
@@ -25,26 +26,20 @@ public class IRCall extends IRInstruction {
   }
 
   public static class TypeArgument {
-    private Optional<Integer> sourceType;
+    private IRType sourceType;
     private int targetType;
 
-    // If sourceRecord is not present, the target type will have this polarity.
-    // If it is present, it's polarity will be xor'ed with this value.
-    private boolean sourcePolarity;
-    
-    public TypeArgument(int sourceType, int targetType, boolean isDual) {
-      this.sourceType = Optional.of(sourceType);
+    // If sourceType is a IRVar, the variable's polarity will be xor'ed with this value.
+    // Otherwise, this determines whether the argument is positive or negative.
+    private boolean isDual;
+
+    public TypeArgument(IRType sourceType, int targetType, boolean isDual) {
+      this.sourceType = sourceType;
       this.targetType = targetType;
-      this.sourcePolarity = isDual;
+      this.isDual = isDual;
     }
 
-    public TypeArgument(boolean sourcePolarity, int targetType) {
-      this.sourceType = Optional.empty();
-      this.targetType = targetType;
-      this.sourcePolarity = sourcePolarity;
-    }
-
-    public Optional<Integer> getSourceType() {
+    public IRType getSourceType() {
       return sourceType;
     }
 
@@ -52,14 +47,13 @@ public class IRCall extends IRInstruction {
       return targetType;
     }
 
-    public boolean getSourcePolarity() {
-      assert sourceType.isEmpty();
-      return sourcePolarity;
-    }
-
     public boolean isDual() {
-      assert sourceType.isPresent();
-      return sourcePolarity;
+      return isDual;
+    }
+    
+    public boolean isPositive() {
+      assert !(sourceType instanceof IRVar);
+      return isDual;
     }
   }
 
@@ -86,31 +80,37 @@ public class IRCall extends IRInstruction {
   }
 
   @Override
-  public void accept(IRVisitor visitor) {
+  public void accept(IRInstructionVisitor visitor) {
     visitor.visit(this);
   }
 
   @Override
   public String toString() {
-    String str = "call(" + processName;
-    for (LinearArgument arg : this.linearArguments) {
-      str += ", " + arg.getSourceRecord() + " L-> " + arg.getTargetRecord();
-    }
+    String str = "";
     for (TypeArgument arg : this.typeArguments) {
-      if (arg.getSourceType().isPresent()) {
-        str += ", " + arg.getSourceType().get() + " T-> " + arg.getTargetType();
-        if (arg.getSourcePolarity()) {
-          str += " (dual)";
-        }
-      } else {
+      if (!str.isEmpty()) {
         str += ", ";
-        if (arg.getSourcePolarity()) {
-          str += "write";
-        } else {
-          str += "read";
-        }
-        str += " T-> " + arg.getTargetType();
       }
+
+      if (arg.getSourceType() instanceof IRVar) {
+        if (arg.isDual()) {
+          str += "dual ";
+        }
+        str += arg.getSourceType() + " -> " + arg.getTargetType();
+      } else {
+        if (arg.isPositive()) {
+          str += "+";
+        } else {
+          str += "-";
+        }
+        str += arg.getSourceType();
+        str += " -> " + arg.getTargetType();
+      }
+    }
+
+    str = "call<" + str + ">(" + this.processName;
+    for (LinearArgument arg : this.linearArguments) {
+      str += ", " + arg.getSourceRecord() + " -> " + arg.getTargetRecord();
     }
     return str + ")";
   }

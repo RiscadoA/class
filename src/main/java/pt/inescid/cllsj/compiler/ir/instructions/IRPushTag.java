@@ -1,6 +1,6 @@
 package pt.inescid.cllsj.compiler.ir.instructions;
 
-import pt.inescid.cllsj.compiler.ir.IRVisitor;
+import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 
 public class IRPushTag extends IRInstruction {
   private int record;
@@ -20,7 +20,7 @@ public class IRPushTag extends IRInstruction {
   }
 
   @Override
-  public void accept(IRVisitor visitor) {
+  public void accept(IRInstructionVisitor visitor) {
     visitor.visit(this);
   }
 

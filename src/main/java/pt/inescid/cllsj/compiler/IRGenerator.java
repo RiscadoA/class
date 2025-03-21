@@ -19,6 +19,8 @@ import pt.inescid.cllsj.ast.nodes.ASTMix;
 import pt.inescid.cllsj.ast.nodes.ASTNode;
 import pt.inescid.cllsj.ast.nodes.ASTProcDef;
 import pt.inescid.cllsj.ast.nodes.ASTProgram;
+import pt.inescid.cllsj.ast.nodes.ASTRecv;
+import pt.inescid.cllsj.ast.nodes.ASTSend;
 import pt.inescid.cllsj.ast.types.ASTIdT;
 import pt.inescid.cllsj.ast.types.ASTNotT;
 import pt.inescid.cllsj.ast.types.ASTType;
@@ -35,9 +37,12 @@ import pt.inescid.cllsj.compiler.ir.instructions.IRNewSession;
 import pt.inescid.cllsj.compiler.ir.instructions.IRNewTask;
 import pt.inescid.cllsj.compiler.ir.instructions.IRNextTask;
 import pt.inescid.cllsj.compiler.ir.instructions.IRPopClose;
+import pt.inescid.cllsj.compiler.ir.instructions.IRPopSession;
 import pt.inescid.cllsj.compiler.ir.instructions.IRPushClose;
+import pt.inescid.cllsj.compiler.ir.instructions.IRPushSession;
 import pt.inescid.cllsj.compiler.ir.instructions.IRCall.LinearArgument;
 import pt.inescid.cllsj.compiler.ir.instructions.IRCall.TypeArgument;
+import pt.inescid.cllsj.compiler.ir.type.IRType;
 
 public class IRGenerator extends ASTNodeVisitor {
   private IRProgram program = new IRProgram();
@@ -102,6 +107,10 @@ public class IRGenerator extends ASTNodeVisitor {
       return polarity;
     }
 
+    public boolean isPositiveOrDual() {
+      return polarity;
+    }
+
     public String getTypeId() {
       assert !isKnown();
       return id.get();
@@ -140,16 +149,17 @@ public class IRGenerator extends ASTNodeVisitor {
   public void visit(ASTCut node) {
     IRBlock lhs = process.addBlock("cut_lhs");
     IRBlock rhs = process.addBlock("cut_rhs");
+    IRType type = ASTIntoIRType.convert(environment(), node.getChType());
 
     // Choose the initial block based on the polarity of the channel type.
     branchOnPolarity(
         node.getChType(),
         () -> {
-          block.add(new IRNewSession(record(node.getCh()), 0, lhs.getLabel()));
+          block.add(new IRNewSession(record(node.getCh()), type, lhs.getLabel()));
           block.add(new IRJump(rhs.getLabel()));
         },
         () -> {
-          block.add(new IRNewSession(record(node.getCh()), 0, rhs.getLabel()));
+          block.add(new IRNewSession(record(node.getCh()), type, rhs.getLabel()));
           block.add(new IRJump(lhs.getLabel()));
         });
 
@@ -196,6 +206,46 @@ public class IRGenerator extends ASTNodeVisitor {
   }
 
   @Override
+  public void visit(ASTSend node) {
+    IRBlock closure = process.addBlock("send_closure");
+    IRBlock rhs = process.addBlock("send_rhs");
+    IRType type = ASTIntoIRType.convert(environment(), node.getLhsType());
+
+    block.add(new IRNewSession(record(node.getCho()), type, closure.getLabel()));
+    block.add(new IRPushSession(record(node.getChs()), record(node.getCho())));
+
+    // Flip if the remainder of the session type is negative.
+    branchOnPolarity(node.getRhsType(),
+      () -> {
+        block.add(new IRJump(rhs.getLabel()));
+      }, () -> {
+        block.add(new IRFlip(record(node.getChs())));
+        block.add(new IRJump(rhs.getLabel()));
+      });
+
+    visit(closure, node.getLhs());
+    visit(rhs, node.getRhs());
+  }
+
+  @Override
+  public void visit(ASTRecv node) {
+    block.add(new IRPopSession(record(node.getChr()), record(node.getChi())));
+
+    IRBlock rhs = process.addBlock("recv_rhs");
+
+    // Flip to the received session if it is negative.
+    branchOnPolarity(node.getChiType(),
+      () -> {
+        block.add(new IRJump(rhs.getLabel()));
+      }, () -> {
+        block.add(new IRFlip(record(node.getChi())));
+        block.add(new IRJump(rhs.getLabel()));
+      });
+
+    visit(rhs, node.getRhs());
+  }
+
+  @Override
   public void visit(ASTId node) {
     List<LinearArgument> linearArguments = new ArrayList<>();
     List<TypeArgument> typeArguments = new ArrayList<>();
@@ -206,11 +256,8 @@ public class IRGenerator extends ASTNodeVisitor {
 
     for (int i = 0; i < node.getTPars().size(); ++i) {
       Polarity polarity = polarity(node.getTPars().get(i));
-      if (polarity.isKnown()) {
-        typeArguments.add(new TypeArgument(polarity.isPositive(), i));
-      } else {
-        typeArguments.add(new TypeArgument(type(polarity.getTypeId()), i, polarity.isDual()));
-      }
+      IRType type = ASTIntoIRType.convert(environment(), node.getTPars().get(i));
+      typeArguments.add(new TypeArgument(type, i, polarity.isPositiveOrDual()));
     }
 
     // TODO: handle exponential arguments
