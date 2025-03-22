@@ -1,5 +1,6 @@
 package pt.inescid.cllsj.compiler.ir;
 
+import pt.inescid.cllsj.compiler.ir.instructions.IRBranch;
 import pt.inescid.cllsj.compiler.ir.instructions.IRBranchOnPolarity;
 import pt.inescid.cllsj.compiler.ir.instructions.IRCallExponential;
 import pt.inescid.cllsj.compiler.ir.instructions.IRCallProcess;
@@ -84,6 +85,10 @@ public abstract class IRInstructionVisitor {
   }
 
   public void visit(IRJump instruction) {
+    visit((IRInstruction) instruction);
+  }
+
+  public void visit(IRBranch instruction) {
     visit((IRInstruction) instruction);
   }
 

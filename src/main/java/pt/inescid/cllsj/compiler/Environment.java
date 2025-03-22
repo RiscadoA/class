@@ -16,6 +16,7 @@ import pt.inescid.cllsj.ast.nodes.ASTCut;
 import pt.inescid.cllsj.ast.nodes.ASTEmpty;
 import pt.inescid.cllsj.ast.nodes.ASTFwd;
 import pt.inescid.cllsj.ast.nodes.ASTId;
+import pt.inescid.cllsj.ast.nodes.ASTIf;
 import pt.inescid.cllsj.ast.nodes.ASTMix;
 import pt.inescid.cllsj.ast.nodes.ASTNode;
 import pt.inescid.cllsj.ast.nodes.ASTPrintLn;
@@ -245,5 +246,11 @@ public class Environment {
 
     @Override
     public void visit(ASTPromoCoExpr node) {}
+
+    @Override
+    public void visit(ASTIf node) {
+      node.getThen().accept(this);
+      node.getElse().accept(this);
+    }
   }
 }

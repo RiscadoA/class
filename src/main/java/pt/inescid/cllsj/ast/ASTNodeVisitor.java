@@ -85,4 +85,8 @@ public abstract class ASTNodeVisitor {
   public void visit(ASTPromoCoExpr node) {
     visit((ASTNode) node);
   }
+
+  public void visit(ASTIf node) {
+    visit((ASTNode) node);
+  }
 }

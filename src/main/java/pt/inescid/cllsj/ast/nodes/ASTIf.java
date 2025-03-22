@@ -12,6 +12,7 @@ import pt.inescid.cllsj.SessionClosure;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.TypeError;
 import pt.inescid.cllsj.VBool;
+import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.types.ASTBotT;
 import pt.inescid.cllsj.ast.types.ASTCoLboolT;
 import pt.inescid.cllsj.ast.types.ASTCointT;
@@ -29,6 +30,18 @@ public class ASTIf extends ASTNode {
     thenp = _thenp;
     elsep = _elsep;
     promoted = false;
+  }
+
+  public ASTExpr getExpr() {
+    return expr;
+  }
+
+  public ASTNode getThen() {
+    return thenp;
+  }
+
+  public ASTNode getElse() {
+    return elsep;
   }
 
   public void ASTInsertPipe(Function<ASTNode, ASTNode> f, ASTNode from) throws Exception {
@@ -235,5 +248,10 @@ public class ASTIf extends ASTNode {
         //		elsep.sam(frame,ep);
       }
     }
+  }
+
+  @Override
+  public void accept(ASTNodeVisitor visitor) {
+    visitor.visit(this);
   }
 }

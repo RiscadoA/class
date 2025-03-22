@@ -27,6 +27,7 @@ import pt.inescid.cllsj.ast.nodes.ASTExpr;
 import pt.inescid.cllsj.ast.nodes.ASTFwd;
 import pt.inescid.cllsj.ast.nodes.ASTGt;
 import pt.inescid.cllsj.ast.nodes.ASTId;
+import pt.inescid.cllsj.ast.nodes.ASTIf;
 import pt.inescid.cllsj.ast.nodes.ASTInt;
 import pt.inescid.cllsj.ast.nodes.ASTLt;
 import pt.inescid.cllsj.ast.nodes.ASTMix;
@@ -68,6 +69,7 @@ import pt.inescid.cllsj.compiler.ir.expressions.IROr;
 import pt.inescid.cllsj.compiler.ir.expressions.IRString;
 import pt.inescid.cllsj.compiler.ir.expressions.IRSub;
 import pt.inescid.cllsj.compiler.ir.expressions.IRVar;
+import pt.inescid.cllsj.compiler.ir.instructions.IRBranch;
 import pt.inescid.cllsj.compiler.ir.instructions.IRBranchOnPolarity;
 import pt.inescid.cllsj.compiler.ir.instructions.IRCallProcess;
 import pt.inescid.cllsj.compiler.ir.instructions.IRCallProcess.LinearArgument;
@@ -317,6 +319,19 @@ public class IRGenerator extends ASTNodeVisitor {
     block.add(new IRReturn(record(node.getCh())));
   }
 
+  @Override
+  public void visit(ASTIf node) {
+    IRBlock thenBlock = process.addBlock("if_then");
+    IRBlock elseBlock = process.addBlock("if_else");
+    
+    IRBranch.Case then = new IRBranch.Case(thenBlock.getLabel(), countEndPoints(node.getThen()) - 1);
+    IRBranch.Case otherwise = new IRBranch.Case(elseBlock.getLabel(), countEndPoints(node.getElse()) - 1);
+    block.add(new IRBranch(expression(node.getExpr()), then, otherwise));
+
+    visit(thenBlock, node.getThen());
+    visit(elseBlock, node.getElse());
+  }
+
   // ======================================== Utilities =========================================
 
   private static class Polarity {
@@ -522,6 +537,12 @@ public class IRGenerator extends ASTNodeVisitor {
     @Override
     public void visit(ASTWhy node) {
       node.getRhs().accept(this);
+    }
+
+    @Override
+    public void visit(ASTIf node) {
+      node.getThen().accept(this);
+      node.getElse().accept(this);
     }
   }
 

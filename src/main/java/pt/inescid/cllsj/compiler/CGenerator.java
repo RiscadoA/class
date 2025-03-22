@@ -469,6 +469,20 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   @Override
+  public void visit(IRBranch instruction) {
+      putIfElse(
+        expression(instruction.getExpression()),
+        () -> {
+          putAssign(endPoints(), endPoints() + " - " + instruction.getOtherwise().getEndPoints());
+          putConstantGoto(blockLabel(instruction.getThen().getLabel()));
+        },
+        () -> {
+          putAssign(endPoints(), endPoints() + " - " + instruction.getThen().getEndPoints());
+          putConstantGoto(blockLabel(instruction.getOtherwise().getLabel()));
+        });
+  }
+
+  @Override
   public void visit(IRBranchOnPolarity instruction) {
     putIfElse(
         typePolarity(ENV, instruction.getType()),
