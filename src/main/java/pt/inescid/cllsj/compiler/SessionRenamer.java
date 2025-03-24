@@ -114,7 +114,7 @@ public class SessionRenamer extends ASTNodeVisitor {
       expr.getLhs().accept(this);
       expr.getRhs().accept(this);
     }
-    
+
     @Override
     public void visit(ASTLt expr) {
       expr.getLhs().accept(this);
@@ -358,5 +358,10 @@ public class SessionRenamer extends ASTNodeVisitor {
     node.getExpr().accept(new ExprVisitor());
     node.getThen().accept(this);
     node.getElse().accept(this);
+  }
+
+  @Override
+  public void visit(ASTExpr expr) {
+    expr.accept(new ExprVisitor());
   }
 }

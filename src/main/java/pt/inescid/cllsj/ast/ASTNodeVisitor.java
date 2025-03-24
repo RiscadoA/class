@@ -89,4 +89,8 @@ public abstract class ASTNodeVisitor {
   public void visit(ASTIf node) {
     visit((ASTNode) node);
   }
+
+  public void visit(ASTExpr expr) {
+    visit((ASTNode) expr);
+  }
 }

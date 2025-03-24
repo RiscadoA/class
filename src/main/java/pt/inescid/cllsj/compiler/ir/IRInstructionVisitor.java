@@ -1,28 +1,6 @@
 package pt.inescid.cllsj.compiler.ir;
 
-import pt.inescid.cllsj.compiler.ir.instructions.IRBranch;
-import pt.inescid.cllsj.compiler.ir.instructions.IRBranchOnPolarity;
-import pt.inescid.cllsj.compiler.ir.instructions.IRCallExponential;
-import pt.inescid.cllsj.compiler.ir.instructions.IRCallProcess;
-import pt.inescid.cllsj.compiler.ir.instructions.IRFlip;
-import pt.inescid.cllsj.compiler.ir.instructions.IRForward;
-import pt.inescid.cllsj.compiler.ir.instructions.IRFreeSession;
-import pt.inescid.cllsj.compiler.ir.instructions.IRInstruction;
-import pt.inescid.cllsj.compiler.ir.instructions.IRJump;
-import pt.inescid.cllsj.compiler.ir.instructions.IRNewSession;
-import pt.inescid.cllsj.compiler.ir.instructions.IRNewTask;
-import pt.inescid.cllsj.compiler.ir.instructions.IRNextTask;
-import pt.inescid.cllsj.compiler.ir.instructions.IRPopClose;
-import pt.inescid.cllsj.compiler.ir.instructions.IRPopExponential;
-import pt.inescid.cllsj.compiler.ir.instructions.IRPopSession;
-import pt.inescid.cllsj.compiler.ir.instructions.IRPopTag;
-import pt.inescid.cllsj.compiler.ir.instructions.IRPrint;
-import pt.inescid.cllsj.compiler.ir.instructions.IRPushClose;
-import pt.inescid.cllsj.compiler.ir.instructions.IRPushExponential;
-import pt.inescid.cllsj.compiler.ir.instructions.IRPushExpression;
-import pt.inescid.cllsj.compiler.ir.instructions.IRPushSession;
-import pt.inescid.cllsj.compiler.ir.instructions.IRPushTag;
-import pt.inescid.cllsj.compiler.ir.instructions.IRReturn;
+import pt.inescid.cllsj.compiler.ir.instructions.*;
 
 public abstract class IRInstructionVisitor {
   // Catch all for instructions which do not have their own visit method
@@ -89,10 +67,6 @@ public abstract class IRInstructionVisitor {
   }
 
   public void visit(IRBranch instruction) {
-    visit((IRInstruction) instruction);
-  }
-
-  public void visit(IRBranchOnPolarity instruction) {
     visit((IRInstruction) instruction);
   }
 

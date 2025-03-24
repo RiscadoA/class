@@ -58,13 +58,10 @@ public class IRCallProcess extends IRInstruction {
 
   private String processName;
   private List<LinearArgument> linearArguments;
-  private List<TypeArgument> typeArguments;
 
-  public IRCallProcess(
-      String processName, List<LinearArgument> linearArguments, List<TypeArgument> typeArguments) {
+  public IRCallProcess(String processName, List<LinearArgument> linearArguments) {
     this.processName = processName;
     this.linearArguments = linearArguments;
-    this.typeArguments = typeArguments;
   }
 
   public String getProcessName() {
@@ -75,10 +72,6 @@ public class IRCallProcess extends IRInstruction {
     return linearArguments;
   }
 
-  public List<TypeArgument> getTypeArguments() {
-    return typeArguments;
-  }
-
   @Override
   public void accept(IRInstructionVisitor visitor) {
     visitor.visit(this);
@@ -86,29 +79,7 @@ public class IRCallProcess extends IRInstruction {
 
   @Override
   public String toString() {
-    String str = "";
-    for (TypeArgument arg : this.typeArguments) {
-      if (!str.isEmpty()) {
-        str += ", ";
-      }
-
-      if (arg.getSourceType() instanceof IRVarT) {
-        if (arg.isDual()) {
-          str += "dual ";
-        }
-        str += arg.getSourceType() + " -> " + arg.getTargetType();
-      } else {
-        if (arg.isPositive()) {
-          str += "+";
-        } else {
-          str += "-";
-        }
-        str += arg.getSourceType();
-        str += " -> " + arg.getTargetType();
-      }
-    }
-
-    str = "call<" + str + ">(" + this.processName;
+    String str = "call(" + this.processName;
     for (LinearArgument arg : this.linearArguments) {
       str += ", " + arg.getSourceRecord() + " -> " + arg.getTargetRecord();
     }

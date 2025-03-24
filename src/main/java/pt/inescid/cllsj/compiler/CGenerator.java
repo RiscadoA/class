@@ -7,7 +7,6 @@ import pt.inescid.cllsj.compiler.ir.*;
 import pt.inescid.cllsj.compiler.ir.expressions.*;
 import pt.inescid.cllsj.compiler.ir.instructions.*;
 import pt.inescid.cllsj.compiler.ir.instructions.IRCallProcess.LinearArgument;
-import pt.inescid.cllsj.compiler.ir.instructions.IRCallProcess.TypeArgument;
 import pt.inescid.cllsj.compiler.ir.type.*;
 
 public class CGenerator extends IRInstructionVisitor {
@@ -51,15 +50,6 @@ public class CGenerator extends IRInstructionVisitor {
     gen.putLine("};");
     gen.putBlankLine();
 
-    // Define the type struct.
-    gen.putLine("struct type {");
-    gen.incIndent();
-    gen.putLine("char polarity;");
-    gen.putLine("unsigned long size;");
-    gen.decIndent();
-    gen.putLine("};");
-    gen.putBlankLine();
-
     // Define the exponential struct.
     gen.putLine("struct exponential {");
     gen.incIndent();
@@ -95,16 +85,6 @@ public class CGenerator extends IRInstructionVisitor {
     gen.put("(char*)(env) + ");
     gen.put("sizeof(struct environment) + ");
     gen.put("sizeof(struct record*) * rec");
-    gen.put("))");
-    gen.putLineEnd();
-    gen.putBlankLine();
-
-    // Utility macro for accessing types on a given environment.
-    gen.put("#define TYPE(env, size, ty) (*(struct type*)(");
-    gen.put("(char*)(env) + ");
-    gen.put("sizeof(struct environment) + ");
-    gen.put("sizeof(struct record*) * size + ");
-    gen.put("sizeof(struct type) * ty");
     gen.put("))");
     gen.putLineEnd();
     gen.putBlankLine();
@@ -198,7 +178,7 @@ public class CGenerator extends IRInstructionVisitor {
     if (ir.getProcesses().get(entryProcess).hasArguments()) {
       throw new RuntimeException("Entry process cannot have arguments: " + entryProcess);
     }
-    gen.visitInstruction(new IRCallProcess(entryProcess, new ArrayList<>(), new ArrayList<>()));
+    gen.visitInstruction(new IRCallProcess(entryProcess, new ArrayList<>()));
 
     // Generate code for each process.
     for (Map.Entry<String, IRProcess> procEntry : ir.getProcesses().entrySet()) {
@@ -276,20 +256,6 @@ public class CGenerator extends IRInstructionVisitor {
       // Bind the linear arguments to the new environment
       for (LinearArgument arg : instruction.getLinearArguments()) {
         putAssign(record(ENV, arg.getTargetRecord()), record(TMP_ENV, arg.getSourceRecord()));
-      }
-
-      // Store the polarities of the type arguments in the new environment
-      for (TypeArgument arg : instruction.getTypeArguments()) {
-        if (arg.getSourceType() instanceof IRVarT) {
-          IRVarT source = (IRVarT) arg.getSourceType();
-          String op = arg.isDual() ? "!" : "";
-          putAssign(
-              typePolarity(ENV, arg.getTargetType()), op + typePolarity(TMP_ENV, source.getType()));
-        } else {
-          String lit = arg.isPositive() ? "1" : "0";
-          putAssign(typePolarity(ENV, arg.getTargetType()), lit);
-        }
-        putAssign(typeSize(ENV, arg.getTargetType()), size(arg.getSourceType()));
       }
 
       putIf("--" + endPoints(TMP_ENV) + " == 0", () -> putFreeEnvironment(TMP_ENV));
@@ -470,7 +436,7 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRBranch instruction) {
-      putIfElse(
+    putIfElse(
         expression(instruction.getExpression()),
         () -> {
           putAssign(endPoints(), endPoints() + " - " + instruction.getOtherwise().getEndPoints());
@@ -480,14 +446,6 @@ public class CGenerator extends IRInstructionVisitor {
           putAssign(endPoints(), endPoints() + " - " + instruction.getThen().getEndPoints());
           putConstantGoto(blockLabel(instruction.getOtherwise().getLabel()));
         });
-  }
-
-  @Override
-  public void visit(IRBranchOnPolarity instruction) {
-    putIfElse(
-        typePolarity(ENV, instruction.getType()),
-        () -> putConstantGoto(blockLabel(instruction.getPosLabel())),
-        () -> putConstantGoto(blockLabel(instruction.getNegLabel())));
   }
 
   @Override
@@ -523,18 +481,6 @@ public class CGenerator extends IRInstructionVisitor {
 
   private String endPoints() {
     return endPoints(ENV);
-  }
-
-  private String typePolarity(String env, int ty) {
-    return type(env, ty) + ".polarity";
-  }
-
-  private String typeSize(String env, int ty) {
-    return type(env, ty) + ".size";
-  }
-
-  private String type(String env, int ty) {
-    return "TYPE(" + env + ", " + envSize + ", " + ty + ")";
   }
 
   private String read(int record) {
@@ -616,9 +562,7 @@ public class CGenerator extends IRInstructionVisitor {
         var,
         "malloc(sizeof(struct environment) + "
             + process.getRecordCount()
-            + " * sizeof(struct record*) + "
-            + process.getTypeCount()
-            + " * sizeof(struct type))");
+            + " * sizeof(struct record*))");
   }
 
   private void putFreeEnvironment(String var) {
@@ -794,7 +738,7 @@ public class CGenerator extends IRInstructionVisitor {
 
     @Override
     public void visit(IRVarT type) {
-      size += typeSize(ENV, type.getType());
+      size += "0";
     }
 
     @Override
@@ -871,7 +815,12 @@ public class CGenerator extends IRInstructionVisitor {
     @Override
     public void visit(IRAdd expr) {
       if (expr.getType() instanceof IRStringT) {
-        code += "string_concat(" + expressionToString(expr.getLhs()) + ", " + expressionToString(expr.getRhs()) + ")";
+        code +=
+            "string_concat("
+                + expressionToString(expr.getLhs())
+                + ", "
+                + expressionToString(expr.getRhs())
+                + ")";
       } else {
         binary("+", expr.getLhs(), expr.getRhs());
       }
@@ -895,7 +844,12 @@ public class CGenerator extends IRInstructionVisitor {
     @Override
     public void visit(IREq expr) {
       if (expr.getLhs() instanceof IRString || expr.getRhs() instanceof IRString) {
-        code += "string_equal(" + expressionToString(expr.getLhs()) + ", " + expressionToString(expr.getRhs()) + ")";
+        code +=
+            "string_equal("
+                + expressionToString(expr.getLhs())
+                + ", "
+                + expressionToString(expr.getRhs())
+                + ")";
       } else {
         binary("==", expr.getLhs(), expr.getRhs());
       }

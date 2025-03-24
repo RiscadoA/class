@@ -2,6 +2,8 @@ package pt.inescid.cllsj.compiler;
 
 import java.util.ArrayList;
 import java.util.List;
+import pt.inescid.cllsj.Env;
+import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.ast.ASTTypeVisitor;
 import pt.inescid.cllsj.ast.types.ASTBangT;
 import pt.inescid.cllsj.ast.types.ASTBotT;
@@ -36,17 +38,17 @@ import pt.inescid.cllsj.compiler.ir.type.IRType;
 import pt.inescid.cllsj.compiler.ir.type.IRVarT;
 
 public class ASTIntoIRType extends ASTTypeVisitor {
-  private Environment env;
+  private Env<EnvEntry> ep;
   private IRType ir;
 
-  public static IRType convert(Environment env, ASTType type) {
-    ASTIntoIRType converter = new ASTIntoIRType(env);
+  public static IRType convert(Env<EnvEntry> ep, ASTType type) {
+    ASTIntoIRType converter = new ASTIntoIRType(ep);
     type.accept(converter);
     return converter.ir;
   }
 
-  private ASTIntoIRType(Environment env) {
-    this.env = env;
+  private ASTIntoIRType(Env<EnvEntry> ep) {
+    this.ep = ep;
   }
 
   @Override
@@ -66,19 +68,19 @@ public class ASTIntoIRType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTSendT type) {
-    ir = new IRSessionT(ASTIntoIRType.convert(env, type.getrhs()));
+    ir = new IRSessionT(ASTIntoIRType.convert(ep, type.getrhs()));
   }
 
   @Override
   public void visit(ASTRecvT type) {
-    ir = new IRSessionT(ASTIntoIRType.convert(env, type.getrhs()));
+    ir = new IRSessionT(ASTIntoIRType.convert(ep, type.getrhs()));
   }
 
   @Override
   public void visit(ASTCaseT type) {
     List<IRType> choices = new ArrayList<>();
     for (int i = 0; i < type.getcases().size(); i++) {
-      choices.add(new IRSessionT(ASTIntoIRType.convert(env, type.getCaseType(type.getLabel(i)))));
+      choices.add(new IRSessionT(ASTIntoIRType.convert(ep, type.getCaseType(type.getLabel(i)))));
     }
     ir = new IRTagT(choices);
   }
@@ -87,33 +89,33 @@ public class ASTIntoIRType extends ASTTypeVisitor {
   public void visit(ASTOfferT type) {
     List<IRType> choices = new ArrayList<>();
     for (int i = 0; i < type.getcases().size(); i++) {
-      choices.add(new IRSessionT(ASTIntoIRType.convert(env, type.getCaseType(type.getLabel(i)))));
+      choices.add(new IRSessionT(ASTIntoIRType.convert(ep, type.getCaseType(type.getLabel(i)))));
     }
     ir = new IRTagT(choices);
   }
 
   @Override
   public void visit(ASTRecT type) {
-    ir = new IRRecT(ASTIntoIRType.convert(env, type.getin()));
+    ir = new IRRecT(ASTIntoIRType.convert(ep, type.getin()));
   }
 
   @Override
   public void visit(ASTCoRecT type) {
-    ir = new IRRecT(ASTIntoIRType.convert(env, type.getin()));
+    ir = new IRRecT(ASTIntoIRType.convert(ep, type.getin()));
   }
 
   @Override
   public void visit(ASTIdT type) {
     ASTType unfolded;
     try {
-      unfolded = type.unfoldType(env.getEp());
+      unfolded = type.unfoldType(ep);
     } catch (Exception e) {
       throw new IllegalArgumentException("Error unfolding type: " + e.getMessage());
     }
 
     if (unfolded instanceof ASTIdT) {
       type = (ASTIdT) unfolded;
-      ir = new IRVarT(env.getTypeVarIndex(type.getid()));
+      ir = new IRVarT();
     } else {
       unfolded.accept(this);
     }
@@ -121,12 +123,12 @@ public class ASTIntoIRType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTBangT type) {
-    ir = new IRExponentialT(ASTIntoIRType.convert(env, type.getin()));
+    ir = new IRExponentialT(ASTIntoIRType.convert(ep, type.getin()));
   }
 
   @Override
   public void visit(ASTWhyT type) {
-    ir = new IRExponentialT(ASTIntoIRType.convert(env, type.getin()));
+    ir = new IRExponentialT(ASTIntoIRType.convert(ep, type.getin()));
   }
 
   @Override
