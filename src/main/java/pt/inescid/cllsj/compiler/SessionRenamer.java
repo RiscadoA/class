@@ -252,11 +252,11 @@ public class SessionRenamer extends ASTNodeVisitor {
   @Override
   public void visit(ASTId node) {
     for (ASTExpr expr : node.getExprs()) {
-      expr.accept(this);
+      expr.accept(new ExprVisitor());
     }
 
     for (ASTExpr expr : node.getGExprs()) {
-      expr.accept(this);
+      expr.accept(new ExprVisitor());
     }
 
     for (int i = 0; i < node.getPars().size(); i++) {
