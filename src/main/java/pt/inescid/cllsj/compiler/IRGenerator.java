@@ -211,7 +211,7 @@ public class IRGenerator extends ASTNodeVisitor {
       int endPointCount = countEndPoints(caseNode) - 1;
 
       IRBlock caseBlock = process.addBlock("case_" + caseLabel.substring(1));
-      cases.put(i, new IRPopTag.Case(block.getLabel(), endPointCount));
+      cases.put(i, new IRPopTag.Case(caseBlock.getLabel(), endPointCount));
 
       visitBlock(caseBlock, caseNode);
     }
@@ -277,7 +277,9 @@ public class IRGenerator extends ASTNodeVisitor {
     block.add(new IRReturn(record(node.getChr())));
 
     IRProcess parentProcess = process;
-    process = new IRProcess(false, env.recordCount(), env.exponentialCount(), countEndPoints(node.getRhs()));
+    process =
+        new IRProcess(
+            false, env.recordCount(), env.exponentialCount(), countEndPoints(node.getRhs()));
     program.addProcess(env.getName(), process);
     environments.push(env);
     visitBlock(process.getEntry(), node.getRhs());
@@ -303,6 +305,21 @@ public class IRGenerator extends ASTNodeVisitor {
     if (!isPositive(node.getType())) {
       block.add(new IRFlip(record(node.getChi())));
     }
+    node.getRhs().accept(this);
+  }
+
+  @Override
+  public void visit(ASTUnfold node) {
+    if (node.rec) {
+      block.add(new IRPushUnfold(record(node.getCh())));
+
+      if (!isPositive(node.getRhsType())) {
+        block.add(new IRFlip(record(node.getCh())));
+      }
+    } else {
+      block.add(new IRPopUnfold(record(node.getCh())));
+    }
+
     node.getRhs().accept(this);
   }
 

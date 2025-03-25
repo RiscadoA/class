@@ -495,7 +495,8 @@ public class CGenerator extends IRInstructionVisitor {
   public void visit(IRPushExponential instruction) {
     IRProcess process = ir.getProcesses().get(instruction.getProcessName());
     putAllocExponential(TMP_EXPONENTIAL, process.getExponentialCount());
-    putAssign(exponentialCont(TMP_EXPONENTIAL), labelAddress("proc_" + instruction.getProcessName()));
+    putAssign(
+        exponentialCont(TMP_EXPONENTIAL), labelAddress("proc_" + instruction.getProcessName()));
     putAssign(exponentialRecordCount(TMP_EXPONENTIAL), process.getRecordCount());
     putAssign(exponentialExponentialCount(TMP_EXPONENTIAL), process.getExponentialCount());
     putAssign(exponentialEndPoints(TMP_EXPONENTIAL), process.getEndPoints());
@@ -538,6 +539,18 @@ public class CGenerator extends IRInstructionVisitor {
     putAssign(recordContRecord(instruction.getArgRecord()), 0);
     putAssign(read(instruction.getArgRecord()), 0);
     putAssign(written(instruction.getArgRecord()), 0);
+  }
+
+  @Override
+  public void visit(IRPushUnfold instruction) {
+    new IRFlip(instruction.getRecord()).accept(this);
+    putAssign(written(instruction.getRecord()), 0);
+  }
+
+  @Override
+  public void visit(IRPopUnfold instruction) {
+    new IRFlip(instruction.getRecord()).accept(this);
+    putAssign(read(instruction.getRecord()), 0);
   }
 
   // =============================== Expression building helpers ================================
@@ -894,7 +907,7 @@ public class CGenerator extends IRInstructionVisitor {
 
     @Override
     public void visit(IRRecT type) {
-      type.accept(this);
+      type.getInner().accept(this);
     }
 
     @Override
