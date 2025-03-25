@@ -89,4 +89,12 @@ public abstract class IRInstructionVisitor {
   public void visit(IRPushExpression instruction) {
     visit((IRInstruction) instruction);
   }
+
+  public void visit(IRPushType instruction) {
+    visit((IRInstruction) instruction);
+  }
+
+  public void visit(IRPopType instruction) {
+    visit((IRInstruction) instruction);
+  }
 }

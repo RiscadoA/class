@@ -18,6 +18,7 @@ import pt.inescid.cllsj.TypeClosure;
 import pt.inescid.cllsj.TypeDefEntry;
 import pt.inescid.cllsj.TypeEntry;
 import pt.inescid.cllsj.TypeError;
+import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.types.ASTIdT;
 import pt.inescid.cllsj.ast.types.ASTRecvTT;
 import pt.inescid.cllsj.ast.types.ASTType;
@@ -34,6 +35,30 @@ public class ASTRecvTy extends ASTNode {
     chs = _chs;
     tyid = _tyid;
     rhs = _rhs;
+  }
+
+  public void setChs(String chs) {
+    this.chs = chs;
+  }
+
+  public String getChs() {
+    return chs;
+  }
+
+  public String getTyid() {
+    return tyid;
+  }
+
+  public String getTyidGen() {
+    return tyidGen;
+  }
+
+  public ASTType getTypeRhs() {
+    return tyrhs;
+  }
+
+  public ASTNode getRhs() {
+    return rhs;
   }
 
   public void ASTInsertPipe(Function<ASTNode, ASTNode> f, ASTNode from) throws Exception {
@@ -309,5 +334,10 @@ public class ASTRecvTy extends ASTNode {
         p_cont.epnm = ep;
       }
     }
+  }
+
+  @Override
+  public void accept(ASTNodeVisitor visitor) {
+    visitor.visit(this);
   }
 }

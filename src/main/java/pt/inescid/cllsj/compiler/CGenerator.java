@@ -461,6 +461,19 @@ public class CGenerator extends IRInstructionVisitor {
         expression(instruction.getExpression()));
   }
 
+  @Override
+  public void visit(IRPushType instruction) {
+    putPush(instruction.getRecord(), "unsigned char", instruction.isPositive() ? "1" : "0");
+  }
+
+  @Override
+  public void visit(IRPopType instruction) {
+    putIfElse(
+        pop(instruction.getRecord(), "unsigned char"),
+        () -> putConstantGoto(blockLabel(instruction.getPositiveLabel())),
+        () -> putConstantGoto(blockLabel(instruction.getNegativeLabel())));
+  }
+
   // =============================== Expression building helpers ================================
 
   private String taskNext(String task) {
@@ -754,6 +767,12 @@ public class CGenerator extends IRInstructionVisitor {
     @Override
     public void visit(IRStringT type) {
       size += "sizeof(char*)";
+    }
+
+    @Override
+    public void visit(IRTypeT type) {
+      size += "sizeof(unsigned char) + ";
+      type.getCont().accept(this);
     }
   }
 

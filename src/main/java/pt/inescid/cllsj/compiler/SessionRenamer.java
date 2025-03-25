@@ -37,8 +37,10 @@ import pt.inescid.cllsj.ast.nodes.ASTProcDef;
 import pt.inescid.cllsj.ast.nodes.ASTProgram;
 import pt.inescid.cllsj.ast.nodes.ASTPromoCoExpr;
 import pt.inescid.cllsj.ast.nodes.ASTRecv;
+import pt.inescid.cllsj.ast.nodes.ASTRecvTy;
 import pt.inescid.cllsj.ast.nodes.ASTSelect;
 import pt.inescid.cllsj.ast.nodes.ASTSend;
+import pt.inescid.cllsj.ast.nodes.ASTSendTy;
 import pt.inescid.cllsj.ast.nodes.ASTString;
 import pt.inescid.cllsj.ast.nodes.ASTSub;
 import pt.inescid.cllsj.ast.nodes.ASTUnfold;
@@ -363,5 +365,17 @@ public class SessionRenamer extends ASTNodeVisitor {
   @Override
   public void visit(ASTExpr expr) {
     expr.accept(new ExprVisitor());
+  }
+
+  @Override
+  public void visit(ASTSendTy node) {
+    node.setChs(rename(node.getChs()));
+    node.getRhs().accept(this);
+  }
+
+  @Override
+  public void visit(ASTRecvTy node) {
+    node.setChs(rename(node.getChs()));
+    node.getRhs().accept(this);
   }
 }

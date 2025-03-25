@@ -85,4 +85,12 @@ public abstract class ASTTypeVisitor {
   public void visit(ASTCoLstringT type) {
     visit((ASTType) type);
   }
+
+  public void visit(ASTSendTT type) {
+    visit((ASTType) type);
+  }
+
+  public void visit(ASTRecvTT type) {
+    visit((ASTType) type);
+  }
 }

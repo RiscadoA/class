@@ -159,6 +159,37 @@ public class IRGenerator extends ASTNodeVisitor {
   }
 
   @Override
+  public void visit(ASTSendTy node) {
+    block.add(new IRPushType(record(node.getChs()), isPositive(node.getType())));
+
+    // Flip if the remainder of the session type is negative.
+    if (!isPositive(node.getTypeRhs())) {
+      block.add(new IRFlip(record(node.getChs())));
+    }
+    node.getRhs().accept(this);
+  }
+
+  @Override
+  public void visit(ASTRecvTy node) {
+    IRBlock positiveBlock = process.addBlock("recv_ty_positive");
+    IRBlock negativeBlock = process.addBlock("recv_ty_negative");
+
+    block.add(
+        new IRPopType(record(node.getChs()), positiveBlock.getLabel(), negativeBlock.getLabel()));
+
+    ep = ep.assoc(node.getTyid(), new TypeEntry(new ASTIdT(node.getTyid())));
+    ep = ep.assoc(node.getTyidGen(), new TypeEntry(new ASTIdT(node.getTyidGen())));
+
+    // Generate code for each possible polarity.
+    environment().setPolarity(node.getTyid(), true);
+    environment().setPolarity(node.getTyidGen(), true);
+    visit(positiveBlock, node.getRhs());
+    environment().setPolarity(node.getTyid(), false);
+    environment().setPolarity(node.getTyidGen(), false);
+    visit(negativeBlock, node.getRhs());
+  }
+
+  @Override
   public void visit(ASTSelect node) {
     block.add(new IRPushTag(record(node.getCh()), node.getLabelIndex()));
 
@@ -183,10 +214,6 @@ public class IRGenerator extends ASTNodeVisitor {
       IRBlock caseBlock = process.addBlock("case_" + caseLabel.substring(1));
       cases.put(i, new IRPopTag.Case(block.getLabel(), endPointCount));
 
-      // Flip if the remainder of the session type is negative.
-      if (!isPositive(node.getCaseType(caseLabel))) {
-        caseBlock.add(new IRFlip(record(node.getCh())));
-      }
       visit(caseBlock, caseNode);
     }
   }
@@ -265,37 +292,6 @@ public class IRGenerator extends ASTNodeVisitor {
       return dual ^ type.isPosCatch(ep);
     }
   }
-
-  // private void branchOnPolarity(ASTType type, Runnable onWrite, Runnable onRead) {
-  //   branchOnPolarity(polarity(type), onWrite, onRead);
-  // }
-
-  // private void branchOnPolarity(Polarity polarity, Runnable onWrite, Runnable onRead) {
-  //   if (!polarity.isKnown()) {
-  //     // If even after unfolding the type is still a variable, we can't know its polarity at
-  // compile
-  //     // time.
-  //     // Therefore, we need to fetch its polarity from the environment, and branch accordingly.
-  //     // We need to do it at runtime, as we don't know the type of the variable at compile time.
-  //     IRBlock negBlock = process.addBlock("polarity_neg");
-  //     IRBlock posBlock = process.addBlock("polarity_pos");
-  //     if (polarity.isDual()) {
-  //       block.add(
-  //           new IRBranchOnPolarity(
-  //               type(polarity.getTypeId()), posBlock.getLabel(), negBlock.getLabel()));
-  //     } else {
-  //       block.add(
-  //           new IRBranchOnPolarity(
-  //               type(polarity.getTypeId()), negBlock.getLabel(), posBlock.getLabel()));
-  //     }
-  //     visit(negBlock, onRead);
-  //     visit(posBlock, onWrite);
-  //   } else if (polarity.isPositive()) {
-  //     onWrite.run();
-  //   } else {
-  //     onRead.run();
-  //   }
-  // }
 
   private Environment environment() {
     return environments.peek();
@@ -410,6 +406,16 @@ public class IRGenerator extends ASTNodeVisitor {
     public void visit(ASTIf node) {
       node.getThen().accept(this);
       node.getElse().accept(this);
+    }
+
+    @Override
+    public void visit(ASTSendTy node) {
+      node.getRhs().accept(this);
+    }
+
+    @Override
+    public void visit(ASTRecvTy node) {
+      node.getRhs().accept(this);
     }
   }
 
@@ -563,6 +569,10 @@ public class IRGenerator extends ASTNodeVisitor {
       return polarities.get(typeVar);
     }
 
+    public void setPolarity(String typeVar, boolean isPositive) {
+      polarities.put(typeVar, isPositive);
+    }
+
     private void insertLinear(String session) {
       records.put(session, records.size());
     }
@@ -670,6 +680,16 @@ public class IRGenerator extends ASTNodeVisitor {
 
       @Override
       public void visit(ASTCoClose node) {
+        node.getRhs().accept(this);
+      }
+
+      @Override
+      public void visit(ASTRecvTy node) {
+        node.getRhs().accept(this);
+      }
+
+      @Override
+      public void visit(ASTSendTy node) {
         node.getRhs().accept(this);
       }
     }

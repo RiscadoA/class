@@ -90,7 +90,15 @@ public abstract class ASTNodeVisitor {
     visit((ASTNode) node);
   }
 
-  public void visit(ASTExpr expr) {
-    visit((ASTNode) expr);
+  public void visit(ASTSendTy node) {
+    visit((ASTNode) node);
+  }
+
+  public void visit(ASTRecvTy node) {
+    visit((ASTNode) node);
+  }
+
+  public void visit(ASTExpr node) {
+    visit((ASTNode) node);
   }
 }

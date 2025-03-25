@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
+import pt.inescid.cllsj.TypeEntry;
 import pt.inescid.cllsj.ast.ASTTypeVisitor;
 import pt.inescid.cllsj.ast.types.ASTBangT;
 import pt.inescid.cllsj.ast.types.ASTBotT;
@@ -22,7 +23,9 @@ import pt.inescid.cllsj.ast.types.ASTOfferT;
 import pt.inescid.cllsj.ast.types.ASTOneT;
 import pt.inescid.cllsj.ast.types.ASTRecT;
 import pt.inescid.cllsj.ast.types.ASTRecvT;
+import pt.inescid.cllsj.ast.types.ASTRecvTT;
 import pt.inescid.cllsj.ast.types.ASTSendT;
+import pt.inescid.cllsj.ast.types.ASTSendTT;
 import pt.inescid.cllsj.ast.types.ASTType;
 import pt.inescid.cllsj.ast.types.ASTWhyT;
 import pt.inescid.cllsj.ast.types.ASTintT;
@@ -35,6 +38,7 @@ import pt.inescid.cllsj.compiler.ir.type.IRSessionT;
 import pt.inescid.cllsj.compiler.ir.type.IRStringT;
 import pt.inescid.cllsj.compiler.ir.type.IRTagT;
 import pt.inescid.cllsj.compiler.ir.type.IRType;
+import pt.inescid.cllsj.compiler.ir.type.IRTypeT;
 import pt.inescid.cllsj.compiler.ir.type.IRVarT;
 
 public class ASTIntoIRType extends ASTTypeVisitor {
@@ -174,5 +178,18 @@ public class ASTIntoIRType extends ASTTypeVisitor {
   @Override
   public void visit(ASTNotT type) {
     type.getin().accept(this);
+  }
+
+  @Override
+  public void visit(ASTSendTT type) {
+    ir = new IRTypeT(ASTIntoIRType.convert(ep, type.getrhs()));
+  }
+
+  @Override
+  public void visit(ASTRecvTT type) {
+    ir =
+        new IRTypeT(
+            ASTIntoIRType.convert(
+                ep.assoc(type.getid(), new TypeEntry(new ASTIdT(type.getid()))), type.getrhs()));
   }
 }
