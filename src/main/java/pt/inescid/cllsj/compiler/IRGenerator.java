@@ -720,7 +720,8 @@ public class IRGenerator extends ASTNodeVisitor {
       @Override
       public void visit(ASTSend node) {
         insertLinear(node.getCho());
-        node.getLhs();
+        node.getLhs().accept(this);
+        node.getRhs().accept(this);
       }
 
       @Override
