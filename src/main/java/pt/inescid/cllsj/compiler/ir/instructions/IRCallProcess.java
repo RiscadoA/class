@@ -24,6 +24,24 @@ public class IRCallProcess extends IRInstruction {
     }
   }
 
+  public static class ExponentialArgument {
+    private int sourceExponential;
+    private int targetExponential;
+
+    public ExponentialArgument(int sourceExponential, int targetExponential) {
+      this.sourceExponential = sourceExponential;
+      this.targetExponential = targetExponential;
+    }
+
+    public int getSourceExponential() {
+      return sourceExponential;
+    }
+
+    public int getTargetExponential() {
+      return targetExponential;
+    }
+  }
+
   public static class TypeArgument {
     private IRType sourceType;
     private int targetType;
@@ -58,10 +76,15 @@ public class IRCallProcess extends IRInstruction {
 
   private String processName;
   private List<LinearArgument> linearArguments;
+  private List<ExponentialArgument> exponentialArguments;
 
-  public IRCallProcess(String processName, List<LinearArgument> linearArguments) {
+  public IRCallProcess(
+      String processName,
+      List<LinearArgument> linearArguments,
+      List<ExponentialArgument> exponentialArguments) {
     this.processName = processName;
     this.linearArguments = linearArguments;
+    this.exponentialArguments = exponentialArguments;
   }
 
   public String getProcessName() {
@@ -70,6 +93,10 @@ public class IRCallProcess extends IRInstruction {
 
   public List<LinearArgument> getLinearArguments() {
     return linearArguments;
+  }
+
+  public List<ExponentialArgument> getExponentialArguments() {
+    return exponentialArguments;
   }
 
   @Override
@@ -82,6 +109,12 @@ public class IRCallProcess extends IRInstruction {
     String str = "call(" + this.processName;
     for (LinearArgument arg : this.linearArguments) {
       str += ", " + arg.getSourceRecord() + " -> " + arg.getTargetRecord();
+    }
+    boolean firstExponential = true;
+    for (ExponentialArgument arg : this.exponentialArguments) {
+      str += firstExponential ? "; " : ", ";
+      str += arg.getSourceExponential() + " -> " + arg.getTargetExponential();
+      firstExponential = false;
     }
     return str + ")";
   }

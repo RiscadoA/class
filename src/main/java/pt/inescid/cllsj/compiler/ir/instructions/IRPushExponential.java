@@ -4,31 +4,19 @@ import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 
 public class IRPushExponential extends IRInstruction {
   private int record;
-  private int parentCount;
-  private int recordCount;
-  private String label;
+  private String processName;
 
-  public IRPushExponential(int record, int parentCount, int recordCount, String label) {
+  public IRPushExponential(int record, String processName) {
     this.record = record;
-    this.parentCount = parentCount;
-    this.recordCount = recordCount;
-    this.label = label;
+    this.processName = processName;
   }
 
   public int getRecord() {
     return record;
   }
 
-  public int getParentCount() {
-    return parentCount;
-  }
-
-  public int getRecordCount() {
-    return recordCount;
-  }
-
-  public String getLabel() {
-    return label;
+  public String getProcessName() {
+    return processName;
   }
 
   @Override
@@ -38,14 +26,6 @@ public class IRPushExponential extends IRInstruction {
 
   @Override
   public String toString() {
-    return "pushExponential("
-        + record
-        + ", "
-        + parentCount
-        + ", "
-        + recordCount
-        + ", "
-        + label
-        + ")";
+    return "pushExponential(" + record + ", " + processName + ")";
   }
 }

@@ -127,12 +127,12 @@ public class ASTIntoIRType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTBangT type) {
-    ir = new IRExponentialT(ASTIntoIRType.convert(ep, type.getin()));
+    ir = new IRExponentialT();
   }
 
   @Override
   public void visit(ASTWhyT type) {
-    ir = new IRExponentialT(ASTIntoIRType.convert(ep, type.getin()));
+    ir = new IRExponentialT();
   }
 
   @Override

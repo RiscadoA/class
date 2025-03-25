@@ -6,13 +6,15 @@ import java.util.List;
 public class IRProcess {
   private boolean hasArguments;
   private int recordCount;
+  private int exponentialCount;
   private int endPoints;
   private IRBlock entry;
   private List<IRBlock> blocks;
 
-  public IRProcess(boolean hasArguments, int recordCount, int endPoints) {
+  public IRProcess(boolean hasArguments, int recordCount, int exponentialCount, int endPoints) {
     this.hasArguments = hasArguments;
     this.recordCount = recordCount;
+    this.exponentialCount = exponentialCount;
     this.endPoints = endPoints;
     this.entry = new IRBlock(null);
     this.blocks = new ArrayList<>();
@@ -24,6 +26,10 @@ public class IRProcess {
 
   public int getRecordCount() {
     return recordCount;
+  }
+
+  public int getExponentialCount() {
+    return exponentialCount;
   }
 
   public int getEndPoints() {

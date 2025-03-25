@@ -14,6 +14,7 @@ public class CGenerator extends IRInstructionVisitor {
   private static final String TMP_ENV = "tmp_env";
   private static final String TMP_CONT = "tmp_cont";
   private static final String TMP_RECORD = "tmp_record";
+  private static final String TMP_EXPONENTIAL = "tmp_exponential";
 
   private static final String TASK = "task";
   private static final String ENV = "env";
@@ -23,7 +24,7 @@ public class CGenerator extends IRInstructionVisitor {
   private int indentLevel = 0;
   private int genLabelCountInBlock;
   private String procName;
-  private int envSize;
+  private int recordCount;
   private Optional<String> blockName;
   private boolean trace;
   private boolean entryCall = true;
@@ -53,9 +54,10 @@ public class CGenerator extends IRInstructionVisitor {
     // Define the exponential struct.
     gen.putLine("struct exponential {");
     gen.incIndent();
-    gen.putLine("struct exponential* parent;");
     gen.putLine("void* cont;");
     gen.putLine("int record_count;");
+    gen.putLine("int exponential_count;");
+    gen.putLine("int end_points;");
     gen.putLine("int ref_count;");
     gen.decIndent();
     gen.putLine("};");
@@ -80,11 +82,25 @@ public class CGenerator extends IRInstructionVisitor {
     gen.putLine("};");
     gen.putBlankLine();
 
-    // Utility macro for accessing recordvisitors on a given environment.
+    // Utility macros for accessing records and exponentials on a given environment, and on
+    // exponentials.
     gen.put("#define RECORD(env, rec) (*(struct record**)(");
     gen.put("(char*)(env) + ");
     gen.put("sizeof(struct environment) + ");
     gen.put("sizeof(struct record*) * rec");
+    gen.put("))");
+    gen.putLineEnd();
+    gen.put("#define EXPONENTIAL(env, rec_count, exp) (*(struct exponential**)(");
+    gen.put("(char*)(env) + ");
+    gen.put("sizeof(struct environment) + ");
+    gen.put("sizeof(struct record*) * rec_count + ");
+    gen.put("sizeof(struct exponential*) * exp");
+    gen.put("))");
+    gen.putLineEnd();
+    gen.put("#define EXPONENTIAL_EXPONENTIAL(exp, exp2) (*(struct exponential**)(");
+    gen.put("(char*)(exp) + ");
+    gen.put("sizeof(struct exponential) + ");
+    gen.put("sizeof(struct exponential*) * exp2");
     gen.put("))");
     gen.putLineEnd();
     gen.putBlankLine();
@@ -164,6 +180,7 @@ public class CGenerator extends IRInstructionVisitor {
     gen.putStatement("struct environment* " + TMP_ENV);
     gen.putStatement("void* " + TMP_CONT);
     gen.putStatement("struct record* " + TMP_RECORD);
+    gen.putStatement("struct exponential* " + TMP_EXPONENTIAL);
     gen.putBlankLine();
 
     // Initialize the task list.
@@ -178,11 +195,11 @@ public class CGenerator extends IRInstructionVisitor {
     if (ir.getProcesses().get(entryProcess).hasArguments()) {
       throw new RuntimeException("Entry process cannot have arguments: " + entryProcess);
     }
-    gen.visitInstruction(new IRCallProcess(entryProcess, new ArrayList<>()));
+    gen.visitInstruction(new IRCallProcess(entryProcess, new ArrayList<>(), new ArrayList<>()));
 
     // Generate code for each process.
     for (Map.Entry<String, IRProcess> procEntry : ir.getProcesses().entrySet()) {
-      gen.envSize = procEntry.getValue().getRecordCount();
+      gen.recordCount = procEntry.getValue().getRecordCount();
 
       String label = "proc_" + procEntry.getKey();
       gen.putBlankLine();
@@ -474,6 +491,55 @@ public class CGenerator extends IRInstructionVisitor {
         () -> putConstantGoto(blockLabel(instruction.getNegativeLabel())));
   }
 
+  @Override
+  public void visit(IRPushExponential instruction) {
+    IRProcess process = ir.getProcesses().get(instruction.getProcessName());
+    putAllocExponential(TMP_EXPONENTIAL, process.getExponentialCount());
+    putAssign(exponentialCont(TMP_EXPONENTIAL), labelAddress("proc_" + instruction.getProcessName()));
+    putAssign(exponentialRecordCount(TMP_EXPONENTIAL), process.getRecordCount());
+    putAssign(exponentialExponentialCount(TMP_EXPONENTIAL), process.getExponentialCount());
+    putAssign(exponentialEndPoints(TMP_EXPONENTIAL), process.getEndPoints());
+    putAssign(exponentialRefCount(TMP_EXPONENTIAL), 1);
+    putPushExponential(instruction.getRecord(), TMP_EXPONENTIAL);
+  }
+
+  @Override
+  public void visit(IRPopExponential instruction) {
+    putAssign(
+        exponential(instruction.getArgExponential()), popExponential(instruction.getRecord()));
+  }
+
+  @Override
+  public void visit(IRCallExponential instruction) {
+    putAllocRecord(record(instruction.getArgRecord()), instruction.getArgType());
+
+    // Initialize the environment of the new record
+    String env = recordContEnv(instruction.getArgRecord());
+    putAllocEnvironment(
+        env,
+        exponentialRecordCount(instruction.getExponential()),
+        exponentialExponentialCount(instruction.getExponential()));
+    putAssign(record(env, 0), record(instruction.getArgRecord()));
+    putLine(
+        "for (int i = 0; i < "
+            + exponentialExponentialCount(instruction.getExponential())
+            + "; i++) {");
+    incIndent();
+    String exp = exponentialExponential(instruction.getExponential(), "i");
+    putAssign(exponential(env, exponentialRecordCount(instruction.getExponential()), "i"), exp);
+    putStatement(exponentialRefCount(exp) + " += 1");
+    decIndent();
+    putLine("}");
+    putAssign(endPoints(env), exponentialEndPoints(instruction.getExponential()));
+
+    // Initialize other fields
+    putAssign(
+        recordCont(instruction.getArgRecord()), exponentialCont(instruction.getExponential()));
+    putAssign(recordContRecord(instruction.getArgRecord()), 0);
+    putAssign(read(instruction.getArgRecord()), 0);
+    putAssign(written(instruction.getArgRecord()), 0);
+  }
+
   // =============================== Expression building helpers ================================
 
   private String taskNext(String task) {
@@ -544,6 +610,58 @@ public class CGenerator extends IRInstructionVisitor {
     return recordContRecord(ENV, record);
   }
 
+  private String exponential(String env, String recordCount, String exponential) {
+    return "EXPONENTIAL(" + env + ", " + recordCount + ", " + exponential + ")";
+  }
+
+  private String exponential(int exponential) {
+    return exponential(ENV, Integer.toString(recordCount), Integer.toString(exponential));
+  }
+
+  private String exponentialCont(String exponential) {
+    return exponential + "->cont";
+  }
+
+  private String exponentialCont(int exponential) {
+    return exponentialCont(exponential(exponential));
+  }
+
+  private String exponentialRecordCount(String exponential) {
+    return exponential + "->record_count";
+  }
+
+  private String exponentialRecordCount(int exponential) {
+    return exponentialRecordCount(exponential(exponential));
+  }
+
+  private String exponentialExponentialCount(String exponential) {
+    return exponential + "->exponential_count";
+  }
+
+  private String exponentialExponentialCount(int exponential) {
+    return exponentialExponentialCount(exponential(exponential));
+  }
+
+  private String exponentialEndPoints(String exponential) {
+    return exponential + "->end_points";
+  }
+
+  private String exponentialEndPoints(int exponential) {
+    return exponentialEndPoints(exponential(exponential));
+  }
+
+  private String exponentialRefCount(String exponential) {
+    return exponential + "->ref_count";
+  }
+
+  private String exponentialExponential(String exponential, String exponential2) {
+    return "EXPONENTIAL_EXPONENTIAL(" + exponential + ", " + exponential2 + ")";
+  }
+
+  private String exponentialExponential(int exponential, String exponential2) {
+    return exponentialExponential(exponential(exponential), exponential2);
+  }
+
   private String pop(int index, String type) {
     return "POP(" + index + ", " + type + ")";
   }
@@ -560,6 +678,10 @@ public class CGenerator extends IRInstructionVisitor {
     return pop(index, "struct record*");
   }
 
+  private String popExponential(int index) {
+    return pop(index, "struct exponential*");
+  }
+
   private String labelAddress(String label) {
     return "&&" + label;
   }
@@ -570,12 +692,22 @@ public class CGenerator extends IRInstructionVisitor {
 
   // ================================= Statement building helpers =================================
 
-  private void putAllocEnvironment(String var, IRProcess process) {
+  private void putAllocEnvironment(String var, String recordCount, String exponentialCount) {
     putAssign(
         var,
         "malloc(sizeof(struct environment) + "
-            + process.getRecordCount()
-            + " * sizeof(struct record*))");
+            + recordCount
+            + " * sizeof(struct record*) + "
+            + exponentialCount
+            + " * sizeof(struct exponential*))");
+  }
+
+  private void putAllocEnvironment(String var, int recordCount, int exponentialCount) {
+    putAllocEnvironment(var, Integer.toString(recordCount), Integer.toString(exponentialCount));
+  }
+
+  private void putAllocEnvironment(String var, IRProcess process) {
+    putAllocEnvironment(var, process.getRecordCount(), process.getExponentialCount());
   }
 
   private void putFreeEnvironment(String var) {
@@ -601,6 +733,18 @@ public class CGenerator extends IRInstructionVisitor {
     putLine("free(" + var + ");");
   }
 
+  private void putAllocExponential(String var, int exponentialCount) {
+    putAssign(
+        var,
+        "malloc(sizeof(struct exponential) + "
+            + exponentialCount
+            + " * sizeof(struct exponential*))");
+  }
+
+  private void putFreeExponential(String var) {
+    putLine("free(" + var + ");");
+  }
+
   private void putLabel(String label) {
     put(label + ":");
     putLineEnd();
@@ -616,6 +760,10 @@ public class CGenerator extends IRInstructionVisitor {
 
   private void putPushRecord(int record, String value) {
     putPush(record, "struct record*", value);
+  }
+
+  private void putPushExponential(int record, String value) {
+    putPush(record, "struct exponential*", value);
   }
 
   private void putAssign(String var, String value) {
@@ -773,6 +921,11 @@ public class CGenerator extends IRInstructionVisitor {
     public void visit(IRTypeT type) {
       size += "sizeof(unsigned char) + ";
       type.getCont().accept(this);
+    }
+
+    @Override
+    public void visit(IRExponentialT type) {
+      size += "sizeof(struct exponential*)";
     }
   }
 
