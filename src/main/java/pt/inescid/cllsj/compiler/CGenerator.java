@@ -1,8 +1,10 @@
 package pt.inescid.cllsj.compiler;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import pt.inescid.cllsj.compiler.ir.*;
 import pt.inescid.cllsj.compiler.ir.expressions.*;
 import pt.inescid.cllsj.compiler.ir.instructions.*;
@@ -503,13 +505,16 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRBranch instruction) {
+    ExpressionEvaluation eval = evaluateExpression(instruction.getExpression());
     putIfElse(
-        expression(instruction.getExpression()),
+        eval.getCode(),
         () -> {
+          eval.freeUsedRecords();
           putAssign(endPoints(), endPoints() + " - " + instruction.getOtherwise().getEndPoints());
           putConstantGoto(blockLabel(instruction.getThen().getLabel()));
         },
         () -> {
+          eval.freeUsedRecords();
           putAssign(endPoints(), endPoints() + " - " + instruction.getThen().getEndPoints());
           putConstantGoto(blockLabel(instruction.getOtherwise().getLabel()));
         });
@@ -522,10 +527,9 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRPushExpression instruction) {
-    putPush(
-        instruction.getRecord(),
-        type(instruction.getExpression().getType()),
-        expression(instruction.getExpression()));
+    ExpressionEvaluation eval = evaluateExpression(instruction.getExpression());
+    putPush(instruction.getRecord(), type(instruction.getExpression().getType()), eval.getCode());
+    eval.freeUsedRecords();
   }
 
   @Override
@@ -1033,24 +1037,54 @@ public class CGenerator extends IRInstructionVisitor {
 
   // ========================== Visitor used to generate expression code ==========================
 
-  private String expression(IRExpression expr) {
+  private class ExpressionEvaluation {
+    private final String code;
+    private final Set<Integer> usedRecords;
+
+    public ExpressionEvaluation(String code, Set<Integer> usedRecords) {
+      this.code = code;
+      this.usedRecords = usedRecords;
+    }
+
+    public String getCode() {
+      return code;
+    }
+
+    public Set<Integer> getUsedRecords() {
+      return usedRecords;
+    }
+
+    public void freeUsedRecords() {
+      for (int record : usedRecords) {
+        putFreeRecord(record(record));
+      }
+    }
+  }
+  ;
+
+  private ExpressionEvaluation evaluateExpression(IRExpression expr) {
     ExpressionGenerator gen = new ExpressionGenerator();
     expr.accept(gen);
-    return gen.code;
+    return new ExpressionEvaluation(gen.code, gen.usedRecords);
   }
 
-  private String expressionToString(IRExpression expr) {
+  private ExpressionEvaluation evaluateExpressionToString(IRExpression expr) {
     if (expr.getType() instanceof IRIntT) {
-      return "string_from_int(" + expression(expr) + ")";
+      ExpressionEvaluation eval = evaluateExpression(expr);
+      return new ExpressionEvaluation(
+          "string_from_int(" + eval.getCode() + ")", eval.getUsedRecords());
     } else if (expr.getType() instanceof IRBoolT) {
-      return expression(expr) + " ? \"true\" : \"false\"";
+      ExpressionEvaluation eval = evaluateExpression(expr);
+      return new ExpressionEvaluation(
+          "string_create(" + eval.getCode() + " ? \"true\" : \"false\")", eval.getUsedRecords());
     } else {
-      return expression(expr);
+      return evaluateExpression(expr);
     }
   }
 
   private class ExpressionGenerator extends IRExpressionVisitor {
     private String code = "";
+    private Set<Integer> usedRecords = new HashSet<>();
 
     private void binary(String op, IRExpression lhs, IRExpression rhs) {
       code += "(";
@@ -1084,18 +1118,27 @@ public class CGenerator extends IRInstructionVisitor {
     @Override
     public void visit(IRVar expr) {
       code += pop(expr.getRecord(), expr.getType());
+      usedRecords.add(expr.getRecord());
     }
 
     @Override
     public void visit(IRAdd expr) {
       if (expr.getType() instanceof IRStringT) {
-        code +=
-            "string_concat("
-                + expressionToString(expr.getLhs())
-                + ", "
-                + expressionToString(expr.getRhs())
-                + ")";
+        ExpressionEvaluation lhs = evaluateExpressionToString(expr.getLhs());
+        ExpressionEvaluation rhs = evaluateExpressionToString(expr.getRhs());
+
+        code += "string_concat(" + lhs.code + ", " + rhs.code + ")";
+
+        usedRecords.addAll(lhs.getUsedRecords());
+        usedRecords.addAll(rhs.getUsedRecords());
       } else {
+        if (!(expr.getType() instanceof IRIntT)
+            || !(expr.getLhs().getType() instanceof IRIntT)
+            || !(expr.getRhs().getType() instanceof IRIntT)) {
+          throw new UnsupportedOperationException(
+              "Unsupported addition: " + expr.getType().getClass().getName());
+        }
+
         binary("+", expr.getLhs(), expr.getRhs());
       }
     }
@@ -1118,12 +1161,13 @@ public class CGenerator extends IRInstructionVisitor {
     @Override
     public void visit(IREq expr) {
       if (expr.getLhs() instanceof IRString || expr.getRhs() instanceof IRString) {
-        code +=
-            "string_equal("
-                + expressionToString(expr.getLhs())
-                + ", "
-                + expressionToString(expr.getRhs())
-                + ")";
+        ExpressionEvaluation lhs = evaluateExpressionToString(expr.getLhs());
+        ExpressionEvaluation rhs = evaluateExpressionToString(expr.getRhs());
+
+        code += "string_equal(" + lhs.code + ", " + rhs.code + ")";
+
+        usedRecords.addAll(lhs.getUsedRecords());
+        usedRecords.addAll(rhs.getUsedRecords());
       } else {
         binary("==", expr.getLhs(), expr.getRhs());
       }
@@ -1151,7 +1195,9 @@ public class CGenerator extends IRInstructionVisitor {
 
     @Override
     public void visit(IRNot expr) {
-      code += "!(" + expression(expr.getInner()) + ")";
+      code += "!(";
+      expr.getInner().accept(this);
+      code += ")";
     }
   }
 
@@ -1229,17 +1275,23 @@ public class CGenerator extends IRInstructionVisitor {
 
     @Override
     public void visit(IRIntT type) {
-      putStatement("printf(\"%d" + nl() + "\", " + expression(expr) + ")");
+      ExpressionEvaluation eval = evaluateExpression(expr);
+      putStatement("printf(\"%d" + nl() + "\", " + eval.getCode() + ")");
+      eval.freeUsedRecords();
     }
 
     @Override
     public void visit(IRBoolT type) {
-      putStatement("printf(\"%s" + nl() + "\", " + expression(expr) + " ? \"true\" : \"false\")");
+      ExpressionEvaluation eval = evaluateExpression(expr);
+      putStatement("printf(\"%s" + nl() + "\", " + eval.getCode() + " ? \"true\" : \"false\")");
+      eval.freeUsedRecords();
     }
 
     @Override
     public void visit(IRStringT type) {
-      putStatement("string_print(\"%s" + nl() + "\", " + expression(expr) + ")");
+      ExpressionEvaluation eval = evaluateExpression(expr);
+      putStatement("string_print(\"%s" + nl() + "\", " + eval.getCode() + ")");
+      eval.freeUsedRecords();
     }
   }
 }
