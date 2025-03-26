@@ -129,11 +129,11 @@ public class CGenerator extends IRInstructionVisitor {
     // Utility macros for pushing and popping values to/from the buffer of a record in the active
     // environment.
     gen.put("#define PUSH(rec, type, value) (*(type*)(");
-    gen.put("&BUFFER(rec)[WRITTEN(rec) += sizeof(type)]");
+    gen.put("&BUFFER(rec)[(WRITTEN(rec) += sizeof(type)) - sizeof(type)]");
     gen.put(")) = value");
     gen.putLineEnd();
     gen.put("#define POP(rec, type) (*(type*)(");
-    gen.put("&BUFFER(rec)[READ(rec) += sizeof(type)]");
+    gen.put("&BUFFER(rec)[(READ(rec) += sizeof(type)) - sizeof(type)]");
     gen.put("))");
     gen.putLineEnd();
     gen.putBlankLine();
@@ -778,7 +778,7 @@ public class CGenerator extends IRInstructionVisitor {
 
   private void putFreeEnvironment(String var) {
     if (trace) {
-      putPrintLn("[endCall(" + procName + ")]");
+      putDebugLn("[endCall(" + procName + ")]");
     }
     putLine("free(" + var + ");");
     if (profile) {
