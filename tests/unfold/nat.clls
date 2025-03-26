@@ -1,0 +1,34 @@
+type rec Nat {
+    choice of {
+        |#Z: close
+        |#S: Nat
+    }
+};;
+
+proc rec nat_to_int(n: ~Nat, x: lint) {
+    println("unfold r"); unfold n;
+    println("case"); case n of {
+        |#Z: println("#Z r"); wait n; println("let 0"); let x 0
+        |#S:  cut {
+            nat_to_int(n, y)
+            |y: ~lint|
+            println("let +1");
+            let x y + 1
+        }
+    }
+};;
+
+proc main() {
+    cut {
+        println("unfold 1"); unfold n;
+        println("#S 1"); #S n;
+        println("unfold 2"); unfold n;
+        println("#S 2"); #S n;
+        println("unfold 3"); unfold n;
+        println("#Z"); #Z n; close n
+        |n: ~Nat|
+        nat_to_int(n, x)
+        |x: ~lint|
+        println(x); ()
+    }
+};;
