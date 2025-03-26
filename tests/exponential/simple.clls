@@ -1,10 +1,13 @@
 proc main() {
     cut {
-        !a(b:wait); wait b; println("x");()
-        |a: ?close|
-        ?a;
-        call a(y:close);
-        call a(z:close);
-        par { close y || close z }
+        println("!"); !a(b: close);
+        println("close"); close b
+        |a: ?wait|
+        println("?"); ?a;
+        println("call 1"); call a(y);
+        println("wait 1"); wait y;
+        println("call 2"); call a(z);
+        println("wait 2"); wait z;
+        ()
     }
 };;

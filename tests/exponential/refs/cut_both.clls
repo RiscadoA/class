@@ -1,0 +1,14 @@
+proc main() {
+    cut {
+        !a(b: close); close b
+        |a: ?wait|
+        ?a;
+        cut {
+            call a(y); wait y;
+            wait x; ()
+            |x: close|
+            call a(y); wait y;
+            close x
+        }
+    }
+};;
