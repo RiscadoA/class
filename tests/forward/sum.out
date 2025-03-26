@@ -1,0 +1,8 @@
+#A a
+case a
+#A b
+case b
+close b
+forward
+wait
+end

@@ -1,0 +1,7 @@
+proc main() {
+    par {
+        println("lhs"); ()
+        ||
+        println("rhs"); ()
+    }
+};;

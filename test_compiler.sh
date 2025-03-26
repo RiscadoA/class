@@ -19,22 +19,29 @@ function error {
 # Find all *.clls files in the tests directory, recursively
 for file in $(find tests -name "*.clls");
 do
+    # Check if file matches argument regex, if any
+    if [ ! -z $1 ]; then
+        if [[ ! $file =~ $1 ]]; then
+            continue
+        fi
+    fi
+
     # Check if there are accompanying .trace or .out files
     basename=$(basename $file .clls)
     outfile=$(dirname $file)/$basename.out
 
     baseout=bin/$(dirname $file)/$basename
-    flags="-P -o $baseout"
+    flags="-t -P -o $baseout"
     mkdir -p $(dirname $baseout)
 
     if [ ! -f $outfile ]; then
-        error "@@@@@@ Test $file missing expected output file"
+        error "@@@@@@ Skipping $file: missing expected output file $outfile"
         continue
     fi
 
     # Compile the file
     echo -n "@@@@@@ Compiling $file... "
-    ./compile.sh $flags $file 2> $baseout.err
+    ./compile.sh $flags $file &> $baseout.err
     if [ $? -ne 0 ]; then
         error "failed! See $baseout.err"
         continue

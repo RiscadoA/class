@@ -1,0 +1,6 @@
+lhs close x
+lhs wait x
+lhs end
+rhs close x
+rhs wait x
+rhs end

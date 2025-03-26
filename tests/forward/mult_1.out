@@ -1,0 +1,9 @@
+send y
+recv x
+close x
+wait y
+end y
+close a
+forward
+wait b
+end b

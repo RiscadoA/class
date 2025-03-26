@@ -1,0 +1,23 @@
+proc main() {
+    cut {
+        println("recv x");
+        recv a(x);
+        par {
+            println("close x");
+            close x
+            ||
+            println("close a");
+            close a
+        }
+        |a:send wait; wait|
+        println("send y");
+        send a(y. println("wait y"); wait y; println("end y"); ());
+        println("forward");
+        fwd a b
+        |b:wait|
+        println("wait b");
+        wait b;
+        println("end b");
+        ()
+    }
+};;

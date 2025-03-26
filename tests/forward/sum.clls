@@ -1,0 +1,20 @@
+proc main() {
+    cut {
+        println("#A a");
+        #A a;
+        println("wait");
+        wait a;
+        println("end");
+        ()
+        |a: offer of { |#A: close }|
+        println("case a");
+        case a of {
+            |#A: println("#A b"); #A b; println("forward"); fwd a b
+        }
+        |b: offer of { |#A: close }|
+        println("case b");
+        case b of {
+            |#A: println("close b"); close b
+        }
+    }
+};;
