@@ -2,9 +2,9 @@
 
 function success {
     if [ -t 1 ]; then
-        echo -e "\e[32m$1\e[0m"
+        echo -n -e "\e[32m$1\e[0m"
     else
-        echo $1
+        echo -n $1
     fi
 }
 
@@ -49,21 +49,21 @@ do
         error "($processed/$count) Skipping $file: missing expected output file $outfile"
         continue
     fi
+    echo -n "($processed/$count) Compiling $file... "
 
     # Compile the file
-    echo -n "($processed/$count) Compiling $file... "
     ./compile.sh $flags $file &> $baseout.err
     if [ $? -ne 0 ]; then
-        error "failed! See $baseout.err"
+        error "compilation failed! See $baseout.err"
         continue
     fi
-    success "done"
+    success "success!"
+    echo -n " Running... "
 
     # Run the compiled file
-    echo -n "($processed/$count) Running $file... "
     $baseout > $baseout.out 2> $baseout.err
     if [ $? -ne 0 ]; then
-        error "failed! See $baseout.out and $baseout.err"
+        error "execution failed! See $baseout.out and $baseout.err"
         continue
     fi
 
@@ -74,5 +74,6 @@ do
         continue
     else
         success "passed"
+        echo
     fi
 done
