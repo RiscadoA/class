@@ -1,0 +1,6 @@
+#B x
+#A x
+close x 3
+case x 1
+case x 2
+wait x 1
