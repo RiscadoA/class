@@ -24,7 +24,7 @@ do
     outfile=$(dirname $file)/$basename.out
 
     baseout=bin/$(dirname $file)/$basename
-    flags="-o $baseout"
+    flags="-P -o $baseout"
     mkdir -p $(dirname $baseout)
 
     if [ ! -f $outfile ]; then

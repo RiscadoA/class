@@ -17,7 +17,8 @@ import pt.inescid.cllsj.ast.nodes.ASTProgramWithIncludes;
 import pt.inescid.cllsj.compiler.ir.IRProgram;
 
 public class Compiler {
-  public static int compile(String path, String entryProcess, boolean trace, boolean onlyIR) {
+  public static int compile(
+      String path, String entryProcess, boolean trace, boolean profile, boolean onlyIR) {
     ASTProgram ast;
     try {
       ast = Compiler.parse(Path.of(path));
@@ -67,7 +68,7 @@ public class Compiler {
 
     String output;
     try {
-      output = CGenerator.generate(ir, entryProcess, trace);
+      output = CGenerator.generate(ir, entryProcess, trace, profile);
     } catch (Exception e) {
       System.err.println("C Generation error: " + e.getMessage());
       e.printStackTrace();

@@ -100,12 +100,18 @@ public class ASTIntoIRType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTRecT type) {
-    ir = new IRRecT(ASTIntoIRType.convert(ep.assoc(type.getid(), new TypeEntry(new ASTIdT(type.getid()))), type.getin()));
+    ir =
+        new IRRecT(
+            ASTIntoIRType.convert(
+                ep.assoc(type.getid(), new TypeEntry(new ASTIdT(type.getid()))), type.getin()));
   }
 
   @Override
   public void visit(ASTCoRecT type) {
-    ir = new IRRecT(ASTIntoIRType.convert(ep.assoc(type.getid(), new TypeEntry(new ASTIdT(type.getid()))), type.getin()));
+    ir =
+        new IRRecT(
+            ASTIntoIRType.convert(
+                ep.assoc(type.getid(), new TypeEntry(new ASTIdT(type.getid()))), type.getin()));
   }
 
   @Override

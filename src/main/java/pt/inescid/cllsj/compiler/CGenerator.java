@@ -28,15 +28,29 @@ public class CGenerator extends IRInstructionVisitor {
   private Optional<String> blockName;
   private boolean trace;
   private boolean entryCall = true;
+  private boolean profile;
 
-  public static String generate(IRProgram ir, String entryProcess, boolean trace) {
-    final CGenerator gen = new CGenerator(ir, trace);
+  public static String generate(IRProgram ir, String entryProcess, boolean trace, boolean profile) {
+    final CGenerator gen = new CGenerator(ir, trace, profile);
 
     // Add the necessary includes.
     gen.putLine("#include <stdlib.h>");
     gen.putLine("#include <stdio.h>");
     gen.putLine("#include <string.h>");
     gen.putBlankLine();
+
+    // Initialize the profiling variables.
+    if (profile) {
+      gen.putStatement("unsigned long env_allocs = 0");
+      gen.putStatement("unsigned long env_frees = 0");
+      gen.putStatement("unsigned long record_allocs = 0");
+      gen.putStatement("unsigned long record_frees = 0");
+      gen.putStatement("unsigned long exponential_allocs = 0");
+      gen.putStatement("unsigned long exponential_frees = 0");
+      gen.putStatement("unsigned long task_allocs = 0");
+      gen.putStatement("unsigned long task_frees = 0");
+      gen.putBlankLine();
+    }
 
     // Define the record struct.
     gen.putLine("struct record {");
@@ -215,6 +229,41 @@ public class CGenerator extends IRInstructionVisitor {
 
     gen.putBlankLine();
     gen.putLabel("end");
+    if (profile) {
+      gen.putDebugLn("Profiling results:");
+      gen.putDebugLn("  Environment allocations: %d", "env_allocs");
+      gen.putDebugLn("  Environment frees: %d", "env_frees");
+      gen.putDebugLn("  Record allocations: %d", "record_allocs");
+      gen.putDebugLn("  Record frees: %d", "record_frees");
+      gen.putDebugLn("  Exponential allocations: %d", "exponential_allocs");
+      gen.putDebugLn("  Exponential frees: %d", "exponential_frees");
+      gen.putDebugLn("  Task allocations: %d", "task_allocs");
+      gen.putDebugLn("  Task frees: %d", "task_frees");
+      gen.putIf(
+          "env_allocs != env_frees",
+          () -> {
+            gen.putDebugLn("Environment leak detected!");
+            gen.putLine("return 1;");
+          });
+      gen.putIf(
+          "record_allocs != record_frees",
+          () -> {
+            gen.putDebugLn("Record leak detected!");
+            gen.putLine("return 1;");
+          });
+      gen.putIf(
+          "exponential_allocs != exponential_frees",
+          () -> {
+            gen.putDebugLn("Exponential leak detected!");
+            gen.putLine("return 1;");
+          });
+      gen.putIf(
+          "task_allocs != task_frees",
+          () -> {
+            gen.putDebugLn("Task leak detected!");
+            gen.putLine("return 1;");
+          });
+    }
     gen.putLine("return 0;");
 
     gen.decIndent();
@@ -223,9 +272,10 @@ public class CGenerator extends IRInstructionVisitor {
     return gen.code;
   }
 
-  private CGenerator(IRProgram ir, boolean trace) {
+  private CGenerator(IRProgram ir, boolean trace, boolean profile) {
     this.ir = ir;
     this.trace = trace;
+    this.profile = profile;
   }
 
   // ================================= IR instruction visitors ==================================
@@ -242,7 +292,7 @@ public class CGenerator extends IRInstructionVisitor {
 
   private void visitInstruction(IRInstruction instruction) {
     if (trace) {
-      putPrintLn(instruction.toString());
+      putDebugLn(instruction.toString());
     } else {
       putLine("/* " + instruction.toString() + " */");
     }
@@ -713,6 +763,9 @@ public class CGenerator extends IRInstructionVisitor {
             + " * sizeof(struct record*) + "
             + exponentialCount
             + " * sizeof(struct exponential*))");
+    if (profile) {
+      putStatement("++env_allocs");
+    }
   }
 
   private void putAllocEnvironment(String var, int recordCount, int exponentialCount) {
@@ -728,22 +781,37 @@ public class CGenerator extends IRInstructionVisitor {
       putPrintLn("[endCall(" + procName + ")]");
     }
     putLine("free(" + var + ");");
+    if (profile) {
+      putStatement("++env_frees");
+    }
   }
 
   private void putAllocRecord(String var, IRType type) {
     putAssign(var, "malloc(sizeof(struct record) + " + size(type) + ")");
+    if (profile) {
+      putStatement("++record_allocs");
+    }
   }
 
   private void putFreeRecord(String var) {
     putLine("free(" + var + ");");
+    if (profile) {
+      putStatement("++record_frees");
+    }
   }
 
   private void putAllocTask(String var) {
     putAssign(var, "malloc(sizeof(struct task))");
+    if (profile) {
+      putStatement("++task_allocs");
+    }
   }
 
   private void putFreeTask(String var) {
     putLine("free(" + var + ");");
+    if (profile) {
+      putStatement("++task_frees");
+    }
   }
 
   private void putAllocExponential(String var, int exponentialCount) {
@@ -752,10 +820,16 @@ public class CGenerator extends IRInstructionVisitor {
         "malloc(sizeof(struct exponential) + "
             + exponentialCount
             + " * sizeof(struct exponential*))");
+    if (profile) {
+      putStatement("++exponential_allocs");
+    }
   }
 
   private void putFreeExponential(String var) {
     putLine("free(" + var + ");");
+    if (profile) {
+      putStatement("++exponential_frees");
+    }
   }
 
   private void putLabel(String label) {
@@ -794,6 +868,21 @@ public class CGenerator extends IRInstructionVisitor {
   private void putPrint(String message) {
     message = message.replace("\"", "\\\"");
     putStatement("printf(\"" + message + "\")");
+  }
+
+  private void putDebugLn(String message, String... args) {
+    putDebug(message + "\\n", args);
+  }
+
+  private void putDebug(String message, String... args) {
+    message = message.replace("\"", "\\\"");
+    String stringArgs = String.join(", ", args);
+    putStatement(
+        "fprintf(stderr, \""
+            + message
+            + "\""
+            + (stringArgs.isEmpty() ? "" : (", " + stringArgs))
+            + ")");
   }
 
   private void putConstantGoto(String label) {
