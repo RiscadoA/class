@@ -1,0 +1,23 @@
+proc f3(x: close) {
+    println("f3");
+    close x
+};;
+
+proc f2(y: close) {
+    println("f2");
+    f3(y)
+};;
+
+proc f1(x: close) {
+    println("f1");
+    f2(x)
+};;
+
+proc main() {
+    cut {
+        println("wait");
+        wait x; ()
+        |x: close|
+        f1(x)
+    }
+};;
