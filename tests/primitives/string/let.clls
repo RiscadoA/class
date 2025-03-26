@@ -1,0 +1,9 @@
+proc main() {
+    cut {
+        let x ", "
+        |x: ~lstring|
+        let y "Hello" + x + "World!"
+        |y: ~lstring|
+        println(y); ()
+    }
+};;

@@ -1,0 +1,9 @@
+proc main() {
+    cut {
+        let x 4 + 1
+        |x: ~lint|
+        let y x * 2
+        |y: ~lint|
+        println(y); ()
+    }
+};;

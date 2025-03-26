@@ -17,14 +17,25 @@ function error {
 }
 
 # Find all *.clls files in the tests directory, recursively
-for file in $(find tests -name "*.clls");
+files=$(find tests -name "*.clls")
+
+# Filter files by regex, if any
+if [ ! -z $1 ]; then
+    files=$(echo $files | tr ' ' '\n' | grep $1)
+fi
+count=$(echo $files | wc -w)
+if [ $count -eq 0 ]; then
+    echo "No test files found"
+elif [ $count -eq 1 ]; then
+    echo "Found 1 test file"
+else
+    echo "Found $count test files"
+fi
+
+processed=0
+for file in $files
 do
-    # Check if file matches argument regex, if any
-    if [ ! -z $1 ]; then
-        if [[ ! $file =~ $1 ]]; then
-            continue
-        fi
-    fi
+    processed=$((processed + 1))
 
     # Check if there are accompanying .trace or .out files
     basename=$(basename $file .clls)
@@ -35,12 +46,12 @@ do
     mkdir -p $(dirname $baseout)
 
     if [ ! -f $outfile ]; then
-        error "@@@@@@ Skipping $file: missing expected output file $outfile"
+        error "($processed/$count) Skipping $file: missing expected output file $outfile"
         continue
     fi
 
     # Compile the file
-    echo -n "@@@@@@ Compiling $file... "
+    echo -n "($processed/$count) Compiling $file... "
     ./compile.sh $flags $file &> $baseout.err
     if [ $? -ne 0 ]; then
         error "failed! See $baseout.err"
@@ -49,7 +60,7 @@ do
     success "done"
 
     # Run the compiled file
-    echo -n "@@@@@@ Running $file... "
+    echo -n "($processed/$count) Running $file... "
     $baseout > $baseout.out 2> $baseout.err
     if [ $? -ne 0 ]; then
         error "failed! See $baseout.out and $baseout.err"

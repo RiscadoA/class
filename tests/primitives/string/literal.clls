@@ -1,0 +1,6 @@
+proc main() {
+    println("Hello, World!");
+    print("Goodbye, ");
+    println("World!");
+    ()
+};;

@@ -1,0 +1,14 @@
+proc main() {
+    println(0 / 1);
+    println(0 / 4232);
+    println(0 / -2131);
+    println(1 / 230);
+    println(1 / 1);
+    println(2 / 1);
+    println(142 / 1);
+    println(142 / 2);
+    println(142 / 33);
+    println(5 / -2);
+    println(-5 / 2);
+    ()
+};;
