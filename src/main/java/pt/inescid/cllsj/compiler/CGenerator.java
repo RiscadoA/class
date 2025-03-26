@@ -231,14 +231,14 @@ public class CGenerator extends IRInstructionVisitor {
     gen.putLabel("end");
     if (profile) {
       gen.putDebugLn("Profiling results:");
-      gen.putDebugLn("  Environment allocations: %d", "env_allocs");
-      gen.putDebugLn("  Environment frees: %d", "env_frees");
-      gen.putDebugLn("  Record allocations: %d", "record_allocs");
-      gen.putDebugLn("  Record frees: %d", "record_frees");
-      gen.putDebugLn("  Exponential allocations: %d", "exponential_allocs");
-      gen.putDebugLn("  Exponential frees: %d", "exponential_frees");
-      gen.putDebugLn("  Task allocations: %d", "task_allocs");
-      gen.putDebugLn("  Task frees: %d", "task_frees");
+      gen.putDebugLn("  Environment allocations: %ld", "env_allocs");
+      gen.putDebugLn("  Environment frees: %ld", "env_frees");
+      gen.putDebugLn("  Record allocations: %ld", "record_allocs");
+      gen.putDebugLn("  Record frees: %ld", "record_frees");
+      gen.putDebugLn("  Exponential allocations: %ld", "exponential_allocs");
+      gen.putDebugLn("  Exponential frees: %ld", "exponential_frees");
+      gen.putDebugLn("  Task allocations: %ld", "task_allocs");
+      gen.putDebugLn("  Task frees: %ld", "task_frees");
       gen.putIf(
           "env_allocs != env_frees",
           () -> {
