@@ -32,6 +32,8 @@ else
     echo "Found $count test files"
 fi
 
+success=0
+failed=0
 processed=0
 for file in $files
 do
@@ -47,6 +49,7 @@ do
 
     if [ ! -f $outfile ]; then
         error "($processed/$count) Skipping $file: missing expected output file $outfile"
+        failed=$((failed + 1))
         continue
     fi
     echo -n "($processed/$count) Compiling $file... "
@@ -55,6 +58,7 @@ do
     ./compile.sh $flags $file &> $baseout.err
     if [ $? -ne 0 ]; then
         error "compilation failed! See $baseout.err"
+        failed=$((failed + 1))
         continue
     fi
     success "success!"
@@ -64,6 +68,7 @@ do
     $baseout > $baseout.out 2> $baseout.err
     if [ $? -ne 0 ]; then
         error "execution failed! See $baseout.out and $baseout.err"
+        failed=$((failed + 1))
         continue
     fi
 
@@ -71,9 +76,16 @@ do
     diff $baseout.out $outfile > /dev/null 2>&1
     if [ $? -ne 0 ]; then
         error "expected $outfile, got $baseout.out"
+        failed=$((failed + 1))
         continue
-    else
-        success "passed"
-        echo
     fi
+
+    success "passed\n"
+    success=$((success + 1))
 done
+
+if [ $failed -eq 0 ]; then
+    success "All tests passed!\n"
+else
+    error "Tests failed: $failed/$count"
+fi
