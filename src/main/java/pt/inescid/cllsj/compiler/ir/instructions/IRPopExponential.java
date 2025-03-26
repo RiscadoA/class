@@ -8,6 +8,7 @@ public class IRPopExponential extends IRInstruction {
 
   public IRPopExponential(int record, int argExponential) {
     this.record = record;
+    this.argExponential = argExponential;
   }
 
   public int getRecord() {

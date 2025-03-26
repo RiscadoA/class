@@ -7,6 +7,7 @@ import pt.inescid.cllsj.compiler.ir.*;
 import pt.inescid.cllsj.compiler.ir.expressions.*;
 import pt.inescid.cllsj.compiler.ir.instructions.*;
 import pt.inescid.cllsj.compiler.ir.instructions.IRCallProcess.LinearArgument;
+import pt.inescid.cllsj.compiler.ir.instructions.IRPushExponential.InheritedExponential;
 import pt.inescid.cllsj.compiler.ir.type.*;
 
 public class CGenerator extends IRInstructionVisitor {
@@ -179,6 +180,23 @@ public class CGenerator extends IRInstructionVisitor {
     gen.putStatement("free(str1)");
     gen.putStatement("free(str2)");
     gen.putStatement("return result");
+    gen.decIndent();
+    gen.putLine("}");
+    gen.putBlankLine();
+
+    // Function used to deallocate an exponential recursively.
+    gen.putLine("void dec_ref_exponential(struct exponential* exp) {");
+    gen.incIndent();
+    gen.putIf(
+        gen.decrement(gen.exponentialRefCount("exp")) + " == 0",
+        () -> {
+          gen.putLine("for (int i = 0; i < " + gen.exponentialExponentialCount("exp") + "; ++i) {");
+          gen.incIndent();
+          gen.putStatement("dec_ref_exponential(" + gen.exponentialExponential("exp", "i") + ")");
+          gen.decIndent();
+          gen.putLine("}");
+          gen.putFreeExponential("exp");
+        });
     gen.decIndent();
     gen.putLine("}");
     gen.putBlankLine();
@@ -551,6 +569,11 @@ public class CGenerator extends IRInstructionVisitor {
     putAssign(exponentialExponentialCount(TMP_EXPONENTIAL), process.getExponentialCount());
     putAssign(exponentialEndPoints(TMP_EXPONENTIAL), process.getEndPoints());
     putAssign(exponentialRefCount(TMP_EXPONENTIAL), 1);
+    for (InheritedExponential inherited : instruction.getInheritedExponentials()) {
+      putAssign(
+          exponentialExponential(TMP_EXPONENTIAL, inherited.getTargetExponential()),
+          exponential(inherited.getSourceExponential()));
+    }
     putPushExponential(instruction.getRecord(), TMP_EXPONENTIAL);
   }
 
@@ -598,11 +621,7 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRDecRefExponential instruction) {
-    putIf(
-        decrement(exponentialRefCount(instruction.getExponential())) + " == 0",
-        () -> {
-          putFreeExponential(instruction.getExponential());
-        });
+    putStatement("dec_ref_exponential(" + exponential(instruction.getExponential()) + ")");
   }
 
   @Override
@@ -737,6 +756,10 @@ public class CGenerator extends IRInstructionVisitor {
 
   private String exponentialExponential(String exponential, String exponential2) {
     return "EXPONENTIAL_EXPONENTIAL(" + exponential + ", " + exponential2 + ")";
+  }
+
+  private String exponentialExponential(String exponential, int exponential2) {
+    return "EXPONENTIAL_EXPONENTIAL(" + exponential + ", " + Integer.toString(exponential2) + ")";
   }
 
   private String exponentialExponential(int exponential, String exponential2) {

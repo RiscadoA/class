@@ -22,6 +22,7 @@ import pt.inescid.cllsj.compiler.ir.expressions.*;
 import pt.inescid.cllsj.compiler.ir.instructions.*;
 import pt.inescid.cllsj.compiler.ir.instructions.IRCallProcess.ExponentialArgument;
 import pt.inescid.cllsj.compiler.ir.instructions.IRCallProcess.LinearArgument;
+import pt.inescid.cllsj.compiler.ir.instructions.IRPushExponential.InheritedExponential;
 import pt.inescid.cllsj.compiler.ir.type.IRType;
 
 public class IRGenerator extends ASTNodeVisitor {
@@ -312,9 +313,10 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTBang node) {
-    Environment env = Environment.forExponential(environment(), node);
+    List<InheritedExponential> inheritedExponentials = new ArrayList<>();
+    Environment env = Environment.forExponential(environment(), node, inheritedExponentials);
 
-    block.add(new IRPushExponential(record(node.getChr()), env.getName()));
+    block.add(new IRPushExponential(record(node.getChr()), env.getName(), inheritedExponentials));
     block.add(new IRReturn(record(node.getChr())));
 
     IRProcess parentProcess = process;
@@ -379,9 +381,12 @@ public class IRGenerator extends ASTNodeVisitor {
     decExponentialRefIfUnused(block, node, name);
   }
 
-  private boolean nameFreeIn(ASTNode node, String name) {
-    Set<String> names = node.fn(new HashSet<>());
-    return names.contains(name);
+  private static Set<String> namesFreeIn(ASTNode node) {
+    return node.fn(new HashSet<>());
+  }
+
+  private static boolean nameFreeIn(ASTNode node, String name) {
+    return namesFreeIn(node).contains(name);
   }
 
   private Set<String> exponentialNamesFreeIn(ASTNode node) {
@@ -701,15 +706,19 @@ public class IRGenerator extends ASTNodeVisitor {
       }
     }
 
-    public static Environment forExponential(Environment parent, ASTBang node) {
+    public static Environment forExponential(
+        Environment parent, ASTBang node, List<InheritedExponential> outInheritedExponentials) {
       Environment env = new Environment(parent.name + "_bang_" + node.getChr());
-
       env.insertLinear(node.getChi());
 
-      // TODO: Inherit used exponentials.
-      // for (Map.Entry<String, Integer> entry : parent.exponentials.entrySet()) {
-      //   env.exponentials.put(entry.getKey(), entry.getValue());
-      // }
+      // Inherit used exponentials.
+      Set<String> freeNames = namesFreeIn(node.getRhs());
+      for (Map.Entry<String, Integer> entry : parent.exponentials.entrySet()) {
+        if (freeNames.contains(entry.getKey()) && entry.getKey() != node.getChi()) {
+          int index = env.insertExponential(entry.getKey());
+          outInheritedExponentials.add(new InheritedExponential(entry.getValue(), index));
+        }
+      }
 
       node.getRhs().accept(env.new Assigner());
       return env;
@@ -751,8 +760,10 @@ public class IRGenerator extends ASTNodeVisitor {
       records.put(session, records.size());
     }
 
-    private void insertExponential(String session) {
-      exponentials.put(session, exponentials.size());
+    private int insertExponential(String session) {
+      int index = exponentials.size();
+      exponentials.put(session, index);
+      return index;
     }
 
     // A visitor which simply traverses the AST and assigns an index to each session created in it.
