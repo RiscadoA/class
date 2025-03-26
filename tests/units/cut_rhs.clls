@@ -1,0 +1,11 @@
+proc main() {
+    cut {
+        println("wait");
+        wait x;
+        println("end");
+        ()
+        |x: close|
+        println("close");
+        close x
+    }
+};;

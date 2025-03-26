@@ -69,16 +69,16 @@ else
 fi
 
 if [ $onlyir = true ]; then
-    echo "@@@@@@ Generating IR code to $irfile..." &&
-    ./CLLSj $CLLSflags -c $1 > $irfile
+    echo "@@@@@@ Generating IR code to $irfile..." >&2 &&
+    mvn -q exec:java -Dexec.args="$CLLSflags -c $1" > $irfile
 else
-    echo "@@@@@@ Generating C code to $cfile..." &&
-    ./CLLSj $CLLSflags -c $1 > $cfile &&
-    echo "@@@@@@ Compiling $cfile to $pfile..." && 
+    echo "@@@@@@ Generating C code to $cfile..." >&2 &&
+    mvn -q exec:java -Dexec.args="$CLLSflags -c $1" > $cfile &&
+    echo "@@@@@@ Compiling $cfile to $pfile..." >&2 && 
     gcc $Cflags -o $pfile $cfile &&
 
     if [ $run = true ]; then
-        echo "@@@@@@ Running $pfile:" &&
+        echo "@@@@@@ Running $pfile:" >&2 &&
         if [ $debug = true ]; then
             gdb ./$pfile
         else
