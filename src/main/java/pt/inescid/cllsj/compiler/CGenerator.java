@@ -311,7 +311,7 @@ public class CGenerator extends IRInstructionVisitor {
 
     if (instruction.getLinearArguments().isEmpty()) {
       if (!entryCall) {
-        putIf("--" + endPoints() + " == 0", () -> putFreeEnvironment(ENV));
+        putIf(decrement(endPoints()) + " == 0", () -> putFreeEnvironment(ENV));
       } else {
         entryCall = false;
       }
@@ -325,7 +325,7 @@ public class CGenerator extends IRInstructionVisitor {
         putAssign(record(ENV, arg.getTargetRecord()), record(TMP_ENV, arg.getSourceRecord()));
       }
 
-      putIf("--" + endPoints(TMP_ENV) + " == 0", () -> putFreeEnvironment(TMP_ENV));
+      putIf(decrement(endPoints(TMP_ENV)) + " == 0", () -> putFreeEnvironment(TMP_ENV));
     }
 
     putAssign(endPoints(), process.getEndPoints());
@@ -370,7 +370,7 @@ public class CGenerator extends IRInstructionVisitor {
         record(i.getPosRecord()));
 
     // Decrement the end points and free the environment if necessary.
-    putIf("--" + endPoints() + " == 0", () -> putFreeEnvironment(ENV));
+    putIf(decrement(endPoints()) + " == 0", () -> putFreeEnvironment(ENV));
 
     // Finally, free the negative record and jump to the continuation.
     putFreeRecord(TMP_RECORD);
@@ -398,7 +398,7 @@ public class CGenerator extends IRInstructionVisitor {
   public void visit(IRReturn i) {
     putAssign(TMP_CONT, recordCont(i.getRecord()));
     putIfElse(
-        "--" + endPoints() + " == 0",
+        decrement(endPoints()) + " == 0",
         () -> {
           putAssign(TMP_ENV, recordContEnv(i.getRecord()));
           putFreeEnvironment(ENV);
@@ -478,7 +478,7 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRNextTask instruction) {
-    putIf("--" + endPoints() + " == 0", () -> putFreeEnvironment(ENV));
+    putIf(decrement(endPoints()) + " == 0", () -> putFreeEnvironment(ENV));
     putAssign(TMP_TASK, TASK);
     putAssign(TASK, taskNext(TASK));
     putAssign(TMP_CONT, taskCont(TMP_TASK));
@@ -504,7 +504,7 @@ public class CGenerator extends IRInstructionVisitor {
   @Override
   public void visit(IRBranch instruction) {
     putIfElse(
-      expression(instruction.getExpression()),
+        expression(instruction.getExpression()),
         () -> {
           putAssign(endPoints(), endPoints() + " - " + instruction.getOtherwise().getEndPoints());
           putConstantGoto(blockLabel(instruction.getThen().getLabel()));
@@ -522,7 +522,10 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRPushExpression instruction) {
-    putPush(instruction.getRecord(), type(instruction.getExpression().getType()), expression(instruction.getExpression()));
+    putPush(
+        instruction.getRecord(),
+        type(instruction.getExpression().getType()),
+        expression(instruction.getExpression()));
   }
 
   @Override
@@ -586,6 +589,20 @@ public class CGenerator extends IRInstructionVisitor {
     putAssign(recordContRecord(instruction.getArgRecord()), 0);
     putAssign(read(instruction.getArgRecord()), 0);
     putAssign(written(instruction.getArgRecord()), 0);
+  }
+
+  @Override
+  public void visit(IRIncRefExponential instruction) {
+    putIncrement(exponentialRefCount(instruction.getExponential()));
+  }
+
+  @Override
+  public void visit(IRDecRefExponential instruction) {
+    putIf(
+        decrement(exponentialRefCount(instruction.getExponential())) + " == 0",
+        () -> {
+          putFreeExponential(instruction.getExponential());
+        });
   }
 
   @Override
@@ -714,6 +731,10 @@ public class CGenerator extends IRInstructionVisitor {
     return exponential + "->ref_count";
   }
 
+  private String exponentialRefCount(int exponential) {
+    return exponentialRefCount(exponential(exponential));
+  }
+
   private String exponentialExponential(String exponential, String exponential2) {
     return "EXPONENTIAL_EXPONENTIAL(" + exponential + ", " + exponential2 + ")";
   }
@@ -750,6 +771,10 @@ public class CGenerator extends IRInstructionVisitor {
     return "block_" + procName + "_" + label;
   }
 
+  private String decrement(String var) {
+    return "--" + var;
+  }
+
   // ================================= Statement building helpers =================================
 
   private void putAllocEnvironment(String var, String recordCount, String exponentialCount) {
@@ -761,7 +786,7 @@ public class CGenerator extends IRInstructionVisitor {
             + exponentialCount
             + " * sizeof(struct exponential*))");
     if (profile) {
-      putStatement("++env_allocs");
+      putIncrement("env_allocs");
     }
   }
 
@@ -779,35 +804,35 @@ public class CGenerator extends IRInstructionVisitor {
     }
     putLine("free(" + var + ");");
     if (profile) {
-      putStatement("++env_frees");
+      putIncrement("env_frees");
     }
   }
 
   private void putAllocRecord(String var, IRType type) {
     putAssign(var, "malloc(sizeof(struct record) + " + size(type) + ")");
     if (profile) {
-      putStatement("++record_allocs");
+      putIncrement("record_allocs");
     }
   }
 
   private void putFreeRecord(String var) {
     putLine("free(" + var + ");");
     if (profile) {
-      putStatement("++record_frees");
+      putIncrement("record_frees");
     }
   }
 
   private void putAllocTask(String var) {
     putAssign(var, "malloc(sizeof(struct task))");
     if (profile) {
-      putStatement("++task_allocs");
+      putIncrement("task_allocs");
     }
   }
 
   private void putFreeTask(String var) {
     putLine("free(" + var + ");");
     if (profile) {
-      putStatement("++task_frees");
+      putIncrement("task_frees");
     }
   }
 
@@ -818,15 +843,19 @@ public class CGenerator extends IRInstructionVisitor {
             + exponentialCount
             + " * sizeof(struct exponential*))");
     if (profile) {
-      putStatement("++exponential_allocs");
+      putIncrement("exponential_allocs");
     }
   }
 
   private void putFreeExponential(String var) {
     putLine("free(" + var + ");");
     if (profile) {
-      putStatement("++exponential_frees");
+      putIncrement("exponential_frees");
     }
+  }
+
+  private void putFreeExponential(int exponential) {
+    putFreeExponential(exponential(exponential));
   }
 
   private void putLabel(String label) {
@@ -856,6 +885,10 @@ public class CGenerator extends IRInstructionVisitor {
 
   private void putAssign(String var, int value) {
     putStatement(var + " = " + value);
+  }
+
+  private void putIncrement(String var) {
+    putStatement("++" + var);
   }
 
   private void putDebugLn(String message, String... args) {
@@ -1080,7 +1113,12 @@ public class CGenerator extends IRInstructionVisitor {
     @Override
     public void visit(IRAdd expr) {
       if (expr.getType() instanceof IRStringT) {
-        code += "string_concat(" + expressionToString(expr.getLhs()) + ", " + expressionToString(expr.getRhs()) + ")";
+        code +=
+            "string_concat("
+                + expressionToString(expr.getLhs())
+                + ", "
+                + expressionToString(expr.getRhs())
+                + ")";
       } else {
         if (!(expr.getType() instanceof IRIntT)
             || !(expr.getLhs().getType() instanceof IRIntT)
@@ -1111,7 +1149,12 @@ public class CGenerator extends IRInstructionVisitor {
     @Override
     public void visit(IREq expr) {
       if (expr.getLhs() instanceof IRString || expr.getRhs() instanceof IRString) {
-        code += "string_equal(" + expressionToString(expr.getLhs()) + ", " + expressionToString(expr.getRhs()) + ")";
+        code +=
+            "string_equal("
+                + expressionToString(expr.getLhs())
+                + ", "
+                + expressionToString(expr.getRhs())
+                + ")";
       } else {
         binary("==", expr.getLhs(), expr.getRhs());
       }

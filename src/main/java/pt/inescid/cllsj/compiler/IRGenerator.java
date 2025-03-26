@@ -87,6 +87,14 @@ public class IRGenerator extends ASTNodeVisitor {
       pos = node.getLhs();
     }
 
+    // If an exponential occurs in both branches, we need to increment its reference count.
+    Set<String> exponentials = exponentialNamesFreeIn(node);
+    for (String name : exponentials) {
+      if (nameFreeIn(pos, name) && nameFreeIn(neg, name)) {
+        block.add(new IRIncRefExponential(exponential(name)));
+      }
+    }
+
     IRType type = ASTIntoIRType.convert(ep, node.getChType());
     IRBlock negBlock = process.addBlock(negLabel);
     block.add(new IRNewSession(record(node.getCh()), type, negBlock.getLabel()));
@@ -97,6 +105,14 @@ public class IRGenerator extends ASTNodeVisitor {
   @Override
   public void visit(ASTMix node) {
     IRBlock rhs = process.addBlock("mix_rhs");
+
+    // If an exponential occurs in both branches, we need to increment its reference count.
+    Set<String> exponentials = exponentialNamesFreeIn(node);
+    for (String name : exponentials) {
+      if (nameFreeIn(node.getLhs(), name) && nameFreeIn(node.getRhs(), name)) {
+        block.add(new IRIncRefExponential(exponential(name)));
+      }
+    }
 
     block.add(new IRNewTask(rhs.getLabel()));
     node.getLhs().accept(this);
@@ -203,6 +219,7 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTCase node) {
+    Set<String> exponentials = exponentialNamesFreeIn(node);
     Map<Integer, IRPopTag.Case> cases = new HashMap<>();
     block.add(new IRPopTag(record(node.getCh()), cases));
 
@@ -214,6 +231,11 @@ public class IRGenerator extends ASTNodeVisitor {
 
       IRBlock caseBlock = process.addBlock("case_" + caseLabel.substring(1));
       cases.put(i, new IRPopTag.Case(caseBlock.getLabel(), endPointCount));
+
+      // Decrement the reference count of any unused exponentials in this case.
+      for (String name : exponentials) {
+        decExponentialRefIfUnused(caseBlock, caseNode, name);
+      }
 
       visitBlock(caseBlock, caseNode);
     }
@@ -263,6 +285,7 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTIf node) {
+    Set<String> exponentials = exponentialNamesFreeIn(node);
     GeneratedExpression expr = generateExpression(node.getExpr());
 
     IRBlock thenBlock = process.addBlock("if_then");
@@ -275,8 +298,15 @@ public class IRGenerator extends ASTNodeVisitor {
     block.add(new IRBranch(expr.getExpr(), then, otherwise));
 
     expr.freeUsedRecords(thenBlock);
-    visitBlock(thenBlock, node.getThen());
     expr.freeUsedRecords(elseBlock);
+
+    // Decrement the reference count of any unused exponentials in the branches.
+    for (String name : exponentials) {
+      decExponentialRefIfUnused(thenBlock, node.getThen(), name);
+      decExponentialRefIfUnused(elseBlock, node.getElse(), name);
+    }
+
+    visitBlock(thenBlock, node.getThen());
     visitBlock(elseBlock, node.getElse());
   }
 
@@ -302,6 +332,7 @@ public class IRGenerator extends ASTNodeVisitor {
   public void visit(ASTWhy node) {
     block.add(new IRPopExponential(record(node.getCh()), exponential(node.getCh())));
     block.add(new IRFreeSession(record(node.getCh())));
+    decExponentialRefIfUnused(node.getRhs(), node.getCh());
     node.getRhs().accept(this);
   }
 
@@ -312,6 +343,7 @@ public class IRGenerator extends ASTNodeVisitor {
             exponential(node.getChr()),
             record(node.getChi()),
             ASTIntoIRType.convert(ep, node.getType())));
+    decExponentialRefIfUnused(node.getRhs(), node.getChr());
 
     // Flip to the called session if it is negative.
     if (!isPositive(node.getType())) {
@@ -336,6 +368,27 @@ public class IRGenerator extends ASTNodeVisitor {
   }
 
   // ======================================== Utilities =========================================
+
+  private void decExponentialRefIfUnused(IRBlock block, ASTNode node, String name) {
+    if (!nameFreeIn(node, name)) {
+      block.add(new IRDecRefExponential(exponential(name)));
+    }
+  }
+
+  private void decExponentialRefIfUnused(ASTNode node, String name) {
+    decExponentialRefIfUnused(block, node, name);
+  }
+
+  private boolean nameFreeIn(ASTNode node, String name) {
+    Set<String> names = node.fn(new HashSet<>());
+    return names.contains(name);
+  }
+
+  private Set<String> exponentialNamesFreeIn(ASTNode node) {
+    Set<String> names = node.fn(new HashSet<>());
+    names.removeIf(name -> !isExponential(name));
+    return names;
+  }
 
   private boolean isPositive(ASTType type) {
     boolean dual = false;
@@ -371,6 +424,10 @@ public class IRGenerator extends ASTNodeVisitor {
 
   private int exponential(String ch) {
     return environment().exponential(ch);
+  }
+
+  private boolean isExponential(String ch) {
+    return environment().exponentials.containsKey(ch);
   }
 
   private static int countEndPoints(ASTNode node) {

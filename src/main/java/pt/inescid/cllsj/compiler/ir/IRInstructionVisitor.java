@@ -105,4 +105,12 @@ public abstract class IRInstructionVisitor {
   public void visit(IRPopUnfold instruction) {
     visit((IRInstruction) instruction);
   }
+
+  public void visit(IRIncRefExponential instruction) {
+    visit((IRInstruction) instruction);
+  }
+
+  public void visit(IRDecRefExponential instruction) {
+    visit((IRInstruction) instruction);
+  }
 }
