@@ -1,0 +1,25 @@
+proc overengineered_forward<X>(x:~X, y:X){
+    cut {
+        println("send");
+        send ch(x);
+        println("lhs fwd");
+        fwd ch y
+        |ch: recv ~X; X|
+        println("recv");
+        recv ch(a);
+        println("rhs fwd");
+        fwd a ch
+    }
+};;
+
+proc main() {
+    cut {
+        println("wait");
+        wait x; ()
+        |x:close|
+        overengineered_forward<wait>(x, y)
+        |y:close|
+        println("close");
+        close y
+    }
+};;

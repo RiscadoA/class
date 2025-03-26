@@ -1,0 +1,16 @@
+lhs send
+id recv
+lhs close x
+id send
+id close
+lhs recv
+lhs wait id
+lhs wait x
+rhs send
+id recv
+id send
+id close
+rhs recv
+rhs wait id
+rhs close x
+rhs wait x

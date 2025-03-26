@@ -1,0 +1,6 @@
+close
+send
+lhs fwd
+recv
+rhs fwd
+wait

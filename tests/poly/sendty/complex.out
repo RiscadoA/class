@@ -1,0 +1,11 @@
+sendty
+lhs send
+recvty
+rhs recv
+close y
+forward
+rhs send
+rhs close
+lhs recv
+lhs wait
+wait y
