@@ -2,8 +2,10 @@ package pt.inescid.cllsj.compiler;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.Stack;
 import java.util.function.BiConsumer;
 import pt.inescid.cllsj.Env;
@@ -244,18 +246,25 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTPrintLn node) {
-    block.add(new IRPrint(expression(node.getExpr()), node.withNewLine()));
+    GeneratedExpression expr = generateExpression(node.getExpr());
+    block.add(new IRPrint(expr.getExpr(), node.withNewLine()));
+    expr.freeUsedRecords(block);
     node.getRhs().accept(this);
   }
 
   @Override
   public void visit(ASTCoExpr node) {
-    block.add(new IRPushExpression(record(node.getCh()), expression(node.getExpr())));
+    GeneratedExpression expr = generateExpression(node.getExpr());
+
+    block.add(new IRPushExpression(record(node.getCh()), expr.getExpr()));
+    expr.freeUsedRecords(block);
     block.add(new IRReturn(record(node.getCh())));
   }
 
   @Override
   public void visit(ASTIf node) {
+    GeneratedExpression expr = generateExpression(node.getExpr());
+
     IRBlock thenBlock = process.addBlock("if_then");
     IRBlock elseBlock = process.addBlock("if_else");
 
@@ -263,9 +272,11 @@ public class IRGenerator extends ASTNodeVisitor {
         new IRBranch.Case(thenBlock.getLabel(), countEndPoints(node.getThen()) - 1);
     IRBranch.Case otherwise =
         new IRBranch.Case(elseBlock.getLabel(), countEndPoints(node.getElse()) - 1);
-    block.add(new IRBranch(expression(node.getExpr()), then, otherwise));
+    block.add(new IRBranch(expr.getExpr(), then, otherwise));
 
+    expr.freeUsedRecords(thenBlock);
     visitBlock(thenBlock, node.getThen());
+    expr.freeUsedRecords(elseBlock);
     visitBlock(elseBlock, node.getElse());
   }
 
@@ -290,6 +301,7 @@ public class IRGenerator extends ASTNodeVisitor {
   @Override
   public void visit(ASTWhy node) {
     block.add(new IRPopExponential(record(node.getCh()), exponential(node.getCh())));
+    block.add(new IRFreeSession(record(node.getCh())));
     node.getRhs().accept(this);
   }
 
@@ -477,14 +489,40 @@ public class IRGenerator extends ASTNodeVisitor {
     }
   }
 
-  private IRExpression expression(ASTExpr expr) {
+  private static class GeneratedExpression {
+    private final IRExpression expr;
+    private final Set<Integer> usedRecords;
+
+    public GeneratedExpression(IRExpression expr, Set<Integer> usedRecords) {
+      this.expr = expr;
+      this.usedRecords = usedRecords;
+    }
+
+    public IRExpression getExpr() {
+      return expr;
+    }
+
+    public void freeUsedRecords(IRBlock block) {
+      for (int record : usedRecords) {
+        block.add(new IRFreeSession(record));
+      }
+    }
+  }
+
+  private GeneratedExpression generateExpression(ASTExpr expr) {
     ExpressionGenerator gen = new ExpressionGenerator();
     expr.accept(gen);
-    return gen.ir;
+    return new GeneratedExpression(gen.ir, gen.usedRecords);
   }
 
   private class ExpressionGenerator extends ASTExprVisitor {
     private IRExpression ir;
+    private Set<Integer> usedRecords = new HashSet<>();
+
+    private IRExpression recurse(ASTExpr expr) {
+      expr.accept(this);
+      return ir;
+    }
 
     @Override
     public void visit(ASTExpr expr) {
@@ -510,61 +548,62 @@ public class IRGenerator extends ASTNodeVisitor {
     @Override
     public void visit(ASTVId expr) {
       ir = new IRVar(record(expr.getCh()), ASTIntoIRType.convert(ep, expr.getType()));
+      usedRecords.add(record(expr.getCh()));
     }
 
     @Override
     public void visit(ASTAdd expr) {
-      ir = new IRAdd(expression(expr.getLhs()), expression(expr.getRhs()));
+      ir = new IRAdd(recurse(expr.getLhs()), recurse(expr.getRhs()));
     }
 
     @Override
     public void visit(ASTSub expr) {
-      ir = new IRSub(expression(expr.getLhs()), expression(expr.getRhs()));
+      ir = new IRSub(recurse(expr.getLhs()), recurse(expr.getRhs()));
     }
 
     @Override
     public void visit(ASTMul expr) {
-      ir = new IRMul(expression(expr.getLhs()), expression(expr.getRhs()));
+      ir = new IRMul(recurse(expr.getLhs()), recurse(expr.getRhs()));
     }
 
     @Override
     public void visit(ASTDiv expr) {
-      ir = new IRDiv(expression(expr.getLhs()), expression(expr.getRhs()));
+      ir = new IRDiv(recurse(expr.getLhs()), recurse(expr.getRhs()));
     }
 
     @Override
     public void visit(ASTEq expr) {
-      ir = new IREq(expression(expr.getLhs()), expression(expr.getRhs()));
+      ir = new IREq(recurse(expr.getLhs()), recurse(expr.getRhs()));
     }
 
     @Override
     public void visit(ASTNEq expr) {
-      ir = new IRNot(new IREq(expression(expr.getLhs()), expression(expr.getRhs())));
+      ir = new IRNot(new IREq(recurse(expr.getLhs()), recurse(expr.getRhs())));
     }
 
     @Override
     public void visit(ASTLt expr) {
-      ir = new IRLt(expression(expr.getLhs()), expression(expr.getRhs()));
+      ir = new IRLt(recurse(expr.getLhs()), recurse(expr.getRhs()));
     }
 
     @Override
     public void visit(ASTGt expr) {
-      ir = new IRGt(expression(expr.getLhs()), expression(expr.getRhs()));
+      ir = new IRGt(recurse(expr.getLhs()), recurse(expr.getRhs()));
     }
 
     @Override
     public void visit(ASTAnd expr) {
-      ir = new IRAnd(expression(expr.getLhs()), expression(expr.getRhs()));
+      ir = new IRAnd(recurse(expr.getLhs()), recurse(expr.getRhs()));
     }
 
     @Override
     public void visit(ASTOr expr) {
-      ir = new IROr(expression(expr.getLhs()), expression(expr.getRhs()));
+      ir = new IROr(recurse(expr.getLhs()), recurse(expr.getRhs()));
     }
 
     @Override
     public void visit(ASTNot expr) {
-      ir = new IRNot(expression(expr.getExpr()));
+      ir = new IRNot(recurse(expr.getExpr()));
     }
   }
 
