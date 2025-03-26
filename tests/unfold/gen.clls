@@ -1,0 +1,35 @@
+type corec Gen(T) {
+    offer of {
+        |#stop: close
+        |#next: send T; Gen(T)
+    }
+};;
+
+proc rec close_g(g: Gen(close)) {
+    println("unfold g"); unfold g;
+    println("case"); case g of {
+        |#stop: println("close g"); close g
+        |#next:
+            println("send"); send g(x. println("close"); close x);
+            close_g(g)
+    }
+};;
+
+proc main() {
+    cut {
+        println("unfold 1"); unfold g;
+        println("#next 1"); #next g;
+        println("recv 1"); recv g(x);
+        println("wait 1"); wait x;
+        println("unfold 2"); unfold g;
+        println("#next 2"); #next g;
+        println("recv 2"); recv g(y);
+        println("wait 2"); wait y;
+        println("unfold 3"); unfold g;
+        println("stop"); #stop g;
+        println("wait g"); wait g;
+        ()
+        |g: Gen(close)|
+        close_g(g)
+    }
+};;
