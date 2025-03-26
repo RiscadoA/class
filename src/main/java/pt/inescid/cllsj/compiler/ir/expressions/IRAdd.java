@@ -1,6 +1,8 @@
 package pt.inescid.cllsj.compiler.ir.expressions;
 
 import pt.inescid.cllsj.compiler.ir.IRExpressionVisitor;
+import pt.inescid.cllsj.compiler.ir.type.IRIntT;
+import pt.inescid.cllsj.compiler.ir.type.IRStringT;
 import pt.inescid.cllsj.compiler.ir.type.IRType;
 
 public class IRAdd extends IRExpression {
@@ -27,7 +29,14 @@ public class IRAdd extends IRExpression {
 
   @Override
   public IRType getType() {
-    return lhs.getType();
+    if (lhs.getType() instanceof IRIntT && rhs.getType() instanceof IRIntT) {
+      return new IRIntT();
+    } else if (lhs.getType() instanceof IRStringT || rhs.getType() instanceof IRStringT) {
+      return new IRStringT();
+    } else {
+      throw new RuntimeException(
+          "Unsupported type for add: " + lhs.getType() + " and " + rhs.getType());
+    }
   }
 
   @Override
