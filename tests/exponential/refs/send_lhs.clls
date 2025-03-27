@@ -1,0 +1,14 @@
+proc main() {
+    cut {
+        !a(b: close); close b
+        |a: ?wait|
+        ?a;
+        send ch(x. call a(y); wait y; close x);
+        close ch
+        |ch: recv wait; wait|
+        recv ch(x);
+        wait ch;
+        wait x;
+        ()
+    }
+};;
