@@ -6,6 +6,7 @@ import java.util.Optional;
 import pt.inescid.cllsj.compiler.ir.*;
 import pt.inescid.cllsj.compiler.ir.expressions.*;
 import pt.inescid.cllsj.compiler.ir.instructions.*;
+import pt.inescid.cllsj.compiler.ir.instructions.IRCallProcess.ExponentialArgument;
 import pt.inescid.cllsj.compiler.ir.instructions.IRCallProcess.LinearArgument;
 import pt.inescid.cllsj.compiler.ir.instructions.IRPushExponential.InheritedExponential;
 import pt.inescid.cllsj.compiler.ir.type.*;
@@ -327,7 +328,7 @@ public class CGenerator extends IRInstructionVisitor {
   public void visit(IRCallProcess instruction) {
     IRProcess process = ir.getProcesses().get(instruction.getProcessName());
 
-    if (instruction.getLinearArguments().isEmpty()) {
+    if (instruction.getLinearArguments().isEmpty() && instruction.getExponentialArguments().isEmpty()) {
       if (!entryCall) {
         putIf(decrement(endPoints()) + " == 0", () -> putFreeEnvironment(ENV));
       } else {
@@ -338,9 +339,13 @@ public class CGenerator extends IRInstructionVisitor {
       putAssign(TMP_ENV, ENV);
       putAllocEnvironment(ENV, process);
 
-      // Bind the linear arguments to the new environment
+      // Bind the arguments to the new environment
       for (LinearArgument arg : instruction.getLinearArguments()) {
         putAssign(record(ENV, arg.getTargetRecord()), record(TMP_ENV, arg.getSourceRecord()));
+      }
+      for (ExponentialArgument arg : instruction.getExponentialArguments()) {
+        putAssign(exponential(ENV, process.getRecordCount(), arg.getTargetExponential()),
+            exponential(TMP_ENV, recordCount, arg.getSourceExponential()));
       }
 
       putIf(decrement(endPoints(TMP_ENV)) + " == 0", () -> putFreeEnvironment(TMP_ENV));
@@ -710,8 +715,12 @@ public class CGenerator extends IRInstructionVisitor {
     return "EXPONENTIAL(" + env + ", " + recordCount + ", " + exponential + ")";
   }
 
+  private String exponential(String env, int recordCount, int exponential) {
+    return exponential(env, Integer.toString(recordCount), Integer.toString(exponential));
+  }
+
   private String exponential(int exponential) {
-    return exponential(ENV, Integer.toString(recordCount), Integer.toString(exponential));
+    return exponential(ENV, recordCount, exponential);
   }
 
   private String exponentialCont(String exponential) {
@@ -875,10 +884,6 @@ public class CGenerator extends IRInstructionVisitor {
     if (profile) {
       putIncrement("exponential_frees");
     }
-  }
-
-  private void putFreeExponential(int exponential) {
-    putFreeExponential(exponential(exponential));
   }
 
   private void putLabel(String label) {
