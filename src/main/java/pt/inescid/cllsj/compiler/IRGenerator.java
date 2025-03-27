@@ -88,7 +88,7 @@ public class IRGenerator extends ASTNodeVisitor {
       pos = node.getLhs();
     }
 
-    // If an exponential occurs in both branches, we need to increment its reference count.
+    // If an exponential occurs in both sides, we need to increment its reference count.
     Set<String> exponentials = exponentialNamesFreeIn(node);
     for (String name : exponentials) {
       if (nameFreeIn(pos, name) && nameFreeIn(neg, name)) {
@@ -155,6 +155,14 @@ public class IRGenerator extends ASTNodeVisitor {
 
     block.add(new IRNewSession(record(node.getCho()), type, closure.getLabel()));
     block.add(new IRPushSession(record(node.getChs()), record(node.getCho())));
+
+    // If an exponential occurs in both sides, we need to increment its reference count.
+    Set<String> exponentials = exponentialNamesFreeIn(node);
+    for (String name : exponentials) {
+      if (nameFreeIn(node.getLhs(), name) && nameFreeIn(node.getRhs(), name)) {
+        block.add(new IRIncRefExponential(exponential(name)));
+      }
+    }
 
     // Flip if the remainder of the session type is negative.
     if (!isPositive(node.getRhsType())) {
