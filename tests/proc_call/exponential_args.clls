@@ -1,0 +1,19 @@
+proc clone_int(out: lint; cloned: ~lint) {
+    call cloned(i);
+    fwd i out
+};;
+
+proc main() {
+    cut {
+        !x(i: lint); let i 42
+        |x: ~!lint|
+        ?x;
+        send ch(i. clone_int(i; x));
+        send ch(i. clone_int(i; x));
+        close ch
+        |ch: recv ~lint; recv ~lint; wait|
+        recv ch(i); println(i);
+        recv ch(i); println(i);
+        wait ch; ()
+    }
+};;
