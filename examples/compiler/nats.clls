@@ -74,6 +74,8 @@ proc rec nat2lint(n:~Nat, m:lint){
 };;
 
 
+// next proc crashes compiler 1-1-2025 (LC)
+
 proc unsafe_rec lint2nat(m:Nat;n:colint) {
     if(n==0 or n <0){
         zero(m)
