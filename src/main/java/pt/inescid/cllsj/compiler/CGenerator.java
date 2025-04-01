@@ -328,7 +328,8 @@ public class CGenerator extends IRInstructionVisitor {
   public void visit(IRCallProcess instruction) {
     IRProcess process = ir.getProcesses().get(instruction.getProcessName());
 
-    if (instruction.getLinearArguments().isEmpty() && instruction.getExponentialArguments().isEmpty()) {
+    if (instruction.getLinearArguments().isEmpty()
+        && instruction.getExponentialArguments().isEmpty()) {
       if (!entryCall) {
         putIf(decrement(endPoints()) + " == 0", () -> putFreeEnvironment(ENV));
       } else {
@@ -344,7 +345,8 @@ public class CGenerator extends IRInstructionVisitor {
         putAssign(record(ENV, arg.getTargetRecord()), record(TMP_ENV, arg.getSourceRecord()));
       }
       for (ExponentialArgument arg : instruction.getExponentialArguments()) {
-        putAssign(exponential(ENV, process.getRecordCount(), arg.getTargetExponential()),
+        putAssign(
+            exponential(ENV, process.getRecordCount(), arg.getTargetExponential()),
             exponential(TMP_ENV, recordCount, arg.getSourceExponential()));
       }
 
