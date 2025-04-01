@@ -1,0 +1,10 @@
+proc main() {
+    println("Hello" + ", " + "World!");
+    print("A" + "B" + "C" + "\n");
+    println("A new line");
+    println("A boolean: " + true);
+    println("An integer: " + 42);
+    println(false + " is false");
+    println(42 + " is the answer");
+    ()
+};;

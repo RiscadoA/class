@@ -1,0 +1,9 @@
+proc main() {
+    cut {
+        let x "2 + 3 = "
+        |x: ~lstring|
+        let y x + 5
+        |y: ~lstring|
+        println(y); ()
+    }
+};;

@@ -1,0 +1,15 @@
+send x
+close x
+recv x
+send y
+recv y
+send z
+recv z
+close w
+wait w
+close z
+wait z
+close y
+wait x
+wait y
+end

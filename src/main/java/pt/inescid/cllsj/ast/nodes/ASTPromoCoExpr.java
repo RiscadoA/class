@@ -18,6 +18,7 @@ import pt.inescid.cllsj.SessionValue;
 import pt.inescid.cllsj.Trail;
 import pt.inescid.cllsj.TypeError;
 import pt.inescid.cllsj.Value;
+import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.types.ASTBangT;
 import pt.inescid.cllsj.ast.types.ASTBasicType;
 import pt.inescid.cllsj.ast.types.ASTCointT;
@@ -33,6 +34,18 @@ public class ASTPromoCoExpr extends ASTNode {
     expr = _expr;
     ch = _ch;
     promoted = false;
+  }
+
+  public void setCh(String _ch) {
+    ch = _ch;
+  }
+
+  public String getCh() {
+    return ch;
+  }
+
+  public ASTExpr getExpr() {
+    return expr;
   }
 
   public void ASTupdCont(ASTNode newCont, ASTNode caller) throws Exception {
@@ -209,5 +222,10 @@ public class ASTPromoCoExpr extends ASTNode {
 
     //	    cont.sam(frm,epn);
 
+  }
+
+  @Override
+  public void accept(ASTNodeVisitor visitor) {
+    visitor.visit(this);
   }
 }

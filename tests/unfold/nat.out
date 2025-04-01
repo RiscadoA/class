@@ -1,0 +1,17 @@
+unfold 1
+unfold r
+#S 1
+unfold 2
+case
+unfold r
+#S 2
+unfold 3
+case
+unfold r
+#Z
+case
+#Z r
+let 0
+let +1
+let +1
+2

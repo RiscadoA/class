@@ -8,7 +8,7 @@ import pt.inescid.cllsj.Server;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.VString;
 import pt.inescid.cllsj.Value;
-import pt.inescid.cllsj.ast.ASTNodeVisitor;
+import pt.inescid.cllsj.ast.ASTExprVisitor;
 import pt.inescid.cllsj.ast.types.ASTCoLstringT;
 import pt.inescid.cllsj.ast.types.ASTType;
 
@@ -20,7 +20,7 @@ public class ASTString extends ASTExpr {
     v = _v;
   }
 
-  public String getV() {
+  public String getValue() {
     return v;
   }
 
@@ -67,7 +67,7 @@ public class ASTString extends ASTExpr {
   }
 
   @Override
-  public void accept(ASTNodeVisitor visitor) {
+  public void accept(ASTExprVisitor visitor) {
     visitor.visit(this);
   }
 }

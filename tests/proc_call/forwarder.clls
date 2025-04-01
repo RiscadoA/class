@@ -1,0 +1,16 @@
+proc forwarder(x:close, y:wait) {
+    println("forward");
+    fwd x y
+};;
+
+proc main() {
+    cut {
+        println("wait");
+        wait x; ()
+        |x:close|
+        forwarder(x, y)
+        |y:close|
+        println("close");
+        close y
+    }
+};;

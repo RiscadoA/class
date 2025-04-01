@@ -9,6 +9,7 @@ import pt.inescid.cllsj.LinSession;
 import pt.inescid.cllsj.Server;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.Value;
+import pt.inescid.cllsj.ast.ASTExprVisitor;
 import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.types.ASTType;
 
@@ -41,6 +42,10 @@ public abstract class ASTExpr extends ASTNode {
 
   public void ASTInsertPipe(Function<ASTNode, ASTNode> f, ASTNode from) throws Exception {
     throw new Exception("ASTInsertPipe: call not expected");
+  }
+
+  public void accept(ASTExprVisitor visitor) {
+    visitor.visit(this);
   }
 
   @Override

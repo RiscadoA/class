@@ -4,6 +4,7 @@ import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.Trail;
 import pt.inescid.cllsj.TypeEntry;
+import pt.inescid.cllsj.ast.ASTTypeVisitor;
 
 public class ASTRecvTT extends ASTType {
   String id;
@@ -80,5 +81,10 @@ public class ASTRecvTT extends ASTType {
     ep = ep.assoc(id, new TypeEntry(new ASTIdT(id)));
     rhs = rhs.unfoldType(ep);
     return rhs.SetOffsets(base + 1, ep);
+  }
+
+  @Override
+  public void accept(ASTTypeVisitor visitor) {
+    visitor.visit(this);
   }
 }

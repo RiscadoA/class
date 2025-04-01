@@ -1,0 +1,4 @@
+close x
+wait x
+close y
+wait y

@@ -1,0 +1,4 @@
+#A x
+case x 1
+close x 1
+wait x 2

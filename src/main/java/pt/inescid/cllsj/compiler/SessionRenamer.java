@@ -4,26 +4,45 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Stack;
+import pt.inescid.cllsj.ast.ASTExprVisitor;
 import pt.inescid.cllsj.ast.ASTNodeVisitor;
+import pt.inescid.cllsj.ast.nodes.ASTAdd;
+import pt.inescid.cllsj.ast.nodes.ASTAnd;
 import pt.inescid.cllsj.ast.nodes.ASTBang;
+import pt.inescid.cllsj.ast.nodes.ASTBool;
 import pt.inescid.cllsj.ast.nodes.ASTCall;
 import pt.inescid.cllsj.ast.nodes.ASTCase;
 import pt.inescid.cllsj.ast.nodes.ASTClose;
 import pt.inescid.cllsj.ast.nodes.ASTCoClose;
+import pt.inescid.cllsj.ast.nodes.ASTCoExpr;
 import pt.inescid.cllsj.ast.nodes.ASTCut;
+import pt.inescid.cllsj.ast.nodes.ASTDiv;
 import pt.inescid.cllsj.ast.nodes.ASTEmpty;
+import pt.inescid.cllsj.ast.nodes.ASTEq;
 import pt.inescid.cllsj.ast.nodes.ASTExpr;
 import pt.inescid.cllsj.ast.nodes.ASTFwd;
+import pt.inescid.cllsj.ast.nodes.ASTGt;
 import pt.inescid.cllsj.ast.nodes.ASTId;
+import pt.inescid.cllsj.ast.nodes.ASTIf;
+import pt.inescid.cllsj.ast.nodes.ASTInt;
+import pt.inescid.cllsj.ast.nodes.ASTLt;
 import pt.inescid.cllsj.ast.nodes.ASTMix;
+import pt.inescid.cllsj.ast.nodes.ASTMul;
+import pt.inescid.cllsj.ast.nodes.ASTNEq;
 import pt.inescid.cllsj.ast.nodes.ASTNode;
+import pt.inescid.cllsj.ast.nodes.ASTNot;
+import pt.inescid.cllsj.ast.nodes.ASTOr;
 import pt.inescid.cllsj.ast.nodes.ASTPrintLn;
 import pt.inescid.cllsj.ast.nodes.ASTProcDef;
 import pt.inescid.cllsj.ast.nodes.ASTProgram;
+import pt.inescid.cllsj.ast.nodes.ASTPromoCoExpr;
 import pt.inescid.cllsj.ast.nodes.ASTRecv;
+import pt.inescid.cllsj.ast.nodes.ASTRecvTy;
 import pt.inescid.cllsj.ast.nodes.ASTSelect;
 import pt.inescid.cllsj.ast.nodes.ASTSend;
+import pt.inescid.cllsj.ast.nodes.ASTSendTy;
 import pt.inescid.cllsj.ast.nodes.ASTString;
+import pt.inescid.cllsj.ast.nodes.ASTSub;
 import pt.inescid.cllsj.ast.nodes.ASTUnfold;
 import pt.inescid.cllsj.ast.nodes.ASTVId;
 import pt.inescid.cllsj.ast.nodes.ASTWhy;
@@ -32,6 +51,101 @@ public class SessionRenamer extends ASTNodeVisitor {
   // How many different occurrences of each session name have been found
   private Map<String, Integer> occurrences = new HashMap<>();
   private Map<String, Stack<Integer>> current = new HashMap<>();
+
+  private class ExprVisitor extends ASTExprVisitor {
+    @Override
+    public void visit(ASTExpr expr) {
+      throw new UnsupportedOperationException(
+          "Renaming of sessions in expressions of type "
+              + expr.getClass().getSimpleName()
+              + " is not yet supported");
+    }
+
+    @Override
+    public void visit(ASTInt node) {
+      // Do nothing
+    }
+
+    @Override
+    public void visit(ASTBool node) {
+      // Do nothing
+    }
+
+    @Override
+    public void visit(ASTString node) {
+      // Do nothing
+    }
+
+    @Override
+    public void visit(ASTVId node) {
+      node.setCh(rename(node.getCh()));
+    }
+
+    @Override
+    public void visit(ASTAdd expr) {
+      expr.getLhs().accept(this);
+      expr.getRhs().accept(this);
+    }
+
+    @Override
+    public void visit(ASTSub expr) {
+      expr.getLhs().accept(this);
+      expr.getRhs().accept(this);
+    }
+
+    @Override
+    public void visit(ASTMul expr) {
+      expr.getLhs().accept(this);
+      expr.getRhs().accept(this);
+    }
+
+    @Override
+    public void visit(ASTDiv expr) {
+      expr.getLhs().accept(this);
+      expr.getRhs().accept(this);
+    }
+
+    @Override
+    public void visit(ASTEq expr) {
+      expr.getLhs().accept(this);
+      expr.getRhs().accept(this);
+    }
+
+    @Override
+    public void visit(ASTNEq expr) {
+      expr.getLhs().accept(this);
+      expr.getRhs().accept(this);
+    }
+
+    @Override
+    public void visit(ASTLt expr) {
+      expr.getLhs().accept(this);
+      expr.getRhs().accept(this);
+    }
+
+    @Override
+    public void visit(ASTGt expr) {
+      expr.getLhs().accept(this);
+      expr.getRhs().accept(this);
+    }
+
+    @Override
+    public void visit(ASTAnd expr) {
+      expr.getLhs().accept(this);
+      expr.getRhs().accept(this);
+    }
+
+    @Override
+    public void visit(ASTOr expr) {
+      expr.getLhs().accept(this);
+      expr.getRhs().accept(this);
+    }
+
+    @Override
+    public void visit(ASTNot expr) {
+      expr.getExpr().accept(this);
+    }
+  }
 
   public static void execute(ASTNode node) {
     node.accept(new SessionRenamer());
@@ -140,11 +254,11 @@ public class SessionRenamer extends ASTNodeVisitor {
   @Override
   public void visit(ASTId node) {
     for (ASTExpr expr : node.getExprs()) {
-      expr.accept(this);
+      expr.accept(new ExprVisitor());
     }
 
     for (ASTExpr expr : node.getGExprs()) {
-      expr.accept(this);
+      expr.accept(new ExprVisitor());
     }
 
     for (int i = 0; i < node.getPars().size(); i++) {
@@ -164,8 +278,20 @@ public class SessionRenamer extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTPrintLn node) {
-    node.getExpr().accept(this);
+    node.getExpr().accept(new ExprVisitor());
     node.getRhs().accept(this);
+  }
+
+  @Override
+  public void visit(ASTCoExpr node) {
+    node.setCh(rename(node.getCh()));
+    node.getExpr().accept(new ExprVisitor());
+  }
+
+  @Override
+  public void visit(ASTPromoCoExpr node) {
+    node.setCh(rename(node.getCh()));
+    node.getExpr().accept(new ExprVisitor());
   }
 
   @Override
@@ -218,14 +344,6 @@ public class SessionRenamer extends ASTNodeVisitor {
   }
 
   @Override
-  public void visit(ASTString node) {}
-
-  @Override
-  public void visit(ASTVId node) {
-    node.setCh(rename(node.getCh()));
-  }
-
-  @Override
   public void visit(ASTUnfold node) {
     node.setCh(rename(node.getCh()));
     node.getRhs().accept(this);
@@ -234,6 +352,30 @@ public class SessionRenamer extends ASTNodeVisitor {
   @Override
   public void visit(ASTWhy node) {
     node.setCh(rename(node.getCh()));
+    node.getRhs().accept(this);
+  }
+
+  @Override
+  public void visit(ASTIf node) {
+    node.getExpr().accept(new ExprVisitor());
+    node.getThen().accept(this);
+    node.getElse().accept(this);
+  }
+
+  @Override
+  public void visit(ASTExpr expr) {
+    expr.accept(new ExprVisitor());
+  }
+
+  @Override
+  public void visit(ASTSendTy node) {
+    node.setChs(rename(node.getChs()));
+    node.getRhs().accept(this);
+  }
+
+  @Override
+  public void visit(ASTRecvTy node) {
+    node.setChs(rename(node.getChs()));
     node.getRhs().accept(this);
   }
 }

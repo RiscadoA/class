@@ -1,0 +1,7 @@
+proc main() {
+    println(false and (true or false));
+    println(true and (true or false));
+    println(false or (true and false));
+    println(true or (true and false));
+    ()
+};;

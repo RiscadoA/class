@@ -1,0 +1,18 @@
+proc main() {
+    cut {
+        println("case x 1");
+        case x of {
+            |#A: println("close x 1"); close x
+            |#B: println("case x 2"); case x of {
+                |#A: println("wait x 1"); wait x; ()
+                |#B: println("close x 2"); close x
+            }
+        }
+        |x : choice of { |#A: wait |#B: choice of { |#A: close |#B: wait } }|
+        println("#A x");
+        #A x;
+        println("wait x 2");
+        wait x;
+        ()
+    }
+};;

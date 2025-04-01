@@ -1,0 +1,11 @@
+proc main() {
+    cut {
+        send x("foo");
+        close x
+        |x: recv ~lstring; wait|
+        recv x(s);
+        wait x;
+        println(s);
+        ()
+    }
+};;

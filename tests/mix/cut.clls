@@ -1,0 +1,23 @@
+proc main() {
+    par {
+        cut {
+            println("lhs close x");
+            close x
+            |x: wait|
+            println("lhs wait x");
+            wait x;
+            println("lhs end");
+            ()
+        }
+        ||
+        cut {
+            println("rhs wait x");
+            wait x;
+            println("rhs end");
+            ()
+            |x: close|
+            println("rhs close x");
+            close x
+        }
+    }
+};;

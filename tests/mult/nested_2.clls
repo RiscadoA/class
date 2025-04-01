@@ -1,0 +1,35 @@
+proc main() {
+    cut {
+        println("recv x");
+        recv x(y);
+        println("send y");
+        send y(z.
+            println("recv z");
+            recv z(w);
+            println("wait w");
+            wait w;
+            println("close z");
+            close z
+        );
+        println("wait x");
+        wait x;
+        println("wait y");
+        wait y;
+        println("end");
+        ()
+        |x: send recv send close; wait; close; close|
+        println("send x");
+        send x(y.
+            println("recv y");
+            recv y(z);
+            println("send z");
+            send z(w. println("close w"); close w);
+            println("wait z");
+            wait z;
+            println("close y");
+            close y
+        );
+        println("close x");
+        close x
+    }
+};;

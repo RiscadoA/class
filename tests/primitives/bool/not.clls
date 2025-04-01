@@ -1,0 +1,5 @@
+proc main() {
+    println(!false);
+    println(!true);
+    ()
+};;

@@ -1,0 +1,15 @@
+proc main() {
+    println(0);
+    println(1);
+    println(2);
+    println(9);
+    println(10);
+    println(11);
+    println(10000);
+    println(99999);
+    println(-1);
+    println(-50);
+    println(-452942);
+    println(32598279);
+    ()
+};;

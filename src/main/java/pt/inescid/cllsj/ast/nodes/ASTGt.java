@@ -10,6 +10,7 @@ import pt.inescid.cllsj.TypeError;
 import pt.inescid.cllsj.VBool;
 import pt.inescid.cllsj.VInt;
 import pt.inescid.cllsj.Value;
+import pt.inescid.cllsj.ast.ASTExprVisitor;
 import pt.inescid.cllsj.ast.types.ASTBotT;
 import pt.inescid.cllsj.ast.types.ASTCoLboolT;
 import pt.inescid.cllsj.ast.types.ASTLCointT;
@@ -22,6 +23,14 @@ public class ASTGt extends ASTExpr {
   public ASTGt(ASTExpr _lhs, ASTExpr _rhs) {
     lhs = _lhs;
     rhs = _rhs;
+  }
+
+  public ASTExpr getLhs() {
+    return lhs;
+  }
+
+  public ASTExpr getRhs() {
+    return rhs;
   }
 
   public void ASTupdCont(ASTNode newCont, ASTNode caller) throws Exception {
@@ -77,5 +86,10 @@ public class ASTGt extends ASTExpr {
     VInt vleft = (VInt) lhs.sameval(ed);
     VInt vright = (VInt) rhs.sameval(ed);
     return new VBool(vleft.get() > vright.get());
+  }
+
+  @Override
+  public void accept(ASTExprVisitor visitor) {
+    visitor.visit(this);
   }
 }

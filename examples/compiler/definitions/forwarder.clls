@@ -1,4 +1,4 @@
-proc forward(x:close, y:wait){
+proc forward(x:close, y:wait) {
     fwd x y
 };;
 

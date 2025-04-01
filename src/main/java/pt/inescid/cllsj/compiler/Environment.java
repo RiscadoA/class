@@ -4,41 +4,64 @@ import java.util.HashMap;
 import java.util.Map;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
+import pt.inescid.cllsj.TypeEntry;
 import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.nodes.ASTBang;
 import pt.inescid.cllsj.ast.nodes.ASTCall;
 import pt.inescid.cllsj.ast.nodes.ASTCase;
 import pt.inescid.cllsj.ast.nodes.ASTClose;
 import pt.inescid.cllsj.ast.nodes.ASTCoClose;
+import pt.inescid.cllsj.ast.nodes.ASTCoExpr;
 import pt.inescid.cllsj.ast.nodes.ASTCut;
 import pt.inescid.cllsj.ast.nodes.ASTEmpty;
-import pt.inescid.cllsj.ast.nodes.ASTExpr;
 import pt.inescid.cllsj.ast.nodes.ASTFwd;
 import pt.inescid.cllsj.ast.nodes.ASTId;
+import pt.inescid.cllsj.ast.nodes.ASTIf;
 import pt.inescid.cllsj.ast.nodes.ASTMix;
 import pt.inescid.cllsj.ast.nodes.ASTNode;
 import pt.inescid.cllsj.ast.nodes.ASTPrintLn;
+import pt.inescid.cllsj.ast.nodes.ASTProcDef;
+import pt.inescid.cllsj.ast.nodes.ASTPromoCoExpr;
 import pt.inescid.cllsj.ast.nodes.ASTRecv;
 import pt.inescid.cllsj.ast.nodes.ASTSelect;
 import pt.inescid.cllsj.ast.nodes.ASTSend;
 import pt.inescid.cllsj.ast.nodes.ASTUnfold;
 import pt.inescid.cllsj.ast.nodes.ASTWhy;
+import pt.inescid.cllsj.ast.types.ASTIdT;
 import pt.inescid.cllsj.ast.types.ASTType;
 
 public class Environment {
   private Environment parent;
   private Map<String, Integer> indices = new HashMap<>();
-  private Map<String, String> sessionCSize = new HashMap<>();
   private Map<String, Integer> typeVarIndices = new HashMap<>();
   private Env<EnvEntry> ep;
-
-  public Environment(Env<EnvEntry> ep) {
-    this(ep, null);
-  }
 
   public Environment(Env<EnvEntry> ep, Environment parent) {
     this.ep = ep;
     this.parent = parent;
+  }
+
+  public Environment(Env<EnvEntry> ep, ASTProcDef procDef) {
+    // Add entries for the type arguments of the process.
+    for (String arg : procDef.getTArgs()) {
+      ep = ep.assoc(arg, new TypeEntry(new ASTIdT(arg)));
+    }
+    this.ep = ep;
+    this.parent = null;
+
+    // Add all arguments to the environment.
+    for (String arg : procDef.getTArgs()) {
+      insertTypeVar(arg);
+    }
+    for (int i = 0; i < procDef.getArgs().size(); i++) {
+      insert(procDef.getArgs().get(i), procDef.getArgTypes().get(i));
+    }
+    for (int i = 0; i < procDef.getGArgs().size(); i++) {
+      insert(procDef.getGArgs().get(i), procDef.getGArgTypes().get(i));
+    }
+
+    // Add all sessions ocurring in the process definition to the environment.
+    insertFromNode(procDef.getRhs());
   }
 
   public Env<EnvEntry> getEp() {
@@ -69,10 +92,7 @@ public class Environment {
   }
 
   public String getSessionCSize(String env, String session) {
-    return sessionCSize
-        .get(session)
-        .replace("$ENV$", env)
-        .replace("$SIZE$", Integer.toString(this.getSize()));
+    return null;
   }
 
   public Integer getTypeVarCount() {
@@ -111,8 +131,6 @@ public class Environment {
       env = env.parent;
       if (env != null) size = Integer.toString(env.getSize());
     }
-
-    this.sessionCSize.put(session, SizeCalculator.calculate(ep, cType, typeVarSizes));
   }
 
   public void insertTypeVar(String typeVar) {
@@ -146,9 +164,6 @@ public class Environment {
 
     @Override
     public void visit(ASTBang node) {}
-
-    @Override
-    public void visit(ASTExpr node) {}
 
     @Override
     public void visit(ASTCall node) {
@@ -224,6 +239,18 @@ public class Environment {
     @Override
     public void visit(ASTWhy node) {
       node.getRhs().accept(this);
+    }
+
+    @Override
+    public void visit(ASTCoExpr node) {}
+
+    @Override
+    public void visit(ASTPromoCoExpr node) {}
+
+    @Override
+    public void visit(ASTIf node) {
+      node.getThen().accept(this);
+      node.getElse().accept(this);
     }
   }
 }

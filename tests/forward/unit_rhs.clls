@@ -1,0 +1,14 @@
+proc main() {
+    cut {
+        println("wait");
+        wait x;
+        println("end");
+        ()
+        |x: close|
+        println("forward");
+        fwd x y
+        |y: close|
+        println("close");
+        close y
+    }
+};;

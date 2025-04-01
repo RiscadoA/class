@@ -1,0 +1,15 @@
+proc main() {
+    par {
+        if true {
+            println("true lhs"); ()
+        } {
+            println("false lhs"); ()
+        }
+        ||
+        if false {
+            println("true rhs"); ()
+        } {
+            println("false rhs"); ()
+        }
+    }
+};;

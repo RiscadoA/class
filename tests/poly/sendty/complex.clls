@@ -1,0 +1,19 @@
+proc main() {
+    cut {
+        println("sendty"); sendty x(close);
+        println("lhs send"); send x(y. println("close y"); close y);
+        println("lhs recv"); recv x(y);
+        println("lhs wait"); wait x;
+        println("wait y"); wait y; ()
+        |x: recvty T; recv ~T; send T; close|
+        println("recvty"); recvty x(U);
+        println("rhs recv"); recv x(y);
+        cut {
+            println("forward");
+            fwd y z
+            |z: ~U|
+            println("rhs send"); send x(z);
+            println("rhs close"); close x
+        }
+    }
+};;

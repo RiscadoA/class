@@ -8,10 +8,10 @@ import pt.inescid.cllsj.Trail;
 import pt.inescid.cllsj.ast.ASTTypeVisitor;
 
 public class ASTOfferT extends ASTType {
-  HashMap<String, ASTType> cases;
+  TreeMap<String, ASTType> cases;
 
   public ASTOfferT() {
-    cases = new HashMap<String, ASTType>();
+    cases = new TreeMap<String, ASTType>();
   }
 
   public void addCase(String id, ASTType t) throws Exception {
@@ -19,7 +19,29 @@ public class ASTOfferT extends ASTType {
       throw new SyntaxError("Duplicate Label " + id + " in offer type");
   }
 
-  public HashMap<String, ASTType> getcases() {
+  public int getIndex(String label) {
+    int i = 0;
+    for (String lab : cases.keySet()) {
+      if (lab.equals(label)) return i;
+      i++;
+    }
+    return -1;
+  }
+
+  public String getLabel(int index) {
+    int i = 0;
+    for (String lab : cases.keySet()) {
+      if (i == index) return lab;
+      i++;
+    }
+    return null;
+  }
+
+  public ASTType getCaseType(String label) {
+    return cases.get(label);
+  }
+
+  public Map<String, ASTType> getcases() {
     return cases;
   }
 

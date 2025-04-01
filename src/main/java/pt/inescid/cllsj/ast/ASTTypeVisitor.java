@@ -53,4 +53,44 @@ public abstract class ASTTypeVisitor {
   public void visit(ASTWhyT type) {
     visit((ASTType) type);
   }
+
+  public void visit(ASTintT type) {
+    visit((ASTType) type);
+  }
+
+  public void visit(ASTCointT type) {
+    visit((ASTType) type);
+  }
+
+  public void visit(ASTLintT type) {
+    visit((ASTType) type);
+  }
+
+  public void visit(ASTLCointT type) {
+    visit((ASTType) type);
+  }
+
+  public void visit(ASTLboolT type) {
+    visit((ASTType) type);
+  }
+
+  public void visit(ASTCoLboolT type) {
+    visit((ASTType) type);
+  }
+
+  public void visit(ASTLstringT type) {
+    visit((ASTType) type);
+  }
+
+  public void visit(ASTCoLstringT type) {
+    visit((ASTType) type);
+  }
+
+  public void visit(ASTSendTT type) {
+    visit((ASTType) type);
+  }
+
+  public void visit(ASTRecvTT type) {
+    visit((ASTType) type);
+  }
 }

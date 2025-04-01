@@ -79,6 +79,7 @@ public class Generator extends ASTNodeVisitor {
     generator.putLine("struct environment {");
     generator.indentLevel++;
     generator.putLine("struct environment* parent;");
+    generator.putLine("unsigned int refs;");
     generator.indentLevel--;
     generator.putLine("};");
     generator.putLine("");
@@ -116,7 +117,7 @@ public class Generator extends ASTNodeVisitor {
       }
 
       // Setup process environment
-      Environment env = new Environment(procEp);
+      Environment env = new Environment(procEp, procDef);
       for (String arg : procDef.getTArgs()) {
         env.insertTypeVar(arg);
       }
@@ -145,6 +146,7 @@ public class Generator extends ASTNodeVisitor {
     generator.putLabel("run");
     generator.putLine(
         "env = " + generator.allocEnvironment(env.getSize(), env.getTypeVarCount()) + ";");
+    generator.putLine("env->refs = " + env.getSize() + ";");
     generator.putLine("goto proc_" + entryProcess + ";");
     generator.putLabel("end");
     generator.putLine("return 0;");
@@ -203,6 +205,8 @@ public class Generator extends ASTNodeVisitor {
     this.putLine(
         "tmp_env = " + allocEnvironment(peekBangEnvironmentSize(node.getChr()), "0") + ";");
     this.putLine("tmp_env->parent = " + peekBangEnvironmentParent(node.getChr()) + ";");
+    this.putLine("tmp_env->parent->refs += 1;");
+    this.putLine("tmp_env->refs = " + peekBangEnvironmentSize(node.getChr()) + ";");
 
     // Then, we initialize the session with the new environment and continuation.
     String chiPtr = this.sessionPointer("tmp_env", 0, node.getChi());
@@ -277,7 +281,11 @@ public class Generator extends ASTNodeVisitor {
     // Pop a close token from the session queue, terminate the session, and generate the
     // continuation.
     this.popClose(node.getCh());
-    this.putLine("free(" + this.sessionPointer(node.getCh()) + ");");
+    String ptr = this.sessionPointer(node.getCh());
+    this.putLine(this.sessionEnv(ptr) + "->refs -= 1;");
+    this.putLine(
+        "if (" + this.sessionEnv(ptr) + "->refs == 0) { free(" + this.sessionEnv(ptr) + "); }");
+    this.putLine("free(" + ptr + ");");
     node.getRhs().accept(this);
 
     this.popWrappingComment();
@@ -407,6 +415,7 @@ public class Generator extends ASTNodeVisitor {
     // We first initialize a new environment for the process.
     Environment env = this.procDefEnvs.get(node.getId());
     this.putLine("tmp_env = " + allocEnvironment(env.getSize(), env.getTypeVarCount()) + ";");
+    this.putLine("tmp_env->refs = " + env.getSize() + ";");
 
     // Add the sizes of the type variables to the environment.
     Map<String, String> typeVarSizes = new HashMap<>();
@@ -494,12 +503,12 @@ public class Generator extends ASTNodeVisitor {
     ASTString string = (ASTString) node.getExpr();
     if (this.trace) {
       if (node.withNewLine()) {
-        this.putTrace("println(\"" + string.getV() + "\"):" + node.lineno);
+        this.putTrace("println(\"" + string.getValue() + "\"):" + node.lineno);
       } else {
-        this.putTrace("print(\"" + string.getV() + "\"):" + node.lineno);
+        this.putTrace("print(\"" + string.getValue() + "\"):" + node.lineno);
       }
     } else {
-      this.putPrint(string.getV(), node.withNewLine());
+      this.putPrint(string.getValue(), node.withNewLine());
     }
     node.getRhs().accept(this);
 

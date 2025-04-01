@@ -8,6 +8,7 @@ import pt.inescid.cllsj.Server;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.VBool;
 import pt.inescid.cllsj.Value;
+import pt.inescid.cllsj.ast.ASTExprVisitor;
 import pt.inescid.cllsj.ast.types.ASTCoLboolT;
 import pt.inescid.cllsj.ast.types.ASTType;
 
@@ -17,6 +18,10 @@ public class ASTBool extends ASTExpr {
 
   public ASTBool(boolean _v) {
     v = _v;
+  }
+
+  public boolean getValue() {
+    return v;
   }
 
   public void typecheck(Env<ASTType> ed, Env<ASTType> eg, Env<EnvEntry> ep) throws Exception {}
@@ -51,5 +56,10 @@ public class ASTBool extends ASTExpr {
 
   public Value sameval(Env<SessionField> ed) throws Exception {
     return new VBool(v);
+  }
+
+  @Override
+  public void accept(ASTExprVisitor visitor) {
+    visitor.visit(this);
   }
 }
