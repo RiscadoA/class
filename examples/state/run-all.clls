@@ -132,28 +132,33 @@ read operation, this variant of the buffered channel only works with
 buffered channels that store persistent elements of type !A.
 
 */
-include "buffered-channel-multicast/client.clls";;
+/*
+include "buffered-channel-multicast/client.clls";
 include "buffered-channel-multicast/server.clls";;
 include "buffered-channel-multicast/tests.clls";;
 systemPar();;
 systemPar2();;
 systemPar3();;
 systemPar4();;
-
+*/
 /*
 Implements a buffered channel in which receives blocks if the channel is empty.
 The implementation exposes two views: one for sending, another for receiving. 
 Only the view for sending can be shared. 
 */
+/*
 include "blocking-buff-chan.clls";; 
 main();;
-
+*/
 /*
     Defines linked lists, some operations and tests.
 */
+
+/*
 include "linked-lists.clls";;
 test0();;
 test1();;
+*/
 
 /*
     A simple example with mutable pairs, some operations and tests.
@@ -168,18 +173,19 @@ test();;
     Qian, Z., Kavvos, G.A., Birkedal, L.
    in CLASS.
 */
+/*
 include "CSLL.clls";;
 
-/*
+
     Implements a shared stack ADT using a list, where push inserts an element to the head of
     the list and pop removes (if any) the head element.
- */
 include "stack/client.clls";;
 include "stack/server.clls";;
 include "stack/tests.clls";;
 systemSeq();;
 systemPar();;
 systemPar2();;
+ */
 
 /*
 Inspired by exponential-isomorphisms.clls, we try to find and code
