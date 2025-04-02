@@ -28,10 +28,10 @@ proc rec add(n:~Nat, m:~Nat, r:Nat) {
 /** explicitly "brute force" contraction (copy) and weakening (drop) **/
 /** possible for inductive types **/
 
-proc rec drop(n:~Nat) {
+proc rec drop_nat(n:~Nat) {
     case n of {
         |#Z: wait n; ()
-        |#S: drop(n)
+        |#S: drop_nat(n)
 	}
 };;
 
@@ -51,7 +51,7 @@ proc rec copy(n:~Nat, d:send Nat;Nat) {
 
 proc unsafe_rec mul(n:~Nat, m:~Nat, r:Nat) {
     case n of {
-        |#Z: wait n; #Z r; par { drop (m) || close r }
+        |#Z: wait n; #Z r; par { drop_nat (m) || close r }
         |#S: cut {
 		copy(m,d0)
 		| d0:~send Nat;Nat|
@@ -65,12 +65,12 @@ proc unsafe_rec mul(n:~Nat, m:~Nat, r:Nat) {
      } 
 };;
 
+
 proc main1() {
-    cut {
+    letc n:Nat {
         #S n; #S n; zero(n)
-        |n:~Nat|
-        printNat(n)
-    }
+    };
+    printNat(n)
 };;
 
 proc main2() {
@@ -80,7 +80,7 @@ proc main2() {
         copy(n,d0)
         |d0:~send Nat;Nat|
 	    recv d0(n0);
-	    par { printNat(n0) || printNat(d0) }
+	    printNat(n0); printNat(d0)
     }
 };;
 

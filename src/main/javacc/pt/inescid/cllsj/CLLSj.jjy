@@ -13,77 +13,77 @@ import pt.inescid.cllsj.compiler.Compiler;
 
 public class CLLSj {
 
-static CLLSj parser;
-static Env<ASTType> ed;
-static Env<ASTType> eg;
-static Env<EnvEntry> ep;
-public static boolean trace = false;
-public static int trace_level = 0;
-static boolean unsafe = true;
+  static CLLSj parser;
+  static Env<ASTType> ed;
+  static Env<ASTType> eg;
+  static Env<EnvEntry> ep;
+  public static boolean trace = false;
+  public static int trace_level = 0;
+  static boolean unsafe = true;
 
-static final ASTType CLOSETYPE = new ASTOneT();
-static final ASTType WAITTYPE = new ASTBotT();
-static final int MAXTRACE = 10;
+  static final ASTType CLOSETYPE = new ASTOneT();
+  static final ASTType WAITTYPE = new ASTBotT();
+  static final int MAXTRACE = 10;
 
-public static long time = 0;
-public static long elapsed = 0;
+  public static long time = 0;
+  public static long elapsed = 0;
 
-// for liveness checks
-public static volatile int num_sends = 0;
-public static volatile int num_recvs = 0;
-public static volatile int num_affines = 0;
-public static volatile int num_coaff = 0;
+  // for liveness checks
+  public static volatile int num_sends = 0;
+  public static volatile int num_recvs = 0;
+  public static volatile int num_affines = 0;
+  public static volatile int num_coaff = 0;
 
-public static  synchronized void inc_sends (int v)
-{
-	num_sends += v;
-}
+  public static  synchronized void inc_sends (int v)
+  {
+    num_sends += v;
+  }
 
-public static  synchronized void inc_coaff (int v)
-{
-	num_coaff += v;
-}
+  public static  synchronized void inc_coaff (int v)
+  {
+    num_coaff += v;
+  }
 
-public static  synchronized void  inc_recvs (int v)
-{
-	num_recvs += v;
-}
+  public static  synchronized void  inc_recvs (int v)
+  {
+    num_recvs += v;
+  }
 
-public static  synchronized void  inc_affines (int v)
-{
-	num_affines += v;
-}
+  public static  synchronized void  inc_affines (int v)
+  {
+    num_affines += v;
+  }
 
 
-public static void clear_statistics ()
-{
-	num_sends = 0;
-	num_recvs = 0;
-	num_affines = 0;
-	num_coaff = 0;
-}
+  public static void clear_statistics ()
+  {
+    num_sends = 0;
+    num_recvs = 0;
+    num_affines = 0;
+    num_coaff = 0;
+  }
 
-public static void liveness_statistics ()
-{
-       System.out.println("\n\nSTATISTICS");
-       System.out.println("num_sends = "+ num_sends);
-       System.out.println("num_recvs = "+ num_recvs);
-       System.out.println("num_affines = "+ num_affines);
-       System.out.println("num_coaff = "+ num_coaff);
-}
+  public static void liveness_statistics ()
+  {
+    System.out.println("\n\nSTATISTICS");
+    System.out.println("num_sends = "+ num_sends);
+    System.out.println("num_recvs = "+ num_recvs);
+    System.out.println("num_affines = "+ num_affines);
+    System.out.println("num_coaff = "+ num_coaff);
+  }
 
-//public static ConsoleHandler handler = new ConsoleHandler() {{setOutputStream(System.out);}};
+  //public static ConsoleHandler handler = new ConsoleHandler() {{setOutputStream(System.out);}};
 
-//public static Logger logger = Logger.getLogger("ASTNode");
+  //public static Logger logger = Logger.getLogger("ASTNode");
 
-public static final ExecutorService threadPool = Executors.newCachedThreadPool();
+  public static final ExecutorService threadPool = Executors.newCachedThreadPool();
 
-static {
+  static {
     try {
-    System.setProperty("java.util.logging.SimpleFormatter.format", "%5$s %n");
+      System.setProperty("java.util.logging.SimpleFormatter.format", "%5$s %n");
     }
     catch (Exception e) { e.printStackTrace(System.out); }
-}
+  }
 
   public static void main(String args[]) {
     ed = new Env<ASTType>();
@@ -150,205 +150,192 @@ static {
     System.exit(0);
   }
 
-public static void processFile(String path, CLLSj parser, boolean inc)
-{
+  public static void processFile(String path, CLLSj parser, boolean inc)
+  {
     while (true) {
-    //ASTNode.reinit();
-    //ASTType.reinit();
-    if (!inc) { System.out.print("> "); }
-    try {
-      	// ep.crawl(); 
-	ASTNode n = parser.Start();
-   	eg = new Env<ASTType>(); // because of in place inserts during inference
-   	if (n == null) {  return; }
-   	if (n instanceof ASTTrace) {
-	int lev = ((ASTTrace)n).getLevel();
-	if (lev >= 0 && lev <MAXTRACE) {
-	trace_level = lev;
-	trace = (trace_level == 1);
-	     }	     
-	  } else
-   	  if (n instanceof ASTSamL) {
-                /* some code (e.g. argument-as-expressions) assume that every node has a parent,
-                so we will create a dummy coclose node to serve as parent of the running process n (UNCLEAN) */
-	      ASTNode exp = ((ASTSamL)n).getExp();
-              ASTCoClose parent = new ASTCoClose("dummy", exp);  // because of rewriting 
-              exp.setanc(parent);
-      	      exp.typecheck(ed,eg,ep);
-	      CLLSj.time=System.nanoTime();
-	      clear_statistics();
+      //ASTNode.reinit();
+      //ASTType.reinit();
+      if (!inc) { System.out.print("> "); }
+      try {
+        // ep.crawl(); 
+        ASTNode n = parser.Start();
+        eg = new Env<ASTType>(); // because of in place inserts during inference
+        if (n == null) {  return; }
+        if (n instanceof ASTTrace) {
+          int lev = ((ASTTrace)n).getLevel();
+          if (lev >= 0 && lev <MAXTRACE) {
+            trace_level = lev;
+            trace = (trace_level == 1);
+          }	     
+        } else if (n instanceof ASTSamL) {
+          /* some code (e.g. argument-as-expressions) assume that every node has a parent,
+          so we will create a dummy coclose node to serve as parent of the running process n (UNCLEAN) */
+          ASTNode exp = ((ASTSamL)n).getExp();
+          ASTCoClose parent = new ASTCoClose("dummy", exp);  // because of rewriting 
+          exp.setanc(parent);
+          exp.typecheck(ed,eg,ep);
+          CLLSj.time=System.nanoTime();
+          clear_statistics();
 
-	      //for (int i=0;i<20;i++)
-	      { 
-	      SAM.SAMloop(parent.getRhs(), new Env<SessionField>(),ep);
- 	      }
-              while(((ThreadPoolExecutor)threadPool).getActiveCount() > 0) {
-	      //
-              //System.out.println("MaxThreads = " +
-              //((ThreadPoolExecutor)threadPool).getActiveCount());
-	      //liveness_statistics();
-	      //Thread.sleep(1);
-	      //
-	      }
-	      if (trace_level > 0) {
-	      System.out.println("ThrTime="+(System.nanoTime()-CLLSj.time));
+          //for (int i=0;i<20;i++)
+          { 
+            SAM.SAMloop(parent.getRhs(), new Env<SessionField>(),ep);
+          }
+
+          while(((ThreadPoolExecutor)threadPool).getActiveCount() > 0) {
+            //
+            //System.out.println("MaxThreads = " +
+            //((ThreadPoolExecutor)threadPool).getActiveCount());
+            //liveness_statistics();
+            //Thread.sleep(1);
+            //
+          }
+
+          if (trace_level > 0) {
+            System.out.println("ThrTime="+(System.nanoTime()-CLLSj.time));
+            System.out.println("MaxThreads = " +
+            ((ThreadPoolExecutor)threadPool).getActiveCount());
+          }
+          if (trace_level == 3) {
+            SessionRecord.dumpStats();
+            SessionRecord.clearStats();
+          }
+        } else if (n instanceof ASTInclude) {
+          String fd = ((ASTInclude)n).getFn();
+          //System.out.println("FD="+fd);
+          //System.out.println("PATH="+path);
+          String fn = path+"/"+fd;
+          String newpath = fn.substring(0,fn.lastIndexOf("/"));
+          //System.out.println("NEWPATH="+newpath);
+          InputStream f = new FileInputStream(fn);
+          System.out.println("> including "+fn);
+          processFile(newpath, new CLLSj(f), true); // this should return on error
+          f.close();
+          if (!unsafe) System.out.println("included "+fn);
+        } else {
+          //  n.typecheck(ed,eg,ep);
+          if (n instanceof ASTDList) {
+            ASTDList ld = (ASTDList)n;
+            ld.typecheckmany(ed,eg,ep);
+            ep = ld.definemany(ed,eg,ep);
+            //  n.typecheck(ed,eg,ep); // recursion !
+            //  ep=ep.assoc(td.id,new TypeDefEntry(td));
+            //  if (!unsafe) System.out.println ("Type "+td.id+": defined.");
+          } else if (n instanceof ASTTypeDef) {
+            ASTTypeDef td = (ASTTypeDef)n;
+            n.typecheck(ed,eg,ep); // recursion !
+            ep=ep.assoc(td.getid(),new TypeDefEntry(td));
+            if (!unsafe) System.out.println ("Type "+td.getid()+": defined.");
+          } else if (n instanceof ASTPList) {
+            ASTPList ld = (ASTPList)n;
+            ld.typecheckmany(ed,eg,ep);
+            ep = ld.definemany(ed,eg,ep,unsafe);
+            //System.out.println ("\nMain:");
+            //ep.crawl();	 
+          } else if (n instanceof ASTProcDef) {
+            ASTProcDef td = (ASTProcDef)n;
+            n.typecheck(ed,eg,ep);
+            ep=ep.assoc(td.getId(),new ProcEntry(td));
+            td.setEnv(ep);
+            if (!unsafe) System.out.println ("Process  "+td.getId()+": defined.");
+          } else { // must be process to run
+            /* some code (e.g. argument-as-expressions) assume that every node has a parent,
+            so we will create a dummy coclose node to serve as parent of the running process n */
+            ASTCoClose parent = new ASTCoClose("dummy", n);
+            n.setanc(parent);
+
+            n.typecheck(ed,eg,ep);
+            // System.out.println("Type Checked.");
+
+            if (n.repeat > 1) System.out.println("[RunStatus] Running process " + n.repeat + " times.");
+
+            Logger logger = Logger.getAnonymousLogger();
+            ConsoleHandler handler = new ConsoleHandler() {{setOutputStream(System.out);}};
+            handler.setFormatter(new SimpleFormatter());
+            logger.addHandler(handler);
+
+            if(n.info) logger.setLevel(Level.INFO);
+            else logger.setLevel(Level.OFF);
+
+            int maxThreads = 0;
+            CLLSj.time = System.nanoTime();
+
+            clear_statistics();
+
+            while(n.repeat	> 0){
+              parent.getRhs().runproc(ep, new Env<LinSession>(), new Env<Server>(), logger);
+              n.repeat--;
+            }
+
+            while(((ThreadPoolExecutor)threadPool).getActiveCount() > 0)
+            {
+              // Thread.sleep(1000);
+              if (CLLSj.trace) {
+                liveness_statistics();
+                System.out.println ("..."+((ThreadPoolExecutor)threadPool).getActiveCount());
+              }
+            }
+            if (CLLSj.trace) {
+              System.out.println("ThrTime="+(System.nanoTime()-CLLSj.time));
               System.out.println("MaxThreads = " +
               ((ThreadPoolExecutor)threadPool).getActiveCount());
-	      }
-	      if (// true ||
-	      trace_level == 3) {
-	      SessionRecord.dumpStats();
-	      SessionRecord.clearStats();
-	      }
-	      } else
-   	      if (n instanceof ASTInclude) {
-	      String fd = ((ASTInclude)n).getFn();
-	      //System.out.println("FD="+fd);
-	      //System.out.println("PATH="+path);
-	      String fn = path+"/"+fd;
-	      String newpath = fn.substring(0,fn.lastIndexOf("/"));
-	      //System.out.println("NEWPATH="+newpath);
-	      InputStream f = new FileInputStream(fn);
-	      System.out.println("> including "+fn);
-	      processFile(newpath, new CLLSj(f), true); // this should return on error
-	      f.close();
-	      if (!unsafe)
-	      System.out.println("included "+fn);
-    	  }
-    	  else {
-       //  n.typecheck(ed,eg,ep);
-    	   if (n instanceof ASTDList) {
-       	      ASTDList ld = (ASTDList)n;
-	       ld.typecheckmany(ed,eg,ep);
-	       ep = ld.definemany(ed,eg,ep);
-               //  n.typecheck(ed,eg,ep); // recursion !
-               //  ep=ep.assoc(td.id,new TypeDefEntry(td));
-      	       //  if (!unsafe) System.out.println ("Type "+td.id+": defined.");
-       	   } else
-    	   if (n instanceof ASTTypeDef) {
-       	      ASTTypeDef td = (ASTTypeDef)n;
-              n.typecheck(ed,eg,ep); // recursion !
-              ep=ep.assoc(td.getid(),new TypeDefEntry(td));
-      	   if (!unsafe)
-	      System.out.println ("Type "+td.getid()+": defined.");
-       	   } else
-	   if (n instanceof ASTPList) {
-       	      ASTPList ld = (ASTPList)n;
-	      ld.typecheckmany(ed,eg,ep);
-	      ep = ld.definemany(ed,eg,ep,unsafe);
-	      //System.out.println ("\nMain:");
-	      //ep.crawl();	 
-	   }
-	   else
-       	   if (n instanceof ASTProcDef) {
-              	      ASTProcDef td = (ASTProcDef)n;
-           	      n.typecheck(ed,eg,ep);
-	   	      ep=ep.assoc(td.getId(),new ProcEntry(td));
-           	      td.setEnv(ep);
-	      	      if (!unsafe)
-		        System.out.println ("Process  "+td.getId()+": defined.");
-	      }
-	      else
-	      { // must be process to run
-
-                /* some code (e.g. argument-as-expressions) assume that every node has a parent,
-                so we will create a dummy coclose node to serve as parent of the running process n */
-                ASTCoClose parent = new ASTCoClose("dummy", n);
-                n.setanc(parent);
-
-              	n.typecheck(ed,eg,ep);
-		// System.out.println("Type Checked.");
-		
-            	if (n.repeat > 1) System.out.println("[RunStatus] Running process " + n.repeat + " times.");
-
-             Logger logger = Logger.getAnonymousLogger();
-             ConsoleHandler handler = new ConsoleHandler() {{setOutputStream(System.out);}};
-             handler.setFormatter(new SimpleFormatter());
-             logger.addHandler(handler);
-
-             if(n.info){
-                logger.setLevel(Level.INFO);
-             }
-             else
-                logger.setLevel(Level.OFF);
-
-                int maxThreads = 0;
-	        CLLSj.time = System.nanoTime();
-
-		clear_statistics();
-
-                while(n.repeat	> 0){
-	  	     parent.getRhs().runproc(ep, new Env<LinSession>(), new Env<Server>(), logger);
-                n.repeat--;
-		}
-		
-                while(((ThreadPoolExecutor)threadPool).getActiveCount() > 0)
-		{
-			// Thread.sleep(1000);
-			if (CLLSj.trace) {
-			liveness_statistics();
-			System.out.println ("..."+((ThreadPoolExecutor)threadPool).getActiveCount());
-		 }
-		 }
-		 if (CLLSj.trace) {
-		 System.out.println("ThrTime="+(System.nanoTime()-CLLSj.time));
-                 System.out.println("MaxThreads = " +
-                 ((ThreadPoolExecutor)threadPool).getActiveCount());}
-		 }
-		 }
-	} catch (TypeError e) {
-    	  	System.out.println ("TypeError: ("+e.msg+")");
-	  	e.printStackTrace(System.out);	
-		parser.ReInit(System.in);
-		}
-	catch (KindError e) {
-    	        System.out.println ("KindError: "+e.msg);
-		if (inc) { return; } else {
-	      	parser.ReInit(System.in);
-		}
-	} catch (SyntaxError e) {
-	  	System.out.println (e.msg);
-  	  e.printStackTrace(System.out);	
-      if (inc) {return;} else{
+            }
+          }
+        }
+      } catch (TypeError e) {
+        System.out.println ("TypeError: ("+e.msg+")");
+        e.printStackTrace(System.out);	
         parser.ReInit(System.in);
       }
-	} catch (FileNotFoundException e) {
-	  System.out.println ("File not found: "+e.getMessage());
-		if (inc) { return; } else {
-	      	parser.ReInit(System.in);
-		}
-	} catch (TokenMgrError e) {
-	  System.out.println(e.getMessage());
-		if (inc) { return; } else {
-	      	parser.ReInit(System.in);
-		}
-	} catch (ParseException e) {
- 	  System.out.println(e.getMessage());
-		if (inc) { return; } else {
-	      	parser.ReInit(System.in);
-		}
-	} catch (SAMError e) {
- 	  System.out.println("SAM Error: "+e.msg);
-  	  e.printStackTrace(System.out);	
-		if (inc) { return; } else {
-	      	parser.ReInit(System.in);
-		}
-	} catch (RunError e) {
- 	  System.out.println("Runtime Error: "+e.msg);
-  	  e.printStackTrace(System.out);	
-		if (inc) { return; } else {
-	      	parser.ReInit(System.in);
-		}
-	} catch (Exception e) {
-	  System.out.println ("Unexpected error: ");
-	  e.printStackTrace(System.out);
-		if (inc) { return; } else {
-	      	parser.ReInit(System.in);
-		}
-	  }
+      catch (KindError e) {
+        System.out.println ("KindError: "+e.msg);
+        if (inc) { return; } else {
+        parser.ReInit(System.in);
+      }
+      } catch (SyntaxError e) {
+        System.out.println (e.msg);
+        e.printStackTrace(System.out);	
+        if (inc) {return;} else{
+        parser.ReInit(System.in);
+      }
+      } catch (FileNotFoundException e) {
+        System.out.println ("File not found: "+e.getMessage());
+        if (inc) { return; } else {
+          parser.ReInit(System.in);
+        }
+      } catch (TokenMgrError e) {
+        System.out.println(e.getMessage());
+        if (inc) { return; } else {
+          parser.ReInit(System.in);
+        }
+      } catch (ParseException e) {
+        System.out.println(e.getMessage());
+        if (inc) { return; } else {
+          parser.ReInit(System.in);
+        }
+      } catch (SAMError e) {
+        System.out.println("SAM Error: "+e.msg);
+        e.printStackTrace(System.out);	
+        if (inc) { return; } else {
+          parser.ReInit(System.in);
+        }
+      } catch (RunError e) {
+        System.out.println("Runtime Error: "+e.msg);
+        e.printStackTrace(System.out);	
+        if (inc) { return; } else {
+          parser.ReInit(System.in);
+        }
+      } catch (Exception e) {
+        System.out.println ("Unexpected error: ");
+        e.printStackTrace(System.out);
+        if (inc) { return; } else {
+          parser.ReInit(System.in);
+        }
       }
     }
+  }
 }
+
 
 PARSER_END(CLLSj)
 
@@ -382,7 +369,7 @@ TOKEN :
   |
   < REC: "rec" >
   |
-  < UNSAFE_REC: "unsafe_rec" | "gen_rec" >
+  < UNSAFE_REC: "unsafe_rec" >
   |
   < COREC: "corec" >
   |
@@ -416,7 +403,7 @@ TOKEN :
   |
   < CLLTYPE: "clltype" >
   |
-  < SEND: "send" | "pair"  >
+  < SEND: "send" >
   |
   < INCLUDE: "include" >
   |
@@ -432,13 +419,13 @@ TOKEN :
   |
   < SOME: "some" >
   |
-  < RELEASE: "release"|"drop" >
+  < RELEASE: "release" >
   |
   < TAKE: "take" >
   |
   < PUT: "put" >
   |
-  < FWD: "fwd"|"forward" >
+  < FWD: "fwd" >
   |
   < FWDB: "fwd!" >
   |
@@ -521,10 +508,6 @@ TOKEN :
   < AND : "and" >
   |
   < REPL: "bang" >
-  |
-  < THEN: "then" >
-  |
-  < ELSE: "else" >
   |
   < TRUE: "true" >
   |
@@ -629,7 +612,7 @@ List<ASTTypeDef> ld;
   | <INFO> n = Proc() <TERM> { n.info = true; }
   | <QUIT> <TERM> {n = null;}
   | <EOF> {n = null;}
-  | <INCLUDE> c=<STRING> <TERM> {n = new ASTInclude(c.image);}
+  | n=Include() <TERM>
 )
 {return n;}
 }
@@ -715,8 +698,7 @@ ASTType Type() throws Exception:
 ASTType SType() throws Exception:
 { ASTType l,r,t; Token s;}
 {
-(   s=<Id>  { t = new ASTIdT(s.image); }
-    ( <LPAR> ArgListT((ASTIdT)t) <RPAR> )? 
+(   s=<Id>  { t = new ASTIdT(s.image); } ( <LPAR> ArgListT((ASTIdT)t) <RPAR> )?
     |
     <LINT> {
     t = new ASTLintT();
@@ -758,7 +740,6 @@ ASTType SType() throws Exception:
     { ASTOfferT to = new ASTOfferT();
     } (TypeOffer(to))+ <RBRA> { t = to; }
     |
-    /*
     <STRUC> <LBRA>
     { ASTStructT tc1 = new ASTStructT();
       r = null;
@@ -785,7 +766,6 @@ ASTType SType() throws Exception:
     } (CoMutElem(tcm2))+ <RBRA>  
        { t = tcm2; }
        |
-       */
     <CLOSE> { t =CLOSETYPE; }
     |
     <CCLOSE> { t = WAITTYPE; }
@@ -816,7 +796,7 @@ ASTType SType() throws Exception:
     |
     <WHY> l=SType() { t = new ASTWhyT(l); }
     |
-    <LBRA> t=Type() <RBRA> 
+    <LBRA> t=Type() <RBRA>
 )
 { return t;}
 }
@@ -1115,11 +1095,9 @@ boolean b;
     |
     c1 = <IF>
     pe=Expr()
-    (<THEN>)?
     <LBRA>
     p1=Proc()
     <RBRA>
-    (<ELSE>)?
     <LBRA>
     p2=Proc()
     <RBRA>
@@ -1152,51 +1130,36 @@ boolean b;
     c1 = <LPAR> <RPAR>
     { p = new ASTEmpty(); p.lineno = c1.beginLine; }
     |
-    /*
     <LBRA> p=Proc() <RBRA>
     |
-    */
-    
-    /* new forms */
-    
-    c1=<Id> { p = new ASTId(c1.image);
-      p.lineno = c1.beginLine; 
-      }
+    c1=<Id> { p = new ASTId(c1.image); p.lineno = c1.beginLine;}
     (
-    (<RIGHTA>  c2=<Id>(<COL> t=Type())? <SEMIC> p1=Proc()
-        { p = new ASTRecv(c1.image,c2.image,t,p1); p.lineno = c1.beginLine; p1.setanc(p); }
-    )
+    ((<COL> t=Type())? <LEFTA> c3=<Id> <DOT> c2=<lab>  <SEMIC> p2=Proc()  {
+
+	   p = new ASTCoSSelect(c1.image,t, c3.image, c2.image,p2); // y:T <- x.#l; P
+    })
     |
-    ( (<COL> t=Type())? <LEFTA>  
-     ( LOOKAHEAD(2)
-        <LBRA> c2=<Id> 
-        (<COL> t=Type())? 
-        <DOT>
-         p1=Proc() <RBRA> <SEMIC> p2=Proc()
-        {
-	p = new ASTSend(c1.image,c2.image,t,p1,p2);
-        p.lineno = c1.beginLine; 
-	p1.setanc(p); p2.setanc(p);
-	}
-    	|
-    	pe = Expr() <SEMIC> p2=Proc()
-    	{
-	p = new ASTSend(c1.image,ASTType.gensym(),null,pe,p2);
-	p.lineno = c1.beginLine; 
-	pe.setanc(p); p2.setanc(p); 
-    	}
-	)
-    	|
-   	 (( <LT>  ArgTList((ASTId)p) <GT>)?  <LPAR>  ArgList((ASTId)p) <RPAR>
-  { p2 = null;}
-  (<SEMIC> p2 = Proc())?
-    { p1 = p; 
-      if (p2!=null) {  p = new ASTMix(false,p1,p2); p1.setanc(p); p2.setanc(p); } else p = p1;
-      p.lineno = c1.beginLine;
-    } )
-
-    	))
-
+    (<DOT> c2=<lab> (<COL> t=Type())? <LEFTA>
+    	   // <LPAR>
+    	   (LOOKAHEAD(2)
+     	   <LBRA> c3=<Id> <DOT> p1=Proc()  <RBRA> <SEMIC> p2=Proc()
+    	   {
+	   p = new ASTSSelect(c1.image,c2.image,t, c3.image,p1,p2); // c1.#c2 <- x.P1; P2
+           p.lineno = c1.beginLine; 
+	   p1.setanc(p); p2.setanc(p); }
+    	   |
+   	    pe = Expr()
+	    //<RPAR>
+	    <SEMIC> p2=Proc()
+    	    {
+      	      p = new ASTSSelect(c1.image,c2.image, t, ASTType.gensym(),pe,p2);
+      	      p.lineno = c1.beginLine; 
+       	      pe.setanc(p); p2.setanc(p); 
+    	    }
+    )
+    | 
+    ( <LT>  ArgTList((ASTId)p) <GT>)?  <LPAR>  ArgList((ASTId)p) <RPAR>
+    ))
     |
     c1 = <CUT> <LBRA> p1=CCut(false) <RBRA>
     { p = p1; p.lineno = c1.beginLine; }
@@ -1204,8 +1167,8 @@ boolean b;
     c1 = <CCUT> <LBRA> p1=CCut(true) <RBRA>
     { p = p1; p.lineno = c1.beginLine; }
     |
-    c2 = <LETC>  c1=<Id> { t = null; } (<COL> t=Type())? <LBRA>  p1=Proc() <RBRA> <SEMIC>
-     p2=Proc() 
+    c2 = <LETC>  c1=<Id> { t = null; } (<COL> t=Type())? <LBRA> p1=Proc() <RBRA>
+    <LBRA> p2=Proc() <RBRA>
     	  {   p = new ASTCut(c1.image,t,p2,p1);
               p.lineno = c2.beginLine; 
   	      p1.setanc(p);
@@ -1268,11 +1231,7 @@ boolean b;
       p1.setanc(p);
       }
     |
-    c2 = <CLOSE>  { p2 = null; } c1=<Id> (<SEMIC> p2 = Proc())?
-    { p1 = new ASTClose(c1.image); 
-      if (p2!=null) {  p = new ASTMix(false,p1,p2); p1.setanc(p); p2.setanc(p); } else p = p1;
-      p.lineno = c2.beginLine;
-    }
+    c2 = <CLOSE> c1=<Id>  { p = new ASTClose(c1.image); p.lineno = c2.beginLine; }
     |
     c2 = <CCLOSE> c1=<Id> <SEMIC> p1 = Proc() { p = new ASTCoClose(c1.image,p1); p.lineno = c2.beginLine;  p1.setanc(p); }
     |
@@ -1301,11 +1260,8 @@ boolean b;
     c3 = <EMPTY> c1=<Id>
     { p = new ASTEmptyCell(c1.image); p.lineno = c3.beginLine; }
     |
-    c2 = <DISCARD> { p2 = null; } c1=<Id> (<SEMIC> p2 = Proc())?
-    { p1 = new ASTDiscard(c1.image); 
-      if (p2!=null) {  p = new ASTMix(false,p1,p2); p1.setanc(p); p2.setanc(p); } else p = p1;
-      p.lineno = c2.beginLine;
-    }
+    c3 = <DISCARD> c1 =<Id>
+    { p = new ASTDiscard(c1.image); p.lineno = c3.beginLine; }
     |
     c3 = <USE> c1 = <Id> <SEMIC> p1 = Proc()
     {
@@ -1318,11 +1274,8 @@ boolean b;
    c3 =  <AFFINE> c1 = <Id> <SEMIC> p1 = Proc()
     { p = new ASTAffine(c1.image, p1); p.lineno = c3.beginLine;  p1.setanc(p); }
     |
-    c2 = <RELEASE>  { p2 = null; } c1=<Id> (<SEMIC> p2 = Proc())?
-    { p1 = new ASTRelease(c1.image); 
-      if (p2!=null) {  p = new ASTMix(false,p1,p2); p1.setanc(p); p2.setanc(p); } else p = p1;
-      p.lineno = c2.beginLine;
-    }
+    c3 = <RELEASE> c1=<Id>
+    { p = new ASTRelease(c1.image); p.lineno = c3.beginLine;  }
     |
     c3 = <PUT>  { b = true; } c1=<Id> (<DOT> c3=<lab> { b = false; })? <LPAR>   
     (LOOKAHEAD(2)

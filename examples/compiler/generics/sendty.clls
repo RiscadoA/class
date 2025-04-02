@@ -1,8 +1,9 @@
 proc main() {
     cut {
-        sendty x(wait);
-        send x(y. wait y; ());
-        close x
+        sendty x(close);
+        send x(y. close y);
+        wait x; 
+        println ("hi!");()
         |x: recvty T; recv ~T; T|
         recvty x(T);
         recv x(y);
