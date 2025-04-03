@@ -1,4 +1,3 @@
-
 type rec Nat {
     choice of {
         |#Z: close
@@ -51,7 +50,7 @@ proc rec copy(n:~Nat, d:send Nat;Nat) {
 
 proc unsafe_rec mul(n:~Nat, m:~Nat, r:Nat) {
     case n of {
-        |#Z: wait n; #Z r; par { drop_nat (m) || close r }
+        |#Z: wait n; #Z r; drop_nat (m); close r 
         |#S: cut {
 		copy(m,d0)
 		| d0:~send Nat;Nat|

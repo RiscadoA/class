@@ -30,7 +30,7 @@ proc rec printPos(n:~Pos) {
 
 proc rec printBin(n:~Bin) {
     case n of {
-        |#O: println("1"); wait n; ()
+        |#O: println(""); wait n; ()
         |#D0: print("0 "); printBin(n)
         |#D1: print("1 "); printBin(n)
     }
@@ -38,7 +38,7 @@ proc rec printBin(n:~Bin) {
 
 proc rec incBin(n:~Bin, m:Bin) {
     case n of {
-        |#O: wait n; #D0 m; #O m; close m
+        |#O: wait n; #O m; close m
         |#D0: #D1 m; fwd n m
         |#D1: #D0 m; incBin(n, m)
     }
@@ -73,9 +73,9 @@ proc rec Bin2Pos(n:~Bin, m:Pos) {
 
 proc main() {
     cut {
-        #D1 n; #D0 n; #O n; close n // 101
+        #D1 n; #O n; close n // 1
         |n:~Bin|
-        incBin(n, m) // 110
+        incBin(n, m) // 10
         |m:~Bin|
         cut {
             duplBin(m, t, u)
