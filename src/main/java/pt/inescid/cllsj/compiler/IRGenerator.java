@@ -330,7 +330,7 @@ public class IRGenerator extends ASTNodeVisitor {
     IRProcess parentProcess = process;
     process =
         new IRProcess(
-            false, env.recordCount(), env.exponentialCount(), countEndPoints(node.getRhs()));
+            true, env.recordCount(), env.exponentialCount(), countEndPoints(node.getRhs()));
     program.addProcess(env.getName(), process);
     environments.push(env);
     visitBlock(process.getEntry(), node.getRhs());
@@ -360,6 +360,11 @@ public class IRGenerator extends ASTNodeVisitor {
       block.add(new IRFlip(record(node.getChi())));
     }
     node.getRhs().accept(this);
+  }
+
+  @Override
+  public void visit(ASTFwdB node) {
+    block.add(new IRForwardExponential(record(node.getCh1()), exponential(node.getCh2())));
   }
 
   @Override
@@ -483,6 +488,9 @@ public class IRGenerator extends ASTNodeVisitor {
 
     @Override
     public void visit(ASTFwd node) {}
+
+    @Override
+    public void visit(ASTFwdB node) {}
 
     @Override
     public void visit(ASTCoExpr node) {}
@@ -679,6 +687,7 @@ public class IRGenerator extends ASTNodeVisitor {
 
   private static class Environment {
     private final String name;
+    private final Environment parent;
     private final Map<String, Integer> records = new HashMap<>();
     private final Map<String, Integer> exponentials = new HashMap<>();
     private final Map<String, Boolean> polarities = new HashMap<>();
@@ -688,7 +697,7 @@ public class IRGenerator extends ASTNodeVisitor {
     // calls the given consumer with a corresponding environment and name suffix.
     public static void forEachProcessPolarity(
         ASTProcDef procDef, BiConsumer<String, Environment> forEach) {
-      Environment env = new Environment(procDef.getId());
+      Environment env = new Environment(null, procDef.getId());
       for (String arg : procDef.getArgs()) {
         env.insertLinear(arg);
       }
@@ -714,25 +723,46 @@ public class IRGenerator extends ASTNodeVisitor {
       }
     }
 
-    public static Environment forExponential(
-        Environment parent, ASTBang node, List<InheritedExponential> outInheritedExponentials) {
-      Environment env = new Environment(parent.name + "_bang_" + node.getChr());
-      env.insertLinear(node.getChi());
+    private static Environment forExponential(
+        Environment parent,
+        ASTNode node,
+        String name,
+        String linear,
+        List<InheritedExponential> outInheritedExponentials) {
+      Environment env = new Environment(parent, parent.name + "_bang_" + name);
+      if (linear != null) {
+        env.insertLinear(linear);
+      }
 
       // Inherit used exponentials.
-      Set<String> freeNames = namesFreeIn(node.getRhs());
+      Set<String> freeNames = namesFreeIn(node);
       for (Map.Entry<String, Integer> entry : parent.exponentials.entrySet()) {
-        if (freeNames.contains(entry.getKey()) && entry.getKey() != node.getChi()) {
+        if (freeNames.contains(entry.getKey()) && entry.getKey() != linear) {
           int index = env.insertExponential(entry.getKey());
           outInheritedExponentials.add(new InheritedExponential(entry.getValue(), index));
         }
       }
 
-      node.getRhs().accept(env.new Assigner());
+      node.accept(env.new Assigner());
       return env;
     }
 
-    Environment(String name) {
+    public static Environment forExponential(
+        Environment parent, ASTBang node, List<InheritedExponential> outInheritedExponentials) {
+      return forExponential(
+          parent, node.getRhs(), node.getChr(), node.getChi(), outInheritedExponentials);
+    }
+
+    public static Environment forExponential(
+        Environment parent,
+        ASTPromoCoExpr node,
+        List<InheritedExponential> outInheritedExponentials) {
+      return forExponential(
+          parent, node.getExpr(), node.getCh(), node.getCh(), outInheritedExponentials);
+    }
+
+    private Environment(Environment parent, String name) {
+      this.parent = parent;
       this.name = name;
     }
 
@@ -753,6 +783,12 @@ public class IRGenerator extends ASTNodeVisitor {
     }
 
     public boolean isPositive(String typeVar) {
+      if (!polarities.containsKey(typeVar)) {
+        if (parent == null) {
+          throw new IllegalStateException("Type variable " + typeVar + " not found in environment");
+        }
+        return parent.isPositive(typeVar);
+      }
       return polarities.get(typeVar);
     }
 
@@ -793,6 +829,9 @@ public class IRGenerator extends ASTNodeVisitor {
 
       @Override
       public void visit(ASTFwd node) {}
+
+      @Override
+      public void visit(ASTFwdB node) {}
 
       @Override
       public void visit(ASTId node) {}
@@ -886,6 +925,9 @@ public class IRGenerator extends ASTNodeVisitor {
       public void visit(ASTSendTy node) {
         node.getRhs().accept(this);
       }
+
+      @Override
+      public void visit(ASTExpr node) {}
     }
   }
 }

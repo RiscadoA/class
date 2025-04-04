@@ -404,6 +404,12 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   @Override
+  public void visit(IRForwardExponential instruction) {
+    putPushExponential(instruction.getRecord(), exponential(instruction.getExponential()));
+    new IRReturn(instruction.getRecord()).accept(this);
+  }
+
+  @Override
   public void visit(IRFlip i) {
     String label = makeLabel("flip");
 

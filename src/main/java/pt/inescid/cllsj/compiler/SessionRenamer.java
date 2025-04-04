@@ -21,6 +21,7 @@ import pt.inescid.cllsj.ast.nodes.ASTEmpty;
 import pt.inescid.cllsj.ast.nodes.ASTEq;
 import pt.inescid.cllsj.ast.nodes.ASTExpr;
 import pt.inescid.cllsj.ast.nodes.ASTFwd;
+import pt.inescid.cllsj.ast.nodes.ASTFwdB;
 import pt.inescid.cllsj.ast.nodes.ASTGt;
 import pt.inescid.cllsj.ast.nodes.ASTId;
 import pt.inescid.cllsj.ast.nodes.ASTIf;
@@ -247,6 +248,12 @@ public class SessionRenamer extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTFwd node) {
+    node.setCh1(rename(node.getCh1()));
+    node.setCh2(rename(node.getCh2()));
+  }
+
+  @Override
+  public void visit(ASTFwdB node) {
     node.setCh1(rename(node.getCh1()));
     node.setCh2(rename(node.getCh2()));
   }

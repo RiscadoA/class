@@ -68,10 +68,12 @@ public class ASTProgram extends ASTNode {
 
   public void typecheck(Env<ASTType> ed, Env<ASTType> eg, Env<EnvEntry> ep) throws Exception {
     for (ASTDList dList : dLists) {
+      eg = new Env<ASTType>(); // because of in place inserts during inference
       dList.typecheckmany(ed, eg, ep);
       ep = dList.definemany(ed, eg, ep, false);
     }
     for (ASTPList pList : pLists) {
+      eg = new Env<ASTType>(); // because of in place inserts during inference
       pList.typecheckmany(ed, eg, ep);
       ep = pList.definemany(ed, eg, ep, false, false);
     }

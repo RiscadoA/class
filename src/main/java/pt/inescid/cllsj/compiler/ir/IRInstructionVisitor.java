@@ -74,6 +74,10 @@ public abstract class IRInstructionVisitor {
     visit((IRInstruction) instruction);
   }
 
+  public void visit(IRForwardExponential instruction) {
+    visit((IRInstruction) instruction);
+  }
+
   public void visit(IRPopExponential instruction) {
     visit((IRInstruction) instruction);
   }

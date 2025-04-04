@@ -1,0 +1,7 @@
+!
+? 1
+fwd
+? 2
+call 1
+close
+wait 1

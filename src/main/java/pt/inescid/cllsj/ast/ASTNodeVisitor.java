@@ -38,6 +38,10 @@ public abstract class ASTNodeVisitor {
     visit((ASTNode) node);
   }
 
+  public void visit(ASTFwdB node) {
+    visit((ASTNode) node);
+  }
+
   public void visit(ASTId node) {
     visit((ASTNode) node);
   }
