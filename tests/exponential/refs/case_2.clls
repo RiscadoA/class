@@ -1,0 +1,17 @@
+proc main() {
+    cut {
+        !a(b: close); close b
+        |a: ?wait|
+        ?a; cut {
+            #y b; close b
+            |b: offer of { |#x: wait |#y: wait }|
+            case b of {
+                |#x:
+                    call a(x); wait x;
+                    wait b; ()
+                |#y:
+                    wait b; ()
+            }
+        }
+    }
+};;
