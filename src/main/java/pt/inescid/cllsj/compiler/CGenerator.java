@@ -82,7 +82,6 @@ public class CGenerator extends IRInstructionVisitor {
     // Define the environment struct.
     gen.putLine("struct environment {");
     gen.incIndent();
-    gen.putLine("struct exponential* exp;");
     gen.putLine("int end_points;");
     gen.decIndent();
     gen.putLine("};");
