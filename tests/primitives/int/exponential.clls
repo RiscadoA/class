@@ -1,0 +1,15 @@
+proc main() {
+    cut {
+        let! x 2
+        |x: ~!lint|
+        ?x;
+        println(x);
+        println(x);
+        let! y x + x
+        |y: ~!lint|
+        ?y;
+        println(y);
+        println(y);
+        ()
+    }
+};;

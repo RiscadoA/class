@@ -6,10 +6,12 @@ import pt.inescid.cllsj.compiler.ir.expressions.IRExpression;
 public class IRPushExpression extends IRInstruction {
   private int record;
   private IRExpression expression;
+  private boolean isExponential;
 
-  public IRPushExpression(int record, IRExpression expression) {
+  public IRPushExpression(int record, IRExpression expression, boolean isExponential) {
     this.record = record;
     this.expression = expression;
+    this.isExponential = isExponential;
   }
 
   public int getRecord() {
@@ -20,6 +22,10 @@ public class IRPushExpression extends IRInstruction {
     return expression;
   }
 
+  public boolean isExponential() {
+    return isExponential;
+  }
+
   @Override
   public void accept(IRInstructionVisitor visitor) {
     visitor.visit(this);
@@ -27,6 +33,7 @@ public class IRPushExpression extends IRInstruction {
 
   @Override
   public String toString() {
-    return "pushExpression(" + record + ", " + expression + ")";
+    return "pushExpression(" + record + ", " + expression + ", " +
+           (isExponential ? "exponential" : "linear") + ")";
   }
 }

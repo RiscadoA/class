@@ -1,0 +1,33 @@
+package pt.inescid.cllsj.compiler.ir.expressions;
+
+import pt.inescid.cllsj.compiler.ir.IRExpressionVisitor;
+import pt.inescid.cllsj.compiler.ir.type.IRType;
+
+public class IRExponentialVar extends IRExpression {
+  private final int exponential;
+  private final IRType type;
+
+  public IRExponentialVar(int exponential, IRType type) {
+    this.exponential = exponential;
+    this.type = type;
+  }
+
+  public int getExponential() {
+    return exponential;
+  }
+
+  @Override
+  public void accept(IRExpressionVisitor visitor) {
+    visitor.visit(this);
+  }
+
+  @Override
+  public IRType getType() {
+    return type;
+  }
+
+  @Override
+  public String toString() {
+    return "exponential " + exponential;
+  }
+}

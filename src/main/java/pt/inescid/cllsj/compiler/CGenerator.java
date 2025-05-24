@@ -140,6 +140,10 @@ public class CGenerator extends IRInstructionVisitor {
 
     // Utility macros for pushing and popping values to/from the buffer of a record in the active
     // environment.
+    gen.put("#define PUSH_RAW(rec, type, value) (*(type*)(");
+    gen.put("&(rec->buffer)[(rec->written += sizeof(type)) - sizeof(type)]");
+    gen.put(")) = value");
+    gen.putLineEnd();
     gen.put("#define PUSH(rec, type, value) (*(type*)(");
     gen.put("&BUFFER(rec)[(WRITTEN(rec) += sizeof(type)) - sizeof(type)]");
     gen.put(")) = value");
@@ -228,7 +232,7 @@ public class CGenerator extends IRInstructionVisitor {
     gen.decIndent();
     gen.putLine("}");
     gen.putBlankLine();
-    gen.putLine("string_drop(char* str) {");
+    gen.putLine("void string_drop(char* str) {");
     gen.incIndent();
     gen.putStatement("free(str)");
     if (gen.profile) {
@@ -767,10 +771,25 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRPushExpression instruction) {
-    putPush(
-        instruction.getRecord(),
-        type(instruction.getExpression().getType()),
-        expression(instruction.getExpression()));
+    if (instruction.isExponential()) {
+      putAllocExponential(TMP_EXPONENTIAL);
+      putAssign(exponentialRefCount(TMP_EXPONENTIAL), 1);
+      putAllocRecord(exponentialRecord(TMP_EXPONENTIAL), instruction.getExpression().getType());
+      putAssign(read(exponentialRecord(TMP_EXPONENTIAL)), 0);
+      putAssign(written(exponentialRecord(TMP_EXPONENTIAL)), 0);
+      putAssign(recordContEnv(exponentialRecord(TMP_EXPONENTIAL)), "NULL");
+
+      putPush(
+        exponentialRecord(TMP_EXPONENTIAL),
+          type(instruction.getExpression().getType()),
+          expression(instruction.getExpression()));
+      putPushExponential(instruction.getRecord(), TMP_EXPONENTIAL);
+    } else {
+      putPush(
+          instruction.getRecord(),
+          type(instruction.getExpression().getType()),
+          expression(instruction.getExpression()));
+    }
   }
 
   @Override
@@ -1250,6 +1269,10 @@ public class CGenerator extends IRInstructionVisitor {
     putStatement("PUSH(" + record + ", " + type + ", " + value + ")");
   }
 
+  private void putPush(String record, String type, String value) {
+    putStatement("PUSH_RAW(" + record + ", " + type + ", " + value + ")");
+  }
+
   private void putPushTag(int record, int value) {
     putPush(record, "unsigned char", Integer.toString(value));
   }
@@ -1527,6 +1550,21 @@ public class CGenerator extends IRInstructionVisitor {
     @Override
     public void visit(IRVar expr) {
       code += pop(expr.getRecord(), expr.getType());
+    }
+
+    @Override
+    public void visit(IRExponentialVar expr) {
+      // We simply access the exponential data buffer directly.
+      final String record = exponentialRecord(expr.getExponential());
+      final String dataPtr = record + "->buffer + " + record + "->read";
+      final String dataRef = "*((" + type(expr.getType()) + "*)(" + dataPtr + "))";
+
+      if (expr.getType() instanceof IRStringT) {
+        // If the exponential is a string, it must be cloned, as it will be consumed.
+        code += "string_create(" + dataRef + ")";
+      } else {
+        code += dataRef;
+      }
     }
 
     @Override

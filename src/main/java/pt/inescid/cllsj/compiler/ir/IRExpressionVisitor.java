@@ -5,6 +5,7 @@ import pt.inescid.cllsj.compiler.ir.expressions.IRAnd;
 import pt.inescid.cllsj.compiler.ir.expressions.IRBool;
 import pt.inescid.cllsj.compiler.ir.expressions.IRDiv;
 import pt.inescid.cllsj.compiler.ir.expressions.IREq;
+import pt.inescid.cllsj.compiler.ir.expressions.IRExponentialVar;
 import pt.inescid.cllsj.compiler.ir.expressions.IRExpression;
 import pt.inescid.cllsj.compiler.ir.expressions.IRGt;
 import pt.inescid.cllsj.compiler.ir.expressions.IRInt;
@@ -33,6 +34,10 @@ public abstract class IRExpressionVisitor {
   }
 
   public void visit(IRVar expr) {
+    visit((IRExpression) expr);
+  }
+
+  public void visit(IRExponentialVar expr) {
     visit((IRExpression) expr);
   }
 

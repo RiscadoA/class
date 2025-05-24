@@ -43,6 +43,10 @@ public class ASTVId extends ASTExpr {
     this.ch = ch;
   }
 
+  public boolean isLinear() {
+    return linId;
+  }
+
   public void ASTInsertWhyNot(String _ch, ASTType _t, ASTNode here) throws Exception {
     throw new Exception("Unexpected call: ASTInsertWhyNot"); // never called
   }

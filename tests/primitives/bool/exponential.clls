@@ -1,0 +1,18 @@
+proc main() {
+    cut {
+        let! x false
+        |x: ~!lbool|
+        ?x;
+        println(x);
+        println(x and x);
+        println(!x);
+        println(x or x);
+        if x {
+            println("x is true");
+            ()
+        } else {
+            println("x is false");
+            ()
+        }
+    }
+};;

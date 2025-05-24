@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.Stack;
 import java.util.function.BiConsumer;
@@ -283,7 +284,7 @@ public class IRGenerator extends ASTNodeVisitor {
   public void visit(ASTPrintLn node) {
     GeneratedExpression expr = generateExpression(node.getExpr());
     block.add(new IRPrint(expr.getExpr(), node.withNewLine()));
-    expr.freeUsedRecords(block);
+    expr.cleanUp(block, Optional.of(node.getRhs()));
     node.getRhs().accept(this);
   }
 
@@ -291,8 +292,17 @@ public class IRGenerator extends ASTNodeVisitor {
   public void visit(ASTCoExpr node) {
     GeneratedExpression expr = generateExpression(node.getExpr());
 
-    block.add(new IRPushExpression(record(node.getCh()), expr.getExpr()));
-    expr.freeUsedRecords(block);
+    block.add(new IRPushExpression(record(node.getCh()), expr.getExpr(), false));
+    expr.cleanUp(block, Optional.empty());
+    block.add(new IRReturn(record(node.getCh())));
+  }
+
+  @Override
+  public void visit(ASTPromoCoExpr node) {
+    GeneratedExpression expr = generateExpression(node.getExpr());
+
+    block.add(new IRPushExpression(record(node.getCh()), expr.getExpr(), true));
+    expr.cleanUp(block, Optional.empty());
     block.add(new IRReturn(record(node.getCh())));
   }
 
@@ -310,8 +320,8 @@ public class IRGenerator extends ASTNodeVisitor {
         new IRBranch.Case(elseBlock.getLabel(), countEndPoints(node.getElse()) - 1);
     block.add(new IRBranch(expr.getExpr(), then, otherwise));
 
-    expr.freeUsedRecords(thenBlock);
-    expr.freeUsedRecords(elseBlock);
+    expr.cleanUp(thenBlock, Optional.of(node.getThen()));
+    expr.cleanUp(elseBlock, Optional.of(node.getElse()));
 
     // Decrement the reference count of any unused exponentials in the branches.
     for (String name : exponentials) {
@@ -572,22 +582,29 @@ public class IRGenerator extends ASTNodeVisitor {
     }
   }
 
-  private static class GeneratedExpression {
+  private class GeneratedExpression {
     private final IRExpression expr;
-    private final Set<Integer> usedRecords;
+    private final Set<String> usedRecords;
+    private final Set<String> usedExponentials;
 
-    public GeneratedExpression(IRExpression expr, Set<Integer> usedRecords) {
+    public GeneratedExpression(IRExpression expr, Set<String> usedRecords, Set<String> usedExponentials) {
       this.expr = expr;
       this.usedRecords = usedRecords;
+      this.usedExponentials = usedExponentials;
     }
 
     public IRExpression getExpr() {
       return expr;
     }
 
-    public void freeUsedRecords(IRBlock block) {
-      for (int record : usedRecords) {
-        block.add(new IRFreeSession(record));
+    public void cleanUp(IRBlock block, Optional<ASTNode> continuation) {
+      for (String record : usedRecords) {
+        block.add(new IRFreeSession(record(record)));
+      }
+      for (String exponential : usedExponentials) {
+        if (continuation.isEmpty() || !nameFreeIn(continuation.get(), exponential)) {
+          block.add(new IRDecRefExponential(exponential(exponential)));
+        }
       }
     }
   }
@@ -595,12 +612,13 @@ public class IRGenerator extends ASTNodeVisitor {
   private GeneratedExpression generateExpression(ASTExpr expr) {
     ExpressionGenerator gen = new ExpressionGenerator();
     expr.accept(gen);
-    return new GeneratedExpression(gen.ir, gen.usedRecords);
+    return new GeneratedExpression(gen.ir, gen.usedRecords, gen.usedExponentials);
   }
 
   private class ExpressionGenerator extends ASTExprVisitor {
     private IRExpression ir;
-    private Set<Integer> usedRecords = new HashSet<>();
+    private Set<String> usedRecords = new HashSet<>();
+    private Set<String> usedExponentials = new HashSet<>();
 
     private IRExpression recurse(ASTExpr expr) {
       expr.accept(this);
@@ -630,8 +648,13 @@ public class IRGenerator extends ASTNodeVisitor {
 
     @Override
     public void visit(ASTVId expr) {
-      ir = new IRVar(record(expr.getCh()), ASTIntoIRType.convert(ep, expr.getType()));
-      usedRecords.add(record(expr.getCh()));
+      if (expr.isLinear()) {
+        ir = new IRVar(record(expr.getCh()), ASTIntoIRType.convert(ep, expr.getType()));
+        usedRecords.add(expr.getCh());
+      } else {
+        ir = new IRExponentialVar(exponential(expr.getCh()), ASTIntoIRType.convert(ep, expr.getType()));
+        usedExponentials.add(expr.getCh());
+      }
     }
 
     @Override
@@ -805,10 +828,6 @@ public class IRGenerator extends ASTNodeVisitor {
 
     public int exponential(String session) {
       return exponentials.get(session);
-    }
-
-    public IRType exponentialType(String session) {
-      return exponentialTypes.get(exponentials.get(session));
     }
 
     public boolean isPositive(String typeVar) {
