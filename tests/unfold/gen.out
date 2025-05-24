@@ -3,16 +3,16 @@ unfold g
 #next 1
 case
 send
-recv 1
 close
+recv 1
 wait 1
 unfold 2
 unfold g
 #next 2
 case
 send
-recv 2
 close
+recv 2
 wait 2
 unfold 3
 unfold g

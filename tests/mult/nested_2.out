@@ -4,8 +4,8 @@ recv x
 send y
 recv y
 send z
-recv z
 close w
+recv z
 wait w
 close z
 wait z

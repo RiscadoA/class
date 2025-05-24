@@ -1,10 +1,10 @@
 send x lhs
-recv x rhs
 close z
+recv x rhs
 send x rhs
+forward
 close x
 recv x rhs
-forward
 wait v
 wait x
 end

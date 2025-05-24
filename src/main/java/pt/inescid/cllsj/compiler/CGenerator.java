@@ -838,20 +838,24 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRCallExponential instruction) {
-    Runnable cloneRecord = () -> {
-      putCloneRecord(
-        recordType(instruction.getArgRecord()),
-        exponentialRecord(instruction.getExponential()),
-        record(instruction.getArgRecord()));
-      putManagerReset(); // Must reset the manager to ensure the next clone is fresh.
-    };
+    Runnable cloneRecord =
+        () -> {
+          putCloneRecord(
+              recordType(instruction.getArgRecord()),
+              exponentialRecord(instruction.getExponential()),
+              record(instruction.getArgRecord()));
+          putManagerReset(); // Must reset the manager to ensure the next clone is fresh.
+        };
 
     if (instruction.shouldDecreaseRefCount()) {
-      putIfElse(exponentialRefCount(instruction.getExponential()) + " == 1",
+      putIfElse(
+          exponentialRefCount(instruction.getExponential()) + " == 1",
           () -> {
             // If the reference count is 1, and we would decrement it, we don't clone the record.
             // Instead, we just use the record directly and deallocate the wrapping exponential.
-            putAssign(record(instruction.getArgRecord()), exponentialRecord(instruction.getExponential()));
+            putAssign(
+                record(instruction.getArgRecord()),
+                exponentialRecord(instruction.getExponential()));
             putFreeExponential(exponential(instruction.getExponential()));
           },
           () -> {
@@ -1733,11 +1737,11 @@ public class CGenerator extends IRInstructionVisitor {
 
     @Override
     public void visit(IRStringT type) {
-      putIfWrittenAndUnread(() -> {
-        putAssign(
-            access(newRecord, "char*"),
-            "string_create(" + access(oldRecord, "char*") + ")");
-      });
+      putIfWrittenAndUnread(
+          () -> {
+            putAssign(
+                access(newRecord, "char*"), "string_create(" + access(oldRecord, "char*") + ")");
+          });
     }
 
     @Override

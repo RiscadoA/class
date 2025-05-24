@@ -7,7 +7,8 @@ public class IRCallExponential extends IRInstruction {
   private int argRecord;
 
   // Used when the reference count of the exponential should be decreased.
-  // Enables the compiler to optimize memory management by using the original record instead of cloning it when the reference count gets to zero.
+  // Enables the compiler to optimize memory management by using the original record instead of
+  // cloning it when the reference count gets to zero.
   private boolean decRefCount;
 
   public IRCallExponential(int exponential, int argRecord, boolean decRefCount) {
@@ -35,6 +36,11 @@ public class IRCallExponential extends IRInstruction {
 
   @Override
   public String toString() {
-    return "callExponential(" + exponential + ", " + argRecord + (decRefCount ? ", decRefCount" : "") + ")";
+    return "callExponential("
+        + exponential
+        + ", "
+        + argRecord
+        + (decRefCount ? ", decRefCount" : "")
+        + ")";
   }
 }

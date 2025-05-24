@@ -1,8 +1,8 @@
 lhs sendty
 lhs send
+lhs close x
 id recvty
 id recv
-lhs close x
 id send
 id close
 lhs recv

@@ -1,8 +1,8 @@
 send x
 recv x
 send y
-recv z
 close t
+recv z
 wait w
 close z
 wait y

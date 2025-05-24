@@ -1,17 +1,16 @@
 !a
 #A
 send b
+close x
 close b
 ?a
 call a
 case b1
 recv b1
-close x
 wait t
 wait b1
 call a
 case b2
 recv b2
-close x
 wait u
 wait b2

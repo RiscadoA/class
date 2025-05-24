@@ -163,6 +163,13 @@ public class IRGenerator extends ASTNodeVisitor {
       }
     }
 
+    // Flip to the argument if its session type is positive.
+    // This execution order is different from the one in the SAM specification, but by computing the
+    // values earlier, we benefit more from the exponential pre-computation.
+    if (isPositive(node.getLhsType())) {
+      block.add(new IRFlip(record(node.getCho())));
+    }
+
     // Flip if the remainder of the session type is negative.
     if (!isPositive(node.getRhsType())) {
       block.add(new IRFlip(record(node.getChs())));
@@ -175,12 +182,10 @@ public class IRGenerator extends ASTNodeVisitor {
   @Override
   public void visit(ASTRecv node) {
     block.add(new IRPopSession(record(node.getChr()), record(node.getChi())));
-
-    // Flip to the received session if it is negative.
-    if (!isPositive(node.getChiType())) {
-      block.add(new IRFlip(record(node.getChi())));
-    }
     node.getRhs().accept(this);
+
+    // We don't flip to the received session here, as if it is negative, the other endpoint has
+    // already been executed by the send instruction, as explained in the comment found there.
   }
 
   @Override
@@ -353,7 +358,8 @@ public class IRGenerator extends ASTNodeVisitor {
   @Override
   public void visit(ASTCall node) {
     boolean decRefCount = !nameFreeIn(node.getRhs(), node.getChr());
-    block.add(new IRCallExponential(exponential(node.getChr()), record(node.getChi()), decRefCount));
+    block.add(
+        new IRCallExponential(exponential(node.getChr()), record(node.getChi()), decRefCount));
 
     // We never flip to the called session, even if the session type is negative, as any positive
     // side has already run when the exponential was created.
@@ -445,10 +451,6 @@ public class IRGenerator extends ASTNodeVisitor {
 
   private boolean isExponential(String ch) {
     return environment().exponentials.containsKey(ch);
-  }
-
-  private IRType exponentialType(String ch) {
-    return environment().exponentialType(ch);
   }
 
   private static int countEndPoints(ASTNode node) {
