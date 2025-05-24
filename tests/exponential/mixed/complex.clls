@@ -8,15 +8,25 @@ proc main() {
         println("close b"); close b
         |a: ? offer of { |#A: recv wait; wait |#B: ?wait }|
         println("?a"); ?a;
-        println("call a"); call a(b);
-        println("case b"); case b of {
+        println("call a"); call a(b1);
+        println("case b1"); case b1 of {
             |#A:
-                println("recv b"); recv b(t);
+                println("recv b1"); recv b1(t);
                 println("wait t"); wait t;
-                println("wait b"); wait b;
-                ()
+                println("wait b1"); wait b1;
+                println("call a"); call a(b2);
+                println("case b2"); case b2 of {
+                    |#A:
+                        println("recv b2"); recv b2(u);
+                        println("wait u"); wait u;
+                        println("wait b2"); wait b2;
+                        ()
+                    |#B:
+                        println("?b2"); ?b2;
+                        ()
+                }
             |#B:
-                println("?b"); ?b;
+                println("?b1"); ?b1;
                 ()
         }
     }

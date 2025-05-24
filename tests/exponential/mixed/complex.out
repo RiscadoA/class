@@ -4,8 +4,14 @@ send b
 close b
 ?a
 call a
-case b
-recv b
+case b1
+recv b1
 close x
 wait t
-wait b
+wait b1
+call a
+case b2
+recv b2
+close x
+wait u
+wait b2

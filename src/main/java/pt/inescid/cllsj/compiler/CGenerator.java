@@ -838,11 +838,29 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRCallExponential instruction) {
-    putCloneRecord(
+    Runnable cloneRecord = () -> {
+      putCloneRecord(
         recordType(instruction.getArgRecord()),
         exponentialRecord(instruction.getExponential()),
         record(instruction.getArgRecord()));
-    putManagerReset(); // Must reset the manager to ensure the next clone is fresh.
+      putManagerReset(); // Must reset the manager to ensure the next clone is fresh.
+    };
+
+    if (instruction.shouldDecreaseRefCount()) {
+      putIfElse(exponentialRefCount(instruction.getExponential()) + " == 1",
+          () -> {
+            // If the reference count is 1, and we would decrement it, we don't clone the record.
+            // Instead, we just use the record directly and deallocate the wrapping exponential.
+            putAssign(record(instruction.getArgRecord()), exponentialRecord(instruction.getExponential()));
+            putFreeExponential(exponential(instruction.getExponential()));
+          },
+          () -> {
+            cloneRecord.run();
+            new IRDecRefExponential(instruction.getExponential()).accept(this);
+          });
+    } else {
+      cloneRecord.run();
+    }
   }
 
   @Override

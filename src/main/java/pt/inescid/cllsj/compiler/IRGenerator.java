@@ -352,8 +352,8 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTCall node) {
-    block.add(new IRCallExponential(exponential(node.getChr()), record(node.getChi())));
-    decExponentialRefIfUnused(node.getRhs(), node.getChr());
+    boolean decRefCount = !nameFreeIn(node.getRhs(), node.getChr());
+    block.add(new IRCallExponential(exponential(node.getChr()), record(node.getChi()), decRefCount));
 
     // We never flip to the called session, even if the session type is negative, as any positive
     // side has already run when the exponential was created.
