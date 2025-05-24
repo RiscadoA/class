@@ -1,0 +1,30 @@
+proc main() {
+    cut {
+        println("!"); !a(b: choice of { |#C: close |#W: wait });
+        println("#A"); #W b;
+        println("wait"); wait b;
+        ()
+        |a: ? offer of { |#C: wait |#W: close }|
+        println("?"); ?a;
+        println("call 1"); call a(y);
+        println("case of 1"); case y of {
+            |#C:
+                println("never"); wait y;
+                ()
+            |#W:
+                par {
+                    println("close 1"); close y
+                    ||
+                    println("call 2"); call a(z);
+                    println("case of 2"); case z of {
+                        |#C:
+                            println("never"); wait z;
+                            ()
+                        |#W:
+                            println("close 2"); close z
+                    }
+                }
+
+        }
+    }
+};;

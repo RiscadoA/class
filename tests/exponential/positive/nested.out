@@ -1,0 +1,16 @@
+!a
+!b
+close
+?a
+call a(b1)
+?b1
+call b1(x)
+wait x
+call b1(y)
+wait y
+call a(b2)
+?b2
+call b2(z)
+wait z
+call b2(w)
+wait w

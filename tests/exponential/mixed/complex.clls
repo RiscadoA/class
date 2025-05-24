@@ -1,0 +1,23 @@
+proc main() {
+    cut {
+        println("!a"); !a(b: choice of { |#A: send close; close |#B: !close });
+        println("#A"); #A b;
+        println("send b"); send b(x.
+            println("close x"); close x
+        );
+        println("close b"); close b
+        |a: ? offer of { |#A: recv wait; wait |#B: ?wait }|
+        println("?a"); ?a;
+        println("call a"); call a(b);
+        println("case b"); case b of {
+            |#A:
+                println("recv b"); recv b(t);
+                println("wait t"); wait t;
+                println("wait b"); wait b;
+                ()
+            |#B:
+                println("?b"); ?b;
+                ()
+        }
+    }
+};;

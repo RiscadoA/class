@@ -1,12 +1,11 @@
 !a
+close a
 ?a
 !b
+call a
+fwd
 ?b
 call 1
-close a
 wait 1
 call 2
-call a
-close a
-fwd
 wait 2

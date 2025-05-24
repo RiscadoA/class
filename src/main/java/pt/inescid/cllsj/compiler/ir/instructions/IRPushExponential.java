@@ -25,12 +25,17 @@ public class IRPushExponential extends IRInstruction {
   private int record;
   private String processName;
   private List<InheritedExponential> inheritedExponentials;
+  private boolean shouldExecute;
 
   public IRPushExponential(
-      int record, String processName, List<InheritedExponential> inheritedExponentials) {
+      int record,
+      String processName,
+      List<InheritedExponential> inheritedExponentials,
+      boolean shouldExecute) {
     this.record = record;
     this.processName = processName;
     this.inheritedExponentials = inheritedExponentials;
+    this.shouldExecute = shouldExecute;
   }
 
   public int getRecord() {
@@ -45,6 +50,10 @@ public class IRPushExponential extends IRInstruction {
     return inheritedExponentials;
   }
 
+  public boolean shouldExecute() {
+    return shouldExecute;
+  }
+
   @Override
   public void accept(IRInstructionVisitor visitor) {
     visitor.visit(this);
@@ -52,7 +61,7 @@ public class IRPushExponential extends IRInstruction {
 
   @Override
   public String toString() {
-    String str = "pushExponential(" + record + ", " + processName;
+    String str = "pushExponential(" + record + ", " + processName + ", " + shouldExecute;
     for (InheritedExponential inheritedExponential : inheritedExponentials) {
       str +=
           ", "

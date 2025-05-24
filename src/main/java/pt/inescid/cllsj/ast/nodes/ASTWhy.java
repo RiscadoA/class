@@ -47,6 +47,10 @@ public class ASTWhy extends ASTNode {
     return rhs;
   }
 
+  public ASTType getType() {
+    return __type;
+  }
+
   public void ASTInsertPipe(Function<ASTNode, ASTNode> f, ASTNode from) throws Exception {
     if (from == rhs) {
       ASTNode nnode = f.apply(from);

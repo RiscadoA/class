@@ -1,7 +1,7 @@
 !
 close
-? 1
-fwd
-? 2
+?
 call 1
 wait 1
+call 2
+wait 2

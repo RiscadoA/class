@@ -1,0 +1,13 @@
+proc main() {
+    cut {
+        println("!"); !a(b: lstring);
+        println("let"); let b "Hello World!"
+        |a: ?colstring|
+        println("?"); ?a;
+        println("call 1"); call a(y);
+        println(y);
+        println("call 2"); call a(z);
+        println(z);
+        ()
+    }
+};;

@@ -1,0 +1,16 @@
+proc main() {
+    cut {
+        println("!"); !a(b: send lint; lint);
+        println("send"); send b(x. println("let 1"); let x 42);
+        println("let 2"); let b 17
+        |a: ?recv colint; colint|
+        println("?"); ?a;
+        println("call 1"); call a(y);
+        println("recv 1"); recv y(z);
+        println(z); println(y);
+        println("call 2"); call a(t);
+        println("recv 2"); recv t(u);
+        println(u); println(t);
+        ()
+    }
+};;

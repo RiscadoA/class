@@ -1,0 +1,11 @@
+!a
+#A
+send b
+close b
+?a
+call a
+case b
+recv b
+close x
+wait t
+wait b

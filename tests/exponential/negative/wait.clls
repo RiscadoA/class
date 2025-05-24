@@ -1,0 +1,15 @@
+proc main() {
+    cut {
+        println("!"); !a(b: wait);
+        println("wait"); wait b; ()
+        |a: ?close|
+        println("?"); ?a;
+        println("call 1"); call a(y);
+        println("call 2"); call a(z);
+        par {
+            println("close 1"); close y
+            ||
+            println("close 2"); close z
+        }
+    }
+};;

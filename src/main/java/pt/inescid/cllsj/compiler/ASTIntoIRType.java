@@ -72,19 +72,23 @@ public class ASTIntoIRType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTSendT type) {
-    ir = new IRSessionT(ASTIntoIRType.convert(ep, type.getrhs()));
+    ir =
+        new IRSessionT(
+            ASTIntoIRType.convert(ep, type.getlhs()), ASTIntoIRType.convert(ep, type.getrhs()));
   }
 
   @Override
   public void visit(ASTRecvT type) {
-    ir = new IRSessionT(ASTIntoIRType.convert(ep, type.getrhs()));
+    ir =
+        new IRSessionT(
+            ASTIntoIRType.convert(ep, type.getlhs()), ASTIntoIRType.convert(ep, type.getrhs()));
   }
 
   @Override
   public void visit(ASTCaseT type) {
     List<IRType> choices = new ArrayList<>();
     for (int i = 0; i < type.getcases().size(); i++) {
-      choices.add(new IRSessionT(ASTIntoIRType.convert(ep, type.getCaseType(type.getLabel(i)))));
+      choices.add(ASTIntoIRType.convert(ep, type.getCaseType(type.getLabel(i))));
     }
     ir = new IRTagT(choices);
   }
@@ -93,7 +97,7 @@ public class ASTIntoIRType extends ASTTypeVisitor {
   public void visit(ASTOfferT type) {
     List<IRType> choices = new ArrayList<>();
     for (int i = 0; i < type.getcases().size(); i++) {
-      choices.add(new IRSessionT(ASTIntoIRType.convert(ep, type.getCaseType(type.getLabel(i)))));
+      choices.add(ASTIntoIRType.convert(ep, type.getCaseType(type.getLabel(i))));
     }
     ir = new IRTagT(choices);
   }
@@ -133,12 +137,12 @@ public class ASTIntoIRType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTBangT type) {
-    ir = new IRExponentialT();
+    ir = new IRExponentialT(ASTIntoIRType.convert(ep, type.getin()));
   }
 
   @Override
   public void visit(ASTWhyT type) {
-    ir = new IRExponentialT();
+    ir = new IRExponentialT(ASTIntoIRType.convert(ep, type.getin()));
   }
 
   @Override

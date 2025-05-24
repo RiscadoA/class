@@ -1,0 +1,8 @@
+!
+?
+call 1
+call 2
+close 1
+wait
+close 2
+wait

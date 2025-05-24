@@ -1,0 +1,11 @@
+!
+#A
+?
+call 1
+case of 1
+close 1
+wait
+call 2
+case of 2
+close 2
+wait
