@@ -6,19 +6,23 @@ type rec Nat {
 };;
 
 proc rec printNat(n: ~Nat) {
-    unfold n;
-    case n of {
+    println("U3"); unfold n;
+    println("C"); case n of {
         |#Z: println("Z"); wait n; ()
-        |#S: print("S "); printNat(n)
+        |#S: println("S"); printNat(n)
     }
 };;
 
 proc main() {
     cut {
+        println("!");
         !n(n: Nat);
-        unfold n; #S n;
-        unfold n; #Z n; close n
+        println("U1"); unfold n;
+        println("#S"); #S n;
+        println("U2"); unfold n;
+        println("#Z"); #Z n; close n
         |n: ?~Nat|
+        println("?");
         ?n;
         par {
             call n(x);
