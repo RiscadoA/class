@@ -3,6 +3,9 @@ package pt.inescid.cllsj.ast.nodes;
 import java.util.*;
 import java.util.function.*;
 import java.util.logging.*;
+
+import javax.management.RuntimeErrorException;
+
 import pt.inescid.cllsj.CLLSj;
 import pt.inescid.cllsj.Channel;
 import pt.inescid.cllsj.Env;
@@ -26,8 +29,13 @@ public class ASTWhy extends ASTNode {
   ASTType __type;
 
   public ASTWhy(String _ch, ASTNode _rhs) {
+    this(_ch, null, _rhs);
+  }
+
+  public ASTWhy(String _ch, ASTType _t, ASTNode _rhs) {
     ch = _ch;
     rhs = _rhs;
+    __type = _t;
   }
 
   @Override
@@ -48,6 +56,9 @@ public class ASTWhy extends ASTNode {
   }
 
   public ASTType getType() {
+    if (__type == null) {
+      throw new RuntimeException("ASTWhy's type is null, wasn't typecheck called?");
+    }
     return __type;
   }
 
@@ -103,7 +114,8 @@ public class ASTWhy extends ASTNode {
     } else if (ty instanceof ASTCoBasicType) {
       ASTCoBasicType tyr = (ASTCoBasicType) ty;
       ed.upd(ch, null);
-      eg = eg.assoc(ch, tyr.lift());
+      __type = tyr.lift();
+      eg = eg.assoc(ch, __type);
       rhs.typecheck(ed, eg, ep);
     } else
       throw new TypeError(

@@ -123,7 +123,7 @@ public class ASTCut extends ASTNode {
   public void ASTInsertWhyNot(String _ch, ASTType _t, ASTNode here) throws Exception {
 
     if (_ch.equals(id)) {
-      ASTNode pushWhy = new ASTWhy(_ch, here);
+      ASTNode pushWhy = new ASTWhy(_ch, _t, here);
       pushWhy.eg = eg;
       here.setanc(pushWhy);
       pushWhy.setanc(this);

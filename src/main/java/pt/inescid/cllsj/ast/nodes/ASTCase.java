@@ -147,7 +147,7 @@ public class ASTCase extends ASTNode {
         String lab = itCases.next();
         ASTNode cp = cases.get(lab);
         if (cp == here) {
-          ASTNode pushWhy = new ASTWhy(ch, here);
+          ASTNode pushWhy = new ASTWhy(ch, _t, here);
           pushWhy.eg = eg;
           here.setanc(pushWhy);
           pushWhy.setanc(this);

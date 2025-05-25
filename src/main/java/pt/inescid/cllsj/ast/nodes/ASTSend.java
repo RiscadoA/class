@@ -134,14 +134,14 @@ public class ASTSend extends ASTNode {
 
   public void ASTInsertWhyNot(String _ch, ASTType _t, ASTNode here) throws Exception {
     if (_ch.equals(chs) && rhs == here) {
-      ASTNode pushWhy = new ASTWhy(_ch, here);
+      ASTNode pushWhy = new ASTWhy(_ch, _t, here);
       pushWhy.eg = eg;
       here.setanc(pushWhy);
       pushWhy.setanc(this);
       eg.insert(_ch, _t);
       rhs = pushWhy;
     } else if (_ch.equals(cho) && lhs == here) {
-      ASTNode pushWhy = new ASTWhy(_ch, here);
+      ASTNode pushWhy = new ASTWhy(_ch, _t, here);
       pushWhy.eg = eg;
       here.setanc(pushWhy);
       pushWhy.setanc(this);

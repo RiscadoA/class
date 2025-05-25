@@ -115,7 +115,7 @@ public class ASTProcDef extends ASTNode {
   }
 
   public void ASTInsertWhyNot(String _ch, ASTType _t, ASTNode here) throws Exception {
-    ASTNode pushWhy = new ASTWhy(_ch, here);
+    ASTNode pushWhy = new ASTWhy(_ch, _t, here);
     pushWhy.eg = eg;
     here.setanc(pushWhy);
     pushWhy.setanc(this);
