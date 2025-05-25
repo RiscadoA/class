@@ -41,6 +41,9 @@ public class IRGenerator extends ASTNodeVisitor {
       for (String arg : procDef.getTArgs()) {
         gen.ep = gen.ep.assoc(arg, new TypeEntry(new ASTIdT(arg)));
       }
+      for (String arg : procDef.getTArgsGen()) {
+        gen.ep = gen.ep.assoc(arg, new TypeEntry(new ASTIdT(arg)));
+      }
 
       Environment.forEachProcessPolarity(
           procDef,
@@ -210,6 +213,7 @@ public class IRGenerator extends ASTNodeVisitor {
 
     ep = ep.assoc(node.getTyid(), new TypeEntry(new ASTIdT(node.getTyid())));
     ep = ep.assoc(node.getTyidGen(), new TypeEntry(new ASTIdT(node.getTyidGen())));
+    ep = ep.assoc(node.getTyidPar(), new TypeEntry(new ASTIdT(node.getTyidPar())));
 
     // Generate code for each possible polarity.
     environment().setPolarity(node.getTyid(), true);
@@ -974,8 +978,10 @@ public class IRGenerator extends ASTNodeVisitor {
 
       @Override
       public void visit(ASTRecvTy node) {
-        ep = ep.assoc(node.getTyid(), new TypeEntry(new ASTIdT(node.getTyid())));
-        ep = ep.assoc(node.getTyidGen(), new TypeEntry(new ASTIdT(node.getTyidGen())));
+        EnvEntry entry = new TypeEntry(new ASTIdT(node.getTyidGen()));
+        ep = ep.assoc(node.getTyid(), entry);
+        ep = ep.assoc(node.getTyidGen(), entry);
+        ep = ep.assoc(node.getTyidPar(), entry);
         node.getRhs().accept(this);
       }
 

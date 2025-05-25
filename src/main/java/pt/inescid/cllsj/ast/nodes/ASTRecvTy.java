@@ -28,6 +28,7 @@ public class ASTRecvTy extends ASTNode {
   String chs;
   String tyid;
   String tyidGen;
+  String tyidPar;
   ASTNode rhs;
   ASTType tyrhs;
 
@@ -51,6 +52,10 @@ public class ASTRecvTy extends ASTNode {
 
   public String getTyidGen() {
     return tyidGen;
+  }
+
+  public String getTyidPar() {
+    return tyidPar;
   }
 
   public ASTType getTypeRhs() {
@@ -139,6 +144,7 @@ public class ASTRecvTy extends ASTNode {
       epn = epn.assoc(tyid, gse); // type parameter of process
       epn = epn.assoc(tys.getid(), gse); // type parameter of type
       tyidGen = ((ASTIdT) gs).getid();
+      tyidPar = tys.getid();
 
       ASTType tcont = tys.getrhs().unfoldType(epn);
 

@@ -192,7 +192,9 @@ public class ASTIntoIRType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTSendTT type) {
-    ir = new IRTypeT(ASTIntoIRType.convert(ep, type.getrhs()));
+    ir = new IRTypeT(ASTIntoIRType.convert(
+      ep.assoc(type.getid(), new TypeEntry(new ASTIdT(type.getid()))),
+        type.getrhs()));
   }
 
   @Override
@@ -200,6 +202,6 @@ public class ASTIntoIRType extends ASTTypeVisitor {
     ir =
         new IRTypeT(
             ASTIntoIRType.convert(
-                ep.assoc(type.getid(), new TypeEntry(new ASTIdT(type.getid()))), type.getrhs()));
+              ep.assoc(type.getid(), new TypeEntry(new ASTIdT(type.getid()))), type.getrhs()));
   }
 }

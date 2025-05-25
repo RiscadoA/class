@@ -58,6 +58,10 @@ public class ASTProcDef extends ASTNode {
     return targs;
   }
 
+  public List<String> getTArgsGen() {
+    return targsGen;
+  }
+
   public List<String> getArgs() {
     return args;
   }
