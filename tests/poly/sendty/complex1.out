@@ -1,0 +1,11 @@
+sendty
+lhs send
+let y
+recvty
+rhs recv
+forward
+rhs send
+rhs close
+lhs recv
+lhs wait
+7

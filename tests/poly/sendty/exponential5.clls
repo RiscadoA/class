@@ -1,0 +1,33 @@
+proc main() {
+    cut {
+        sendty x(sendty U; send !U; ~!U);
+        send x(y.
+            !y(z);
+            sendty z(lint);
+            send z(a. !a(b); let b 4);
+            ?z;
+            call z(i); call z(j);
+            println(i); println(j);
+            ()
+        );
+        ?x;
+        call x(x0);
+        recvty x0(U);
+        recv x0(y0);
+        call x(x1);
+        recvty x1(U);
+        recv x1(y1);
+        par {
+            fwd x0 y0
+            ||
+            fwd x1 y1
+        }
+        |x: recvty T; recv ~!T; !T|
+        recvty x(T);
+        recv x(y);
+        ?y;
+        !x(z);
+        call y(a);
+        fwd a z
+    }
+};;

@@ -33,7 +33,12 @@ public class IRPushExpression extends IRInstruction {
 
   @Override
   public String toString() {
-    return "pushExpression(" + record + ", " + expression + ", " +
-           (isExponential ? "exponential" : "linear") + ")";
+    return "pushExpression("
+        + record
+        + ", "
+        + expression
+        + ", "
+        + (isExponential ? "exponential" : "linear")
+        + ")";
   }
 }

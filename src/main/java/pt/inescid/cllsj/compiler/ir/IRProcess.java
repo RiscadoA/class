@@ -11,15 +11,18 @@ public class IRProcess {
   private int endPoints;
   private IRBlock entry;
   private List<IRBlock> blocks;
+  private int typeVariableCount = 0;
 
   public IRProcess(
       boolean hasArguments,
       List<IRType> recordTypes,
       List<IRType> exponentialTypes,
+      int typeVariableCount,
       int endPoints) {
     this.hasArguments = hasArguments;
     this.recordTypes = recordTypes;
     this.exponentialTypes = exponentialTypes;
+    this.typeVariableCount = typeVariableCount;
     this.endPoints = endPoints;
     this.entry = new IRBlock(null);
     this.blocks = new ArrayList<>();
@@ -43,6 +46,10 @@ public class IRProcess {
 
   public IRType getExponentialType(int index) {
     return exponentialTypes.get(index);
+  }
+
+  public int getTypeVariableCount() {
+    return typeVariableCount;
   }
 
   public int getEndPoints() {

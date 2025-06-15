@@ -1,0 +1,14 @@
+!
+sendty
+send 1
+let
+send 2
+close
+?
+call
+recvty
+recv 1
+recv 2
+wait
+fwd
+3

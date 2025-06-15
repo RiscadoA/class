@@ -1,0 +1,17 @@
+sendty
+lhs send
+recvty
+rhs recv
+?
+rhs send 1
+call 1
+fwd 1
+rhs send 2
+call 2
+fwd 2
+rhs close
+lhs recv 1
+lhs recv 2
+lhs wait
+1
+1

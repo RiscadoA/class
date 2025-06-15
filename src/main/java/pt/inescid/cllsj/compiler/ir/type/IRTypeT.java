@@ -20,6 +20,6 @@ public class IRTypeT extends IRType {
 
   @Override
   public String toString() {
-    return "type; " + cont;
+    return "type(" + cont + ")";
   }
 }

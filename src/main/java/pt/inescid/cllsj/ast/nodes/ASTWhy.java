@@ -3,9 +3,6 @@ package pt.inescid.cllsj.ast.nodes;
 import java.util.*;
 import java.util.function.*;
 import java.util.logging.*;
-
-import javax.management.RuntimeErrorException;
-
 import pt.inescid.cllsj.CLLSj;
 import pt.inescid.cllsj.Channel;
 import pt.inescid.cllsj.Env;

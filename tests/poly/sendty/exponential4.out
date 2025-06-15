@@ -1,11 +1,19 @@
 sendty
 lhs send
-close y
+lhs !
+let
 recvty
 rhs recv
-forward
+?
 rhs send
+rhs !
+call
+fwd
 rhs close
 lhs recv
 lhs wait
-wait y
+lhs ?
+lhs call 1
+lhs call 2
+4
+4

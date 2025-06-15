@@ -3,7 +3,6 @@ package pt.inescid.cllsj.compiler.ir.instructions;
 import java.util.List;
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 import pt.inescid.cllsj.compiler.ir.type.IRType;
-import pt.inescid.cllsj.compiler.ir.type.IRVarT;
 
 public class IRCallProcess extends IRInstruction {
   public static class LinearArgument {
@@ -46,14 +45,9 @@ public class IRCallProcess extends IRInstruction {
     private IRType sourceType;
     private int targetType;
 
-    // If sourceType is a IRVar, the variable's polarity will be xor'ed with this value.
-    // Otherwise, this determines whether the argument is positive or negative.
-    private boolean isDual;
-
-    public TypeArgument(IRType sourceType, int targetType, boolean isDual) {
+    public TypeArgument(IRType sourceType, int targetType) {
       this.sourceType = sourceType;
       this.targetType = targetType;
-      this.isDual = isDual;
     }
 
     public IRType getSourceType() {
@@ -63,28 +57,22 @@ public class IRCallProcess extends IRInstruction {
     public int getTargetType() {
       return targetType;
     }
-
-    public boolean isDual() {
-      return isDual;
-    }
-
-    public boolean isPositive() {
-      assert !(sourceType instanceof IRVarT);
-      return isDual;
-    }
   }
 
   private String processName;
   private List<LinearArgument> linearArguments;
   private List<ExponentialArgument> exponentialArguments;
+  private List<TypeArgument> typeArguments;
 
   public IRCallProcess(
       String processName,
       List<LinearArgument> linearArguments,
-      List<ExponentialArgument> exponentialArguments) {
+      List<ExponentialArgument> exponentialArguments,
+      List<TypeArgument> typeArguments) {
     this.processName = processName;
     this.linearArguments = linearArguments;
     this.exponentialArguments = exponentialArguments;
+    this.typeArguments = typeArguments;
   }
 
   public String getProcessName() {
@@ -99,6 +87,10 @@ public class IRCallProcess extends IRInstruction {
     return exponentialArguments;
   }
 
+  public List<TypeArgument> getTypeArguments() {
+    return typeArguments;
+  }
+
   @Override
   public void accept(IRInstructionVisitor visitor) {
     visitor.visit(this);
@@ -106,7 +98,18 @@ public class IRCallProcess extends IRInstruction {
 
   @Override
   public String toString() {
-    String str = "call(" + this.processName;
+    String str = "call";
+    if (!this.typeArguments.isEmpty()) {
+      str += "<";
+      boolean firstType = true;
+      for (TypeArgument arg : this.typeArguments) {
+        str += firstType ? "" : ", ";
+        str += arg.getSourceType() + " -> " + arg.getTargetType();
+        firstType = false;
+      }
+      str += ">";
+    }
+    str += "(" + this.processName;
     for (LinearArgument arg : this.linearArguments) {
       str += ", " + arg.getSourceRecord() + " -> " + arg.getTargetRecord();
     }

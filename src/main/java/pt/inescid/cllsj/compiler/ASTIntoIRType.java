@@ -1,7 +1,9 @@
 package pt.inescid.cllsj.compiler;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.TypeEntry;
@@ -43,16 +45,32 @@ import pt.inescid.cllsj.compiler.ir.type.IRVarT;
 
 public class ASTIntoIRType extends ASTTypeVisitor {
   private Env<EnvEntry> ep;
+  private Map<String, Integer> typeMap = new HashMap<>();
   private IRType ir;
 
-  public static IRType convert(Env<EnvEntry> ep, ASTType type) {
-    ASTIntoIRType converter = new ASTIntoIRType(ep);
+  public static IRType convert(
+      Env<EnvEntry> ep, ASTType type, Map<String, Integer> typeMap) {
+    ASTIntoIRType converter = new ASTIntoIRType(ep, typeMap);
     type.accept(converter);
     return converter.ir;
   }
 
-  private ASTIntoIRType(Env<EnvEntry> ep) {
+  private IRType recurse(Env<EnvEntry> ep, ASTType type) {
+    return convert(ep, type, typeMap);
+  }
+
+  private ASTIntoIRType(Env<EnvEntry> ep, Map<String, Integer> typeMap) {
     this.ep = ep;
+    this.typeMap = typeMap;
+  }
+
+  private Map<String, Integer> insertType(String id) {
+    Map<String, Integer> typeMap = new HashMap<>();
+    for (Map.Entry<String, Integer> entry : this.typeMap.entrySet()) {
+      typeMap.put(entry.getKey(), entry.getValue() + 1);
+    }
+    typeMap.put(id, 0);
+    return typeMap;
   }
 
   @Override
@@ -72,23 +90,19 @@ public class ASTIntoIRType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTSendT type) {
-    ir =
-        new IRSessionT(
-            ASTIntoIRType.convert(ep, type.getlhs()), ASTIntoIRType.convert(ep, type.getrhs()));
+    ir = new IRSessionT(recurse(ep, type.getlhs()), recurse(ep, type.getrhs()));
   }
 
   @Override
   public void visit(ASTRecvT type) {
-    ir =
-        new IRSessionT(
-            ASTIntoIRType.convert(ep, type.getlhs()), ASTIntoIRType.convert(ep, type.getrhs()));
+    ir = new IRSessionT(recurse(ep, type.getlhs()), recurse(ep, type.getrhs()));
   }
 
   @Override
   public void visit(ASTCaseT type) {
     List<IRType> choices = new ArrayList<>();
     for (int i = 0; i < type.getcases().size(); i++) {
-      choices.add(ASTIntoIRType.convert(ep, type.getCaseType(type.getLabel(i))));
+      choices.add(recurse(ep, type.getCaseType(type.getLabel(i))));
     }
     ir = new IRTagT(choices);
   }
@@ -97,25 +111,29 @@ public class ASTIntoIRType extends ASTTypeVisitor {
   public void visit(ASTOfferT type) {
     List<IRType> choices = new ArrayList<>();
     for (int i = 0; i < type.getcases().size(); i++) {
-      choices.add(ASTIntoIRType.convert(ep, type.getCaseType(type.getLabel(i))));
+      choices.add(recurse(ep, type.getCaseType(type.getLabel(i))));
     }
     ir = new IRTagT(choices);
   }
 
   @Override
   public void visit(ASTRecT type) {
+    Map<String, Integer> typeMap = this.typeMap;
+    this.typeMap = insertType(type.getid());
     ir =
         new IRRecT(
-            ASTIntoIRType.convert(
-                ep.assoc(type.getid(), new TypeEntry(new ASTIdT(type.getid()))), type.getin()));
+            recurse(ep.assoc(type.getid(), new TypeEntry(new ASTIdT(type.getid()))), type.getin()));
+    this.typeMap = typeMap;
   }
 
   @Override
   public void visit(ASTCoRecT type) {
+    Map<String, Integer> typeMap = this.typeMap;
+    this.typeMap = insertType(type.getid());
     ir =
         new IRRecT(
-            ASTIntoIRType.convert(
-                ep.assoc(type.getid(), new TypeEntry(new ASTIdT(type.getid()))), type.getin()));
+            recurse(ep.assoc(type.getid(), new TypeEntry(new ASTIdT(type.getid()))), type.getin()));
+    this.typeMap = typeMap;
   }
 
   @Override
@@ -129,7 +147,17 @@ public class ASTIntoIRType extends ASTTypeVisitor {
 
     if (unfolded instanceof ASTIdT) {
       type = (ASTIdT) unfolded;
-      ir = new IRVarT();
+      if (!typeMap.containsKey(type.getid())) {
+        String knownTypes = "";
+        for (String key : typeMap.keySet()) {
+          if (!knownTypes.isEmpty()) {
+            knownTypes += ", ";
+          }
+          knownTypes += key;
+        }
+        throw new IllegalArgumentException("Type not found in environment: " + type.getid() + " (contains {" + knownTypes + "})");
+      }
+      ir = new IRVarT(typeMap.get(type.getid()));
     } else {
       unfolded.accept(this);
     }
@@ -137,12 +165,12 @@ public class ASTIntoIRType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTBangT type) {
-    ir = new IRExponentialT(ASTIntoIRType.convert(ep, type.getin()));
+    ir = new IRExponentialT(recurse(ep, type.getin()));
   }
 
   @Override
   public void visit(ASTWhyT type) {
-    ir = new IRExponentialT(ASTIntoIRType.convert(ep, type.getin()));
+    ir = new IRExponentialT(recurse(ep, type.getin()));
   }
 
   @Override
@@ -192,16 +220,23 @@ public class ASTIntoIRType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTSendTT type) {
-    ir = new IRTypeT(ASTIntoIRType.convert(
-      ep.assoc(type.getid(), new TypeEntry(new ASTIdT(type.getid()))),
-        type.getrhs()));
+    Map<String, Integer> typeMap = this.typeMap;
+    this.typeMap = insertType(type.getid());
+    ir =
+        new IRTypeT(
+            recurse(
+                ep.assoc(type.getid(), new TypeEntry(new ASTIdT(type.getid()))), type.getrhs()));
+    this.typeMap = typeMap;
   }
 
   @Override
   public void visit(ASTRecvTT type) {
+    Map<String, Integer> typeMap = this.typeMap;
+    this.typeMap = insertType(type.getid());
     ir =
         new IRTypeT(
-            ASTIntoIRType.convert(
-              ep.assoc(type.getid(), new TypeEntry(new ASTIdT(type.getid()))), type.getrhs()));
+            recurse(
+                ep.assoc(type.getid(), new TypeEntry(new ASTIdT(type.getid()))), type.getrhs()));
+    this.typeMap = typeMap;
   }
 }

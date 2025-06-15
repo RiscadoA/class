@@ -1,0 +1,30 @@
+1 send
+1 close x
+id recv
+id send
+fwd 1
+fwd 2
+id close
+1 recv
+1 wait id
+1 wait x
+2 send
+id recv
+id send
+id close
+2 recv
+2 wait id
+2 close x
+fwd 2
+fwd 1
+2 wait x
+3 send
+3 let
+id recv
+id send
+fwd 1
+fwd 2
+id close
+3 recv
+3 wait id
+3

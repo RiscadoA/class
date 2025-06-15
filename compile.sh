@@ -10,7 +10,7 @@ ofile=""
 while getopts ":dOtPirp:o:" opt; do
     case $opt in
         d)
-            Cflags="-g"
+            Cflags="-g -O0"
             debug=true
             ;;
         O)

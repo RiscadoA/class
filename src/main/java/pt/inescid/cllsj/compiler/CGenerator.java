@@ -1,14 +1,18 @@
 package pt.inescid.cllsj.compiler;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import pt.inescid.cllsj.compiler.ir.*;
 import pt.inescid.cllsj.compiler.ir.expressions.*;
 import pt.inescid.cllsj.compiler.ir.instructions.*;
 import pt.inescid.cllsj.compiler.ir.instructions.IRCallProcess.ExponentialArgument;
 import pt.inescid.cllsj.compiler.ir.instructions.IRCallProcess.LinearArgument;
+import pt.inescid.cllsj.compiler.ir.instructions.IRCallProcess.TypeArgument;
 import pt.inescid.cllsj.compiler.ir.instructions.IRPushExponential.InheritedExponential;
+import pt.inescid.cllsj.compiler.ir.instructions.IRPushExponential.InheritedType;
 import pt.inescid.cllsj.compiler.ir.type.*;
 
 public class CGenerator extends IRInstructionVisitor {
@@ -28,10 +32,14 @@ public class CGenerator extends IRInstructionVisitor {
   private int genLabelCountInBlock;
   private String procName;
   private int recordCount;
+  private int exponentialCount;
   private Optional<String> blockName;
   private boolean trace;
   private boolean entryCall = true;
   private boolean profile;
+  private boolean inManager = false;
+
+  private Set<IRType> usedRecordManagers = new HashSet<>();
 
   public static String generate(IRProgram ir, String entryProcess, boolean trace, boolean profile) {
     final CGenerator gen = new CGenerator(ir, trace, profile);
@@ -70,24 +78,43 @@ public class CGenerator extends IRInstructionVisitor {
     gen.putLine("};");
     gen.putBlankLine();
 
-    // Define the exponential struct.
-    gen.putLine("struct exponential {");
-    gen.incIndent();
-    gen.putLine("int ref_count;");
-    gen.putLine("struct record* record;");
-    gen.decIndent();
-    gen.putLine("};");
-    gen.putBlankLine();
-
     // Define the manager stack struct.
     gen.putLine("struct manager_state {");
     gen.incIndent();
     gen.putLine("struct environment** env;");
     gen.putLine("struct record** record;");
+    gen.putLine("struct type* type;");
     gen.putLine("int env_capacity;");
     gen.putLine("int record_capacity;");
+    gen.putLine("int type_capacity;");
     gen.putLine("int env_count;");
     gen.putLine("int record_count;");
+    gen.putLine("int type_count;");
+    gen.decIndent();
+    gen.putLine("};");
+    gen.putBlankLine();
+
+    // Define the exponential struct.
+    gen.putLine("struct exponential {");
+    gen.incIndent();
+    gen.putLine("int ref_count;");
+    gen.putLine("struct record* record;");
+    gen.putLine(
+        "void(*manager)(const char* old, char* new, int written, int read, struct manager_state* "
+            + MANAGER_STATE
+            + ");");
+    gen.decIndent();
+    gen.putLine("};");
+    gen.putBlankLine();
+
+    // Define the type struct.
+    gen.putLine("struct type {");
+    gen.incIndent();
+    gen.putLine("int size;");
+    gen.putLine(
+        "void(*manager)(const char* old, char* new, int written, int read, struct manager_state* "
+            + MANAGER_STATE
+            + ");");
     gen.decIndent();
     gen.putLine("};");
     gen.putBlankLine();
@@ -129,6 +156,14 @@ public class CGenerator extends IRInstructionVisitor {
     gen.put("sizeof(struct exponential*) * exp");
     gen.put("))");
     gen.putLineEnd();
+    gen.put("#define TYPE(env, rec_count, exp_count, type_i) (*(struct type*)(");
+    gen.put("(char*)(env) + ");
+    gen.put("sizeof(struct environment) + ");
+    gen.put("sizeof(struct record*) * rec_count + ");
+    gen.put("sizeof(struct exponential*) * exp_count + ");
+    gen.put("sizeof(struct type) * type_i");
+    gen.put("))");
+    gen.putLineEnd();
     gen.putBlankLine();
 
     // Utility macro for accessing the read, written and buffer fields of a record in the active
@@ -140,24 +175,22 @@ public class CGenerator extends IRInstructionVisitor {
 
     // Utility macros for pushing and popping values to/from the buffer of a record in the active
     // environment.
-    gen.put("#define PUSH_RAW(rec, type, value) (*(type*)(");
+    gen.put("#define PUSH_RAW(rec, type, ...) (*(type*)(");
     gen.put("&(rec->buffer)[(rec->written += sizeof(type)) - sizeof(type)]");
-    gen.put(")) = value");
+    gen.put(")) = __VA_ARGS__");
     gen.putLineEnd();
-    gen.put("#define PUSH(rec, type, value) (*(type*)(");
+    gen.put("#define PUSH(rec, type, ...) (*(type*)(");
     gen.put("&BUFFER(rec)[(WRITTEN(rec) += sizeof(type)) - sizeof(type)]");
-    gen.put(")) = value");
+    gen.put(")) = __VA_ARGS__");
     gen.putLineEnd();
     gen.put("#define POP(rec, type) (*(type*)(");
     gen.put("&BUFFER(rec)[(READ(rec) += sizeof(type)) - sizeof(type)]");
     gen.put("))");
     gen.putLineEnd();
-    gen.put("#define ACCESS(ptr, type, offset) (*(type*)(ptr->buffer + offset))");
-    gen.putLineEnd();
     gen.putBlankLine();
 
-    // Utility macros for pushing stuff to manager stacks.\
-    gen.put("#define MANAGER_PUSH(what, value) do { ");
+    // Utility macros for pushing stuff to manager stacks.
+    gen.put("#define MANAGER_PUSH(what, ...) do { ");
     gen.put(
         "if ("
             + MANAGER_STATE
@@ -172,9 +205,9 @@ public class CGenerator extends IRInstructionVisitor {
             + MANAGER_STATE
             + "->what, "
             + MANAGER_STATE
-            + "->what ## _capacity * sizeof(struct what*)); ");
+            + "->what ## _capacity * sizeof(__VA_ARGS__)); ");
     gen.put("} ");
-    gen.put(MANAGER_STATE + "->what[" + MANAGER_STATE + "->what ## _count++] = value; ");
+    gen.put(MANAGER_STATE + "->what[" + MANAGER_STATE + "->what ## _count++] = __VA_ARGS__; ");
     gen.put("} while (0)");
     gen.putLineEnd();
     gen.put("#define MANAGER_PUSH_PAIR(what, first, second) do { ");
@@ -182,15 +215,22 @@ public class CGenerator extends IRInstructionVisitor {
     gen.put("MANAGER_PUSH(what, second); ");
     gen.put("} while (0)");
     gen.putLineEnd();
+    gen.put("#define MANAGER_POP(what) do { ");
+    gen.put(MANAGER_STATE + "->what ## _count -= 1; ");
+    gen.put("} while (0)");
+    gen.putLineEnd();
     gen.put("#define MANAGER_RESET() do { ");
     gen.put(MANAGER_STATE + "->env_count = 0; ");
     gen.put(MANAGER_STATE + "->record_count = 0; ");
+    gen.put(MANAGER_STATE + "->type_count = 0; ");
     gen.put("} while (0)");
     gen.putBlankLine();
 
     // Utility macros for calling environment managers.
-    gen.putLine("#define MANAGER_CALL_CLONE(env) (env)->manager(env, " + MANAGER_STATE + ", 1)");
-    gen.putLine("#define MANAGER_CALL_CLEAN(env) (env)->manager(env, " + MANAGER_STATE + ", 0)");
+    gen.putLine(
+        "#define ENV_MANAGER_CALL_CLONE(what) (what)->manager(what, " + MANAGER_STATE + ", 1)");
+    gen.putLine(
+        "#define ENV_MANAGER_CALL_CLEAN(what) (what)->manager(what, " + MANAGER_STATE + ", 0)");
     gen.putBlankLine();
 
     // Utility macros for finding values in manager stacks.
@@ -290,21 +330,32 @@ public class CGenerator extends IRInstructionVisitor {
     gen.putLine("}");
     gen.putBlankLine();
 
+    // Generate environment managers and the main function to a different string, so that we can
+    // insert record cloner and cleaner functions later.
+    String headerCode = gen.code;
+    gen.code = "";
+
     // Generate managers for all process' environments.
     // Each manager function receives the environment to be operated on and the manager's state.
     // If clone is false, then the manager will free the environment and all its records,
     // recursively. Otherwise, then the manager will clone the environment and all
     // its records, and return the new environment.
+    gen.inManager = true;
     for (Map.Entry<String, IRProcess> entry : ir.getProcesses().entrySet()) {
       String processName = entry.getKey();
       IRProcess process = entry.getValue();
       gen.putLine(
-          "struct environment* manager_"
+          "struct environment* env_manager_"
               + processName
               + "(struct environment* env, struct manager_state* "
               + MANAGER_STATE
               + ", int clone) {");
       gen.incIndent();
+
+      // Start by pushing a new type variable frame to the manager.
+      gen.putManagerPushProcessTypes(process, "env");
+
+      gen.putBlankLine();
       gen.putIfElse(
           "clone",
           () -> {
@@ -313,7 +364,10 @@ public class CGenerator extends IRInstructionVisitor {
             // The first thing we do is check if the environment has already been allocated.
             // If so, we just return it.
             gen.putManagerFindEnvironmentPair("env", "new_env");
-            gen.putIf("new_env != NULL", () -> gen.putStatement("return new_env"));
+            gen.putIf("new_env != NULL", () -> {
+              gen.putManagerPopProcessTypes(process);
+              gen.putStatement("return new_env");
+            });
 
             // Otherwise, we allocate it and put it in the manager.
             gen.putAllocEnvironment("new_env", processName);
@@ -328,6 +382,12 @@ public class CGenerator extends IRInstructionVisitor {
                   gen.exponential("env", process.getRecordCount(), i),
                   gen.exponential("new_env", process.getRecordCount(), i));
             }
+            for (int i = 0; i < process.getTypeVariableCount(); ++i) {
+              gen.putAssign(
+                  gen.type("new_env", process.getRecordCount(), process.getExponentialCount(), i),
+                  gen.type("env", process.getRecordCount(), process.getExponentialCount(), i));
+            }
+            gen.putManagerPopProcessTypes(process);
             gen.putStatement("return new_env");
           },
           () -> {
@@ -338,6 +398,7 @@ public class CGenerator extends IRInstructionVisitor {
             gen.putIf(
                 "found",
                 () -> {
+                  gen.putManagerPopProcessTypes(process);
                   gen.putStatement("return NULL");
                 });
 
@@ -356,11 +417,13 @@ public class CGenerator extends IRInstructionVisitor {
 
             // Free the environment's memory.
             gen.putFreeEnvironment("env");
+            gen.putManagerPopProcessTypes(process);
           });
       gen.decIndent();
       gen.putLine("}");
       gen.putBlankLine();
     }
+    gen.inManager = false;
 
     // Main function.
     gen.putLine("int main() {");
@@ -377,14 +440,8 @@ public class CGenerator extends IRInstructionVisitor {
     gen.putStatement("struct manager_state* " + MANAGER_STATE);
     gen.putBlankLine();
 
-    // Initialize the cloner.
-    gen.putAssign(MANAGER_STATE, "malloc(sizeof(struct manager_state))");
-    gen.putAssign(MANAGER_STATE + "->env", "NULL");
-    gen.putAssign(MANAGER_STATE + "->record", "NULL");
-    gen.putAssign(MANAGER_STATE + "->env_capacity", 0);
-    gen.putAssign(MANAGER_STATE + "->record_capacity", 0);
-    gen.putAssign(MANAGER_STATE + "->env_count", 0);
-    gen.putAssign(MANAGER_STATE + "->record_count", 0);
+    // Initialize the manager.
+    gen.putAssign(MANAGER_STATE, "calloc(1, sizeof(struct manager_state))");
     gen.putBlankLine();
 
     // Initialize the task list.
@@ -399,11 +456,13 @@ public class CGenerator extends IRInstructionVisitor {
     if (ir.getProcesses().get(entryProcess).hasArguments()) {
       throw new RuntimeException("Entry process cannot have arguments: " + entryProcess);
     }
-    gen.visitInstruction(new IRCallProcess(entryProcess, new ArrayList<>(), new ArrayList<>()));
+    gen.visitInstruction(
+        new IRCallProcess(entryProcess, new ArrayList<>(), new ArrayList<>(), new ArrayList<>()));
 
     // Generate code for each process.
     for (Map.Entry<String, IRProcess> procEntry : ir.getProcesses().entrySet()) {
       gen.recordCount = procEntry.getValue().getRecordCount();
+      gen.exponentialCount = procEntry.getValue().getExponentialCount();
 
       String label = "proc_" + procEntry.getKey();
       gen.putBlankLine();
@@ -468,6 +527,43 @@ public class CGenerator extends IRInstructionVisitor {
     gen.decIndent();
     gen.putLine("}");
 
+    // Generate the record buffer managers.
+    // Since these might depend on other managers, we must forward declare them.
+    String mainCode = gen.code;
+    String declarationsCode = "";
+    String definitionsCode = "";
+    Set<String> generatedRecordManagers = new HashSet<>();
+    boolean generatedNewManagers = true;
+    while (generatedNewManagers) {
+      generatedNewManagers = false;
+
+      Set<IRType> usedRecordManagers = gen.usedRecordManagers;
+      gen.usedRecordManagers = new HashSet<>();
+
+      for (IRType type : usedRecordManagers) {
+        if (!generatedRecordManagers.add(gen.recordBufferManagerName(type))) {
+          continue;
+        }
+
+        gen.code = declarationsCode;
+        gen.putRecordBufferManagerDeclaration(type);
+        declarationsCode = gen.code;
+
+        gen.code = definitionsCode;
+        gen.putRecordBufferManagerDefinition(type);
+        gen.putBlankLine();
+        definitionsCode = gen.code;
+
+        generatedNewManagers = true;
+      }
+    }
+
+    // Concatenate the sections.
+    gen.code = headerCode;
+    gen.code += declarationsCode;
+    gen.putBlankLine();
+    gen.code += definitionsCode;
+    gen.code += mainCode;
     return gen.code;
   }
 
@@ -509,7 +605,8 @@ public class CGenerator extends IRInstructionVisitor {
     IRProcess process = ir.getProcesses().get(instruction.getProcessName());
 
     if (instruction.getLinearArguments().isEmpty()
-        && instruction.getExponentialArguments().isEmpty()) {
+        && instruction.getExponentialArguments().isEmpty()
+        && instruction.getTypeArguments().isEmpty()) {
       if (!entryCall) {
         putIf(decrement(environmentEndPoints()) + " == 0", () -> putFreeEnvironment(ENV));
       } else {
@@ -517,20 +614,29 @@ public class CGenerator extends IRInstructionVisitor {
       }
       putAllocEnvironment(ENV, instruction.getProcessName());
     } else {
-      putAssign(TMP_ENV, ENV);
-      putAllocEnvironment(ENV, instruction.getProcessName());
+      putAllocEnvironment(TMP_ENV, instruction.getProcessName());
 
       // Bind the arguments to the new environment
       for (LinearArgument arg : instruction.getLinearArguments()) {
-        putAssign(record(ENV, arg.getTargetRecord()), record(TMP_ENV, arg.getSourceRecord()));
+        putAssign(record(TMP_ENV, arg.getTargetRecord()), record(ENV, arg.getSourceRecord()));
       }
       for (ExponentialArgument arg : instruction.getExponentialArguments()) {
         putAssign(
-            exponential(ENV, process.getRecordCount(), arg.getTargetExponential()),
-            exponential(TMP_ENV, recordCount, arg.getSourceExponential()));
+            exponential(TMP_ENV, process.getRecordCount(), arg.getTargetExponential()),
+            exponential(ENV, recordCount, arg.getSourceExponential()));
+      }
+      for (TypeArgument arg : instruction.getTypeArguments()) {
+        putAssign(
+            type(
+                TMP_ENV,
+                process.getRecordCount(),
+                process.getExponentialCount(),
+                arg.getTargetType()),
+            typeInitializer(arg.getSourceType()));
       }
 
-      putIf(decrement(environmentEndPoints(TMP_ENV)) + " == 0", () -> putFreeEnvironment(TMP_ENV));
+      putIf(decrement(environmentEndPoints(ENV)) + " == 0", () -> putFreeEnvironment(ENV));
+      putAssign(ENV, TMP_ENV);
     }
 
     putAssign(environmentEndPoints(), process.getEndPoints());
@@ -640,6 +746,16 @@ public class CGenerator extends IRInstructionVisitor {
     putAssign(TMP_ENV, recordContEnv(i.getRecord()));
 
     putAssign(recordContEnv(i.getRecord()), "NULL");
+
+    // If the record won't be used anymore, we need to remove its binding from the current environment.
+    // This is necessary to prevent it from being cloned or freed again later on.
+    //
+    // The record can be unbound from the current environment if either:
+    // - its continuation environment is not the current environment;
+    // - or its continuation environment is the current environment, but its record is not the same.
+    putIf(TMP_ENV + " != " + ENV + " || " + recordContRecord(i.getRecord()) + " != " + i.getRecord(), () -> {
+      putAssign(record(ENV, i.getRecord()), "NULL");
+    });
 
     putIfElse(
         decrement(environmentEndPoints()) + " == 0",
@@ -778,29 +894,36 @@ public class CGenerator extends IRInstructionVisitor {
       putAssign(read(exponentialRecord(TMP_EXPONENTIAL)), 0);
       putAssign(written(exponentialRecord(TMP_EXPONENTIAL)), 0);
       putAssign(recordContEnv(exponentialRecord(TMP_EXPONENTIAL)), "NULL");
+      String recordBufferManagerName =
+          recordBufferManagerName(instruction.getExpression().getType());
+      putAssign(
+          exponentialManager(TMP_EXPONENTIAL),
+          recordBufferManagerName.isEmpty() ? "NULL" : ("&" + recordBufferManagerName));
 
       putPush(
-        exponentialRecord(TMP_EXPONENTIAL),
-          type(instruction.getExpression().getType()),
+          exponentialRecord(TMP_EXPONENTIAL),
+          cType(instruction.getExpression().getType()),
           expression(instruction.getExpression()));
       putPushExponential(instruction.getRecord(), TMP_EXPONENTIAL);
     } else {
       putPush(
           instruction.getRecord(),
-          type(instruction.getExpression().getType()),
+          cType(instruction.getExpression().getType()),
           expression(instruction.getExpression()));
     }
   }
 
   @Override
   public void visit(IRPushType instruction) {
-    putPush(instruction.getRecord(), "unsigned char", instruction.isPositive() ? "1" : "0");
+    putPushType(instruction.getRecord(), instruction.getType());
+    putPushPolarity(instruction.getRecord(), instruction.isPositive());
   }
 
   @Override
   public void visit(IRPopType instruction) {
+    putAssign(type(instruction.getArgType()), popType(instruction.getRecord()));
     putIfElse(
-        pop(instruction.getRecord(), "unsigned char"),
+        popPolarity(instruction.getRecord()),
         () -> putConstantGoto(blockLabel(instruction.getPositiveLabel())),
         () -> putConstantGoto(blockLabel(instruction.getNegativeLabel())));
   }
@@ -815,6 +938,10 @@ public class CGenerator extends IRInstructionVisitor {
     putAllocRecord(exponentialRecord(TMP_EXPONENTIAL), process.getRecordType(0));
     putAssign(read(exponentialRecord(TMP_EXPONENTIAL)), 0);
     putAssign(written(exponentialRecord(TMP_EXPONENTIAL)), 0);
+    String recordBufferManagerName = recordBufferManagerName(process.getRecordType(0));
+    putAssign(
+        exponentialManager(TMP_EXPONENTIAL),
+        recordBufferManagerName.isEmpty() ? "NULL" : ("&" + recordBufferManagerName));
 
     // Send it to the channel
     putPushExponential(instruction.getRecord(), TMP_EXPONENTIAL);
@@ -824,9 +951,29 @@ public class CGenerator extends IRInstructionVisitor {
     putAssign(environmentEndPoints(TMP_ENV), process.getEndPoints());
     putAssign(record(TMP_ENV, 0), exponentialRecord(TMP_EXPONENTIAL));
     for (InheritedExponential inherited : instruction.getInheritedExponentials()) {
+      if (inherited.getTargetExponential() >= process.getExponentialCount()) {
+        throw new RuntimeException(
+            "Target exponential index "
+                + inherited.getTargetExponential()
+                + " is out of bounds for process "
+                + instruction.getProcessName()
+                + " with "
+                + process.getExponentialCount()
+                + " exponentials.");
+      }
+
       putAssign(
           exponential(TMP_ENV, process.getRecordCount(), inherited.getTargetExponential()),
           exponential(inherited.getSourceExponential()));
+    }
+    for (InheritedType inherited : instruction.getInheritedTypes()) {
+      putAssign(
+          type(
+              TMP_ENV,
+              process.getRecordCount(),
+              process.getExponentialCount(),
+              inherited.getTargetType()),
+          type(inherited.getSourceType()));
     }
 
     // Initialize the continuation of the linear record to be promoted
@@ -859,16 +1006,51 @@ public class CGenerator extends IRInstructionVisitor {
   public void visit(IRCallExponential instruction) {
     Runnable cloneRecord =
         () -> {
-          putCloneRecord(
-              recordType(instruction.getArgRecord()),
-              exponentialRecord(instruction.getExponential()),
-              record(instruction.getArgRecord()));
-          putManagerReset(); // Must reset the manager to ensure the next clone is fresh.
+          putManagerReset();
+          putManagerPushProcessTypes();
+          putIfElse(
+              recordContEnv(exponentialRecord(instruction.getExponential())) + " != NULL",
+              () -> {
+                // The exponential record has a continuation environment, which means it hasn't been
+                // closed yet. In that case, just clone the whole environment, and fetch the new
+                // record from the new environment.
+                //
+                // The record's index in the environment is always 0.
+                putCloneEnvironment(
+                    recordContEnv(exponentialRecord(instruction.getExponential())), TMP_ENV);
+                putAssign(record(instruction.getArgRecord()), record(TMP_ENV, 0));
+              },
+              () -> {
+                // Otherwise, the record has already been closed. In that case, we allocate a new
+                // record with a buffer big enough to accomodate all written data, and then, clone
+                // the buffer using the record buffer manager.
+                putAllocRecord(
+                    record(instruction.getArgRecord()),
+                    written(exponentialRecord(instruction.getExponential())));
+                putAssign(read(instruction.getArgRecord()), read(exponentialRecord(instruction.getExponential())));
+                putAssign(written(instruction.getArgRecord()), written(exponentialRecord(instruction.getExponential())));
+                putAssign(recordContEnv(instruction.getArgRecord()), "NULL");
+
+                putIfElse(
+                    exponentialManager(instruction.getExponential()) + " != NULL",
+                    () -> {
+                      putCloneRecordBuffer(
+                          exponentialManager(instruction.getExponential()),
+                          exponentialRecord(instruction.getExponential()),
+                          record(instruction.getArgRecord()));
+                    },
+                    () -> {
+                      putCloneRecordBuffer(
+                          "",
+                          exponentialRecord(instruction.getExponential()),
+                          record(instruction.getArgRecord()));
+                    });
+              });
         };
 
     if (instruction.shouldDecreaseRefCount()) {
       putIfElse(
-          exponentialRefCount(instruction.getExponential()) + " == 1",
+          decrement(exponentialRefCount(instruction.getExponential())) + " == 0",
           () -> {
             // If the reference count is 1, and we would decrement it, we don't clone the record.
             // Instead, we just use the record directly and deallocate the wrapping exponential.
@@ -879,7 +1061,6 @@ public class CGenerator extends IRInstructionVisitor {
           },
           () -> {
             cloneRecord.run();
-            new IRDecRefExponential(instruction.getExponential()).accept(this);
           });
     } else {
       cloneRecord.run();
@@ -894,7 +1075,9 @@ public class CGenerator extends IRInstructionVisitor {
   @Override
   public void visit(IRDecRefExponential instruction) {
     putDecRefExponential(
-        exponential(instruction.getExponential()), exponentialType(instruction.getExponential()));
+        exponential(instruction.getExponential()),
+        exponentialType(instruction.getExponential()),
+        true);
   }
 
   @Override
@@ -933,6 +1116,44 @@ public class CGenerator extends IRInstructionVisitor {
 
   private String environmentEndPoints() {
     return environmentEndPoints(ENV);
+  }
+
+  private String type(String env, int recordCount, int exponentialCount, String type) {
+    return "TYPE(" + env + ", " + recordCount + ", " + exponentialCount + ", " + type + ")";
+  }
+
+  private String type(String env, int recordCount, int exponentialCount, int type) {
+    return type(env, recordCount, exponentialCount, Integer.toString(type));
+  }
+
+  private String type(String env, String type) {
+    return type(env, recordCount, exponentialCount, type);
+  }
+
+  private String type(String env, int type) {
+    return type(env, Integer.toString(type));
+  }
+
+  private String type(int type) {
+    if (inManager) {
+      return managerType(type);
+    } else {
+      return type(ENV, type);
+    }
+  }
+
+  private String typeInitializer(IRType type) {
+    String name = recordBufferManagerName(type);
+    String managerValue = name.isEmpty() ? "NULL" : "&" + name;
+    return "(struct type){.size = " + size(type) + ", .manager = " + managerValue + "}";
+  }
+
+  private String typeManager(String type) {
+    return type + ".manager";
+  }
+
+  private String typeSize(String type) {
+    return type + ".size";
   }
 
   private String read(String record) {
@@ -1043,8 +1264,16 @@ public class CGenerator extends IRInstructionVisitor {
     return exponentialRefCount(exponential(exponential));
   }
 
-  private String exponentialRecordContEnv(String exponential) {
-    return exponentialRecord(exponential) + "->cont_env";
+  private String exponentialManager(String exponential) {
+    return exponential + "->manager";
+  }
+
+  private String exponentialManager(int exponential) {
+    return exponentialManager(exponential(exponential));
+  }
+
+  private String managerType(int index) {
+    return MANAGER_STATE + "->type[" + MANAGER_STATE + "->type_count - 1 - " + index + "]";
   }
 
   private String pop(int index, String type) {
@@ -1052,7 +1281,7 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   private String pop(int index, IRType type) {
-    return pop(index, type(type));
+    return pop(index, cType(type));
   }
 
   private String popTag(int index) {
@@ -1065,6 +1294,14 @@ public class CGenerator extends IRInstructionVisitor {
 
   private String popExponential(int index) {
     return pop(index, "struct exponential*");
+  }
+
+  private String popPolarity(int index) {
+    return pop(index, "unsigned char");
+  }
+
+  private String popType(int index) {
+    return pop(index, "struct type");
   }
 
   private String labelAddress(String label) {
@@ -1082,14 +1319,16 @@ public class CGenerator extends IRInstructionVisitor {
   // ================================= Statement building helpers =================================
 
   private void putAllocEnvironment(
-      String var, String manager, String recordCount, String exponentialCount) {
+      String var, String manager, String recordCount, String exponentialCount, String typeCount) {
     putAssign(
         var,
         "calloc(1, sizeof(struct environment) + "
             + recordCount
             + " * sizeof(struct record*) + "
             + exponentialCount
-            + " * sizeof(struct exponential*))");
+            + " * sizeof(struct exponential*) + "
+            + typeCount
+            + " * sizeof(struct type))");
     putAssign(environmentManager(var), "&" + manager);
     if (profile) {
       putIncrement("env_allocs");
@@ -1097,15 +1336,23 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   private void putAllocEnvironment(
-      String var, String manager, int recordCount, int exponentialCount) {
+      String var, String manager, int recordCount, int exponentialCount, int typeCount) {
     putAllocEnvironment(
-        var, manager, Integer.toString(recordCount), Integer.toString(exponentialCount));
+        var,
+        manager,
+        Integer.toString(recordCount),
+        Integer.toString(exponentialCount),
+        Integer.toString(typeCount));
   }
 
   private void putAllocEnvironment(String var, String processName) {
     IRProcess process = ir.getProcesses().get(processName);
     putAllocEnvironment(
-        var, "manager_" + processName, process.getRecordCount(), process.getExponentialCount());
+        var,
+        "env_manager_" + processName,
+        process.getRecordCount(),
+        process.getExponentialCount(),
+        process.getTypeVariableCount());
   }
 
   private void putFreeEnvironment(String var) {
@@ -1118,11 +1365,15 @@ public class CGenerator extends IRInstructionVisitor {
     }
   }
 
-  private void putAllocRecord(String var, IRType type) {
-    putAssign(var, "malloc(sizeof(struct record) + " + size(type) + ")");
+  private void putAllocRecord(String var, String bufferSize) {
+    putAssign(var, "malloc(sizeof(struct record) + " + bufferSize + ")");
     if (profile) {
       putIncrement("record_allocs");
     }
+  }
+
+  private void putAllocRecord(String var, IRType type) {
+    putAllocRecord(var, size(type));
   }
 
   private void putFreeRecord(String var) {
@@ -1163,12 +1414,31 @@ public class CGenerator extends IRInstructionVisitor {
     }
   }
 
-  private void putDecRefExponential(String var, IRType type) {
+  private void putDecRefExponential(String var, IRType type, boolean initManager) {
     putIf(
         decrement(exponentialRefCount(var)) + " == 0",
         () -> {
-          putCleanRecord(type, exponentialRecord(var));
-          putManagerReset(); // Must reset the manager to ensure the next clean is fresh.
+          if (initManager) {
+            putManagerReset();
+            putManagerPushProcessTypes();
+          }
+
+          // If the exponential has a continuation environment, call its manager.
+          // Otherwise, we just call the exponential's manager on its buffer.
+          putIfElse(
+              recordContEnv(exponentialRecord(var)) + " != NULL",
+              () -> {
+                putCleanEnvironment(recordContEnv(exponentialRecord(var)));
+              },
+              () -> {
+                putIf(
+                    exponentialManager(var) + " != NULL",
+                    () -> {
+                      putCleanRecordBuffer(exponentialManager(var), exponentialRecord(var));
+                    });
+                putFreeRecord(exponentialRecord(var));
+              });
+
           putFreeExponential(var);
         });
   }
@@ -1181,7 +1451,7 @@ public class CGenerator extends IRInstructionVisitor {
         },
         () -> {
           // We call the environment manager to clone the environment.
-          putAssign(newEnv, "MANAGER_CALL_CLONE(" + oldEnv + ")");
+          putAssign(newEnv, "ENV_MANAGER_CALL_CLONE(" + oldEnv + ")");
         });
   }
 
@@ -1190,7 +1460,7 @@ public class CGenerator extends IRInstructionVisitor {
     putIf(
         env + " != NULL",
         () -> {
-          putStatement("MANAGER_CALL_CLEAN(" + env + ")");
+          putStatement("ENV_MANAGER_CALL_CLEAN(" + env + ")");
         });
   }
 
@@ -1217,14 +1487,16 @@ public class CGenerator extends IRInstructionVisitor {
                 putAssign(read(newRecord), read(oldRecord));
                 putAssign(written(newRecord), written(oldRecord));
                 putCloneEnvironment(recordContEnv(oldRecord), recordContEnv(newRecord));
-                putCloneRecordBufferContents(recordType, oldRecord, newRecord);
+                putCloneRecordBuffer(recordType, oldRecord, newRecord);
               });
         });
   }
 
   private void putCloneExponential(String oldExponential, String newExponential) {
     putAssign(newExponential, oldExponential);
-    putIncrement(exponentialRefCount(newExponential));
+    putIf(newExponential + " != NULL", () -> {
+      putIncrement(exponentialRefCount(newExponential));
+    });
   }
 
   private void putCleanRecord(IRType recordType, String record) {
@@ -1244,7 +1516,7 @@ public class CGenerator extends IRInstructionVisitor {
                 putCleanEnvironment(recordContEnv(record));
 
                 // Clean any records or exponentials on its buffer.
-                recordType.accept(new BufferRecordCleaner(record));
+                putCleanRecordBuffer(recordType, record);
 
                 // Release the record's memory.
                 putFreeRecord(record);
@@ -1256,7 +1528,7 @@ public class CGenerator extends IRInstructionVisitor {
     putIf(
         exponential + " != NULL",
         () -> {
-          putDecRefExponential(exponential, recordType);
+          putDecRefExponential(exponential, recordType, false);
         });
   }
 
@@ -1283,6 +1555,14 @@ public class CGenerator extends IRInstructionVisitor {
 
   private void putPushExponential(int record, String value) {
     putPush(record, "struct exponential*", value);
+  }
+
+  private void putPushPolarity(int record, boolean isPositive) {
+    putPush(record, "unsigned char", isPositive ? "1" : "0");
+  }
+
+  private void putPushType(int record, IRType type) {
+    putPush(record, "struct type", typeInitializer(type));
   }
 
   private void putAssign(String var, String value) {
@@ -1321,6 +1601,14 @@ public class CGenerator extends IRInstructionVisitor {
     putStatement("MANAGER_PUSH(env, " + env + ")");
   }
 
+  private void putManagerPushType(String type) {
+    putStatement("MANAGER_PUSH(type, " + type + ")");
+  }
+
+  private void putManagerPopType() {
+    putStatement("MANAGER_POP(type)");
+  }
+
   private void putManagerContainsRecord(String record, String bool) {
     putStatement("MANAGER_CONTAINS(record, " + record + ", " + bool + ")");
   }
@@ -1331,6 +1619,23 @@ public class CGenerator extends IRInstructionVisitor {
 
   private void putManagerReset() {
     putStatement("MANAGER_RESET()");
+  }
+
+  private void putManagerPushProcessTypes(IRProcess process, String env) {
+    // We push them in reverse order, as they will be accessed in reverse order.
+    for (int i = process.getTypeVariableCount() - 1; i >= 0; --i) {
+      putManagerPushType(type(env, i));
+    }
+  }
+
+  private void putManagerPopProcessTypes(IRProcess process) {
+    for (int i = 0; i < process.getTypeVariableCount(); ++i) {
+      putManagerPopType();
+    }
+  }
+
+  private void putManagerPushProcessTypes() {
+    putManagerPushProcessTypes(ir.getProcesses().get(procName), ENV);
   }
 
   private void putDebugLn(String message, String... args) {
@@ -1430,6 +1735,7 @@ public class CGenerator extends IRInstructionVisitor {
 
   private class SizeCalculator extends IRTypeVisitor {
     private String size = "";
+    private int definedTypes = 0;
 
     @Override
     public void visit(IRType type) {
@@ -1459,12 +1765,21 @@ public class CGenerator extends IRInstructionVisitor {
 
     @Override
     public void visit(IRRecT type) {
+      definedTypes += 1;
       type.getInner().accept(this);
+      definedTypes -= 1;
     }
 
     @Override
     public void visit(IRVarT type) {
-      size += "0";
+      if (type.getType() >= definedTypes) {
+        // The variable must refer to a type bound in the environment or manager.
+        size += typeSize(type(type.getType()));
+      } else {
+        // The variable refers to a type bound in the current type, e.g. a recursive type.
+        // In that case, since recursive types reset the buffer, we consider their size to be 0.
+        size += "0";
+      }
     }
 
     @Override
@@ -1484,8 +1799,7 @@ public class CGenerator extends IRInstructionVisitor {
 
     @Override
     public void visit(IRTypeT type) {
-      size += "sizeof(unsigned char) + ";
-      type.getCont().accept(this);
+      size += "sizeof(struct record*) + sizeof(struct type) + sizeof(unsigned char)";
     }
 
     @Override
@@ -1557,7 +1871,7 @@ public class CGenerator extends IRInstructionVisitor {
       // We simply access the exponential data buffer directly.
       final String record = exponentialRecord(expr.getExponential());
       final String dataPtr = record + "->buffer + " + record + "->read";
-      final String dataRef = "*((" + type(expr.getType()) + "*)(" + dataPtr + "))";
+      final String dataRef = "*((" + cType(expr.getType()) + "*)(" + dataPtr + "))";
 
       if (expr.getType() instanceof IRStringT) {
         // If the exponential is a string, it must be cloned, as it will be consumed.
@@ -1647,7 +1961,7 @@ public class CGenerator extends IRInstructionVisitor {
 
   // ========================= Visitor used to get C types from IR types ==========================
 
-  private String type(IRType type) {
+  private String cType(IRType type) {
     TypeGenerator tGen = new TypeGenerator();
     type.accept(tGen);
     return tGen.code;
@@ -1733,32 +2047,251 @@ public class CGenerator extends IRInstructionVisitor {
     }
   }
 
-  // ========================== Visitor used to clone records in buffers ==========================
+  // ========================= Visitor which names record buffer managers =========================
 
-  private void putCloneRecordBufferContents(IRType type, String oldRecord, String newRecord) {
-    putStatement(
-        "memcpy(" + buffer(newRecord) + ", " + buffer(oldRecord) + ", " + written(oldRecord) + ")");
-    BufferRecordCloner visitor = new BufferRecordCloner(oldRecord, newRecord);
-    type.accept(visitor);
+  private String recordBufferManagerName(IRType type) {
+    // If the type doesn't require a buffer manager, an empty string is returned.
+    RecordBufferManagerNamer namer = new RecordBufferManagerNamer();
+    type.accept(namer);
+    if (namer.name.isEmpty()) {
+      return "";
+    }
+    usedRecordManagers.add(type);
+    return "record_buffer_manager_" + namer.name;
   }
 
-  private class BufferRecordCloner extends IRTypeVisitor {
-    private String oldRecord;
-    private String newRecord;
-    private String offset = "0";
+  private static class RecordBufferManagerNamer extends IRTypeVisitor {
+    private String name = "";
 
-    public BufferRecordCloner(String oldRecord, String newRecord) {
-      this.oldRecord = oldRecord;
-      this.newRecord = newRecord;
+    private void separate() {
+      if (!name.isEmpty()) {
+        name += "_";
+      }
     }
 
-    private String access(String record, String type) {
-      return "ACCESS(" + record + ", " + type + ", " + offset + ")";
+    @Override
+    public void visit(IRType type) {
+      throw new UnsupportedOperationException(
+          "Unsupported type for buffer record manager namer: " + type.getClass().getName());
+    }
+
+    @Override
+    public void visit(IRIntT type) {}
+
+    @Override
+    public void visit(IRBoolT type) {}
+
+    @Override
+    public void visit(IRStringT type) {
+      separate();
+      name += "string";
+    }
+
+    @Override
+    public void visit(IRSessionT type) {
+      separate();
+      name += "session_arg";
+      type.getArg().accept(this);
+      name += "_cont";
+      type.getCont().accept(this);
+    }
+
+    @Override
+    public void visit(IRExponentialT type) {
+      separate();
+      name += "exponential";
+    }
+
+    @Override
+    public void visit(IRTagT type) {
+      separate();
+      name += "tag";
+      for (int i = 0; i < type.getChoices().size(); ++i) {
+        name += "_choice_" + i;
+        type.getChoices().get(i).accept(this);
+        name += "_end";
+      }
+    }
+
+    @Override
+    public void visit(IRTypeT type) {
+      separate();
+      name += "type";
+      type.getCont().accept(this);
+    }
+
+    @Override
+    public void visit(IRRecT type) {
+      separate();
+      name += "rec";
+      type.getInner().accept(this);
+    }
+
+    @Override
+    public void visit(IRVarT type) {
+      separate();
+      name += "var" + type.getType();
+    }
+
+    @Override
+    public void visit(IRCloseT type) {}
+  }
+
+  // ====================== Visitors used to generate record buffer managers ======================
+
+  private void putRecordBufferManagerDeclaration(IRType type) {
+    String name = recordBufferManagerName(type);
+    if (name.isEmpty()) {
+      // If the name is empty, we don't need a record manAger.
+      return;
+    }
+
+    putLine(
+        "void "
+            + name
+            + "(const char* old, char* new, int written, int read, struct manager_state* "
+            + MANAGER_STATE
+            + ");");
+  }
+
+  private void putRecordBufferManagerDefinition(IRType type) {
+    String name = recordBufferManagerName(type);
+    if (name.isEmpty()) {
+      // If the name is empty, we don't need a record cloner.
+      return;
+    }
+
+    inManager = true;
+    putLine(
+        "void "
+            + name
+            + "(const char* old, char* new, int written, int read, struct manager_state* "
+            + MANAGER_STATE
+            + ") {");
+    incIndent();
+    putIfElse(
+        "new == NULL",
+        () -> {
+          type.accept(new RecordBufferCleaner("old", "written", "read"));
+        },
+        () -> {
+          type.accept(new RecordBufferCloner("old", "new", "written", "read"));
+        });
+    decIndent();
+    putLine("}");
+    inManager = false;
+  }
+
+  private void putCallRecordBufferManager(
+      String manager, String oldBuffer, String newBuffer, String written, String read) {
+    if (!manager.isEmpty()) {
+      putStatement(
+          manager
+              + "("
+              + oldBuffer
+              + ", "
+              + newBuffer
+              + ", "
+              + written
+              + ", "
+              + read
+              + ", "
+              + MANAGER_STATE
+              + ")");
+    }
+  }
+
+  private void putCleanRecordBufferCall(
+      String manager, String buffer, String written, String read) {
+    putCallRecordBufferManager(manager, buffer, "NULL", written, read);
+  }
+
+  private void putCleanRecordBufferCall(IRType type, String buffer, String written, String read) {
+    putCleanRecordBufferCall(recordBufferManagerName(type), buffer, written, read);
+  }
+
+  private void putCleanRecordBuffer(String manager, String record) {
+    putCleanRecordBufferCall(manager, buffer(record), written(record), read(record));
+  }
+
+  private void putCleanRecordBuffer(IRType type, String record) {
+    putCleanRecordBuffer(recordBufferManagerName(type), record);
+  }
+
+  private void putCloneRecordBufferCall(
+      String manager, String oldBuffer, String newBuffer, String written, String read) {
+    putCallRecordBufferManager(manager, oldBuffer, newBuffer, written, read);
+  }
+
+  private void putCloneRecordBufferCall(
+      IRType type, String oldBuffer, String newBuffer, String written, String read) {
+    putCloneRecordBufferCall(recordBufferManagerName(type), oldBuffer, newBuffer, written, read);
+  }
+
+  private void putCloneRecordBuffer(String manager, String oldRecord, String newRecord) {
+    putStatement(
+        "memcpy("
+            + buffer(newRecord)
+            + " + "
+            + read(oldRecord)
+            + ", "
+            + buffer(oldRecord)
+            + " + "
+            + read(oldRecord)
+            + ", "
+            + written(oldRecord)
+            + " - "
+            + read(oldRecord)
+            + ")");
+    putCloneRecordBufferCall(
+        manager, buffer(oldRecord), buffer(newRecord), written(oldRecord), read(oldRecord));
+  }
+
+  private void putCloneRecordBuffer(IRType type, String oldRecord, String newRecord) {
+    putCloneRecordBuffer(recordBufferManagerName(type), oldRecord, newRecord);
+  }
+
+  private class RecordBufferCloner extends IRTypeVisitor {
+    private String oldBuffer;
+    private String newBuffer;
+    private String written;
+    private String read;
+
+    public RecordBufferCloner(String oldBuffer, String newBuffer, String written, String read) {
+      this.oldBuffer = oldBuffer;
+      this.newBuffer = newBuffer;
+      this.written = written;
+      this.read = read;
+    }
+
+    private String access(String buffer, String type) {
+      return "(*(" + type + "*)(" + buffer + "))";
+    }
+
+    private void putIfWritten(Runnable action) {
+      putIf(written + " > 0", action);
     }
 
     private void putIfWrittenAndUnread(Runnable action) {
-      putIf(
-          written(oldRecord) + " > " + offset + " && " + read(oldRecord) + " <= " + offset, action);
+      putIf(written + " > 0 && " + read + " <= 0", action);
+    }
+
+    private void recurse(String manager, String offset) {
+      putCloneRecordBufferCall(
+          manager,
+          oldBuffer + " + " + offset,
+          newBuffer + " + " + offset,
+          written + " - " + offset,
+          read + " - " + offset);
+    }
+
+    private void recurse(IRType type, String offset) {
+      putCloneRecordBufferCall(
+          type,
+          oldBuffer + " + " + offset,
+          newBuffer + " + " + offset,
+          written + " - " + offset,
+          read + " - " + offset);
     }
 
     @Override
@@ -1778,7 +2311,7 @@ public class CGenerator extends IRInstructionVisitor {
       putIfWrittenAndUnread(
           () -> {
             putAssign(
-                access(newRecord, "char*"), "string_create(" + access(oldRecord, "char*") + ")");
+                access(newBuffer, "char*"), "string_create(" + access(oldBuffer, "char*") + ")");
           });
     }
 
@@ -1788,10 +2321,9 @@ public class CGenerator extends IRInstructionVisitor {
           () -> {
             putCloneRecord(
                 type.getArg(),
-                access(oldRecord, "struct record*"),
-                access(newRecord, "struct record*"));
-            offset += " + sizeof(struct record*)";
-            type.getCont().accept(this);
+                access(oldBuffer, "struct record*"),
+                access(newBuffer, "struct record*"));
+            recurse(type.getCont(), "sizeof(struct record*)");
           });
     }
 
@@ -1800,16 +2332,15 @@ public class CGenerator extends IRInstructionVisitor {
       putIfWrittenAndUnread(
           () -> {
             putCloneExponential(
-                access(oldRecord, "struct exponential*"), access(newRecord, "struct exponential*"));
+                access(oldBuffer, "struct exponential*"), access(newBuffer, "struct exponential*"));
           });
     }
 
     @Override
     public void visit(IRTagT type) {
-      putIfWrittenAndUnread(
+      putIfWritten(
           () -> {
-            String tag = access(oldRecord, "unsigned char");
-            String offsetStart = offset + " + sizeof(unsigned char)";
+            String tag = access(oldBuffer, "unsigned char");
 
             putLine("switch (" + tag + ") {");
             incIndent();
@@ -1817,8 +2348,7 @@ public class CGenerator extends IRInstructionVisitor {
             for (int i = 0; i < type.getChoices().size(); ++i) {
               putLine("case " + i + ":");
               incIndent();
-              offset = offsetStart;
-              type.getChoices().get(i).accept(this);
+              recurse(type.getChoices().get(i), "sizeof(unsigned char)");
               putStatement("break");
               decIndent();
             }
@@ -1830,37 +2360,75 @@ public class CGenerator extends IRInstructionVisitor {
 
     @Override
     public void visit(IRTypeT type) {
-      type.getCont().accept(this);
+      putIfWrittenAndUnread(
+          () -> {
+            putManagerPushType(access(oldBuffer + " + sizeof(struct record*)", "struct type"));
+            putCloneRecord(
+                type.getCont(),
+                access(oldBuffer, "struct record*"),
+                access(newBuffer, "struct record*"));
+            putManagerPopType();
+          });
     }
 
     @Override
     public void visit(IRRecT type) {
-      type.getInner().accept(this);
+      putIfWritten(
+          () -> {
+            putManagerPushType(typeInitializer(type.getInner()));
+            type.getInner().accept(this);
+            putManagerPopType();
+          });
     }
 
     @Override
-    public void visit(IRVarT type) {}
+    public void visit(IRVarT type) {
+      // Recurse into the manager of the type variable.
+      String manager = typeManager(managerType(type.getType()));
+      putIf(manager + " != NULL", () -> {
+        recurse(manager, "0");
+      });
+    }
 
     @Override
     public void visit(IRCloseT type) {}
   }
 
-  // ============================= Visitor used to free record buffers =============================
+  private class RecordBufferCleaner extends IRTypeVisitor {
+    private String buffer;
+    private String written;
+    private String read;
 
-  private class BufferRecordCleaner extends IRTypeVisitor {
-    private String record;
-    private String offset = "0";
+    private RecordBufferCleaner(String buffer, String written, String read) {
+      this.buffer = buffer;
+      this.written = written;
+      this.read = read;
+    }
 
-    private BufferRecordCleaner(String record) {
-      this.record = record;
+    private String access(String buffer, String type) {
+      return "(*(" + type + "*)(" + buffer + "))";
     }
 
     private String access(String type) {
-      return "ACCESS(" + record + ", " + type + ", " + offset + ")";
+      return access(buffer, type);
+    }
+
+    private void putIfWritten(Runnable action) {
+      putIf(written + " > 0", action);
     }
 
     private void putIfWrittenAndUnread(Runnable action) {
-      putIf(written(record) + " > " + offset + " && " + read(record) + " <= " + offset, action);
+      putIf(written + " > 0 && " + read + " <= 0", action);
+    }
+
+    private void recurse(String manager, String offset) {
+      putCleanRecordBufferCall(
+          manager, buffer + " + " + offset, written + " - " + offset, read + " - " + offset);
+    }
+
+    private void recurse(IRType type, String offset) {
+      putCleanRecordBufferCall(
+          type, buffer + " + " + offset, written + " - " + offset, read + " - " + offset);
     }
 
     @Override
@@ -1888,8 +2456,7 @@ public class CGenerator extends IRInstructionVisitor {
       putIfWrittenAndUnread(
           () -> {
             putCleanRecord(type.getArg(), access("struct record*"));
-            offset += " + sizeof(struct record*)";
-            type.getCont().accept(this);
+            recurse(type.getCont(), "sizeof(struct record*)");
           });
     }
 
@@ -1903,10 +2470,9 @@ public class CGenerator extends IRInstructionVisitor {
 
     @Override
     public void visit(IRTagT type) {
-      putIfWrittenAndUnread(
+      putIfWritten(
           () -> {
             String tag = access("unsigned char");
-            String offsetStart = offset + " + sizeof(unsigned char)";
 
             putLine("switch (" + tag + ") {");
             incIndent();
@@ -1914,8 +2480,7 @@ public class CGenerator extends IRInstructionVisitor {
             for (int i = 0; i < type.getChoices().size(); ++i) {
               putLine("case " + i + ":");
               incIndent();
-              offset = offsetStart;
-              type.getChoices().get(i).accept(this);
+              recurse(type.getChoices().get(i), "sizeof(unsigned char)");
               putStatement("break");
               decIndent();
             }
@@ -1927,16 +2492,32 @@ public class CGenerator extends IRInstructionVisitor {
 
     @Override
     public void visit(IRTypeT type) {
-      type.getCont().accept(this);
+      putIfWrittenAndUnread(
+          () -> {
+            putManagerPushType(access(buffer + " + sizeof(struct record*)", "struct type"));
+            putCleanRecord(type.getCont(), access("struct record*"));
+            putManagerPopType();
+          });
     }
 
     @Override
     public void visit(IRRecT type) {
-      type.getInner().accept(this);
+      putIfWritten(
+          () -> {
+            putManagerPushType(typeInitializer(type.getInner()));
+            type.getInner().accept(this);
+            putManagerPopType();
+          });
     }
 
     @Override
-    public void visit(IRVarT type) {}
+    public void visit(IRVarT type) {
+      // Recurse into the manager of the type variable.
+      String manager = typeManager(managerType(type.getType()));
+      putIf(manager + " != NULL", () -> {
+        recurse(manager, "0");
+      });
+    }
 
     @Override
     public void visit(IRCloseT type) {}

@@ -1,0 +1,60 @@
+type Id(T) {
+    recv ~T; send T; close
+};;
+
+proc id<T>(x: Id(T)) {
+    println("id recv");
+    recv x(y);
+    println("id send");
+    send x(z. cut {
+        println("fwd 1"); fwd y w
+        |w: ~T|
+        println("fwd 2"); fwd w z
+    });
+    println("id close");
+    close x
+};;
+
+proc main() {
+    par {
+        cut {
+            id<close>(id)
+            |id: ~Id(close)|
+            println("1 send");
+            send id(x. println("1 close x"); close x);
+            println("1 recv");
+            recv id(x);
+            println("1 wait id");
+            wait id;
+            println("1 wait x");
+            wait x;
+            ()
+        }
+        ||
+        cut {
+            id<wait>(id)
+            |id: ~Id(wait)|
+            println("2 send");
+            send id(x. println("2 wait x"); wait x; ());
+            println("2 recv");
+            recv id(x);
+            println("2 wait id");
+            wait id;
+            println("2 close x");
+            close x
+        }
+        ||
+        cut {
+            id<lint>(id)
+            |id: ~Id(lint)|
+            println("3 send");
+            send id(x. println("3 let"); let x 3);
+            println("3 recv");
+            recv id(x);
+            println("3 wait id");
+            wait id;
+            println(x);
+            ()
+        }
+    }
+};;

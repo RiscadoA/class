@@ -1,0 +1,14 @@
+proc main() {
+    cut {
+        println("!"); !x(y);
+        println("sendty"); sendty y(lint);
+        println("lhs send"); send y(a. println("let"); let a 2);
+        println(y); ()
+        |x: ? recvty T; recv ~T; T |
+        println("?"); ?x;
+        println("call"); call x(y);
+        println("recvty"); recvty y(T);
+        println("rhs recv"); recv y(a);
+        println("fwd"); fwd a y
+    }
+};;
