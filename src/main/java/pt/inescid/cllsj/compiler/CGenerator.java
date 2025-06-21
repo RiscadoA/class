@@ -21,6 +21,7 @@ public class CGenerator extends IRInstructionVisitor {
   private static final String TMP_CONT = "tmp_cont";
   private static final String TMP_RECORD = "tmp_record";
   private static final String TMP_EXPONENTIAL = "tmp_exponential";
+  private static final String TMP_THREAD = "tmp_thread";
 
   private static final String TASK = "task";
   private static final String ENV = "env";
@@ -45,23 +46,29 @@ public class CGenerator extends IRInstructionVisitor {
     final CGenerator gen = new CGenerator(ir, trace, profile);
 
     // Add the necessary includes.
-    gen.putLine("#include <stdlib.h>");
     gen.putLine("#include <stdio.h>");
+    gen.putLine("#include <stdlib.h>");
     gen.putLine("#include <string.h>");
+    gen.putLine("#include <threads.h>");
+    gen.putLine("#include <stdatomic.h>");
     gen.putBlankLine();
 
     // Initialize the profiling variables.
+    gen.putStatement("cnd_t thread_stops_cond_var");
+    gen.putStatement("mtx_t thread_stops_mutex");
+    gen.putStatement("atomic_ulong thread_inits = 1");
+    gen.putStatement("atomic_ulong thread_stops = 0");
     if (profile) {
-      gen.putStatement("unsigned long env_allocs = 0");
-      gen.putStatement("unsigned long env_frees = 0");
-      gen.putStatement("unsigned long record_allocs = 0");
-      gen.putStatement("unsigned long record_frees = 0");
-      gen.putStatement("unsigned long exponential_allocs = 0");
-      gen.putStatement("unsigned long exponential_frees = 0");
-      gen.putStatement("unsigned long task_allocs = 0");
-      gen.putStatement("unsigned long task_frees = 0");
-      gen.putStatement("unsigned long string_allocs = 0");
-      gen.putStatement("unsigned long string_frees = 0");
+      gen.putStatement("atomic_ulong env_allocs = 0");
+      gen.putStatement("atomic_ulong env_frees = 0");
+      gen.putStatement("atomic_ulong record_allocs = 0");
+      gen.putStatement("atomic_ulong record_frees = 0");
+      gen.putStatement("atomic_ulong exponential_allocs = 0");
+      gen.putStatement("atomic_ulong exponential_frees = 0");
+      gen.putStatement("atomic_ulong task_allocs = 0");
+      gen.putStatement("atomic_ulong task_frees = 0");
+      gen.putStatement("atomic_ulong string_allocs = 0");
+      gen.putStatement("atomic_ulong string_frees = 0");
       gen.putBlankLine();
     }
 
@@ -97,7 +104,7 @@ public class CGenerator extends IRInstructionVisitor {
     // Define the exponential struct.
     gen.putLine("struct exponential {");
     gen.incIndent();
-    gen.putLine("int ref_count;");
+    gen.putLine("atomic_int ref_count;");
     gen.putLine("struct record* record;");
     gen.putLine(
         "void(*manager)(const char* old, char* new, int written, int read, struct manager_state* "
@@ -126,7 +133,7 @@ public class CGenerator extends IRInstructionVisitor {
         "struct environment*(*manager)(struct environment* env, struct manager_state* "
             + MANAGER_STATE
             + ", int clone);");
-    gen.putLine("int end_points;");
+    gen.putLine("atomic_int end_points;");
     gen.decIndent();
     gen.putLine("};");
     gen.putBlankLine();
@@ -425,8 +432,9 @@ public class CGenerator extends IRInstructionVisitor {
     }
     gen.inManager = false;
 
-    // Main function.
-    gen.putLine("int main() {");
+    // Execution function.
+    gen.putLine("int thread(void* entry);");
+    gen.putLine("void executor(struct task* entry) {");
     gen.incIndent();
 
     // Define registers.
@@ -437,6 +445,7 @@ public class CGenerator extends IRInstructionVisitor {
     gen.putStatement("void* " + TMP_CONT);
     gen.putStatement("struct record* " + TMP_RECORD);
     gen.putStatement("struct exponential* " + TMP_EXPONENTIAL);
+    gen.putStatement("thrd_t " + TMP_THREAD);
     gen.putStatement("struct manager_state* " + MANAGER_STATE);
     gen.putBlankLine();
 
@@ -450,14 +459,21 @@ public class CGenerator extends IRInstructionVisitor {
     gen.putBlankLine();
 
     // Jump to the entry process.
-    if (!ir.getProcesses().containsKey(entryProcess)) {
-      throw new RuntimeException("Entry process not found: " + entryProcess);
-    }
-    if (ir.getProcesses().get(entryProcess).hasArguments()) {
-      throw new RuntimeException("Entry process cannot have arguments: " + entryProcess);
-    }
-    gen.visitInstruction(
-        new IRCallProcess(entryProcess, new ArrayList<>(), new ArrayList<>(), new ArrayList<>()));
+    gen.putIfElse("entry == NULL", () -> {
+      if (!ir.getProcesses().containsKey(entryProcess)) {
+        throw new RuntimeException("Entry process not found: " + entryProcess);
+      }
+      if (ir.getProcesses().get(entryProcess).hasArguments()) {
+        throw new RuntimeException("Entry process cannot have arguments: " + entryProcess);
+      }
+      gen.visitInstruction(
+          new IRCallProcess(entryProcess, new ArrayList<>(), new ArrayList<>(), new ArrayList<>()));
+    }, () -> {
+      gen.putAssign(ENV, gen.taskContEnv("entry"));
+      gen.putAssign(TMP_CONT, gen.taskCont("entry"));
+      gen.putFreeTask("entry");
+      gen.putComputedGoto(TMP_CONT);
+    });
 
     // Generate code for each process.
     for (Map.Entry<String, IRProcess> procEntry : ir.getProcesses().entrySet()) {
@@ -478,8 +494,42 @@ public class CGenerator extends IRInstructionVisitor {
 
     gen.putBlankLine();
     gen.putLabel("end");
+    gen.putStatement("mtx_lock(&thread_stops_mutex)");
+    gen.putIncrement("thread_stops");
+    gen.putStatement("cnd_signal(&thread_stops_cond_var)");
+    gen.putStatement("mtx_unlock(&thread_stops_mutex)");
+    gen.putStatement("free(" + MANAGER_STATE + ")");
+
+    gen.decIndent();
+    gen.putLine("}");
+    gen.putBlankLine();
+    gen.putLine("int thread(void* entry) {");
+    gen.incIndent();
+    gen.putStatement("executor((struct task*)entry)");
+    gen.putLine("return 0;");
+    gen.decIndent();
+    gen.putLine("}");
+    gen.putBlankLine();
+
+    gen.putLine("int main() {");
+    gen.incIndent();
+    gen.putStatement("cnd_init(&thread_stops_cond_var)");
+    gen.putStatement("mtx_init(&thread_stops_mutex, mtx_plain)");
+    gen.putBlankLine();
+    gen.putStatement("thread(NULL)");
+    gen.putBlankLine();
+    gen.putStatement("mtx_lock(&thread_stops_mutex)");
+    gen.putWhile("thread_stops != thread_inits", () -> {
+      gen.putStatement("cnd_wait(&thread_stops_cond_var, &thread_stops_mutex)");
+    });
+    gen.putStatement("mtx_unlock(&thread_stops_mutex)");
+    gen.putStatement("mtx_destroy(&thread_stops_mutex)");
+    gen.putStatement("cnd_destroy(&thread_stops_cond_var)");
+    gen.putBlankLine();
     if (profile) {
       gen.putDebugLn("Profiling results:");
+      gen.putDebugLn("  Thread inits: %ld", "thread_inits");
+      gen.putDebugLn("  Thread stops: %ld", "thread_stops");
       gen.putDebugLn("  Environment allocations: %ld", "env_allocs");
       gen.putDebugLn("  Environment frees: %ld", "env_frees");
       gen.putDebugLn("  Record allocations: %ld", "record_allocs");
@@ -521,11 +571,11 @@ public class CGenerator extends IRInstructionVisitor {
             gen.putLine("return 1;");
           });
     }
-    gen.putStatement("free(" + MANAGER_STATE + ")");
-    gen.putLine("return 0;");
 
+    gen.putLine("return 0;");
     gen.decIndent();
     gen.putLine("}");
+
 
     // Generate the record buffer managers.
     // Since these might depend on other managers, we must forward declare them.
@@ -855,6 +905,15 @@ public class CGenerator extends IRInstructionVisitor {
     putAssign(taskNext(TASK), TMP_TASK);
     putAssign(taskCont(TASK), labelAddress(blockLabel(instruction.getLabel())));
     putAssign(taskContEnv(TASK), ENV);
+  }
+
+  @Override
+  public void visit(IRNewThread instruction) {
+    putAllocTask(TMP_TASK);
+    putAssign(taskCont(TMP_TASK), labelAddress(blockLabel(instruction.getLabel())));
+    putAssign(taskContEnv(TMP_TASK), ENV);
+    putIncrement("thread_inits");
+    putStatement("thrd_create(&" + TMP_THREAD + ", thread, (void*)" + TMP_TASK + ")");
   }
 
   @Override
@@ -1677,6 +1736,14 @@ public class CGenerator extends IRInstructionVisitor {
     putLine("} else {");
     incIndent();
     otherwise.run();
+    decIndent();
+    putLine("}");
+  }
+
+  private void putWhile(String condition, Runnable body) {
+    putLine("while (" + condition + ") {");
+    incIndent();
+    body.run();
     decIndent();
     putLine("}");
   }

@@ -1,0 +1,13 @@
+Profiling results:
+  Thread inits: 3
+  Thread stops: 3
+  Environment allocations: 1
+  Environment frees: 1
+  Record allocations: 0
+  Record frees: 0
+  Exponential allocations: 0
+  Exponential frees: 0
+  Task allocations: 5
+  Task frees: 5
+  String allocations: 4
+  String frees: 4

@@ -42,16 +42,15 @@ do
     # Check if there are accompanying .trace or .out files
     basename=$(basename $file .clls)
     outfile=$(dirname $file)/$basename.out
+    errfile=$(dirname $file)/$basename.err
 
     baseout=bin/$(dirname $file)/$basename
-    flags="-t -P -o $baseout"
+    flags="-P -o $baseout"
+    if [ ! -f $errfile ]; then
+        flags="$flags -t";
+    fi
     mkdir -p $(dirname $baseout)
 
-    if [ ! -f $outfile ]; then
-        error "($processed/$count) Skipping $file: missing expected output file $outfile"
-        failed=$((failed + 1))
-        continue
-    fi
     echo -n "($processed/$count) Compiling $file... "
 
     # Compile the file
@@ -72,12 +71,24 @@ do
         continue
     fi
 
-    # Compare the output with the expected
-    diff $baseout.out $outfile > /dev/null 2>&1
-    if [ $? -ne 0 ]; then
-        error "expected $outfile, got $baseout.out"
-        failed=$((failed + 1))
-        continue
+    # Compare the standard output with the expected
+    if [ -f $outfile ]; then
+        diff $baseout.out $outfile > /dev/null 2>&1
+        if [ $? -ne 0 ]; then
+            error "expected $outfile, got $baseout.out"
+            failed=$((failed + 1))
+            continue
+        fi
+    fi
+
+    # Compare the error output with the expected
+    if [ -f $errfile ]; then
+        diff $baseout.err $errfile > /dev/null 2>&1
+        if [ $? -ne 0 ]; then
+            error "expected $errfile, got $baseout.err"
+            failed=$((failed + 1))
+            continue
+        fi
     fi
 
     success "passed\n"

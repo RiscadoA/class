@@ -35,6 +35,10 @@ public class ASTMix extends ASTNode {
     return rhs;
   }
 
+  public boolean isConcurrent() {
+    return con;
+  }
+
   public void ASTInsertUse(String ch, ASTType t, ASTNode here, Boolean disCont) throws Exception {
     anc.ASTInsertUse(ch, t, this, disCont);
   }

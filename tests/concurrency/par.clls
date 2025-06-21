@@ -1,0 +1,12 @@
+proc main() {
+    cpar {
+        println("1");
+        cpar {
+            println("11"); ()
+            ||
+            println("12"); ()
+        }
+        ||
+        println("2"); ()
+    }
+};;

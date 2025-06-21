@@ -121,7 +121,11 @@ public class IRGenerator extends ASTNodeVisitor {
       }
     }
 
-    block.add(new IRNewTask(rhs.getLabel()));
+    if (node.isConcurrent()) {
+      block.add(new IRNewThread(rhs.getLabel()));
+    } else {
+      block.add(new IRNewTask(rhs.getLabel()));
+    }
     node.getLhs().accept(this);
 
     visitBlock(rhs, node.getRhs());

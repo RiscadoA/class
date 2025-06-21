@@ -6,6 +6,10 @@ public abstract class IRInstructionVisitor {
   // Catch all for instructions which do not have their own visit method
   public abstract void visit(IRInstruction instruction);
 
+  public void visit(IRNewThread instruction) {
+    visit((IRInstruction) instruction);
+  }
+
   public void visit(IRNewTask instruction) {
     visit((IRInstruction) instruction);
   }

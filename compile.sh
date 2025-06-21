@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 CLLSflags=""
-Cflags=""
+Cflags="-std=c11"
 onlyir=false
 debug=false
 run=false
@@ -10,7 +10,7 @@ ofile=""
 while getopts ":dOtPirp:o:" opt; do
     case $opt in
         d)
-            Cflags="-g -O0"
+            Cflags="$Cflags -g -O0"
             debug=true
             ;;
         O)
