@@ -1151,6 +1151,16 @@ public class CGenerator extends IRInstructionVisitor {
     putAssign(read(instruction.getRecord()), 0);
   }
 
+  @Override
+  public void visit(IRCleanRecord instruction) {
+    // Clean the remainder of the record.
+    // The clean call will delete any environments found through links in the record.
+    // Since we only want to get rid of the affine part of the record.
+    putManagerReset();
+    putManagerPushProcessTypes();
+    putCleanRecord(recordType(instruction.getRecord()), record(instruction.getRecord()));
+  }
+
   // =============================== Expression building helpers ================================
 
   private String taskNext(String task) {
@@ -1873,6 +1883,11 @@ public class CGenerator extends IRInstructionVisitor {
     public void visit(IRExponentialT type) {
       size += "sizeof(struct exponential*)";
     }
+
+    @Override
+    public void visit(IRAffineT type) {
+      type.getInner().accept(this);
+    }
   }
 
   // ========================== Visitor used to generate expression code ==========================
@@ -2201,6 +2216,11 @@ public class CGenerator extends IRInstructionVisitor {
     }
 
     @Override
+    public void visit(IRAffineT type) {
+      type.getInner().accept(this);
+    }
+
+    @Override
     public void visit(IRCloseT type) {}
   }
 
@@ -2339,6 +2359,10 @@ public class CGenerator extends IRInstructionVisitor {
       putIf(written + " > 0", action);
     }
 
+    private void putIfUnread(Runnable action) {
+      putIf(read + " <= 0", action);
+    }
+
     private void putIfWrittenAndUnread(Runnable action) {
       putIf(written + " > 0 && " + read + " <= 0", action);
     }
@@ -2384,12 +2408,14 @@ public class CGenerator extends IRInstructionVisitor {
 
     @Override
     public void visit(IRSessionT type) {
-      putIfWrittenAndUnread(
+      putIfWritten(
           () -> {
-            putCloneRecord(
-                type.getArg(),
-                access(oldBuffer, "struct record*"),
-                access(newBuffer, "struct record*"));
+            putIfUnread(() -> {
+              putCloneRecord(
+                  type.getArg(),
+                  access(oldBuffer, "struct record*"),
+                  access(newBuffer, "struct record*"));
+            });
             recurse(type.getCont(), "sizeof(struct record*)");
           });
     }
@@ -2459,6 +2485,11 @@ public class CGenerator extends IRInstructionVisitor {
 
     @Override
     public void visit(IRCloseT type) {}
+
+    @Override
+    public void visit(IRAffineT type) {
+      type.getInner().accept(this);
+    }
   }
 
   private class RecordBufferCleaner extends IRTypeVisitor {
@@ -2482,6 +2513,10 @@ public class CGenerator extends IRInstructionVisitor {
 
     private void putIfWritten(Runnable action) {
       putIf(written + " > 0", action);
+    }
+
+    private void putIfUnread(Runnable action) {
+      putIf(read + " <= 0", action);
     }
 
     private void putIfWrittenAndUnread(Runnable action) {
@@ -2520,9 +2555,11 @@ public class CGenerator extends IRInstructionVisitor {
 
     @Override
     public void visit(IRSessionT type) {
-      putIfWrittenAndUnread(
+      putIfWritten(
           () -> {
-            putCleanRecord(type.getArg(), access("struct record*"));
+            putIfUnread(() -> {
+              putCleanRecord(type.getArg(), access("struct record*"));
+            });
             recurse(type.getCont(), "sizeof(struct record*)");
           });
     }
@@ -2588,5 +2625,10 @@ public class CGenerator extends IRInstructionVisitor {
 
     @Override
     public void visit(IRCloseT type) {}
+
+    @Override
+    public void visit(IRAffineT type) {
+      type.getInner().accept(this);
+    }
   }
 }

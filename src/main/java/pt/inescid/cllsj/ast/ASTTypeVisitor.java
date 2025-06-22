@@ -93,4 +93,12 @@ public abstract class ASTTypeVisitor {
   public void visit(ASTRecvTT type) {
     visit((ASTType) type);
   }
+
+  public void visit(ASTAffineT type) {
+    visit((ASTType) type);
+  }
+
+  public void visit(ASTCoAffineT type) {
+    visit((ASTType) type);
+  }
 }

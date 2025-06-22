@@ -1,0 +1,18 @@
+proc main() {
+    cut {
+        println("send 1"); send x(a.
+            println("close 1"); close a
+        );
+        println("affine"); affine x;
+        println("send 2"); send x(b.
+            println("wait 3"); wait b; ()
+        );
+        println("close 2"); close x
+        |x: recv wait; coaffine recv close; wait|
+        println("recv 1"); recv x(a);
+        println("wait 1"); wait a;
+        println("use"); use x;
+        println("recv 2"); recv x(b);
+        println("fwd"); fwd x b
+    }
+};;

@@ -8,9 +8,11 @@ import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.TypeEntry;
 import pt.inescid.cllsj.ast.ASTTypeVisitor;
+import pt.inescid.cllsj.ast.types.ASTAffineT;
 import pt.inescid.cllsj.ast.types.ASTBangT;
 import pt.inescid.cllsj.ast.types.ASTBotT;
 import pt.inescid.cllsj.ast.types.ASTCaseT;
+import pt.inescid.cllsj.ast.types.ASTCoAffineT;
 import pt.inescid.cllsj.ast.types.ASTCoLboolT;
 import pt.inescid.cllsj.ast.types.ASTCoLstringT;
 import pt.inescid.cllsj.ast.types.ASTCoRecT;
@@ -31,6 +33,7 @@ import pt.inescid.cllsj.ast.types.ASTSendTT;
 import pt.inescid.cllsj.ast.types.ASTType;
 import pt.inescid.cllsj.ast.types.ASTWhyT;
 import pt.inescid.cllsj.ast.types.ASTintT;
+import pt.inescid.cllsj.compiler.ir.type.IRAffineT;
 import pt.inescid.cllsj.compiler.ir.type.IRBoolT;
 import pt.inescid.cllsj.compiler.ir.type.IRCloseT;
 import pt.inescid.cllsj.compiler.ir.type.IRExponentialT;
@@ -238,5 +241,15 @@ public class ASTIntoIRType extends ASTTypeVisitor {
             recurse(
                 ep.assoc(type.getid(), new TypeEntry(new ASTIdT(type.getid()))), type.getrhs()));
     this.typeMap = typeMap;
+  }
+
+  @Override
+  public void visit(ASTAffineT type) {
+    ir = new IRAffineT(recurse(ep, type.getin()));
+  }
+
+  @Override
+  public void visit(ASTCoAffineT type) {
+    ir = new IRAffineT(recurse(ep, type.getin()));
   }
 }

@@ -1,0 +1,9 @@
+proc main() {
+    cut {
+        affine x; let x "Hello"
+        |x: ~affine lstring|
+        affine y; use x; let y x + " World"
+        |y: ~affine lstring|
+        discard y
+    }
+};;

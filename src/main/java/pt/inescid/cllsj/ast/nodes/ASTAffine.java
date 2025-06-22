@@ -20,6 +20,7 @@ import pt.inescid.cllsj.SessionFieldDiscard;
 import pt.inescid.cllsj.SessionFieldUse;
 import pt.inescid.cllsj.SessionRecord;
 import pt.inescid.cllsj.TypeError;
+import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.types.ASTAffineT;
 import pt.inescid.cllsj.ast.types.ASTCoAffineT;
 import pt.inescid.cllsj.ast.types.ASTCoRecT;
@@ -42,6 +43,22 @@ public class ASTAffine extends ASTNode {
     rhs = _rhs;
     usageSet = new HashMap<String, ASTType>();
     coaffineSet = new HashMap<String, ASTType>();
+  }
+
+  public String getCh() {
+    return ch;
+  }
+
+  public ASTNode getRhs() {
+    return rhs;
+  }
+
+  public ASTType getContType() {
+    return contType;
+  }
+
+  public void setCh(String ch) {
+    this.ch = ch;
   }
 
   public boolean isCoaffine(ASTCoStructT ty) {
@@ -329,5 +346,10 @@ public class ASTAffine extends ASTNode {
         throw new SAMError("affine-op - " + ch + " " + srec);
       }
     }
+  }
+
+  @Override
+  public void accept(ASTNodeVisitor visitor) {
+    visitor.visit(this);
   }
 }

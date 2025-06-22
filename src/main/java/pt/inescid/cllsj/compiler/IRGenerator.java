@@ -24,9 +24,8 @@ import pt.inescid.cllsj.compiler.ir.instructions.*;
 import pt.inescid.cllsj.compiler.ir.instructions.IRCallProcess.ExponentialArgument;
 import pt.inescid.cllsj.compiler.ir.instructions.IRCallProcess.LinearArgument;
 import pt.inescid.cllsj.compiler.ir.instructions.IRCallProcess.TypeArgument;
-import pt.inescid.cllsj.compiler.ir.instructions.IRPushExponential.InheritedExponential;
-import pt.inescid.cllsj.compiler.ir.instructions.IRPushExponential.InheritedType;
 import pt.inescid.cllsj.compiler.ir.type.IRType;
+import pt.inescid.cllsj.compiler.ir.type.IRVarT;
 
 public class IRGenerator extends ASTNodeVisitor {
   private IRProgram program = new IRProgram();
@@ -377,8 +376,8 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTBang node) {
-    List<InheritedExponential> inheritedExponentials = new ArrayList<>();
-    List<InheritedType> inheritedTypes = new ArrayList<>();
+    List<IRPushExponential.InheritedExponential> inheritedExponentials = new ArrayList<>();
+    List<IRPushExponential.InheritedType> inheritedTypes = new ArrayList<>();
     Environment env =
         Environment.forExponential(environment(), node, inheritedExponentials, inheritedTypes, ep);
 
@@ -444,6 +443,50 @@ public class IRGenerator extends ASTNodeVisitor {
     }
 
     node.getRhs().accept(this);
+  }
+
+  @Override
+  public void visit(ASTAffine node) {
+    List<IRCallProcess.ExponentialArgument> exponentialArgs = new ArrayList<>();
+    List<IRCallProcess.LinearArgument> linearArgs = new ArrayList<>();
+    List<IRCallProcess.TypeArgument> typeArgs = new ArrayList<>();
+    Environment env =
+        Environment.forAffine(environment(), node, exponentialArgs, linearArgs, typeArgs, ep);
+
+    // We call the process we generated below.
+    // If the affine continuation is negative, we flip first.
+    if (!isPositive(node.getContType())) {
+      block.add(new IRFlip(record(node.getCh())));
+    }
+    block.add(new IRCallProcess(env.getName(), linearArgs, exponentialArgs, typeArgs));
+
+    // Generate the process for the affine continuation.
+    IRProcess parentProcess = process;
+    process =
+        new IRProcess(
+            true,
+            env.recordTypes(),
+            env.exponentialTypes(),
+            env.typeVariableCount(),
+            countEndPoints(node.getRhs()));
+    program.addProcess(env.getName(), process);
+    environments.push(env);
+    visitBlock(process.getEntry(), node.getRhs());
+    environments.pop();
+    process = parentProcess;
+  }
+
+  @Override
+  public void visit(ASTUse node) {
+    // We don't generate any code, we can just continue using the channel.
+    node.getRhs().accept(this);
+  }
+
+  @Override
+  public void visit(ASTDiscard node) {
+    // We need to clean up the record as we'll no longer use it.
+    block.add(new IRCleanRecord(record(node.getCh())));
+    block.add(new IRNextTask());
   }
 
   // ======================================== Utilities =========================================
@@ -646,6 +689,17 @@ public class IRGenerator extends ASTNodeVisitor {
     public void visit(ASTRecvTy node) {
       node.getRhs().accept(this);
     }
+
+    @Override
+    public void visit(ASTAffine node) {}
+
+    @Override
+    public void visit(ASTUse node) {
+      node.getRhs().accept(this);
+    }
+
+    @Override
+    public void visit(ASTDiscard node) {}
   }
 
   private class GeneratedExpression {
@@ -798,7 +852,7 @@ public class IRGenerator extends ASTNodeVisitor {
     private final List<IRType> exponentialTypes = new ArrayList<>();
     private final Map<String, Integer> typeVariables = new HashMap<>();
     private final List<Boolean> polarities = new ArrayList<>();
-    private int nextExponentialIndex = 0;
+    private int nextChildIndex = 0;
 
     // This function takes a process definition, and for each polarity combination of its type
     // arguments,
@@ -844,12 +898,12 @@ public class IRGenerator extends ASTNodeVisitor {
         ASTNode node,
         String name,
         String linear,
-        List<InheritedExponential> outInheritedExponentials,
-        List<InheritedType> outInheritedTypes,
+        List<IRPushExponential.InheritedExponential> outInheritedExponentials,
+        List<IRPushExponential.InheritedType> outInheritedTypes,
         ASTType type,
         Env<EnvEntry> ep) {
       Environment env =
-          new Environment(parent, parent.name + "_bang_" + parent.nextExponentialIndex++);
+          new Environment(parent, parent.name + "_bang_" + parent.nextChildIndex++);
 
       // Inherit used exponentials.
       Set<String> freeNames = namesFreeIn(node);
@@ -857,7 +911,7 @@ public class IRGenerator extends ASTNodeVisitor {
         if (freeNames.contains(entry.getKey()) && entry.getKey() != linear) {
           int index =
               env.insertExponential(entry.getKey(), parent.exponentialTypes.get(entry.getValue()));
-          outInheritedExponentials.add(new InheritedExponential(entry.getValue(), index));
+          outInheritedExponentials.add(new IRPushExponential.InheritedExponential(entry.getValue(), index));
         }
       }
 
@@ -887,7 +941,7 @@ public class IRGenerator extends ASTNodeVisitor {
         // Insert the type variable into the new environment.
         int index = env.insertTypeVariable(typeName, typeGenName);
         env.setPolarity(index, parent.isPositive(typeGenName));
-        outInheritedTypes.add(new InheritedType(i, index));
+        outInheritedTypes.add(new IRPushExponential.InheritedType(i, index));
       }
 
       if (linear != null) {
@@ -902,8 +956,8 @@ public class IRGenerator extends ASTNodeVisitor {
     public static Environment forExponential(
         Environment parent,
         ASTBang node,
-        List<InheritedExponential> outInheritedExponentials,
-        List<InheritedType> outInheritedTypes,
+        List<IRPushExponential.InheritedExponential> outInheritedExponentials,
+        List<IRPushExponential.InheritedType> outInheritedTypes,
         Env<EnvEntry> ep) {
       return forExponential(
           parent,
@@ -914,6 +968,69 @@ public class IRGenerator extends ASTNodeVisitor {
           outInheritedTypes,
           node.getType(),
           ep);
+    }
+
+    public static Environment forAffine(
+        Environment parent,
+        ASTAffine node,
+        List<IRCallProcess.ExponentialArgument> outExponentialArgs,
+        List<IRCallProcess.LinearArgument> outLinearArgs,
+        List<IRCallProcess.TypeArgument> outTypeArgs,
+        Env<EnvEntry> ep) {
+      Environment env =
+          new Environment(parent, parent.name + "_affine_" + parent.nextChildIndex++);
+
+      // Pass all exponentials ocurring in the node.
+      Set<String> freeNames = namesFreeIn(node);
+      for (Map.Entry<String, Integer> entry : parent.exponentials.entrySet()) {
+        if (freeNames.contains(entry.getKey())) {
+          int index =
+              env.insertExponential(entry.getKey(), parent.exponentialTypes.get(entry.getValue()));
+          outExponentialArgs.add(new IRCallProcess.ExponentialArgument(entry.getValue(), index));
+        }
+      }
+
+      // Pass all linear arguments ocurring in the node.
+      for (Map.Entry<String, RecordLocation> entry : parent.records.entrySet()) {
+        if (freeNames.contains(entry.getKey())) {
+          int index =
+            env.insertLinear(entry.getKey(), parent.recordTypes().get(entry.getValue().index()));
+          outLinearArgs.add(new IRCallProcess.LinearArgument(entry.getValue().index(), index));
+        }
+      }
+
+      // Pass all types ocurring in the node.
+      for (int i = 0; i < parent.typeVariableCount(); ++i) {
+        // Find name of the type variable.
+        String typeName = null;
+        String typeGenName = null;
+        for (Map.Entry<String, Integer> entry : parent.typeVariables.entrySet()) {
+          if (entry.getValue() == i) {
+            if (typeName == null) {
+              typeName = entry.getKey();
+            } else {
+              typeGenName = entry.getKey();
+              break; // We found both names, no need to continue.
+            }
+          }
+        }
+
+        if (typeName == null) {
+          throw new IllegalStateException("Type variable not found in parent environment");
+        }
+        if (typeGenName == null) {
+          typeGenName = typeName;
+        }
+
+        // Insert the type variable into the new environment.
+        int index = env.insertTypeVariable(typeName, typeGenName);
+        env.setPolarity(index, parent.isPositive(typeGenName));
+        outTypeArgs.add(new IRCallProcess.TypeArgument(new IRVarT(i), index));
+      }
+
+      node.getRhs().accept(env.new TypeAssigner());
+      node.getRhs().accept(env.new SessionAssigner(ep));
+      return env;
     }
 
     private Environment(Environment parent, String name) {
@@ -975,12 +1092,14 @@ public class IRGenerator extends ASTNodeVisitor {
       return name;
     }
 
-    private void insertLinear(String session, IRType type) {
+    private int insertLinear(String session, IRType type) {
       if (!records.containsKey(session)) {
         records.put(session, new RecordLocation());
       }
-      records.get(session).indices.add(recordTypes.size());
+      int index = recordTypes.size();
+      records.get(session).indices.add(index);
       recordTypes.add(type);
+      return index;
     }
 
     private int insertExponential(String session, IRType type) {
@@ -1112,6 +1231,17 @@ public class IRGenerator extends ASTNodeVisitor {
 
       @Override
       public void visit(ASTExpr node) {}
+
+      @Override
+      public void visit(ASTAffine node) {}
+
+      @Override
+      public void visit(ASTUse node) {
+        node.getRhs().accept(this);
+      }
+
+      @Override
+      public void visit(ASTDiscard node) {}
     }
 
     // A visitor which simply traverses the AST and assigns an index to each session created in it.
@@ -1244,6 +1374,17 @@ public class IRGenerator extends ASTNodeVisitor {
 
       @Override
       public void visit(ASTExpr node) {}
+
+      @Override
+      public void visit(ASTAffine node) {}
+
+      @Override
+      public void visit(ASTUse node) {
+        node.getRhs().accept(this);
+      }
+
+      @Override
+      public void visit(ASTDiscard node) {}
     }
   }
 }

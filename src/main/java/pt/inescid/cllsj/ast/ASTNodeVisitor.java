@@ -102,6 +102,18 @@ public abstract class ASTNodeVisitor {
     visit((ASTNode) node);
   }
 
+  public void visit(ASTAffine node) {
+    visit((ASTNode) node);
+  }
+
+  public void visit(ASTUse node) {
+    visit((ASTNode) node);
+  }
+
+  public void visit(ASTDiscard node) {
+    visit((ASTNode) node);
+  }
+
   public void visit(ASTExpr node) {
     visit((ASTNode) node);
   }

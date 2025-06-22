@@ -18,6 +18,7 @@ import pt.inescid.cllsj.SessionFieldAffine;
 import pt.inescid.cllsj.SessionFieldDiscard;
 import pt.inescid.cllsj.SessionRecord;
 import pt.inescid.cllsj.TypeError;
+import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.types.ASTCoAffineT;
 import pt.inescid.cllsj.ast.types.ASTType;
 
@@ -26,6 +27,14 @@ public class ASTDiscard extends ASTNode {
 
   public ASTDiscard(String _chr) {
     chr = _chr;
+  }
+
+  public String getCh() {
+    return chr;
+  }
+
+  public void setCh(String ch) {
+    this.chr = ch;
   }
 
   public void ASTInsertPipe(Function<ASTNode, ASTNode> f, ASTNode from) throws Exception {
@@ -184,5 +193,10 @@ public class ASTDiscard extends ASTNode {
         CLLSj.elapsed = System.nanoTime();
       }
     }
+  }
+
+  @Override
+  public void accept(ASTNodeVisitor visitor) {
+    visitor.visit(this);
   }
 }

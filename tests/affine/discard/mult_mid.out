@@ -1,0 +1,10 @@
+send 1
+close 1
+affine
+send 2
+close 2
+recv 1
+wait 1
+discard
+close 4
+wait 4

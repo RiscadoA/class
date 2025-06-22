@@ -114,6 +114,10 @@ public abstract class IRInstructionVisitor {
     visit((IRInstruction) instruction);
   }
 
+  public void visit(IRCleanRecord instruction) {
+    visit((IRInstruction) instruction);
+  }
+
   public void visit(IRIncRefExponential instruction) {
     visit((IRInstruction) instruction);
   }

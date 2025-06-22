@@ -7,6 +7,7 @@ import java.util.Stack;
 import pt.inescid.cllsj.ast.ASTExprVisitor;
 import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.nodes.ASTAdd;
+import pt.inescid.cllsj.ast.nodes.ASTAffine;
 import pt.inescid.cllsj.ast.nodes.ASTAnd;
 import pt.inescid.cllsj.ast.nodes.ASTBang;
 import pt.inescid.cllsj.ast.nodes.ASTBool;
@@ -16,6 +17,7 @@ import pt.inescid.cllsj.ast.nodes.ASTClose;
 import pt.inescid.cllsj.ast.nodes.ASTCoClose;
 import pt.inescid.cllsj.ast.nodes.ASTCoExpr;
 import pt.inescid.cllsj.ast.nodes.ASTCut;
+import pt.inescid.cllsj.ast.nodes.ASTDiscard;
 import pt.inescid.cllsj.ast.nodes.ASTDiv;
 import pt.inescid.cllsj.ast.nodes.ASTEmpty;
 import pt.inescid.cllsj.ast.nodes.ASTEq;
@@ -45,6 +47,7 @@ import pt.inescid.cllsj.ast.nodes.ASTSendTy;
 import pt.inescid.cllsj.ast.nodes.ASTString;
 import pt.inescid.cllsj.ast.nodes.ASTSub;
 import pt.inescid.cllsj.ast.nodes.ASTUnfold;
+import pt.inescid.cllsj.ast.nodes.ASTUse;
 import pt.inescid.cllsj.ast.nodes.ASTVId;
 import pt.inescid.cllsj.ast.nodes.ASTWhy;
 
@@ -384,5 +387,22 @@ public class SessionRenamer extends ASTNodeVisitor {
   public void visit(ASTRecvTy node) {
     node.setChs(rename(node.getChs()));
     node.getRhs().accept(this);
+  }
+
+  @Override
+  public void visit(ASTAffine node) {
+    node.setCh(rename(node.getCh()));
+    node.getRhs().accept(this);
+  }
+
+  @Override
+  public void visit(ASTUse node) {
+    node.setCh(rename(node.getCh()));
+    node.getRhs().accept(this);
+  }
+
+  @Override
+  public void visit(ASTDiscard node) {
+    node.setCh(rename(node.getCh()));
   }
 }

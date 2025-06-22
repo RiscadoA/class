@@ -1,0 +1,22 @@
+proc main() {
+    cut {
+        println("affine 1"); affine x;
+        println("send 1"); send x(a. println("close 1"); close a);
+        println("affine 2"); affine x;
+        println("send 2"); send x(b. println("close 2"); close b);
+        println("affine 3"); affine x;
+        println("send 3"); send x(c. println("wait 3"); wait c; ());
+        println("close 4"); close x
+        |x: ~affine send close; affine send close; affine send wait; close|
+        println("use 1"); use x;
+        println("recv 1"); recv x(a);
+        println("wait 1"); wait a;
+        println("use 2"); use x;
+        println("recv 2"); recv x(b);
+        println("wait 2"); wait b;
+        println("use 3"); use x;
+        println("recv 3"); recv x(c);
+        println("wait 4"); wait x;
+        println("close 3"); close c
+    }
+};;

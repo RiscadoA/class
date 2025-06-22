@@ -1,0 +1,12 @@
+proc main() {
+    cut {
+        println("affine"); affine x;
+        par {
+            println("wait"); wait x; ()
+            ||
+            println("wont execute"); ()
+        }
+        |x: ~affine wait|
+        println("discard"); discard x
+    }
+};;

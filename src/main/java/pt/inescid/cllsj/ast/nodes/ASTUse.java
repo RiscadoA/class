@@ -18,6 +18,7 @@ import pt.inescid.cllsj.SessionFieldAffine;
 import pt.inescid.cllsj.SessionFieldUse;
 import pt.inescid.cllsj.SessionRecord;
 import pt.inescid.cllsj.TypeError;
+import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.types.ASTCoAffineT;
 import pt.inescid.cllsj.ast.types.ASTType;
 
@@ -29,6 +30,18 @@ public class ASTUse extends ASTNode {
   public ASTUse(String _ch, ASTNode _rhs) {
     ch = _ch;
     rhs = _rhs;
+  }
+
+  public String getCh() {
+    return ch;
+  }
+
+  public ASTNode getRhs() {
+    return rhs;
+  }
+
+  public void setCh(String ch) {
+    this.ch = ch;
   }
 
   public void show() {
@@ -240,5 +253,10 @@ public class ASTUse extends ASTNode {
         }
       }
     }
+  }
+
+  @Override
+  public void accept(ASTNodeVisitor visitor) {
+    visitor.visit(this);
   }
 }
