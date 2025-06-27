@@ -16,6 +16,7 @@ import pt.inescid.cllsj.Server;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.SessionRecord;
 import pt.inescid.cllsj.TypeError;
+import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.types.ASTBotT;
 import pt.inescid.cllsj.ast.types.ASTType;
 import pt.inescid.cllsj.ast.types.ASTUsageBT;
@@ -33,6 +34,26 @@ public class ASTShare extends ASTNode {
     lhs = _lhs;
     rhs = _rhs;
     con = c;
+  }
+
+  public ASTNode getLhs() {
+    return lhs;
+  }
+
+  public ASTNode getRhs() {
+    return rhs;
+  }
+
+  public boolean isConcurrent() {
+    return con;
+  }
+
+  public String getCh() {
+    return sh;
+  }
+
+  public void setCh(String ch) {
+    sh = ch;
   }
 
   public void ASTInsertUse(String ch, ASTType t, ASTNode here, Boolean disCont) throws Exception {
@@ -211,5 +232,10 @@ public class ASTShare extends ASTNode {
       p_cont.frame = frame;
       p_cont.epnm = ep;
     }
+  }
+
+  @Override
+  public void accept(ASTNodeVisitor visitor) {
+    visitor.visit(this);
   }
 }

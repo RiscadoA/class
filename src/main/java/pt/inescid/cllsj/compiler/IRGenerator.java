@@ -416,6 +416,7 @@ public class IRGenerator extends ASTNodeVisitor {
     block.add(new IRCallProcess(env.getName(), List.of(new LinearArgument(record(node.getChi()), env.record(node.getChi()))), exponentialArgs, typeArgs));
     finish.add(new IRNewExponential(exponential(node.getChr() + "$bang"), record(node.getChi())));
     finish.add(new IRPushExponential(record(node.getChr()), exponential(node.getChr() + "$bang")));
+    finish.add(new IRDetachExponential(exponential(node.getChr() + "$bang")));
     finish.add(new IRReturn(record(node.getChr())));
   }
 
@@ -581,6 +582,31 @@ public class IRGenerator extends ASTNodeVisitor {
     node.getRhs().accept(this);
   }
 
+  @Override
+  public void visit(ASTShare node) {
+    IRBlock rhs = process.addBlock("share_rhs");
+
+    // Increment the reference count of the cell.
+    block.add(new IRIncRefCell(record(node.getCh())));
+
+    // If an exponential occurs in both branches, we need to increment its reference count.
+    Set<String> exponentials = exponentialNamesFreeIn(node);
+    for (String name : exponentials) {
+      if (nameFreeIn(node.getLhs(), name) && nameFreeIn(node.getRhs(), name)) {
+        block.add(new IRIncRefExponential(exponential(name)));
+      }
+    }
+
+    if (node.isConcurrent()) {
+      block.add(new IRNewThread(rhs.getLabel()));
+    } else {
+      block.add(new IRNewTask(rhs.getLabel()));
+    }
+    node.getLhs().accept(this);
+
+    visitBlock(rhs, node.getRhs());
+  }
+
   // ======================================== Utilities =========================================
 
   private void decExponentialRefIfUnused(IRBlock block, ASTNode node, String name) {
@@ -687,6 +713,13 @@ public class IRGenerator extends ASTNodeVisitor {
 
     @Override
     public void visit(ASTMix node) {
+      count += 1;
+      node.getLhs().accept(this);
+      node.getRhs().accept(this);
+    }
+
+    @Override
+    public void visit(ASTShare node) {
       count += 1;
       node.getLhs().accept(this);
       node.getRhs().accept(this);
@@ -1375,6 +1408,12 @@ public class IRGenerator extends ASTNodeVisitor {
       public void visit(ASTTake node) {
         node.getRhs().accept(this);
       }
+
+      @Override
+      public void visit(ASTShare node) {
+        node.getLhs().accept(this);
+        node.getRhs().accept(this);
+      }
     }
 
     // A visitor which simply traverses the AST and assigns an index to each session created in it.
@@ -1539,6 +1578,12 @@ public class IRGenerator extends ASTNodeVisitor {
       @Override
       public void visit(ASTTake node) {
         insertLinear(node.getChi(), intoIRType(ep, node.getChiType()));
+        node.getRhs().accept(this);
+      }
+
+      @Override
+      public void visit(ASTShare node) {
+        node.getLhs().accept(this);
         node.getRhs().accept(this);
       }
     }

@@ -1116,6 +1116,11 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   @Override
+  public void visit(IRDetachExponential instruction) {
+    putAssign(exponential(instruction.getExponential()), "NULL");
+  }
+
+  @Override
   public void visit(IRIncRefCell instruction) {
     putIncrement(cellRefCount(peekCell(instruction.getRecord())));
   }

@@ -90,6 +90,10 @@ public abstract class IRInstructionVisitor {
     visit((IRInstruction) instruction);
   }
 
+  public void visit(IRDetachExponential instruction) {
+    visit((IRInstruction) instruction);
+  }
+
   public void visit(IRPrint instruction) {
     visit((IRInstruction) instruction);
   }

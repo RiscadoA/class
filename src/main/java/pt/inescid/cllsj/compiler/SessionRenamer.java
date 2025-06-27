@@ -204,6 +204,13 @@ public class SessionRenamer extends ASTNodeVisitor {
   }
 
   @Override
+  public void visit(ASTShare node) {
+    node.setCh(rename(node.getCh()));
+    node.getLhs().accept(this);
+    node.getRhs().accept(this);
+  }
+
+  @Override
   public void visit(ASTEmpty node) {}
 
   @Override

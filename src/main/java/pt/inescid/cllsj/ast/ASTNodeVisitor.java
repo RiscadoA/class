@@ -130,6 +130,10 @@ public abstract class ASTNodeVisitor {
     visit((ASTNode) node);
   }
 
+  public void visit(ASTShare node) {
+    visit((ASTNode) node);
+  }
+
   public void visit(ASTExpr node) {
     visit((ASTNode) node);
   }

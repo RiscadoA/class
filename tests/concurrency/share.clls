@@ -1,0 +1,19 @@
+proc main() {
+    cut {
+        cell x("a")
+        |x: ~state lstring|
+        share x {
+            take x(s); println(s);
+            put x("b");
+            take x(s); println(s);
+            put x("c");
+            release x
+            ||
+            take x(s); println(s);
+            put x("d");
+            take x(s); println(s);
+            put x("e");
+            release x
+        }
+    }
+};;
