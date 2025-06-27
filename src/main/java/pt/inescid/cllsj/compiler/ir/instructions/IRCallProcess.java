@@ -98,26 +98,15 @@ public class IRCallProcess extends IRInstruction {
 
   @Override
   public String toString() {
-    String str = "call";
-    if (!this.typeArguments.isEmpty()) {
-      str += "<";
-      boolean firstType = true;
-      for (TypeArgument arg : this.typeArguments) {
-        str += firstType ? "" : ", ";
-        str += arg.getSourceType() + " -> " + arg.getTargetType();
-        firstType = false;
-      }
-      str += ">";
+    String str = "callProcess(" + processName;
+    for (TypeArgument arg : this.typeArguments) {
+      str += ", T" + arg.getTargetType() + " <- " + arg.getTargetType();
     }
-    str += "(" + this.processName;
     for (LinearArgument arg : this.linearArguments) {
-      str += ", " + arg.getSourceRecord() + " -> " + arg.getTargetRecord();
+      str += ", L" + arg.getTargetRecord() + " <- " + arg.getSourceRecord();
     }
-    boolean firstExponential = true;
     for (ExponentialArgument arg : this.exponentialArguments) {
-      str += firstExponential ? "; " : ", ";
-      str += arg.getSourceExponential() + " -> " + arg.getTargetExponential();
-      firstExponential = false;
+      str += ", E" + arg.getTargetExponential() + " <- " + arg.getSourceExponential();
     }
     return str + ")";
   }

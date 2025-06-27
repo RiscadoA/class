@@ -1,0 +1,19 @@
+proc main() {
+    cut {
+        println("cell 1"); cell c(x. affine x; println("wait 1"); wait x; ())
+        |c: ~state wait|
+        println("take 1"); take c(x);
+        par {
+            println("close 1"); close x
+            ||
+            println("put 1"); put c(x. affine x; println("wait 2"); wait x; ());
+            println("take 2"); take c(x);
+            par {
+                println("close 2"); close x
+                ||
+                println("put 2"); put c(x. affine x; println("wait 3"); wait x; ());
+                println("release"); release c
+            }
+        }
+    }
+};;

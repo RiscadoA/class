@@ -74,11 +74,11 @@ public abstract class IRInstructionVisitor {
     visit((IRInstruction) instruction);
   }
 
-  public void visit(IRPushExponential instruction) {
+  public void visit(IRNewExponential instruction) {
     visit((IRInstruction) instruction);
   }
 
-  public void visit(IRForwardExponential instruction) {
+  public void visit(IRPushExponential instruction) {
     visit((IRInstruction) instruction);
   }
 
@@ -123,6 +123,26 @@ public abstract class IRInstructionVisitor {
   }
 
   public void visit(IRDecRefExponential instruction) {
+    visit((IRInstruction) instruction);
+  }
+
+  public void visit(IRIncRefCell instruction) {
+    visit((IRInstruction) instruction);
+  }
+
+  public void visit(IRDecRefCell instruction) {
+    visit((IRInstruction) instruction);
+  }
+
+  public void visit(IRPushCell instruction) {
+    visit((IRInstruction) instruction);
+  }
+
+  public void visit(IRPutCell instruction) {
+    visit((IRInstruction) instruction);
+  }
+
+  public void visit(IRTakeCell instruction) {
     visit((IRInstruction) instruction);
   }
 }

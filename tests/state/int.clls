@@ -1,0 +1,18 @@
+proc main() {
+    cut {
+        cell c1(13)
+        |c1: ~state lint|
+        take c1(x);
+        put c1(x + 1);
+        fwd c1 c2
+        |c2: ~state lint|
+        take c2(x);
+        put c2(x + 1);
+        fwd c2 c3
+        |c3: ~state lint|
+        take c3(x);
+        println(x);
+        put c3(0);
+        release c3
+    }
+};;

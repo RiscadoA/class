@@ -16,6 +16,7 @@ import pt.inescid.cllsj.Server;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.SessionRecord;
 import pt.inescid.cllsj.TypeError;
+import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.types.ASTType;
 import pt.inescid.cllsj.ast.types.ASTUsageBT;
 import pt.inescid.cllsj.ast.types.ASTUsageT;
@@ -24,6 +25,14 @@ public class ASTRelease extends ASTNode {
   String chr;
 
   public ASTRelease(String _chr) {
+    chr = _chr;
+  }
+
+  public String getChr() {
+    return chr;
+  }
+
+  public void setChr(String _chr) {
     chr = _chr;
   }
 
@@ -120,5 +129,10 @@ public class ASTRelease extends ASTNode {
     }
     p_cont.code = null;
     CLLSj.elapsed = System.nanoTime();
+  }
+
+  @Override
+  public void accept(ASTNodeVisitor visitor) {
+    visitor.visit(this);
   }
 }

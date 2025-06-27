@@ -1,0 +1,10 @@
+cell 1
+take 1
+close 1
+wait 1
+put 1
+take 2
+close 2
+wait 2
+put 2
+release

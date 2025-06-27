@@ -1,22 +1,24 @@
 package pt.inescid.cllsj.compiler.ir.instructions;
 
+import java.util.List;
+
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 
-public class IRForwardExponential extends IRInstruction {
+public class IRPutCell extends IRInstruction {
   private int record;
-  private int exponential;
+  private int argRecord;
 
-  public IRForwardExponential(int record, int exponential) {
+  public IRPutCell(int record, int argRecord) {
     this.record = record;
-    this.exponential = exponential;
+    this.argRecord = argRecord;
   }
 
   public int getRecord() {
     return record;
   }
 
-  public int getExponential() {
-    return exponential;
+  public int getArgRecord() {
+    return argRecord;
   }
 
   @Override
@@ -26,6 +28,6 @@ public class IRForwardExponential extends IRInstruction {
 
   @Override
   public String toString() {
-    return "forwardExponential(" + record + ", " + exponential + ")";
+    return "putCell(" + record + ", " + argRecord + ")";
   }
 }

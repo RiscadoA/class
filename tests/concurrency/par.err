@@ -11,3 +11,5 @@ Profiling results:
   Task frees: 5
   String allocations: 4
   String frees: 4
+  Cell allocations: 0
+  Cell frees: 0

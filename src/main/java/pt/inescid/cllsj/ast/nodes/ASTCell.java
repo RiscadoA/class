@@ -19,6 +19,7 @@ import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.SessionRecord;
 import pt.inescid.cllsj.Trail;
 import pt.inescid.cllsj.TypeError;
+import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.types.ASTAffineT;
 import pt.inescid.cllsj.ast.types.ASTBangT;
 import pt.inescid.cllsj.ast.types.ASTCellBT;
@@ -40,6 +41,30 @@ public class ASTCell extends ASTNode {
     chc = _chc;
     type = _type;
     rhs = _rhs;
+  }
+
+  public String getCh() {
+    return ch;
+  }
+
+  public String getChc() {
+    return chc;
+  }
+
+  public ASTType getTypeRhs() {
+    return ty_rhs;
+  }
+
+  public ASTNode getRhs() {
+    return rhs;
+  }
+
+  public void setCh(String ch) {
+    this.ch = ch;
+  }
+
+  public void setChc(String chc) {
+    this.chc = chc;
   }
 
   public void ASTInsertPipe(Function<ASTNode, ASTNode> f, ASTNode from) throws Exception {
@@ -280,5 +305,10 @@ public class ASTCell extends ASTNode {
         throw new SAMError("cell-op - " + ch);
       }
     }
+  }
+
+  @Override
+  public void accept(ASTNodeVisitor visitor) {
+    visitor.visit(this);
   }
 }

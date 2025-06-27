@@ -18,6 +18,7 @@ import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.SessionRecord;
 import pt.inescid.cllsj.Trail;
 import pt.inescid.cllsj.TypeError;
+import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.types.ASTCoAffineT;
 import pt.inescid.cllsj.ast.types.ASTType;
 import pt.inescid.cllsj.ast.types.ASTUsageLT;
@@ -35,6 +36,30 @@ public class ASTTake extends ASTNode {
     chi = _chi;
     type = _type;
     rhs = _rhs;
+  }
+
+  public String getChr() {
+    return chr;
+  }
+
+  public String getChi() {
+    return chi;
+  }
+
+  public ASTNode getRhs() {
+    return rhs;
+  }
+
+  public ASTType getChiType() {
+    return ty_lhs;
+  }
+
+  public void setChr(String _chr) {
+    chr = _chr;
+  }
+
+  public void setChi(String _chi) {
+    chi = _chi;
   }
 
   public void ASTInsertPipe(Function<ASTNode, ASTNode> f, ASTNode from) throws Exception {
@@ -243,5 +268,10 @@ public class ASTTake extends ASTNode {
         return;
       } else throw new SAMError("take-op - " + chr + " " + srec);
     }
+  }
+
+  @Override
+  public void accept(ASTNodeVisitor visitor) {
+    visitor.visit(this);
   }
 }

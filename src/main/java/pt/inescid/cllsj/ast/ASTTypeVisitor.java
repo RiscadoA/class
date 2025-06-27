@@ -101,4 +101,20 @@ public abstract class ASTTypeVisitor {
   public void visit(ASTCoAffineT type) {
     visit((ASTType) type);
   }
+
+  public void visit(ASTCellT type) {
+    visit((ASTType) type);
+  }
+  
+  public void visit(ASTUsageT type) {
+    visit((ASTType) type);
+  }
+
+  public void visit(ASTCellLT type) {
+    visit((ASTType) type);
+  }
+
+  public void visit(ASTUsageLT type) {
+    visit((ASTType) type);
+  }
 }

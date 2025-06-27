@@ -2,6 +2,7 @@ package pt.inescid.cllsj.compiler.ir;
 
 import pt.inescid.cllsj.compiler.ir.type.IRAffineT;
 import pt.inescid.cllsj.compiler.ir.type.IRBoolT;
+import pt.inescid.cllsj.compiler.ir.type.IRCellT;
 import pt.inescid.cllsj.compiler.ir.type.IRCloseT;
 import pt.inescid.cllsj.compiler.ir.type.IRExponentialT;
 import pt.inescid.cllsj.compiler.ir.type.IRIntT;
@@ -52,12 +53,16 @@ public abstract class IRTypeVisitor {
   public void visit(IRStringT type) {
     visit((IRType) type);
   }
-  
+
+  public void visit(IRTypeT type) {
+    visit((IRType) type);
+  }
+
   public void visit(IRAffineT type) {
     visit((IRType) type);
   }
 
-  public void visit(IRTypeT type) {
+  public void visit(IRCellT type) {
     visit((IRType) type);
   }
 }

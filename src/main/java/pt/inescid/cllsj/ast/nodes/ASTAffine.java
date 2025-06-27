@@ -53,6 +53,10 @@ public class ASTAffine extends ASTNode {
     return rhs;
   }
 
+  public void setRhs(ASTNode _rhs) {
+    rhs = _rhs;
+  }
+
   public ASTType getContType() {
     return contType;
   }

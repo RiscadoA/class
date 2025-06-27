@@ -16,6 +16,7 @@ import pt.inescid.cllsj.SessionClosure;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.Trail;
 import pt.inescid.cllsj.TypeError;
+import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.types.ASTAffineT;
 import pt.inescid.cllsj.ast.types.ASTBotT;
 import pt.inescid.cllsj.ast.types.ASTType;
@@ -36,6 +37,38 @@ public class ASTPut extends ASTNode {
     type = _type;
     lhs = _lhs;
     rhs = _rhs;
+  }
+
+  public String getChs() {
+    return chs;
+  }
+
+  public String getCho() {
+    return cho;
+  }
+
+  public ASTNode getLhs() {
+    return lhs;
+  }
+
+  public ASTNode getRhs() {
+    return rhs;
+  }
+
+  public ASTType getLhsType() {
+    return tys_payl;
+  }
+
+  public ASTType getRhsType() {
+    return type;
+  }
+
+  public void setChs(String _chs) {
+    chs = _chs;
+  }
+
+  public void setCho(String _cho) {
+    cho = _cho;
   }
 
   public void ASTInsertPipe(Function<ASTNode, ASTNode> f, ASTNode from) throws Exception {
@@ -241,5 +274,10 @@ public class ASTPut extends ASTNode {
       p_cont.code = rhs;
       return;
     } else throw new SAMError("put-op - " + chs);
+  }
+
+  @Override
+  public void accept(ASTNodeVisitor visitor) {
+    visitor.visit(this);
   }
 }

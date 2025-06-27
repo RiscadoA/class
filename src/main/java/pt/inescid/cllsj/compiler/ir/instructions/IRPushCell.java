@@ -2,21 +2,21 @@ package pt.inescid.cllsj.compiler.ir.instructions;
 
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 
-public class IRPushExponential extends IRInstruction {
+public class IRPushCell extends IRInstruction {
   private int record;
-  private int exponential;
+  private int argRecord;
 
-  public IRPushExponential(int record, int exponential) {
+  public IRPushCell(int record, int argRecord) {
     this.record = record;
-    this.exponential = exponential;
+    this.argRecord = argRecord;
   }
 
   public int getRecord() {
     return record;
   }
 
-  public int getExponential() {
-    return exponential;
+  public int getArgRecord() {
+    return argRecord;
   }
 
   @Override
@@ -26,6 +26,6 @@ public class IRPushExponential extends IRInstruction {
 
   @Override
   public String toString() {
-    return "pushExponential(" + record + ", " + exponential + ")";
+    return "pushCell(" + record + ", " + argRecord + ")";
   }
 }

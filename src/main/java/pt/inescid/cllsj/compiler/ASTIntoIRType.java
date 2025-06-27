@@ -8,51 +8,15 @@ import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.TypeEntry;
 import pt.inescid.cllsj.ast.ASTTypeVisitor;
-import pt.inescid.cllsj.ast.types.ASTAffineT;
-import pt.inescid.cllsj.ast.types.ASTBangT;
-import pt.inescid.cllsj.ast.types.ASTBotT;
-import pt.inescid.cllsj.ast.types.ASTCaseT;
-import pt.inescid.cllsj.ast.types.ASTCoAffineT;
-import pt.inescid.cllsj.ast.types.ASTCoLboolT;
-import pt.inescid.cllsj.ast.types.ASTCoLstringT;
-import pt.inescid.cllsj.ast.types.ASTCoRecT;
-import pt.inescid.cllsj.ast.types.ASTCointT;
-import pt.inescid.cllsj.ast.types.ASTIdT;
-import pt.inescid.cllsj.ast.types.ASTLCointT;
-import pt.inescid.cllsj.ast.types.ASTLboolT;
-import pt.inescid.cllsj.ast.types.ASTLintT;
-import pt.inescid.cllsj.ast.types.ASTLstringT;
-import pt.inescid.cllsj.ast.types.ASTNotT;
-import pt.inescid.cllsj.ast.types.ASTOfferT;
-import pt.inescid.cllsj.ast.types.ASTOneT;
-import pt.inescid.cllsj.ast.types.ASTRecT;
-import pt.inescid.cllsj.ast.types.ASTRecvT;
-import pt.inescid.cllsj.ast.types.ASTRecvTT;
-import pt.inescid.cllsj.ast.types.ASTSendT;
-import pt.inescid.cllsj.ast.types.ASTSendTT;
-import pt.inescid.cllsj.ast.types.ASTType;
-import pt.inescid.cllsj.ast.types.ASTWhyT;
-import pt.inescid.cllsj.ast.types.ASTintT;
-import pt.inescid.cllsj.compiler.ir.type.IRAffineT;
-import pt.inescid.cllsj.compiler.ir.type.IRBoolT;
-import pt.inescid.cllsj.compiler.ir.type.IRCloseT;
-import pt.inescid.cllsj.compiler.ir.type.IRExponentialT;
-import pt.inescid.cllsj.compiler.ir.type.IRIntT;
-import pt.inescid.cllsj.compiler.ir.type.IRRecT;
-import pt.inescid.cllsj.compiler.ir.type.IRSessionT;
-import pt.inescid.cllsj.compiler.ir.type.IRStringT;
-import pt.inescid.cllsj.compiler.ir.type.IRTagT;
-import pt.inescid.cllsj.compiler.ir.type.IRType;
-import pt.inescid.cllsj.compiler.ir.type.IRTypeT;
-import pt.inescid.cllsj.compiler.ir.type.IRVarT;
+import pt.inescid.cllsj.ast.types.*;
+import pt.inescid.cllsj.compiler.ir.type.*;
 
 public class ASTIntoIRType extends ASTTypeVisitor {
   private Env<EnvEntry> ep;
   private Map<String, Integer> typeMap = new HashMap<>();
   private IRType ir;
 
-  public static IRType convert(
-      Env<EnvEntry> ep, ASTType type, Map<String, Integer> typeMap) {
+  public static IRType convert(Env<EnvEntry> ep, ASTType type, Map<String, Integer> typeMap) {
     ASTIntoIRType converter = new ASTIntoIRType(ep, typeMap);
     type.accept(converter);
     return converter.ir;
@@ -158,7 +122,8 @@ public class ASTIntoIRType extends ASTTypeVisitor {
           }
           knownTypes += key;
         }
-        throw new IllegalArgumentException("Type not found in environment: " + type.getid() + " (contains {" + knownTypes + "})");
+        throw new IllegalArgumentException(
+            "Type not found in environment: " + type.getid() + " (contains {" + knownTypes + "})");
       }
       ir = new IRVarT(typeMap.get(type.getid()));
     } else {
@@ -251,5 +216,25 @@ public class ASTIntoIRType extends ASTTypeVisitor {
   @Override
   public void visit(ASTCoAffineT type) {
     ir = new IRAffineT(recurse(ep, type.getin()));
+  }
+
+  @Override
+  public void visit(ASTCellT type) {
+    ir = new IRCellT(recurse(ep, type.getin()));
+  }
+
+  @Override
+  public void visit(ASTUsageT type) {
+    ir = new IRCellT(recurse(ep, type.getin()));
+  }
+
+  @Override
+  public void visit(ASTCellLT type) {
+    ir = new IRCellT(recurse(ep, type.getin()));
+  }
+
+  @Override
+  public void visit(ASTUsageLT type) {
+    ir = new IRCellT(recurse(ep, type.getin()));
   }
 }

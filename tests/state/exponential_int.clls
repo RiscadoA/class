@@ -1,0 +1,20 @@
+proc main() {
+    cut {
+        cell c1(x. affine x; let! x 13)
+        |c1: ~state !lint|
+        take c1(x);
+        println("inc " + x);
+        put c1(y. affine y; let! y x + 1);
+        fwd c1 c2
+        |c2: ~state !lint|
+        take c2(x);
+        println("inc " + x);
+        put c2(y. affine y; let! y x + 1);
+        fwd c2 c3
+        |c3: ~state !lint|
+        take c3(x);
+        println("final " + x);
+        put c3(y. affine y; let! y 0);
+        release c3
+    }
+};;

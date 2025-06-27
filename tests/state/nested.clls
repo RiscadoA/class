@@ -1,0 +1,28 @@
+proc main() {
+    cut {
+        cell a(b. affine b; cell b(1))
+        |a: ~state state lint|
+        take a(b);
+        take b(x);
+        put b(x * 2);
+        put a(b);
+
+        take a(b);
+        take b(x);
+        put b(x * 3);
+        put a(b);
+
+        take a(b);
+        take b(x);
+        println(x);
+        put b(5);
+        put a(b);
+
+        take a(b);
+        take b(x);
+        println(x);
+        put b(0);
+        put a(b);
+        release a
+    }
+};;

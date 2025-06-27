@@ -6,50 +6,7 @@ import java.util.Map;
 import java.util.Stack;
 import pt.inescid.cllsj.ast.ASTExprVisitor;
 import pt.inescid.cllsj.ast.ASTNodeVisitor;
-import pt.inescid.cllsj.ast.nodes.ASTAdd;
-import pt.inescid.cllsj.ast.nodes.ASTAffine;
-import pt.inescid.cllsj.ast.nodes.ASTAnd;
-import pt.inescid.cllsj.ast.nodes.ASTBang;
-import pt.inescid.cllsj.ast.nodes.ASTBool;
-import pt.inescid.cllsj.ast.nodes.ASTCall;
-import pt.inescid.cllsj.ast.nodes.ASTCase;
-import pt.inescid.cllsj.ast.nodes.ASTClose;
-import pt.inescid.cllsj.ast.nodes.ASTCoClose;
-import pt.inescid.cllsj.ast.nodes.ASTCoExpr;
-import pt.inescid.cllsj.ast.nodes.ASTCut;
-import pt.inescid.cllsj.ast.nodes.ASTDiscard;
-import pt.inescid.cllsj.ast.nodes.ASTDiv;
-import pt.inescid.cllsj.ast.nodes.ASTEmpty;
-import pt.inescid.cllsj.ast.nodes.ASTEq;
-import pt.inescid.cllsj.ast.nodes.ASTExpr;
-import pt.inescid.cllsj.ast.nodes.ASTFwd;
-import pt.inescid.cllsj.ast.nodes.ASTFwdB;
-import pt.inescid.cllsj.ast.nodes.ASTGt;
-import pt.inescid.cllsj.ast.nodes.ASTId;
-import pt.inescid.cllsj.ast.nodes.ASTIf;
-import pt.inescid.cllsj.ast.nodes.ASTInt;
-import pt.inescid.cllsj.ast.nodes.ASTLt;
-import pt.inescid.cllsj.ast.nodes.ASTMix;
-import pt.inescid.cllsj.ast.nodes.ASTMul;
-import pt.inescid.cllsj.ast.nodes.ASTNEq;
-import pt.inescid.cllsj.ast.nodes.ASTNode;
-import pt.inescid.cllsj.ast.nodes.ASTNot;
-import pt.inescid.cllsj.ast.nodes.ASTOr;
-import pt.inescid.cllsj.ast.nodes.ASTPrintLn;
-import pt.inescid.cllsj.ast.nodes.ASTProcDef;
-import pt.inescid.cllsj.ast.nodes.ASTProgram;
-import pt.inescid.cllsj.ast.nodes.ASTPromoCoExpr;
-import pt.inescid.cllsj.ast.nodes.ASTRecv;
-import pt.inescid.cllsj.ast.nodes.ASTRecvTy;
-import pt.inescid.cllsj.ast.nodes.ASTSelect;
-import pt.inescid.cllsj.ast.nodes.ASTSend;
-import pt.inescid.cllsj.ast.nodes.ASTSendTy;
-import pt.inescid.cllsj.ast.nodes.ASTString;
-import pt.inescid.cllsj.ast.nodes.ASTSub;
-import pt.inescid.cllsj.ast.nodes.ASTUnfold;
-import pt.inescid.cllsj.ast.nodes.ASTUse;
-import pt.inescid.cllsj.ast.nodes.ASTVId;
-import pt.inescid.cllsj.ast.nodes.ASTWhy;
+import pt.inescid.cllsj.ast.nodes.*;
 
 public class SessionRenamer extends ASTNodeVisitor {
   // How many different occurrences of each session name have been found
@@ -173,7 +130,7 @@ public class SessionRenamer extends ASTNodeVisitor {
     return sanitize(session) + "_" + occurences;
   }
 
-  private void leave_scope(String session) {
+  private void leaveScope(String session) {
     Stack<Integer> occurences = this.current.get(session);
     if (occurences == null) {
       throw new IllegalStateException("Session " + session + " was not introduced");
@@ -206,7 +163,7 @@ public class SessionRenamer extends ASTNodeVisitor {
     node.setChr(rename(node.getChr()));
     node.setChi(introduce(chi));
     node.getRhs().accept(this);
-    leave_scope(chi);
+    leaveScope(chi);
   }
 
   @Override
@@ -215,7 +172,7 @@ public class SessionRenamer extends ASTNodeVisitor {
     node.setChr(rename(node.getChr()));
     node.setChi(introduce(chi));
     node.getRhs().accept(this);
-    leave_scope(chi);
+    leaveScope(chi);
   }
 
   @Override
@@ -243,7 +200,7 @@ public class SessionRenamer extends ASTNodeVisitor {
     node.setCh(introduce(ch));
     node.getLhs().accept(this);
     node.getRhs().accept(this);
-    leave_scope(ch);
+    leaveScope(ch);
   }
 
   @Override
@@ -334,7 +291,7 @@ public class SessionRenamer extends ASTNodeVisitor {
     node.setChr(rename(node.getChr()));
     node.setChi(introduce(chi));
     node.getRhs().accept(this);
-    leave_scope(chi);
+    leaveScope(chi);
   }
 
   @Override
@@ -349,8 +306,8 @@ public class SessionRenamer extends ASTNodeVisitor {
     node.setChs(rename(node.getChs()));
     node.setCho(introduce(cho));
     node.getLhs().accept(this);
+    leaveScope(cho);
     node.getRhs().accept(this);
-    leave_scope(cho);
   }
 
   @Override
@@ -404,5 +361,38 @@ public class SessionRenamer extends ASTNodeVisitor {
   @Override
   public void visit(ASTDiscard node) {
     node.setCh(rename(node.getCh()));
+  }
+
+  @Override
+  public void visit(ASTCell node) {
+    String chc = node.getChc();
+    node.setCh(rename(node.getCh()));
+    node.setChc(introduce(chc));
+    node.getRhs().accept(this);
+    leaveScope(chc);
+  }
+
+  @Override
+  public void visit(ASTPut node) {
+    String cho = node.getCho();
+    node.setChs(rename(node.getChs()));
+    node.setCho(introduce(cho));
+    node.getLhs().accept(this);
+    leaveScope(cho);
+    node.getRhs().accept(this);
+  }
+
+  @Override
+  public void visit(ASTTake node) {
+    String chi = node.getChi();
+    node.setChr(rename(node.getChr()));
+    node.setChi(introduce(chi));
+    node.getRhs().accept(this);
+    leaveScope(chi);
+  }
+
+  @Override
+  public void visit(ASTRelease node) {
+    node.setChr(rename(node.getChr()));
   }
 }

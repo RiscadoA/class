@@ -114,6 +114,22 @@ public abstract class ASTNodeVisitor {
     visit((ASTNode) node);
   }
 
+  public void visit(ASTCell node) {
+    visit((ASTNode) node);
+  }
+
+  public void visit(ASTPut node) {
+    visit((ASTNode) node);
+  }
+
+  public void visit(ASTTake node) {
+    visit((ASTNode) node);
+  }
+
+  public void visit(ASTRelease node) {
+    visit((ASTNode) node);
+  }
+
   public void visit(ASTExpr node) {
     visit((ASTNode) node);
   }

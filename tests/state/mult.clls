@@ -1,0 +1,29 @@
+proc main() {
+    cut {
+        send c1(a. close a);
+        cell c1(x.
+            affine x;
+            println("send 1"); send x(a. println("wait 1"); wait a; ());
+            println("close 1"); close x
+        )
+        |c1: ~send close; state send wait; close|
+        recv c1(a); wait a;
+        println("take 1"); take c1(x1);
+        println("put 1"); put c1(x2.
+            affine x2;
+            println("recv 1"); recv x1(y); wait x1;
+            println("send 2"); send x2(y);
+            println("close 2"); close x2
+        );
+        fwd c1 c2
+        |c2: ~state send wait; close|
+        println("take 2"); take c2(x1);
+        println("put 2"); put c2(x2.
+            affine x2;
+            println("recv 1"); recv x1(y); wait x1;
+            println("send 3"); send x2(y);
+            println("close 3"); close x2
+        );
+        println("release"); release c2
+    }
+};;

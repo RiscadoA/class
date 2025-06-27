@@ -40,6 +40,7 @@ public class IRProgram {
                 + process.getValue().getExponentialType(i).toString()
                 + "\n";
       }
+      result += "    endPoints: " + process.getValue().getEndPoints() + "\n";
       result += process.getKey() + ":\n";
       result += process.getValue().toString() + "\n";
     }

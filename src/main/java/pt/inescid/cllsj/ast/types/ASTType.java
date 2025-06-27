@@ -242,8 +242,8 @@ public abstract class ASTType {
         || it instanceof ASTBasicType
         || it instanceof ASTRecT
         || it instanceof ASTAffineT
-        || it instanceof ASTCellT) {
-
+        || it instanceof ASTCellT
+        || it instanceof ASTCellLT) {
       return true;
     } else {
       return false;
