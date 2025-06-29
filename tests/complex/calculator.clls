@@ -1,0 +1,43 @@
+type rec Input {
+    choice of {
+        |#int: recv ~!lint; Input
+        |#line: recv ~!lstring; Input
+        |#end: wait
+    }
+};;
+
+proc rec input(i: ~Input) {
+    case i of {
+        |#int: send i(x. !x(y); scan(y)); input(i)
+        |#line: send i(x. !x(y); scan(y)); input(i)
+        |#end: close i
+    }
+};;
+
+proc unsafe_rec exec(i: Input) {
+    print("Command: ");
+    #line i; recv i(s);
+    if s == "end" {
+        #end i; wait i; ()
+    } else if s == "add" {
+        #int i; recv i(x);
+        #int i; recv i(y);
+        #line i; recv i(z); // Discard trailing whitespace
+        println("Result: " + (x + y));
+        exec(i)
+    } else {
+        println("Command '" + s + "' not recognized");
+        println("Available commands: ");
+        println("  add - adds two integers received from input");
+        println("  end - ends the input session");
+        exec(i)
+    }
+};;
+
+proc main() {
+    cut {
+        input(i)
+        |i: Input|
+        exec(i)
+    }
+};;
