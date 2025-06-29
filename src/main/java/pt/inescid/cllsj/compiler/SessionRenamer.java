@@ -407,4 +407,9 @@ public class SessionRenamer extends ASTNodeVisitor {
   public void visit(ASTRelease node) {
     node.setChr(rename(node.getChr()));
   }
+
+  @Override
+  public void visit(ASTSleep node) {
+    node.getRhs().accept(this);
+  }
 }

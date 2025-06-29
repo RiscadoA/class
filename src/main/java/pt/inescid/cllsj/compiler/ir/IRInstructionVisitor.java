@@ -153,4 +153,8 @@ public abstract class IRInstructionVisitor {
   public void visit(IRTakeCell instruction) {
     visit((IRInstruction) instruction);
   }
+
+  public void visit(IRSleep instruction) {
+    visit((IRInstruction) instruction);
+  }
 }

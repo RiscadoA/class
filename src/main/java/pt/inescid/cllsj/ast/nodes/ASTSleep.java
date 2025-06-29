@@ -9,6 +9,7 @@ import pt.inescid.cllsj.LinSession;
 import pt.inescid.cllsj.SAMCont;
 import pt.inescid.cllsj.Server;
 import pt.inescid.cllsj.SessionField;
+import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.types.ASTType;
 
 public class ASTSleep extends ASTNode {
@@ -20,6 +21,18 @@ public class ASTSleep extends ASTNode {
   public ASTSleep(int time, ASTNode rhs) {
     this.msecs = time;
     this.rhs = rhs;
+  }
+
+  public ASTNode getRhs() {
+    return rhs;
+  }
+
+  public void setRhs(ASTNode rhs) {
+    this.rhs = rhs;
+  }
+
+  public int getMsecs() {
+    return msecs;
   }
 
   public void ASTInsertPipe(Function<ASTNode, ASTNode> f, ASTNode from) throws Exception {
@@ -91,5 +104,10 @@ public class ASTSleep extends ASTNode {
   public void samL(Env<SessionField> frame, Env<EnvEntry> ep, SAMCont p_cont) throws Exception {
     Thread.sleep(msecs);
     rhs.samL(frame, ep, p_cont);
+  }
+
+  @Override
+  public void accept(ASTNodeVisitor visitor) {
+    visitor.visit(this);
   }
 }

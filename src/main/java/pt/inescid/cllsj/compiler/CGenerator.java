@@ -45,11 +45,13 @@ public class CGenerator extends IRInstructionVisitor {
     final CGenerator gen = new CGenerator(ir, trace, profile);
 
     // Add the necessary includes.
+    gen.putLine("#define _POSIX_C_SOURCE 199309L");
     gen.putLine("#include <stdio.h>");
     gen.putLine("#include <stdlib.h>");
     gen.putLine("#include <string.h>");
     gen.putLine("#include <threads.h>");
     gen.putLine("#include <stdatomic.h>");
+    gen.putLine("#include <time.h>");
     gen.putBlankLine();
 
     // Initialize the profiling variables.
@@ -351,14 +353,15 @@ public class CGenerator extends IRInstructionVisitor {
     gen.putLine("}");
     gen.putBlankLine();
 
-
     // Functions used for reading primitives from the standard input.
     gen.putLine("int int_scan() {");
     gen.incIndent();
     gen.putLine("int value;");
-    gen.putIf("scanf(\"%d\", &value) == 1", () -> {
-      gen.putStatement("return value");
-    });
+    gen.putIf(
+        "scanf(\"%d\", &value) == 1",
+        () -> {
+          gen.putStatement("return value");
+        });
     gen.putStatement("return 0");
     gen.decIndent();
     gen.putLine("}");
@@ -367,29 +370,45 @@ public class CGenerator extends IRInstructionVisitor {
     gen.putLine("int bool_scan() {");
     gen.incIndent();
     gen.putLine("char buffer[6];");
-    gen.putIf("scanf(\"%5s\", buffer) == 1", () -> {
-      gen.putStatement("return strcmp(buffer, \"true\") == 0");
-    });
+    gen.putIf(
+        "scanf(\"%5s\", buffer) == 1",
+        () -> {
+          gen.putStatement("return strcmp(buffer, \"true\") == 0");
+        });
     gen.putStatement("return 0");
     gen.decIndent();
     gen.putLine("}");
     gen.putBlankLine();
-    
+
     gen.putLine("char* string_scan() {");
     gen.incIndent();
     gen.putLine("char buffer[256];");
     gen.putLine("char c;");
     gen.putLine("int i = 0;");
-    gen.putWhile("(c = getchar()) != \'\\n\' && c != EOF", () -> {
-      gen.putIf("i < sizeof(buffer) - 1", () -> {
-        gen.putStatement("buffer[i++] = c");
-      });
-    });
+    gen.putWhile(
+        "(c = getchar()) != \'\\n\' && c != EOF",
+        () -> {
+          gen.putIf(
+              "i < sizeof(buffer) - 1",
+              () -> {
+                gen.putStatement("buffer[i++] = c");
+              });
+        });
     gen.putStatement("buffer[i] = '\\0'");
     gen.putStatement("return string_create(buffer)");
     gen.decIndent();
     gen.putLine("}");
     gen.putBlankLine();
+
+    // Utility function for sleeping a given number of milliseconds.
+    gen.putLine("void sleep_msecs(int msecs) {");
+    gen.incIndent();
+    gen.putStatement("struct timespec ts");
+    gen.putStatement("ts.tv_sec = msecs / 1000");
+    gen.putStatement("ts.tv_nsec = (msecs % 1000) * 1000000");
+    gen.putStatement("nanosleep(&ts, NULL)");
+    gen.decIndent();
+    gen.putLine("}");
 
     // Generate environment managers and the main function to a different string, so that we can
     // insert record cloner and cleaner functions later.
@@ -1235,6 +1254,11 @@ public class CGenerator extends IRInstructionVisitor {
     putAssign(cellRecord(peekCell(instruction.getRecord())), record(instruction.getArgRecord()));
     putAssign(record(instruction.getArgRecord()), "NULL");
     putStatement("mtx_unlock(&" + cellMutex(peekCell(instruction.getRecord())) + ")");
+  }
+
+  @Override
+  public void visit(IRSleep instruction) {
+    putStatement("sleep_msecs(" + instruction.getMsecs() + ")");
   }
 
   // =============================== Expression building helpers ================================

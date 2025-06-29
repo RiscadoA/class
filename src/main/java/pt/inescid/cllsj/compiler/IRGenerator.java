@@ -627,6 +627,12 @@ public class IRGenerator extends ASTNodeVisitor {
     visitBlock(rhs, node.getRhs());
   }
 
+  @Override
+  public void visit(ASTSleep node) {
+    block.add(new IRSleep(node.getMsecs()));
+    node.getRhs().accept(this);
+  }
+
   // ======================================== Utilities =========================================
 
   private void decExponentialRefIfUnused(IRBlock block, ASTNode node, String name) {
@@ -873,6 +879,11 @@ public class IRGenerator extends ASTNodeVisitor {
 
     @Override
     public void visit(ASTRelease node) {}
+
+    @Override
+    public void visit(ASTSleep node) {
+      node.getRhs().accept(this);
+    }
   }
 
   private class GeneratedExpression {
@@ -1440,6 +1451,11 @@ public class IRGenerator extends ASTNodeVisitor {
         node.getLhs().accept(this);
         node.getRhs().accept(this);
       }
+
+      @Override
+      public void visit(ASTSleep node) {
+        node.getRhs().accept(this);
+      }
     }
 
     // A visitor which simply traverses the AST and assigns an index to each session created in it.
@@ -1613,6 +1629,11 @@ public class IRGenerator extends ASTNodeVisitor {
       @Override
       public void visit(ASTShare node) {
         node.getLhs().accept(this);
+        node.getRhs().accept(this);
+      }
+
+      @Override
+      public void visit(ASTSleep node) {
         node.getRhs().accept(this);
       }
     }

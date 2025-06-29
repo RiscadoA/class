@@ -141,4 +141,8 @@ public abstract class ASTNodeVisitor {
   public void visit(ASTScan node) {
     visit((ASTNode) node);
   }
+
+  public void visit(ASTSleep node) {
+    visit((ASTNode) node);
+  }
 }
