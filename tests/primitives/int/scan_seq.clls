@@ -1,0 +1,13 @@
+proc main() {
+    cut {
+        send ch(x. scan(x));
+        send ch(y. scan(y: lint));
+        send ch(z. scan(z));
+        close ch
+        |ch: ~send lint; send lint; send lint; close|
+        recv ch(x); println(x);
+        recv ch(y); println(y);
+        recv ch(z); println(z);
+        wait ch; ()
+    }
+};;

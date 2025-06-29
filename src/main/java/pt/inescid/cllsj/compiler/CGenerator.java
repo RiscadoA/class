@@ -351,6 +351,46 @@ public class CGenerator extends IRInstructionVisitor {
     gen.putLine("}");
     gen.putBlankLine();
 
+
+    // Functions used for reading primitives from the standard input.
+    gen.putLine("int int_scan() {");
+    gen.incIndent();
+    gen.putLine("int value;");
+    gen.putIf("scanf(\"%d\", &value) == 1", () -> {
+      gen.putStatement("return value");
+    });
+    gen.putStatement("return 0");
+    gen.decIndent();
+    gen.putLine("}");
+    gen.putBlankLine();
+
+    gen.putLine("int bool_scan() {");
+    gen.incIndent();
+    gen.putLine("char buffer[6];");
+    gen.putIf("scanf(\"%5s\", buffer) == 1", () -> {
+      gen.putStatement("return strcmp(buffer, \"true\") == 0");
+    });
+    gen.putStatement("return 0");
+    gen.decIndent();
+    gen.putLine("}");
+    gen.putBlankLine();
+    
+    gen.putLine("char* string_scan() {");
+    gen.incIndent();
+    gen.putLine("char buffer[256];");
+    gen.putLine("char c;");
+    gen.putLine("int i = 0;");
+    gen.putWhile("(c = getchar()) != \'\\n\' && c != EOF", () -> {
+      gen.putIf("i < sizeof(buffer) - 1", () -> {
+        gen.putStatement("buffer[i++] = c");
+      });
+    });
+    gen.putStatement("buffer[i] = '\\0'");
+    gen.putStatement("return string_create(buffer)");
+    gen.decIndent();
+    gen.putLine("}");
+    gen.putBlankLine();
+
     // Generate environment managers and the main function to a different string, so that we can
     // insert record cloner and cleaner functions later.
     String headerCode = gen.code;
@@ -834,9 +874,7 @@ public class CGenerator extends IRInstructionVisitor {
           putAssign(record(ENV, i.getRecord()), "NULL");
         });
 
-    putIf(
-        decrementAtomic(environmentEndPoints()) + " == 0",
-        () -> putFreeEnvironment(ENV));
+    putIf(decrementAtomic(environmentEndPoints()) + " == 0", () -> putFreeEnvironment(ENV));
 
     putAssign(ENV, TMP_ENV);
     putComputedGoto(TMP_CONT);
@@ -964,6 +1002,21 @@ public class CGenerator extends IRInstructionVisitor {
   @Override
   public void visit(IRPrint instruction) {
     generatePrint(instruction.getExpression(), instruction.hasNewLine());
+  }
+
+  @Override
+  public void visit(IRScan instruction) {
+    String type = cType(instruction.getType());
+    if (instruction.getType() instanceof IRIntT) {
+      putPush(instruction.getRecord(), type, "int_scan()");
+    } else if (instruction.getType() instanceof IRBoolT) {
+      putPush(instruction.getRecord(), type, "bool_scan()");
+    } else if (instruction.getType() instanceof IRStringT) {
+      putPush(instruction.getRecord(), type, "string_scan()");
+    } else {
+      throw new UnsupportedOperationException(
+          "Unsupported type for IRScan: " + instruction.getType().getClass().getName());
+    }
   }
 
   @Override
@@ -1127,11 +1180,13 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRDecRefCell instruction) {
-    putIf(decrementAtomic(cellRefCount(peekCell(instruction.getRecord()))) + " == 0", () -> {
-      putManagerReset();
-      putManagerPushProcessTypes();
-      putCleanRecord(recordType(instruction.getRecord()), record(instruction.getRecord()));
-    });
+    putIf(
+        decrementAtomic(cellRefCount(peekCell(instruction.getRecord()))) + " == 0",
+        () -> {
+          putManagerReset();
+          putManagerPushProcessTypes();
+          putCleanRecord(recordType(instruction.getRecord()), record(instruction.getRecord()));
+        });
   }
 
   @Override
@@ -1647,7 +1702,6 @@ public class CGenerator extends IRInstructionVisitor {
           putDecRefExponential(exponential, recordType, false);
         });
   }
-
 
   private void putAllocCell(String var) {
     putAssign(var, "malloc(sizeof(struct cell))");
@@ -2575,13 +2629,17 @@ public class CGenerator extends IRInstructionVisitor {
 
     @Override
     public void visit(IRCellT type) {
-      putIfWritten(() -> {
-        putAllocCell(access(newBuffer, "struct cell*"));
-        putAssign(cellRefCount(access(newBuffer, "struct cell*")), cellRefCount(access(oldBuffer, "struct cell*")));
-        putCloneRecord(type.getInner(),
-                       cellRecord(access(oldBuffer, "struct cell*")),
-                       cellRecord(access(newBuffer, "struct cell*")));
-      });
+      putIfWritten(
+          () -> {
+            putAllocCell(access(newBuffer, "struct cell*"));
+            putAssign(
+                cellRefCount(access(newBuffer, "struct cell*")),
+                cellRefCount(access(oldBuffer, "struct cell*")));
+            putCloneRecord(
+                type.getInner(),
+                cellRecord(access(oldBuffer, "struct cell*")),
+                cellRecord(access(newBuffer, "struct cell*")));
+          });
     }
   }
 
@@ -2721,12 +2779,12 @@ public class CGenerator extends IRInstructionVisitor {
 
     @Override
     public void visit(IRCellT type) {
-      putIfWritten(() -> {
-        putStatement("mtx_destroy(&" + cellMutex(access(buffer, "struct cell*")) + ");");
-        putCleanRecord(type.getInner(),
-                       cellRecord(access(buffer, "struct cell*")));
-        putFreeCell(access(buffer, "struct cell*"));
-      });
+      putIfWritten(
+          () -> {
+            putStatement("mtx_destroy(&" + cellMutex(access(buffer, "struct cell*")) + ");");
+            putCleanRecord(type.getInner(), cellRecord(access(buffer, "struct cell*")));
+            putFreeCell(access(buffer, "struct cell*"));
+          });
     }
   }
 }

@@ -1,0 +1,7 @@
+proc main() {
+    cut {
+        scan(x)
+        |x: ~lbool|
+        println(x); ()
+    }
+};;

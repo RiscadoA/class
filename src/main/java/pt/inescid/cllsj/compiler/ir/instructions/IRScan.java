@@ -1,22 +1,23 @@
 package pt.inescid.cllsj.compiler.ir.instructions;
 
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
+import pt.inescid.cllsj.compiler.ir.type.IRType;
 
-public class IRPutCell extends IRInstruction {
+public class IRScan extends IRInstruction {
   private int record;
-  private int argRecord;
+  private IRType type;
 
-  public IRPutCell(int record, int argRecord) {
+  public IRScan(int record, IRType type) {
     this.record = record;
-    this.argRecord = argRecord;
+    this.type = type;
   }
 
   public int getRecord() {
     return record;
   }
 
-  public int getArgRecord() {
-    return argRecord;
+  public IRType getType() {
+    return type;
   }
 
   @Override
@@ -26,6 +27,6 @@ public class IRPutCell extends IRInstruction {
 
   @Override
   public String toString() {
-    return "putCell(" + record + ", " + argRecord + ")";
+    return "scan(" + record + ", " + type + ")";
   }
 }

@@ -410,6 +410,8 @@ TOKEN :
   |
   < PRINTLN: "println" >
   |
+  < SCAN: "scan" >
+  |
   < INFO: "info" >
   |
   < REPEAT: "repeat" >
@@ -1096,6 +1098,16 @@ boolean b;
       p.setanc(p1);
       p = p1;
       p1.lineno = c2.beginLine; 
+    }
+    |
+    c1 = <SCAN>
+    <LPAR>
+    c2=<Id>
+    (<COL> t=Type()) ?
+    <RPAR>
+    {
+      p = new ASTScan(c2.image,t);
+      p.lineno = c1.beginLine; 
     }
     |
     c1 = <PRINTLN>

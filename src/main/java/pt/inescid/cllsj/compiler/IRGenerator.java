@@ -10,7 +10,6 @@ import java.util.Set;
 import java.util.Stack;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
-
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.TypeEntry;
@@ -60,7 +59,8 @@ public class IRGenerator extends ASTNodeVisitor {
 
   // ==================================== AST node visitors =====================================
 
-  private void addProcess(boolean hasArguments, Environment env, ASTNode node, Consumer<IRBlock> entryConsumer) {
+  private void addProcess(
+      boolean hasArguments, Environment env, ASTNode node, Consumer<IRBlock> entryConsumer) {
     IRProcess oldProcess = process;
     IRBlock oldBlock = block;
     process =
@@ -345,6 +345,12 @@ public class IRGenerator extends ASTNodeVisitor {
   }
 
   @Override
+  public void visit(ASTScan node) {
+    block.add(new IRScan(record(node.getCh()), intoIRType(node.getType())));
+    block.add(new IRReturn(record(node.getCh())));
+  }
+
+  @Override
   public void visit(ASTCoExpr node) {
     GeneratedExpression expr = generateExpression(node.getExpr());
 
@@ -396,15 +402,19 @@ public class IRGenerator extends ASTNodeVisitor {
     List<TypeArgument> typeArgs = new ArrayList<>();
     Environment env =
         Environment.forExponential(environment(), node, exponentialArgs, typeArgs, ep);
-    
+
     // Generate the process for the exponential closure
-    addProcess(true, env, node.getRhs(), entry -> {
-      // If the session type is negative, we can't immediately run the closure.
-      // Thus, after we enter into the process, we just flip back.
-      if (!isPositive(node.getType())) {
-        process.getEntry().add(new IRFlip(env.record(node.getChi())));
-      }
-    });
+    addProcess(
+        true,
+        env,
+        node.getRhs(),
+        entry -> {
+          // If the session type is negative, we can't immediately run the closure.
+          // Thus, after we enter into the process, we just flip back.
+          if (!isPositive(node.getType())) {
+            process.getEntry().add(new IRFlip(env.record(node.getChi())));
+          }
+        });
 
     // Call the process we generated above.
     // The reason we use a separate process here at all is to decouple the right
@@ -413,7 +423,12 @@ public class IRGenerator extends ASTNodeVisitor {
     // currently in, and only the environment of the process we are calling now.
     IRBlock finish = process.addBlock("bang_return");
     block.add(new IRNewSession(record(node.getChi()), finish.getLabel()));
-    block.add(new IRCallProcess(env.getName(), List.of(new LinearArgument(record(node.getChi()), env.record(node.getChi()))), exponentialArgs, typeArgs));
+    block.add(
+        new IRCallProcess(
+            env.getName(),
+            List.of(new LinearArgument(record(node.getChi()), env.record(node.getChi()))),
+            exponentialArgs,
+            typeArgs));
     finish.add(new IRNewExponential(exponential(node.getChr() + "$bang"), record(node.getChi())));
     finish.add(new IRPushExponential(record(node.getChr()), exponential(node.getChr() + "$bang")));
     finish.add(new IRDetachExponential(exponential(node.getChr() + "$bang")));
@@ -468,17 +483,22 @@ public class IRGenerator extends ASTNodeVisitor {
     List<IRCallProcess.LinearArgument> linearArgs = new ArrayList<>();
     List<IRCallProcess.TypeArgument> typeArgs = new ArrayList<>();
     Environment env =
-        Environment.forAffine(environment(), node.getRhs(), exponentialArgs, linearArgs, typeArgs, ep);
+        Environment.forAffine(
+            environment(), node.getRhs(), exponentialArgs, linearArgs, typeArgs, ep);
 
     // Generate the process holding the affine right hand side.
-    addProcess(true, env, node.getRhs(), entry -> {
-      // If the session type is negative, we should not immediately run the code.
-      // Thus, after we enter into the process, we just flip back.
-      if (!isPositive(node.getContType())) {
-        process.getEntry().add(new IRFlip(env.record(node.getCh())));
-      }
-    });
-      
+    addProcess(
+        true,
+        env,
+        node.getRhs(),
+        entry -> {
+          // If the session type is negative, we should not immediately run the code.
+          // Thus, after we enter into the process, we just flip back.
+          if (!isPositive(node.getContType())) {
+            process.getEntry().add(new IRFlip(env.record(node.getCh())));
+          }
+        });
+
     // Call the process we generated above.
     // The reason we use a separate process here at all is to decouple the right
     // hand side of the node from the current environment, so that if it is
@@ -508,11 +528,11 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTCell node) {
-    if (!(node.getTypeRhs() instanceof ASTAffineT) ||
-        !(node.getRhs() instanceof ASTAffine)) {
+    if (!(node.getTypeRhs() instanceof ASTAffineT) || !(node.getRhs() instanceof ASTAffine)) {
       throw new RuntimeException(
           "The compiler assumes that the right hand side of a cell is an affine process, but got: "
-              + node.getRhs().getClass().getSimpleName() + " with type "
+              + node.getRhs().getClass().getSimpleName()
+              + " with type "
               + node.getTypeRhs().getClass().getSimpleName());
     }
 
@@ -779,6 +799,9 @@ public class IRGenerator extends ASTNodeVisitor {
     public void visit(ASTPrintLn node) {
       node.getRhs().accept(this);
     }
+
+    @Override
+    public void visit(ASTScan node) {}
 
     @Override
     public void visit(ASTUnfold node) {
@@ -1354,6 +1377,9 @@ public class IRGenerator extends ASTNodeVisitor {
       }
 
       @Override
+      public void visit(ASTScan node) {}
+
+      @Override
       public void visit(ASTCut node) {
         node.getLhs().accept(this);
         node.getRhs().accept(this);
@@ -1436,7 +1462,7 @@ public class IRGenerator extends ASTNodeVisitor {
       @Override
       public void visit(ASTBang node) {
         insertExponential(node.getChr() + "$bang", intoIRType(ep, node.getType()));
-        insertLinear(node.getChi(),  intoIRType(ep, node.getType()));
+        insertLinear(node.getChi(), intoIRType(ep, node.getType()));
       }
 
       @Override
@@ -1515,6 +1541,9 @@ public class IRGenerator extends ASTNodeVisitor {
       public void visit(ASTPrintLn node) {
         node.getRhs().accept(this);
       }
+
+      @Override
+      public void visit(ASTScan node) {}
 
       @Override
       public void visit(ASTCut node) {

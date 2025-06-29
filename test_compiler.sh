@@ -39,8 +39,9 @@ for file in $files
 do
     processed=$((processed + 1))
 
-    # Check if there are accompanying .trace or .out files
+    # Check if there are accompanying .trace, .in, .out or .err files
     basename=$(basename $file .clls)
+    infile=$(dirname $file)/$basename.in
     outfile=$(dirname $file)/$basename.out
     errfile=$(dirname $file)/$basename.err
 
@@ -61,38 +62,63 @@ do
         continue
     fi
     success "success!"
-    echo -n " Running... "
 
-    # Run the compiled file
-    $baseout > $baseout.out 2> $baseout.err
-    if [ $? -ne 0 ]; then
-        error "execution failed! See $baseout.out and $baseout.err"
+    # Check if there are input files
+    shopt -s nullglob
+    just_failed=0
+    infiles=($infile.*)
+    if [ ${#infiles[@]} -eq 0 ]; then
+        infiles=($infile)
+    fi
+    echo -n " Running..."
+    for file in "${infiles[@]}"; do
+        suffix=${file#$infile}
+
+        # Run the compiled file with the input file, if it exists
+        if [ -f $file ]; then
+            $baseout > $baseout.out$suffix 2> $baseout.err$suffix < $file
+        else
+            $baseout > $baseout.out$suffix 2> $baseout.err$suffix
+        fi
+        if [ $? -ne 0 ]; then
+            error " execution failed! See $baseout.out$suffix and $baseout.err$suffix"
+            just_failed=1
+            break
+        fi
+
+        # Compare the standard output with the expected
+        if [ -f $outfile$suffix ]; then
+            diff $baseout.out$suffix $outfile$suffix > /dev/null 2>&1
+            if [ $? -ne 0 ]; then
+                error " expected $outfile$suffix, got $baseout.out$suffix"
+                just_failed=1
+                break
+            fi
+        fi
+
+        # Compare the error output with the expected
+        if [ -f $errfile$suffix ]; then
+            diff $baseout.err$suffix $errfile$suffix > /dev/null 2>&1
+            if [ $? -ne 0 ]; then
+                error " expected $errfile$suffix, got $baseout.err$suffix"
+                just_failed=1
+                break
+            fi
+        fi
+
+        if [[ $suffix != "" ]]; then
+            success " $suffix"
+        fi
+    done
+    success " passed"
+
+    # If any of the passes above failed
+    if [ $just_failed -ne 0 ]; then
         failed=$((failed + 1))
-        continue
+    else
+        success=$((success + 1))
+        success "\n"
     fi
-
-    # Compare the standard output with the expected
-    if [ -f $outfile ]; then
-        diff $baseout.out $outfile > /dev/null 2>&1
-        if [ $? -ne 0 ]; then
-            error "expected $outfile, got $baseout.out"
-            failed=$((failed + 1))
-            continue
-        fi
-    fi
-
-    # Compare the error output with the expected
-    if [ -f $errfile ]; then
-        diff $baseout.err $errfile > /dev/null 2>&1
-        if [ $? -ne 0 ]; then
-            error "expected $errfile, got $baseout.err"
-            failed=$((failed + 1))
-            continue
-        fi
-    fi
-
-    success "passed\n"
-    success=$((success + 1))
 done
 
 if [ $failed -eq 0 ]; then

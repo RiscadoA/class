@@ -98,6 +98,10 @@ public abstract class IRInstructionVisitor {
     visit((IRInstruction) instruction);
   }
 
+  public void visit(IRScan instruction) {
+    visit((IRInstruction) instruction);
+  }
+
   public void visit(IRPushExpression instruction) {
     visit((IRInstruction) instruction);
   }
