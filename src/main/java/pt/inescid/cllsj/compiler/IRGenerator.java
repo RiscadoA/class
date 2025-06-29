@@ -340,7 +340,7 @@ public class IRGenerator extends ASTNodeVisitor {
   public void visit(ASTPrintLn node) {
     GeneratedExpression expr = generateExpression(node.getExpr());
     block.add(new IRPrint(expr.getExpr(), node.withNewLine()));
-    expr.cleanUp(block, Optional.of(node.getRhs()));
+    expr.cleanUp(block, Optional.of(node.getRhs()), true);
     node.getRhs().accept(this);
   }
 
@@ -355,7 +355,7 @@ public class IRGenerator extends ASTNodeVisitor {
     GeneratedExpression expr = generateExpression(node.getExpr());
 
     block.add(new IRPushExpression(record(node.getCh()), expr.getExpr(), false));
-    expr.cleanUp(block, Optional.empty());
+    expr.cleanUp(block, Optional.empty(), true);
     block.add(new IRReturn(record(node.getCh())));
   }
 
@@ -364,7 +364,7 @@ public class IRGenerator extends ASTNodeVisitor {
     GeneratedExpression expr = generateExpression(node.getExpr());
 
     block.add(new IRPushExpression(record(node.getCh()), expr.getExpr(), true));
-    expr.cleanUp(block, Optional.empty());
+    expr.cleanUp(block, Optional.empty(), true);
     block.add(new IRReturn(record(node.getCh())));
   }
 
@@ -382,8 +382,8 @@ public class IRGenerator extends ASTNodeVisitor {
         new IRBranch.Case(elseBlock.getLabel(), countEndPoints(node.getElse()) - 1);
     block.add(new IRBranch(expr.getExpr(), then, otherwise));
 
-    expr.cleanUp(thenBlock, Optional.of(node.getThen()));
-    expr.cleanUp(elseBlock, Optional.of(node.getElse()));
+    expr.cleanUp(thenBlock, Optional.of(node.getThen()), false);
+    expr.cleanUp(elseBlock, Optional.of(node.getElse()), false);
 
     // Decrement the reference count of any unused exponentials in the branches.
     for (String name : exponentials) {
@@ -902,13 +902,15 @@ public class IRGenerator extends ASTNodeVisitor {
       return expr;
     }
 
-    public void cleanUp(IRBlock block, Optional<ASTNode> continuation) {
+    public void cleanUp(IRBlock block, Optional<ASTNode> continuation, boolean cleanExponentials) {
       for (String record : usedRecords) {
         block.add(new IRFreeSession(record(record)));
       }
-      for (String exponential : usedExponentials) {
-        if (continuation.isEmpty() || !nameFreeIn(continuation.get(), exponential)) {
-          block.add(new IRDecRefExponential(exponential(exponential)));
+      if (cleanExponentials) {
+        for (String exponential : usedExponentials) {
+          if (continuation.isEmpty() || !nameFreeIn(continuation.get(), exponential)) {
+            block.add(new IRDecRefExponential(exponential(exponential)));
+          }
         }
       }
     }
