@@ -107,7 +107,7 @@ public class ASTRecv extends ASTNode {
   public ASTNode ASTweakeningOnLeaf(String _ch, ASTType t, boolean exp) throws Exception {
     if (_ch.equals(chi)) {
       if (!_ch.equals(chr)) { // may place here before receeive
-        return this.ASTweakeningHere(_ch, exp);
+        return this.ASTweakeningHere(_ch, t, exp);
       }
       throw new TypeError(
           "Line " + lineno + " :" + "for " + _ch + " type pending after RECV on " + chr);

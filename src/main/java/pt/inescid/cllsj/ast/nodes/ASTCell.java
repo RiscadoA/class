@@ -111,7 +111,7 @@ public class ASTCell extends ASTNode {
   public ASTNode ASTweakeningOnLeaf(String _ch, ASTType typ, boolean exp) throws Exception {
     if (_ch.equals(chc)) { // may place before cell
       if (!_ch.equals(ch)) {
-        return this.ASTweakeningHere(_ch, exp);
+        return this.ASTweakeningHere(_ch, typ, exp);
       }
       throw new TypeError(
           "Line " + lineno + " :" + "for " + _ch + " type pending in CELL on " + chc);

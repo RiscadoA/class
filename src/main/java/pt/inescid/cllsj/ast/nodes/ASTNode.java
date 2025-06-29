@@ -217,10 +217,10 @@ public abstract class ASTNode {
     return mix;
   }
 
-  public ASTNode ASTweakeningHere(String _ch, boolean exp) {
+  public ASTNode ASTweakeningHere(String _ch, ASTType t, boolean exp) {
     // System.out.println("ASTweakeningHere ");
     if (exp) {
-      ASTNode push = new ASTWhy(_ch, this);
+      ASTNode push = new ASTWhy(_ch, t, this);
       this.setanc(push);
       push.setanc(anc);
       return push;

@@ -81,7 +81,7 @@ public class ASTCut extends ASTNode {
 
   public ASTNode ASTweakeningOnLeaf(String ch, ASTType typ, boolean exp) throws Exception {
     if (ch.equals(id)) {
-      return this.ASTweakeningHere(ch, exp);
+      return this.ASTweakeningHere(ch, typ, exp);
     } else {
       Set<String> s = lhs.fn(new HashSet<String>());
       if (s.contains(ch)) {

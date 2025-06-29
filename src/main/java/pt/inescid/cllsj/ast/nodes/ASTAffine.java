@@ -118,7 +118,7 @@ public class ASTAffine extends ASTNode {
   public ASTNode ASTweakeningOnLeaf(String _ch, ASTType typ, boolean exp) throws Exception {
     if (exp)
       return this.ASTweakeningHere(
-          _ch, exp); // must insert here because affine blocks linear names ?x
+          _ch, typ, exp); // must insert here because affine blocks linear names ?x
     else {
       rhs = rhs.ASTweakeningOnLeaf(_ch, typ, exp);
       // if(coaffineSet.contains(_ch)) System.out.println("in CoaffineSet");

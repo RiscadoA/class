@@ -69,7 +69,7 @@ public class ASTFwdB extends ASTNode {
   public ASTNode ASTweakeningOnLeaf(String _ch, ASTType t, boolean exp) throws Exception {
     if (_ch.equals(ch1) || _ch.equals(ch2))
       throw new Exception("Unexpected call: ASTInsertWhyNot"); // never called
-    return this.ASTweakeningHere(_ch, exp);
+    return this.ASTweakeningHere(_ch, t, exp);
   }
 
   public void typecheck(Env<ASTType> ed, Env<ASTType> eg, Env<EnvEntry> ep) throws Exception {

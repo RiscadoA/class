@@ -86,7 +86,7 @@ public class ASTFwd extends ASTNode {
   public ASTNode ASTweakeningOnLeaf(String _ch, ASTType typ, boolean exp) throws Exception {
     if (_ch.equals(ch1) || _ch.equals(ch2))
       throw new Exception("Unexpected call: ASTInsertWhyNot"); // never called
-    return this.ASTweakeningHere(_ch, exp);
+    return this.ASTweakeningHere(_ch, typ, exp);
   }
 
   private Pair<ASTType, ASTType> fwdInferRec(

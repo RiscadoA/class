@@ -96,7 +96,7 @@ public class ASTId extends ASTNode {
 
   public ASTNode ASTweakeningOnLeaf(String _ch, ASTType typ, boolean exp) throws Exception {
     if (pars.contains(_ch)) throw new Exception("Unexpected call: ASTInsertWhyNot"); // never called
-    return this.ASTweakeningHere(_ch, exp);
+    return this.ASTweakeningHere(_ch, typ, exp);
   }
 
   public void addpar(String id) {
