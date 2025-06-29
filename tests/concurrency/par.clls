@@ -1,12 +1,14 @@
 proc main() {
     cpar {
-        println("1");
+        sleep 1;
+        println("2");
         cpar {
-            println("11"); ()
+            sleep 1;
+            println("4"); ()
             ||
-            println("12"); ()
+            println("3"); ()
         }
         ||
-        println("2"); ()
+        println("1"); ()
     }
 };;

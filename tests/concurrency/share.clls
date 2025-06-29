@@ -1,18 +1,21 @@
 proc main() {
     cut {
-        cell x("a")
+        cell x("1")
         |x: ~state lstring|
         share x {
             take x(s); println(s);
-            put x("b");
+            put x("2");
+            sleep 2;
             take x(s); println(s);
-            put x("c");
+            put x("4");
             release x
             ||
+            sleep 1;
             take x(s); println(s);
-            put x("d");
+            put x("3");
+            sleep 2;
             take x(s); println(s);
-            put x("e");
+            put x("5");
             release x
         }
     }
