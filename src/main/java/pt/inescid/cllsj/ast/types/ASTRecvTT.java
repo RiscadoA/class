@@ -45,7 +45,7 @@ public class ASTRecvTT extends ASTType {
 
   public void kindcheck(Env<EnvEntry> e) throws Exception {
     Env<EnvEntry> el = e.assoc(id, new TypeEntry(new ASTIdT(id)));
-    rhs.unfoldType(e).kindcheck(el);
+    rhs.unfoldType(el).kindcheck(el);
   }
 
   public ASTType dual(Env<EnvEntry> e) throws Exception {
