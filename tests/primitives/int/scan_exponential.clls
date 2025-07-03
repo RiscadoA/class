@@ -1,0 +1,7 @@
+proc main() {
+    cut {
+        scan(x)
+        |x: ~!lint|
+        println(x); println(x); println(x); ()
+    }
+};;

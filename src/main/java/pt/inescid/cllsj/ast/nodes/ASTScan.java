@@ -20,6 +20,7 @@ import pt.inescid.cllsj.VInt;
 import pt.inescid.cllsj.VString;
 import pt.inescid.cllsj.Value;
 import pt.inescid.cllsj.ast.ASTNodeVisitor;
+import pt.inescid.cllsj.ast.types.ASTBangT;
 import pt.inescid.cllsj.ast.types.ASTBasicType;
 import pt.inescid.cllsj.ast.types.ASTLboolT;
 import pt.inescid.cllsj.ast.types.ASTLintT;
@@ -90,14 +91,19 @@ public class ASTScan extends ASTNode {
     ed.upd(ch, null);
     type = ty;
 
-    if (!(type instanceof ASTBasicType)) {
+    ASTType t = type;
+    if (t instanceof ASTBangT) {
+      t = ((ASTBangT)t).getin();
+    }
+
+    if (!(t instanceof ASTBasicType)) {
       throw new TypeError(
           "Line "
               + lineno
               + " :"
               + "SCAN "
               + ch
-              + " not of basic type (found "
+              + " not of (optionally exponential) basic type (found "
               + type.toStr(ep)
               + ")");
     }

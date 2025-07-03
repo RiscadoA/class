@@ -5,6 +5,7 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+
 import pt.inescid.cllsj.compiler.ir.*;
 import pt.inescid.cllsj.compiler.ir.expressions.*;
 import pt.inescid.cllsj.compiler.ir.instructions.*;
@@ -1025,16 +1026,43 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRScan instruction) {
-    String type = cType(instruction.getType());
-    if (instruction.getType() instanceof IRIntT) {
-      putPush(instruction.getRecord(), type, "int_scan()");
-    } else if (instruction.getType() instanceof IRBoolT) {
-      putPush(instruction.getRecord(), type, "bool_scan()");
-    } else if (instruction.getType() instanceof IRStringT) {
-      putPush(instruction.getRecord(), type, "string_scan()");
+    IRType irType = instruction.getType();
+    boolean promote = false;
+    if (irType instanceof IRExponentialT) {
+      irType = ((IRExponentialT)irType).getInner();
+      promote = true;
+    }
+
+    String cType = cType(irType);
+    String cValue;
+
+    if (irType instanceof IRIntT) {
+      cValue = "int_scan()";
+    } else if (irType instanceof IRBoolT) {
+      cValue = "bool_scan()";
+    } else if (irType instanceof IRStringT) {
+      cValue = "string_scan()";
     } else {
       throw new UnsupportedOperationException(
           "Unsupported type for IRScan: " + instruction.getType().getClass().getName());
+    }
+
+    if (promote) {
+      putAllocExponential(TMP_EXPONENTIAL);
+      putAssign(exponentialRefCount(TMP_EXPONENTIAL), 1);
+      putAllocRecord(exponentialRecord(TMP_EXPONENTIAL), irType);
+      putAssign(read(exponentialRecord(TMP_EXPONENTIAL)), 0);
+      putAssign(written(exponentialRecord(TMP_EXPONENTIAL)), 0);
+      putAssign(recordContEnv(exponentialRecord(TMP_EXPONENTIAL)), "NULL");
+      String recordBufferManagerName = recordBufferManagerName(irType);
+      putAssign(
+          exponentialManager(TMP_EXPONENTIAL),
+          recordBufferManagerName.isEmpty() ? "NULL" : ("&" + recordBufferManagerName));
+
+      putPush(exponentialRecord(TMP_EXPONENTIAL), cType, cValue);
+      putPushExponential(instruction.getRecord(), TMP_EXPONENTIAL);
+    } else {
+      putPush(instruction.getRecord(), cType, cValue);
     }
   }
 
