@@ -47,9 +47,6 @@ do
 
     baseout=bin/$(dirname $file)/$basename
     flags="-P -o $baseout"
-    if [ ! -f $errfile ]; then
-        flags="$flags -t";
-    fi
     mkdir -p $(dirname $baseout)
 
     echo -n "($processed/$count) Compiling $file... "
