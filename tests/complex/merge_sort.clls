@@ -1,0 +1,190 @@
+type rec List(A) {
+    choice of {
+        |#cons: send A; List(A)
+        |#nil: close
+    }
+};;
+
+type Ordering {
+    choice of {
+        |#lt: close
+        |#gt: close
+        |#eq: close
+    }
+};;
+
+type Comparator(A) {
+    recv ~A; recv ~A; Ordering
+};;
+
+type rec Iter {
+    choice of {
+        |#cons: Iter
+        |#nil: close
+    }
+};;
+
+proc int_compare(o: Ordering; x: ~lint, y: ~lint) {
+    if x < y {
+        #lt o; close o
+    } else if x == y {
+        #eq o; close o
+    } else {
+        #gt o; close o
+    }
+};;
+
+proc int_comparator(c: !Comparator(!lint)) {
+    !c(i);
+    recv i(x);
+    recv i(y);
+    int_compare(i; x, y)
+};;
+
+proc rec print_list(l: ~List(!lint), done: close) {
+    case l of {
+        |#cons: recv l(x); println(x); print_list(l, done)
+        |#nil: fwd l done
+    }
+};;
+
+proc unsafe_rec merge<A>(
+    l1: ~List(!A),
+    l2: ~List(!A),
+    out: List(!A);
+    cmp: ~Comparator(!A))
+{
+    case l1 of {
+        |#cons: case l2 of {
+            |#cons:
+                recv l1(x); recv l2(y); ?x; ?y;
+                call cmp(o); send o(x); send o(y);
+                #cons out;
+                case o of {
+                    |#lt:
+                        wait o;
+                        send out(x);
+                        cut {
+                            #cons l2n; send l2n(y);
+                            fwd l2 l2n
+                            |l2n: ~List(!A)|
+                            merge<A>(l1, l2n, out; cmp)
+                        }
+                    |#eq:
+                        wait o;
+                        send out(x);
+                        cut {
+                            #cons l2n; send l2n(y);
+                            fwd l2 l2n
+                            |l2n: ~List(!A)|
+                            merge<A>(l1, l2n, out; cmp)
+                        }
+                    |#gt:
+                        wait o;
+                        send out(y);
+                        cut {
+                            #cons l1n; send l1n(x);
+                            fwd l1 l1n
+                            |l1n: ~List(!A)|
+                            merge<A>(l1n, l2, out; cmp)
+                        }
+                }
+            |#nil: wait l2; #cons out; fwd l1 out
+        }
+        |#nil: wait l1; fwd l2 out 
+    }
+};;
+
+proc rec split<A>(l1: ~List(!A), ls: send List(!A); send List(!A); close) {
+    case l1 of {
+        |#cons:
+            recv l1(x); ?x;
+            case l1 of {
+                |#cons:
+                    recv l1(y); ?y;
+                    cut {
+                        split<A>(l1, lp)
+                        |lp: recv ~List(!A); recv ~List(!A); wait|
+                        recv lp(l2);
+                        recv lp(l3);
+                        wait lp;
+                        cut {
+                            #cons l2n; send l2n(x); fwd l2 l2n
+                            |l2n: ~List(!A)|
+                            cut {
+                                #cons l3n; send l3n(y); fwd l3 l3n
+                                |l3n: ~List(!A)|
+                                send ls(l2n); send ls(l3n);
+                                close ls
+                            }
+                        }
+                    }
+                |#nil:
+                    wait l1;
+                    send ls(l. #cons l; send l(x); #nil l; close l);
+                    send ls(l. #nil l; close l);
+                    close ls
+            }
+        |#nil:
+            wait l1;
+            send ls(l. #nil l; close l);
+            send ls(l. #nil l; close l);
+            close ls
+    }
+};;
+
+proc unsafe_rec merge_sort<A>(
+    unsorted: ~List(!A),
+    sorted: List(!A);
+    cmp: ~Comparator(!A)) {
+    cut {
+        split<A>(unsorted, ls)
+        |ls: recv ~List(!A); recv ~List(!A); wait|
+        recv ls(l1);
+        recv ls(l2);
+        wait ls;
+        case l2 of {
+            |#nil: wait l2; fwd l1 sorted
+            |#cons: recv l2(x); cut {
+                #cons l2n; send l2n(x); fwd l2 l2n
+                |l2n: ~List(!A)|
+                merge_sort<A>(l2n, l2s; cmp)
+                |l2s: ~List(!A)|
+                cut {
+                    merge_sort<A>(l1, l1s; cmp)
+                    |l1s: ~List(!A)|
+                    merge<A>(l1s, l2s, sorted; cmp)
+                }
+            }
+        }
+    }
+};;
+
+proc unsafe_rec scan_list(list: List(!lint)) {
+    cut {
+        scan(i)
+        |i: ~!lint|
+        if i == -1 {
+            #nil list; close list
+        } else {
+            #cons list; send list(i);
+            scan_list(list)
+        }
+    }
+};;
+
+proc main() {
+    cut {
+        int_comparator(cmp)
+        |cmp: ~!Comparator(!lint)|
+        cut {
+            scan_list(l)
+            |l: ~List(!lint)|
+            merge_sort<lint>(l, sorted; cmp)
+            |sorted: ~List(!lint)|
+            print_list(sorted, done)
+            |done: wait|
+            wait done; ()
+        }
+    }
+};;
