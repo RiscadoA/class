@@ -1,0 +1,65 @@
+type Impl(X, Y) {
+    recv ~X; send Y; close
+};;
+
+type Equiv(X, Y) {
+    send Impl(X, Y);
+    send Impl(Y, X);
+    close
+};;
+
+type Top {
+    close
+};;
+
+type Bot {
+    recvty X; X
+};;
+
+type Or(X, Y) {
+    choice of {
+        |#lhs: X
+        |#rhs: Y
+    }
+};;
+
+type Lem1 {
+    recvty X; recvty Y;
+    recv ~Impl(X, Y); recv ~Impl(Y, X);
+    send Equiv(X, Y);
+    close
+};;
+
+proc Lem1_proof(l: Lem1) {
+    recvty l(X); recvty l(Y);
+    recv l(implXY); recv l(implYX);
+    send l(equiv.
+        send equiv(implXY);
+        send equiv(implYX);
+        close equiv
+    );
+    close l
+};;
+
+type Lem2 {
+    recvty X; recvty Y; recvty Z;
+    recv ~Impl(X, Y); recv ~Impl(Y, Z);
+    send Impl(X, Z);
+    close
+};;
+
+proc Lem2_proof(l: Lem2) {
+    recvty l(X); recvty l(Y); recvty l(Z);
+    recv l(implXY); recv l(implYZ);
+    send l(implXZ.
+        recv implXZ(x);
+        send implXY(x); recv implXY(y); wait implXY;
+        send implYZ(y); recv implYZ(z); wait implYZ;
+        send implXZ(z); close implXZ
+    );
+    close l
+};;
+
+proc main() {
+    ()
+};;
