@@ -351,6 +351,11 @@ public class IRGenerator extends ASTNodeVisitor {
   }
 
   @Override
+  public void visit(ASTUnreachable node) {
+    block.add(new IRPanic("Unreachable code reached at line " + node.lineno));
+  }
+
+  @Override
   public void visit(ASTCoExpr node) {
     GeneratedExpression expr = generateExpression(node.getExpr());
 
@@ -884,6 +889,9 @@ public class IRGenerator extends ASTNodeVisitor {
     public void visit(ASTSleep node) {
       node.getRhs().accept(this);
     }
+
+    @Override
+    public void visit(ASTUnreachable node) {}
   }
 
   private class GeneratedExpression {
@@ -1458,6 +1466,9 @@ public class IRGenerator extends ASTNodeVisitor {
       public void visit(ASTSleep node) {
         node.getRhs().accept(this);
       }
+
+      @Override
+      public void visit(ASTUnreachable node) {}
     }
 
     // A visitor which simply traverses the AST and assigns an index to each session created in it.
@@ -1638,6 +1649,9 @@ public class IRGenerator extends ASTNodeVisitor {
       public void visit(ASTSleep node) {
         node.getRhs().accept(this);
       }
+
+      @Override
+      public void visit(ASTUnreachable node) {}
     }
   }
 }

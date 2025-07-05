@@ -93,7 +93,7 @@ public class ASTScan extends ASTNode {
 
     ASTType t = type;
     if (t instanceof ASTBangT) {
-      t = ((ASTBangT)t).getin();
+      t = ((ASTBangT) t).getin();
     }
 
     if (!(t instanceof ASTBasicType)) {
@@ -123,8 +123,8 @@ public class ASTScan extends ASTNode {
   }
 
   public void subs(String x, String y) { // implements x/y (substitutes y by x)
-    if (ch.equals(x)) {
-      ch = y; // Substitute ch by y
+    if (ch.equals(y)) {
+      ch = x; // Substitute ch by x
     }
   }
 

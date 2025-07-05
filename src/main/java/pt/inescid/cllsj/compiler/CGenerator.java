@@ -5,7 +5,6 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-
 import pt.inescid.cllsj.compiler.ir.*;
 import pt.inescid.cllsj.compiler.ir.expressions.*;
 import pt.inescid.cllsj.compiler.ir.instructions.*;
@@ -1029,7 +1028,7 @@ public class CGenerator extends IRInstructionVisitor {
     IRType irType = instruction.getType();
     boolean promote = false;
     if (irType instanceof IRExponentialT) {
-      irType = ((IRExponentialT)irType).getInner();
+      irType = ((IRExponentialT) irType).getInner();
       promote = true;
     }
 
@@ -1287,6 +1286,12 @@ public class CGenerator extends IRInstructionVisitor {
   @Override
   public void visit(IRSleep instruction) {
     putStatement("sleep_msecs(" + instruction.getMsecs() + ")");
+  }
+
+  @Override
+  public void visit(IRPanic instruction) {
+    putDebugLn("Panic: " + instruction.getMsg());
+    putStatement("exit(1);");
   }
 
   // =============================== Expression building helpers ================================

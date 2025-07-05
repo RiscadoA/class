@@ -412,4 +412,9 @@ public class SessionRenamer extends ASTNodeVisitor {
   public void visit(ASTSleep node) {
     node.getRhs().accept(this);
   }
+
+  @Override
+  public void visit(ASTUnreachable node) {
+    node.setCh(rename(node.getCh()));
+  }
 }

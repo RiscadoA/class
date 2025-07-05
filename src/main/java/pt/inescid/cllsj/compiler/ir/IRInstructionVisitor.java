@@ -157,4 +157,8 @@ public abstract class IRInstructionVisitor {
   public void visit(IRSleep instruction) {
     visit((IRInstruction) instruction);
   }
+
+  public void visit(IRPanic instruction) {
+    visit((IRInstruction) instruction);
+  }
 }

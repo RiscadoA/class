@@ -145,4 +145,8 @@ public abstract class ASTNodeVisitor {
   public void visit(ASTSleep node) {
     visit((ASTNode) node);
   }
+
+  public void visit(ASTUnreachable node) {
+    visit((ASTNode) node);
+  }
 }

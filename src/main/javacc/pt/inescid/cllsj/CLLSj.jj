@@ -412,6 +412,8 @@ TOKEN :
   |
   < SCAN: "scan" >
   |
+  < UNREACHABLE: "unreachable" >
+  |
   < INFO: "info" >
   |
   < REPEAT: "repeat" >
@@ -1131,6 +1133,13 @@ boolean b;
       p.setanc(p1);
       p = p1;
       p1.lineno = c2.beginLine; 
+    }
+    |
+    c1 = <UNREACHABLE>
+    c2=<Id>
+    {
+      p = new ASTUnreachable(c2.image);
+      p.lineno = c1.beginLine; 
     }
     |
     c1 = <SCAN>
