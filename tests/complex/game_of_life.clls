@@ -1,0 +1,139 @@
+include "../../lib/data/zipper.clls";;
+
+type Cell {
+    choice of {
+        |#live: close
+        |#dead: close
+    }
+};;
+
+type Column {
+    Iter(Cell)
+};;
+
+type ColumnZipper {
+    Zipper(Cell)
+};;
+
+type Grid {
+    Iter(Column)
+};;
+
+type GridZipper {
+    Zipper(ColumnZipper)
+};;
+
+proc update_cell(prev: ~Cell, next: Cell; live_neighbors: ~lint) {
+    case prev of {
+        |#live:
+            if live_neighbors < 2 or live_neighbors > 3 {
+                #dead next; fwd prev next
+            } else {
+                #live next; fwd prev next
+            }
+        |#dead:
+            if live_neighbors == 3 {
+                #live next; fwd prev next
+            } else {
+                #dead next; fwd prev next
+            }
+    }
+};;
+
+proc rec iter_zipper_map<T>(map: IterMap(Iter(T), Zipper(T))) {
+    case map of {
+        |#close: close map
+        |#next:
+            recv map(iter);
+            send map(zipper. zipper<T>(iter, zipper));
+            iter_zipper_map<T>(map)
+    }
+};;
+
+proc grid_zipper(grid: ~Grid, zipper: GridZipper) {
+    cut {
+        iter_zipper_map<Cell>(map)
+        |map: ~IterMap(Column, ColumnZipper)|
+        map_iter<Column, ColumnZipper>(grid, map, col_zippers)
+        |col_zippers: ~Iter(ColumnZipper)|
+        zipper<ColumnZipper>(col_zippers, zipper)
+    }
+};;
+
+proc grid_zipper_left(old: ~GridZipper, new: GridZipper) {
+    zipper_prev<ColumnZipper>(old, new)
+};;
+
+
+proc grid_zipper_right(old: ~GridZipper, new: GridZipper) {
+    zipper_next<ColumnZipper>(old, new)
+};;
+
+proc grid_zipper_up(old: ~GridZipper, new: GridZipper) {
+    recv old(old_left);
+    recv old(old_col);
+    recv old(old_right);
+    wait old;
+    send new(old_left);
+    send new(new_col. zipper_prev<Cell>(old_col, new_col));
+    send new(old_right);
+    close new
+};;
+
+proc grid_zipper_down(old: ~GridZipper, new: GridZipper) {
+    recv old(old_left);
+    recv old(old_col);
+    recv old(old_right);
+    wait old;
+    send new(old_left);
+    send new(new_col. zipper_next<Cell>(old_col, new_col));
+    send new(old_right);
+    close new
+};;
+
+proc grid_zipper_access(old_grid: ~GridZipper, new_grid: GridZipper, cell: send Cell; ~Cell) {
+    cut {
+        zipper_access<ColumnZipper>(old_grid, new_grid, column)
+        |new_column: recv ~ColumnZipper; ColumnZipper|
+        recv new_column(old_column);
+        zipper_access<Cell>(old_column, new_column, cell)
+    }
+};;
+
+proc grid_zipper_read(old_grid: ~GridZipper, new_grid: GridZipper, cell: Cell) {
+    cut {
+        grid_zipper_access(old_grid, new_grid, cell)
+        |new_cell: recv ~Cell; Cell|
+        recv new_cell(old_cell);
+        case old_cell of {
+            |#live: #live new_cell; #live cell; par { close new_cell || close cell }
+            |#dead: #dead new_cell; #dead cell; par { close new_cell || close cell }
+        }
+    }
+};;
+
+proc grid_zipper_count_live_self(old_grid: ~GridZipper, new_grid: GridZipper, old_live: ~lint, new_live: ~lint) {
+    cut {
+        grid_zipper_read(old_grid, new_grid, cell)
+        |cell: ~Cell|
+        case cell of {
+            |#live: wait cell; let new_live old_live + 1
+            |#dead: wait cell; let new_live old_live
+        }
+    }
+};;
+
+proc grid_zipper_count_live_neighbors(old_grid: ~GridZipper, new_grid: GridZipper, live_neighbors: lint) {
+    cut {
+        send p1(0);
+        grid_zipper_left(old_grid, p1)
+        |p1: recv ~lint; ~GridZipper|
+        recv p1(old_live_neighbors);
+        grid_zipper_count_live_self(p1, ???, old_live_neighbors, new_live_neighbors)
+        #next iter; send iter(c. grid_zipper_read(g1, g2, c));
+    }
+};;
+
+proc main() {
+    ()
+};;

@@ -1,0 +1,114 @@
+include "iter.clls";;
+
+type Zipper(A) {
+    send Iter(A); send A; send Iter(A); close
+};;
+
+proc zipper<A>(iter: ~Iter(A), zipper: Zipper(A)) {
+    case iter of {
+        |#next:
+            recv iter(curr);
+            send zipper(prev. #close prev; close prev);
+            send zipper(curr);
+            send zipper(iter);
+            close zipper
+        |#close:
+            println("zipper called with empty iterator");
+            wait iter; unreachable zipper
+    }
+};;
+
+proc zipper_has_prev<A>(old: ~Zipper(A), new: send lbool; Zipper(A)) {
+    recv old(old_prev);
+    recv old(old_curr);
+    recv old(old_next);
+    wait old;
+    case old_prev of {
+        |#close:
+            wait old_prev;
+            send new(false);
+            send new(i. #close i; close i);
+            send new(old_curr);
+            send new(old_next);
+            close new
+        |#next:
+            recv old_prev(old_prev_next);
+            send new(true);
+            send new(i. #next i; send i(old_prev_next); fwd old_prev i);
+            send new(old_curr);
+            send new(old_next);
+            close new
+    }
+};;
+
+
+proc zipper_has_next<A>(old: ~Zipper(A), new: send lbool; Zipper(A)) {
+    recv old(old_prev);
+    recv old(old_curr);
+    recv old(old_next);
+    wait old;
+    case old_next of {
+        |#close:
+            wait old_next;
+            send new(false);
+            send new(old_prev);
+            send new(old_curr);
+            send new(i. #close i; close i);
+            close new
+        |#next:
+            recv old_next(old_next_next);
+            send new(true);
+            send new(old_prev);
+            send new(old_curr);
+            send new(i. #next i; send i(old_next_next); fwd old_next i);
+            close new
+    }
+};;
+
+proc zipper_prev<A>(old: ~Zipper(A), new: Zipper(A)) {
+    recv old(old_prev);
+    recv old(old_curr);
+    recv old(old_next);
+    wait old;
+    case old_prev of {
+        |#close:
+            println("zipper_prev called out of bounds");
+            wait old_prev; par { unreachable old_curr || unreachable old_next || unreachable new }
+        |#next:
+            recv old_prev(new_curr);
+            send new(old_prev);
+            send new(new_curr);
+            send new(new_next. #next new_next; send new_next(old_curr); fwd old_next new_next);
+            close new
+    }
+};;
+
+proc zipper_next<A>(old: ~Zipper(A), new: Zipper(A)) {
+    recv old(old_prev);
+    recv old(old_curr);
+    recv old(old_next);
+    wait old;
+    case old_next of {
+        |#close:
+            println("zipper_next called out of bounds");
+            wait old_next; par { unreachable old_curr || unreachable old_prev || unreachable new }
+        |#next:
+            recv old_next(new_curr);
+            send new(new_prev. #next new_prev; send new_prev(old_curr); fwd old_prev new_prev);
+            send new(new_curr);
+            send new(old_next);
+            close new
+    }
+};;
+
+proc zipper_access<A>(old_zipper: ~Zipper(A), new_zipper: Zipper(A), value: send A; ~A) {
+    recv old_zipper(old_prev);
+    recv old_zipper(old_curr);
+    recv old_zipper(old_next);
+    wait old_zipper;
+    send value(old_curr);
+    send new_zipper(old_prev);
+    send new_zipper(value);
+    send new_zipper(old_next);
+    close new_zipper
+};;
