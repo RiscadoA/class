@@ -97,6 +97,7 @@ static {
       boolean trace = false;
       boolean profile = false;
       boolean onlyIR = false;
+      boolean onlyAST = false;
 
       for (int i = 0; i < args.length; i++) {
         if (args[i].equals("-c")) {
@@ -113,6 +114,8 @@ static {
           profile = true;
         } else if (args[i].equals("-i")) {
           onlyIR = true;
+        } else if (args[i].equals("-a")) {
+          onlyAST = true;
         } else if (args[i].equals("-p")) {
           if (i + 1 >= args.length) {
             failed = true;
@@ -128,11 +131,11 @@ static {
       }
 
       if (failed || input == null) {
-        System.err.println("Usage: CLLSj [-c <input-file>] [-t] [-P] [-p <entry-process>]");
+        System.err.println("Usage: CLLSj [-c <input-file>] [-t] [-P] [-i] [-a] [-p <entry-process>]");
         System.exit(1);
       }
 
-      System.exit(Compiler.compile(input, entryProcess, trace, profile, onlyIR));
+      System.exit(Compiler.compile(input, entryProcess, trace, profile, onlyIR, onlyAST));
     }
 
     //System.out.println("maximum pool size = " + ((ThreadPoolExecutor) threadPool).getMaximumPoolSize() );

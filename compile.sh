@@ -3,11 +3,12 @@
 CLLSflags=""
 Cflags="-std=c11"
 onlyir=false
+onlyast=false
 debug=false
 run=false
 ofile=""
 
-while getopts ":dOtPirp:o:" opt; do
+while getopts ":dOtPirap:o:" opt; do
     case $opt in
         d)
             Cflags="$Cflags -g -O0"
@@ -25,6 +26,10 @@ while getopts ":dOtPirp:o:" opt; do
         i)
             onlyir=true
             CLLSflags="$CLLSflags -i"
+            ;;
+        a)
+            onlyast=true
+            CLLSflags="$CLLSflags -a"
             ;;
         r)
             run=true
@@ -54,6 +59,7 @@ if [ -z $1 ]; then
     echo "    -t: Compile with tracing enabled" >&2
     echo "    -P: Compile with profiling enabled" >&2
     echo "    -i: Only generate IR code" >&2
+    echo "    -a: Only generate AST" >&2
     echo "    -O: Compile with optimization flags" >&2
     echo "    -r: Run the compiled program after compilation" >&2
     echo "    -p <process>: Specify the name of the entry process" >&2
@@ -65,15 +71,20 @@ if [ -z $ofile ]; then
     basename=$(basename $1)
     cfile=bin/${basename%.*}.c
     irfile=bin/${basename%.*}.ir
+    astfile=bin/${basename%.*}.ast
     pfile=bin/${basename%.*}
     mkdir -p bin
 else
     cfile=$ofile.c
     irfile=$ofile.ir
+    astfile=$ofile.ast
     pfile=$ofile
 fi
 
-if [ $onlyir = true ]; then
+if [ $onlyast = true ]; then
+    echo "@@@@@@ Generating AST to $astfile..." >&2 &&
+    mvn -q exec:java -Dexec.args="$CLLSflags -c $1" > $astfile
+elif [ $onlyir = true ]; then
     echo "@@@@@@ Generating IR code to $irfile..." >&2 &&
     mvn -q exec:java -Dexec.args="$CLLSflags -c $1" > $irfile
 else

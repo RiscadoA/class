@@ -18,7 +18,12 @@ import pt.inescid.cllsj.compiler.ir.IRProgram;
 
 public class Compiler {
   public static int compile(
-      String path, String entryProcess, boolean trace, boolean profile, boolean onlyIR) {
+      String path,
+      String entryProcess,
+      boolean trace,
+      boolean profile,
+      boolean onlyIR,
+      boolean onlyAST) {
     ASTProgram ast;
     try {
       ast = Compiler.parse(Path.of(path));
@@ -50,6 +55,11 @@ public class Compiler {
       System.err.println("Typechecking error: " + e.getMessage());
       e.printStackTrace();
       return 1;
+    }
+
+    if (onlyAST) {
+      ASTPrinter.print(System.out, ast);
+      return 0;
     }
 
     IRProgram ir;
