@@ -393,6 +393,9 @@ public class ASTId extends ASTNode {
                 + actual.toStr(ep));
       }
     }
+  
+    exprs.clear();
+    gexprs.clear();
   }
 
   public Set<String> fn(Set<String> s) {
