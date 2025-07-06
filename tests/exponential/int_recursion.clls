@@ -1,0 +1,18 @@
+proc unsafe_rec int_recursion(done: close; i: colint) {
+    println(i);
+    if i == 0 {
+        close done
+    } else {
+        int_recursion(done; i - 1)
+    }
+};;
+
+proc main() {
+    cut {
+        let! i 5
+        |i: ?colint|
+        int_recursion(done; i)
+        |done: wait|
+        wait done; ()
+    }
+};;
