@@ -90,7 +90,7 @@ proc acker(m:~Nat, n:~Nat, r:Nat){
 };;
 
 
-proc test0() {
+proc main() {
   cut {
      six(n)
      |n:~Nat|

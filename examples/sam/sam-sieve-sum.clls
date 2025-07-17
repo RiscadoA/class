@@ -97,5 +97,7 @@ proc mainc_ss(;np:colint)
  };;
 
 
-sam main_ss(;200);;
-sam mainc_ss(;98);;
+proc main() {
+  mainc_ss(;98)
+};;
+
