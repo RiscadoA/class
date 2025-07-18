@@ -49,14 +49,14 @@ public class CGenerator extends IRInstructionVisitor {
     gen.putLine("#include <stdio.h>");
     gen.putLine("#include <stdlib.h>");
     gen.putLine("#include <string.h>");
-    gen.putLine("#include <threads.h>");
+    gen.putLine("#include <pthread.h>");
     gen.putLine("#include <stdatomic.h>");
     gen.putLine("#include <time.h>");
     gen.putBlankLine();
 
     // Initialize the profiling variables.
-    gen.putStatement("cnd_t thread_stops_cond_var");
-    gen.putStatement("mtx_t thread_stops_mutex");
+    gen.putStatement("pthread_cond_t thread_stops_cond_var");
+    gen.putStatement("pthread_mutex_t thread_stops_mutex");
     gen.putStatement("atomic_ulong thread_inits = 1");
     gen.putStatement("atomic_ulong thread_stops = 0");
     if (profile) {
@@ -154,7 +154,7 @@ public class CGenerator extends IRInstructionVisitor {
     // Define the cell struct.
     gen.putLine("struct cell {");
     gen.incIndent();
-    gen.putLine("mtx_t mutex;");
+    gen.putLine("pthread_mutex_t mutex;");
     gen.putLine("atomic_int ref_count;");
     gen.putLine("struct record* record;");
     gen.decIndent();
@@ -508,7 +508,7 @@ public class CGenerator extends IRInstructionVisitor {
     gen.inManager = false;
 
     // Execution function.
-    gen.putLine("int thread(void* entry);");
+    gen.putLine("void* thread(void* entry);");
     gen.putLine("void executor(struct task* entry) {");
     gen.incIndent();
 
@@ -520,7 +520,7 @@ public class CGenerator extends IRInstructionVisitor {
     gen.putStatement("void* " + TMP_CONT);
     gen.putStatement("struct record* " + TMP_RECORD);
     gen.putStatement("struct exponential* " + TMP_EXPONENTIAL);
-    gen.putStatement("thrd_t " + TMP_THREAD);
+    gen.putStatement("pthread_t " + TMP_THREAD);
     gen.putStatement("struct cell* " + TMP_CELL);
     gen.putStatement("struct manager_state* " + MANAGER_STATE);
     gen.putBlankLine();
@@ -574,39 +574,39 @@ public class CGenerator extends IRInstructionVisitor {
 
     gen.putBlankLine();
     gen.putLabel("end");
-    gen.putStatement("mtx_lock(&thread_stops_mutex)");
+    gen.putStatement("pthread_mutex_lock(&thread_stops_mutex)");
     gen.putIncrement("thread_stops");
-    gen.putStatement("cnd_signal(&thread_stops_cond_var)");
-    gen.putStatement("mtx_unlock(&thread_stops_mutex)");
+    gen.putStatement("pthread_cond_signal(&thread_stops_cond_var)");
+    gen.putStatement("pthread_mutex_unlock(&thread_stops_mutex)");
     gen.putStatement("free(" + MANAGER_STATE + ")");
 
     gen.decIndent();
     gen.putLine("}");
     gen.putBlankLine();
-    gen.putLine("int thread(void* entry) {");
+    gen.putLine("void* thread(void* entry) {");
     gen.incIndent();
     gen.putStatement("executor((struct task*)entry)");
-    gen.putLine("return 0;");
+    gen.putLine("return NULL;");
     gen.decIndent();
     gen.putLine("}");
     gen.putBlankLine();
 
     gen.putLine("int main() {");
     gen.incIndent();
-    gen.putStatement("cnd_init(&thread_stops_cond_var)");
-    gen.putStatement("mtx_init(&thread_stops_mutex, mtx_plain)");
+    gen.putStatement("pthread_cond_init(&thread_stops_cond_var, NULL)");
+    gen.putStatement("pthread_mutex_init(&thread_stops_mutex, NULL)");
     gen.putBlankLine();
     gen.putStatement("thread(NULL)");
     gen.putBlankLine();
-    gen.putStatement("mtx_lock(&thread_stops_mutex)");
+    gen.putStatement("pthread_mutex_lock(&thread_stops_mutex)");
     gen.putWhile(
         "thread_stops != thread_inits",
         () -> {
-          gen.putStatement("cnd_wait(&thread_stops_cond_var, &thread_stops_mutex)");
+          gen.putStatement("pthread_cond_wait(&thread_stops_cond_var, &thread_stops_mutex)");
         });
-    gen.putStatement("mtx_unlock(&thread_stops_mutex)");
-    gen.putStatement("mtx_destroy(&thread_stops_mutex)");
-    gen.putStatement("cnd_destroy(&thread_stops_cond_var)");
+    gen.putStatement("pthread_mutex_unlock(&thread_stops_mutex)");
+    gen.putStatement("pthread_mutex_destroy(&thread_stops_mutex)");
+    gen.putStatement("pthread_cond_destroy(&thread_stops_cond_var)");
     gen.putBlankLine();
     if (profile) {
       gen.putDebugLn("Profiling results:");
@@ -992,7 +992,7 @@ public class CGenerator extends IRInstructionVisitor {
     putAssign(taskCont(TMP_TASK), labelAddress(blockLabel(instruction.getLabel())));
     putAssign(taskContEnv(TMP_TASK), ENV);
     putIncrement("thread_inits");
-    putStatement("thrd_create(&" + TMP_THREAD + ", thread, (void*)" + TMP_TASK + ")");
+    putStatement("pthread_create(&" + TMP_THREAD + ", NULL, thread, (void*)" + TMP_TASK + ")");
   }
 
   @Override
@@ -1260,7 +1260,7 @@ public class CGenerator extends IRInstructionVisitor {
   public void visit(IRPushCell instruction) {
     // Push a new cell structure and initialize its mutex.
     putAllocCell(TMP_CELL);
-    putStatement("mtx_init(&" + cellMutex(TMP_CELL) + ", mtx_plain)");
+    putStatement("pthread_mutex_init(&" + cellMutex(TMP_CELL) + ", NULL)");
     putAssign(cellRefCount(TMP_CELL), 1);
     putAssign(cellRecord(TMP_CELL), record(instruction.getArgRecord()));
     putPushCell(instruction.getRecord(), TMP_CELL);
@@ -1270,7 +1270,7 @@ public class CGenerator extends IRInstructionVisitor {
   @Override
   public void visit(IRTakeCell instruction) {
     // Lock the mutex and extract the record.
-    putStatement("mtx_lock(&" + cellMutex(peekCell(instruction.getRecord())) + ")");
+    putStatement("pthread_mutex_lock(&" + cellMutex(peekCell(instruction.getRecord())) + ")");
     putAssign(record(instruction.getArgRecord()), cellRecord(peekCell(instruction.getRecord())));
     putAssign(cellRecord(peekCell(instruction.getRecord())), "NULL");
   }
@@ -1280,7 +1280,7 @@ public class CGenerator extends IRInstructionVisitor {
     // Put the record into the cell and unlock the mutex.
     putAssign(cellRecord(peekCell(instruction.getRecord())), record(instruction.getArgRecord()));
     putAssign(record(instruction.getArgRecord()), "NULL");
-    putStatement("mtx_unlock(&" + cellMutex(peekCell(instruction.getRecord())) + ")");
+    putStatement("pthread_mutex_unlock(&" + cellMutex(peekCell(instruction.getRecord())) + ")");
   }
 
   @Override
@@ -1762,7 +1762,7 @@ public class CGenerator extends IRInstructionVisitor {
 
   private void putAllocCell(String var) {
     putAssign(var, "malloc(sizeof(struct cell))");
-    putStatement("mtx_init(&" + cellMutex(var) + ", mtx_plain)");
+    putStatement("pthread_mutex_init(&" + cellMutex(var) + ", NULL)");
     if (profile) {
       putIncrement("cell_allocs");
     }
@@ -1772,7 +1772,7 @@ public class CGenerator extends IRInstructionVisitor {
     if (trace) {
       putDebugLn("[freeCell(" + var + ")]");
     }
-    putStatement("mtx_destroy(&" + cellMutex(var) + ")");
+    putStatement("pthread_mutex_destroy(&" + cellMutex(var) + ")");
     putStatement("free(" + var + ")");
     if (profile) {
       putIncrement("cell_frees");
@@ -2838,7 +2838,7 @@ public class CGenerator extends IRInstructionVisitor {
     public void visit(IRCellT type) {
       putIfWritten(
           () -> {
-            putStatement("mtx_destroy(&" + cellMutex(access(buffer, "struct cell*")) + ");");
+            putStatement("pthread_mutex_destroy(&" + cellMutex(access(buffer, "struct cell*")) + ");");
             putCleanRecord(type.getInner(), cellRecord(access(buffer, "struct cell*")));
             putFreeCell(access(buffer, "struct cell*"));
           });
