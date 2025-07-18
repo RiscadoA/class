@@ -2838,7 +2838,8 @@ public class CGenerator extends IRInstructionVisitor {
     public void visit(IRCellT type) {
       putIfWritten(
           () -> {
-            putStatement("pthread_mutex_destroy(&" + cellMutex(access(buffer, "struct cell*")) + ");");
+            putStatement(
+                "pthread_mutex_destroy(&" + cellMutex(access(buffer, "struct cell*")) + ");");
             putCleanRecord(type.getInner(), cellRecord(access(buffer, "struct cell*")));
             putFreeCell(access(buffer, "struct cell*"));
           });
