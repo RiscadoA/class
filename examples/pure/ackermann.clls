@@ -89,7 +89,7 @@ proc tryAcker(;m:colint, n:colint){
     }
 };;
 
-proc test_ackerman(){
+proc main(){
         tryAcker(;3,5)
 };;
 
