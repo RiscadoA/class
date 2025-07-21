@@ -1,0 +1,80 @@
+/*
+    Implements the Ackermann function
+    (https://en.wikipedia.org/wiki/Ackermann_function),
+    more specifically its definition as an iterated 1-ary function:
+    A_0(n)     = n +1
+    A_{m+1}(n) = A_m^{n+1}(1)
+*/
+
+
+proc id<X>(f:recv ~X; X){
+    recv f(x);
+    fwd f x
+};;
+
+
+proc unsafe_rec iter_(n:~!lint, g:recv ~ !lint; !lint ; f: ~ recv ~ !lint; !lint){
+    if (n==0) {
+	id<!lint>(g)
+    } { cut {
+                iter_(n-1,h; f)
+                |h:send !lint;~ !lint |
+                recv g(x);
+                send h(x);
+                call f(f0);
+                send f0(h);
+                fwd g f0
+        }
+     }
+};;
+
+/*
+A_0(n) = n +1
+A_{m+1}(n)  = A_m^{n+1}(1)
+*/
+
+proc unsafe_rec ackerAux(m:~ !lint, f:!recv ~ !lint; !lint){
+    if (m==0) {
+                !f(f0);
+                recv f0(n);
+                let! f0 n+1
+    } {
+           cut{
+                    ackerAux(m-1,g)
+                    |g:?send !lint;~ !lint |
+                    !f(f0);
+                    recv f0(n);
+                    cut{
+                        iter_(n+1,h;g)
+                        |h:send !lint;~ !lint |
+                        send h(1);
+                        fwd h f0
+                    }
+                 }
+        }
+};;
+
+proc acker(m:~ !lint, n:~ !lint, r: !lint){
+    cut{
+        ackerAux(m,f)
+        |f:?send !lint;~ !lint |
+        call f(f00);
+        send f00(n);
+        fwd f00 r
+    }
+};;
+
+proc ackermann_main( ; m:colint, n:colint)
+{
+    cut {
+
+            acker(m,n,r)
+            |r:~!lint|
+            println ( "Ackermann("+m+","+n+") = " + r ); ()
+    }
+};;
+
+proc main(){
+    ackermann_main(;3,2)
+};;
+
