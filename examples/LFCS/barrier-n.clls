@@ -1,0 +1,85 @@
+include "lists.clls";;
+
+type Cont {
+    affine wait
+};;
+
+type BState {
+    pair !lint; 
+    affine List(Cont)
+};;
+
+type Barrier {
+    state BState
+};;
+
+proc init(rep: BState;n:~lint){
+    rep <- n;
+    affine rep; nil<Cont>(rep)
+};;
+
+proc barrier(b:Barrier;nt:~lint){
+    cell b(rep. affine rep; init(rep;nt))
+};;
+
+proc rec awakeAll(ws:~List(Cont)) {
+    case ws of {
+        |#Nil: wait ws;()
+        |#Cons: recv ws(w);
+                close w;
+                awakeAll(ws)
+    }
+};;
+
+proc bwait (b:~Barrier, cont: ~Cont) {
+	take b(ws);
+	ws -> n;
+	if n==1 then {
+	    cpar {   awakeAll(ws)
+                ||
+                put b(nw. affine nw; init(nw;0));
+                close cont; drop b
+	    }
+	 } else {
+        letc nw: affine BState {
+            affine nw; nw <- n-1;  
+		    affine nw; cons<Cont>(cont,ws,nw)};
+	    put b (nw); drop b
+	} 
+};;
+
+proc thread(b:~Barrier; i:~lint) {
+    println("thread " + i + " started.");
+    sleep 2; // do some work before barrier
+    letc cont: ~affine wait {	    
+        println("thread " + i + " on wait");
+        bwait(b,cont) // call barrier wait
+    };
+    affine cont; wait cont; // this the cont
+    println("thread " + i + " wake up.");
+    sleep 2; // do some more work after barrier
+    println("thread " + i + " after wait.");
+    ()
+};;
+
+proc gen_rec spawnall(b:~Barrier; i:~lint, n:~lint) {
+     if n == 0 then {
+        drop b
+     } else {
+        share b {
+            thread(b;i)
+            ||
+            spawnall(b;i+1,n-1)
+        }
+     }
+};;
+
+proc mainb(;nt:~lint) {
+    letc c: Barrier {
+    	barrier(c;nt)
+    };
+    spawnall(c;0,nt)
+};;
+
+
+

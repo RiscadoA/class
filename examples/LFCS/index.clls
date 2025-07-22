@@ -1,0 +1,14 @@
+include "../pure/arithmetic-server-n.clls";;
+main0();;
+main1();;
+system();;
+include "../state/simplemut.clls";;
+main0m();;
+main1m();;
+pass();;
+include "../state/barrier-n.clls";;
+mainb(;10);;
+include "../state/llist.clls";;
+include "../state/squeue-n.clls";;
+mainq();;
+

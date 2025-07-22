@@ -1,0 +1,52 @@
+
+
+proc diff(hyp : ~recv usage ~lint;lint,
+               dif: recv usage ~lint; recv ~affine lint;lint) {
+    dif -> ed;
+    dif -> a;
+    share ed {
+            send hyp (ed);
+            fwd hyp dif
+            ||
+            sleep 0;
+            take ed(v);
+            put ed(a);
+            drop ed
+        }
+};;
+
+!A ==> usage A
+?A ==  cell A
+
+proc hy(hyp:recv usage ~lint;lint)
+{
+    recv hyp(u); take u(v); put u(0); drop u; use v; fwd v hyp
+};;
+
+proc cdiff (df: recv usage ~lint; recv ~affine lint;lint)
+{
+    letc h:recv usage ~lint;lint {
+        hy(h)
+    };
+    diff(h,df)
+};;
+
+proc app (df: usage ~lint, a:~affine lint, r:lint)
+{
+    letc d: recv usage ~lint; recv ~affine lint;lint {
+        cdiff(d)
+    };
+    send d(df
+    send d(a);
+    fwd d r
+};;
+
+proc test() {
+    letc u:state lint {
+        cell u(20)
+    };
+    letc r:lint {
+        app (u,3,r)
+    };
+    println(r);()
+};;

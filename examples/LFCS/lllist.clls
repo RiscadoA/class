@@ -1,0 +1,118 @@
+type rec BList(A){
+    lstate Node(A)
+} and Node(A) {
+    choice of {
+        |#Nil: close
+        |#Next: pair affine A; BList(A)
+    }
+};;
+
+type ANode(A) {
+    affine Node(A)
+};;
+
+type UBList(A) {
+	lstate Node(A)
+};;
+
+proc nil<A>(l: ANode(A)) {
+    affine l;
+    #Nil l;
+    close l
+};;
+
+proc cons<A>(a:~affine A, t:~ BList(A), l: ANode(A)){
+    unfold t; 
+    affine l;
+    #Next l;
+    l <- a;
+    fwd l t
+};;
+
+proc rec concat<A>(a:~ BList(A), b:~ BList(A), ab: BList(A)){
+    take a(node); // *a -> node;
+    case node of {
+        | #Nil:
+            put a(n.nil<A>(n)); // a := { n.nil<A>(n) };
+            wait node;
+            drop a; fwd b ab 
+        | #Next: 
+            node -> val;
+            letc nodeb: BList(A) {
+                concat<A>(node,b,nodeb)
+            };
+            put a(node. cons<A>(val,nodeb,node));
+            fwd a ab
+    }
+};;
+
+proc rec concat_in_place<A>(a:~ BList(A), b:~ BList(A)){
+    take a(node);
+    case node of {
+        | #Nil:
+	    take b(nodeb);
+            put a(nodeb);
+            put b(n.nil<A>(n));
+            wait node;
+            drop a;
+	    drop b 
+        | #Next: 
+            node -> val;
+            borrow node {
+                concat_in_place<A>(node,b) ||
+                letc nl: BList(A) {
+                    unfold nl; fwd nl node
+                }; 
+                put a(nn. cons<A>(val,nl,nn));
+                drop a
+            }
+    }
+};;
+
+proc rec concat2<A>(a:~ BList(A), b:~ BList(A), ab: BList(A)){
+    borrow a {
+    concat_in_place<A>(a,b) || fwd a ab
+    }
+};;
+
+proc rec print_list(l0:~ BList(lint)) {
+    take l0(node);
+    case node of {
+        | #Nil:
+            put l0(n.nil<lint>(n));
+            wait node;
+	    println("");
+	    drop l0
+        | #Next: 
+            node -> val;
+	    print(val+" ");
+	    par { print_list(node) ||
+            put l0(n. nil<lint>(n));
+            drop l0 }
+    }
+};;
+
+proc lempty(l0: BList(lint))
+{
+  cell l0 (l.nil<lint>(l))
+};;
+
+proc lcons(v:~affine lint,l0: ~ BList(lint),l1: BList(lint))
+{
+  cell l1 (l.cons<lint>(v,l0,l) )
+};;
+
+proc mkl(l2: BList(lint)) {
+	letc l0 : BList(lint) { lempty(l0) };
+	letc l1 : BList(lint) { lcons(1,l0,l1) };
+	lcons(2,l1,l2)	
+};;
+
+proc ctests() {
+	letc l1: BList(lint) { mkl(l1) };
+	letc l2: BList(lint) { mkl(l2) };
+	letc l3: BList(lint) { concat<lint>(l1,l2,l3) };
+	print_list(l3)
+};;
+
+

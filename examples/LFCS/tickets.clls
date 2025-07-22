@@ -1,0 +1,22 @@
+proc client (s:usage ~lint;name:~lint) {
+    take s (n); 
+    if n==1 {
+        print (name+" got it");
+        put s(n-1);
+        drop s
+    } {
+        println (name+" alice looses");
+        put s(n);
+        drop s
+    }
+};;
+
+proc main() {
+    letc tik: state !lint
+        { cell tik (1)};
+    share tik {
+        client(tik;1)
+        ||
+        client(tik;0)
+    }
+};;

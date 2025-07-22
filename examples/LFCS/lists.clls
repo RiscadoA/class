@@ -1,0 +1,237 @@
+/*
+    An implementation of lists using recursive types.
+*/
+
+type rec List(A){
+    choice of {
+        |#Nil:  close
+        |#Cons: send A; List(A)
+    }
+};;
+
+proc nil<A>(l:List(A)){
+    #Nil l; close l
+};;
+
+proc cons<A>(a:~A, l:~List(A), nl:List(A)){
+    #Cons nl; nl  <- a; fwd nl l
+};;
+
+proc rec concat<A>(a:~List(A),b:~List(A), ab:List(A)){
+    case a of {
+        |#Nil: wait a; fwd b ab
+        |#Cons: 
+            a->val;
+            letc lx:List(A) { concat<A>(a,b, lx) };
+            cons<A>(val,lx,ab)
+    }
+};;
+
+
+proc rec dispose<A>(l:~List(!A)){
+    case l of {
+        |#Nil: wait l; ()
+        |#Cons: recv l(a:?~A); ?a;dispose<A>(l) 
+    }
+};;
+
+
+
+
+/*
+include "maybe.clls";;
+
+proc head<A>(l:~List(!A), a:maybe(!A)){
+    case l of {
+        |#Nil: wait l; #Nothing a; close a
+        |#Cons: recv l(b:?~A); par{dispose<A>(l) || #Just a; fwd a b}
+    }
+};;
+
+proc tail<A>(l:~List(!A), tl: maybe(List(!A))){
+    case l of {
+        |#Nil: wait l; #Nothing tl; close tl
+        |#Cons: recv l(a:?~A); ?a; #Just tl; fwd tl l
+    }
+};;
+
+proc rec append<A>(l:~List(A),a:~A, nl:List(A)){
+    case l of {
+        |#Nil: wait l; cut{nil<A>(x) |x:~List(A)| cons<A>(a,x,nl)}
+        |#Cons: recv l(b:~A); cut{ append<A>(l,a, x) |x:~List(A)| cons<A>(b,x,nl)}
+    }
+};;
+
+
+proc rec affList<tA>(x:~List(affine tA), y:affine List(affine tA)){
+    case x of {
+        |#Nil: wait x; affine y; nil<affine tA>(y)
+        |#Cons: recv x(a:coaffine ~tA);
+                cut{
+                    affList<tA>(x,z)
+                    |z:coaffine ~List(affine tA)|
+                    affine y;
+                    #Cons y;
+                    send y(ad: affine tA. fwd ad a);
+                    use z;
+                    fwd z y
+                }
+    }
+};;
+
+proc unsafe_rec genList<A>(l:List(A) ; z:~A, f:send A;~A, niters:colint){
+    if (niters == 0){
+        nil<A>(l)
+    }{
+        cut{
+            !n(n0);
+            call f(f0);
+            send f0(z0:A. call z(z0d); fwd z0d z0);
+            fwd n0 f0
+            |n:?~A|
+            genList<A>(tail; n, f, niters-1) 
+            |tail:~List(A)|
+            cut{
+                call z(z0);
+                fwd z0 w
+                |w:~A|
+                cons<A>(w,tail,l) 
+            }
+        }
+    }
+};;
+*/
+
+/*
+type Ans(R,X) {
+    choice of {
+        |#Some: send X; R
+        |#None: close
+    }
+};;
+
+type TokensI(R,X) {
+    ! offer of {
+        |#Count: recv ~R; send R; !lint
+        |#Add: recv ~R; recv ~X; R
+        |#Get: recv ~R; Ans(R,X)
+    } 
+};;
+
+type Tokens(X) {
+    sendty T;send T;TokensI(T,X)
+};;
+
+proc rec count_op<A>(a:~List(A),ao:pair List(A);!lint)
+{
+    case a of {
+        |#Nil: wait a; ao <- { l. #Nil l; close l }; let! ao 0 
+        |#Cons: 
+            a->val;
+            letc ar: pair List(A);!lint
+                { count_op<A>(a,ar) };
+            ar -> lr; 
+            ao <- {l. cons<A>(val,lr,l) };
+            let! ao ar + 1
+   }
+};;
+
+proc rec get_op<A>(a:~List(A), ans:Ans(List(A),A) )
+{
+    case a of {
+        |#Nil: wait a; #None ans; close ans
+        |#Cons: 
+            a->val;
+            #Some ans; ans <- val; fwd a ans
+   }
+};;
+
+proc tokens_meth<A>(tm:TokensI(List(A),A)) {
+    !tm(m);
+    case m of {
+        |#Count: m -> r;
+            letc rc: pair List(A);!lint { count_op<A>(r,rc) };
+            rc -> l; 
+            m <- l; fwd rc m
+        |#Add: m -> r; m -> val; cons<A>(val,r,m) 
+        |#Get: m -> r; get_op<A>(r,m)
+    }
+};;
+
+proc new_tokens<A>(tl:Tokens(A))
+{
+    sendty tl (List(A));
+    tl <- { v. nil<A>(v) };
+    tokens_meth<A>(tl)
+};;
+
+proc use_tokens(tl:~Tokens(lstring), tt:Tokens(lstring))
+{
+    recvty tl (R); recv tl(r);
+    call tl(m); #Add m; m <- r; m <- "A36D54F89606A576DC62"; 
+    call tl(c); #Count c; c <- m; c -> r1; print("balance "+c);
+    sendty tt (R); tt <- r1; fwd! tt tl
+};;
+
+*/
+
+/*
+type corec IWallet(X) {
+    offer of {
+        |#Count: send !lint; IWallet(X)
+        |#Add: recv ~X; IWallet(X)
+        |#Get: Ans(X)
+    } 
+} and Ans(X) {
+    choice of {
+        |#Some: send X; IWallet(X)
+        |#None: close
+    }
+};;
+
+
+proc rec len<A>(a:~List(A),ao:pair List(A);!lint)
+{
+    case a of {
+    |#Nil: wait a; ao <- { l. #Nil l; close l }; let! ao 0 
+    |#Cons: 
+        a->val;
+        letc ar: pair List(A);!lint
+            { len<A>(a,ar) };
+        ar -> lr; 
+        ao <- {l. cons<A>(val,lr,l) };
+        let! ao ar + 1
+   }
+};;
+
+proc rec tokens_imp<A>(tm:IWallet(A), st:~List(A)) {
+    case tm of {
+    |#Count: 
+        letc rc: pair List(A);!lint { count_op<A>(st,rc) };
+        rc -> ns; tm <- rc;
+        tokens_imp<A>(tm,ns)    
+    |#Add:
+        tm -> val; 
+        letc ns:  List(A) { cons<A>(val,st,ns) };
+        tokens_imp<A>(tm,ns)    
+    |#Get: 
+        case st of {
+        |#Nil: wait st; #None tm; close tm
+        |#Cons: st -> val; #Some tm; tm <- val; 
+            tokens_imp<A>(tm,st)       
+        }
+    }
+};;
+
+proc newTokens(tm:IWallet(lstring)) {
+    letc s: List(lstring) { nil<lstring>(s) };
+    tokens_imp<lstring>(tm,s)
+};;
+
+proc test(tk:IWallet(lstring)) {
+    letc t: IWallet(lstring) { newTokens(t) };
+    #Add t; t <- "NFT@A36D54F89606A576DC62";
+    #Count t; 
+    t -> n; print ("balance = "+n); fwd t tk
+};;
+*/

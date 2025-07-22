@@ -1,0 +1,156 @@
+type rec LList(A){
+    state Node(A)
+} and Node(A) {
+    choice of {
+        |#Nil: close
+        |#Next: pair affine A; LList(A)
+    }
+};;
+
+proc copy(a:~LList(A), b:LList(A), c:LList(A)) {
+	unfold a;
+	share a {
+		unfold b; fwd a b
+	||
+		unfold c; fwd a c
+	}
+};;
+
+type ANode(A) {
+    affine Node(A)
+};;
+
+type ULList(A) {
+	state Node(A)
+};;
+
+proc nil<A>(l: ANode(A)) {
+    affine l;
+    #Nil l;
+    close l
+};;
+
+proc cons<A>(a:~affine A, t:~LList(A), l: ANode(A)){
+    unfold t;
+    affine l;
+    #Next l;
+    l <- a;
+    unfold l;
+    fwd l t
+};;
+
+proc rec concat<A>(a0:~LList(A), b:~LList(A), ab: LList(A)){
+    unfold a0;
+    take a0(node);
+    case node of {
+        | #Nil:
+            put a0(n.nil<A>(n));
+            wait node;
+            drop a0;
+	    fwd b ab 
+        | #Next: 
+            node -> val;
+            letc nodeb:LList(A) {
+                concat<A>(node,b,nodeb)
+            };
+            put a0(node. cons<A>(val,nodeb,node));
+	    // unfold ab; // not infered
+            fwd a0 ab
+    }
+};;
+
+proc rec concat_in_place<A>(a:~ULList(A), b:~ ULList(A)){
+    take a(node);
+    case node of {
+        | #Nil:
+	    take b(nodeb);
+            put a(nodeb);
+            put b(n.nil<A>(n));
+            wait node;
+            drop a;
+	    drop b 
+        | #Next: 
+            node -> val;
+	    unfold node;
+            share node {
+               concat_in_place<A>(node,b) ||
+                letc nl: LList(A) {
+                    unfold nl; fwd nl node
+                }; 
+                put a(nn. cons<A>(val,nl,nn));
+                drop a
+            }
+    }
+};;
+
+proc concat2<A>(a:~LList(A), b:~LList(A), ab: LList(A)){
+    share a {
+        concat_in_place<A>(a,b)
+        ||
+        sleep 1;unfold ab; fwd a ab
+    }
+};;
+
+proc lempty(l0: LList(lint))
+{
+  cell l0 (l.nil<lint>(l))
+};;
+
+proc lcons(v:~affine lint,l0: ~LList(lint),l1:LList(lint))
+{
+  cell l1 (l.cons<lint>(v,l0,l) )
+};;
+
+proc mkl(l2:LList(lint)) {
+  cut {
+	lempty(l0)
+	|l0 : ~LList(lint) |
+	lcons(1,l0,l1)
+	|l1 : ~LList(lint) |
+	lcons(2,l1,l2)
+  }
+};;
+
+proc rec print_list(l0:~LList(lint)) {
+    take l0(node);
+    case node of {
+        | #Nil:
+            put l0(n.nil<lint>(n));
+            wait node;
+            drop l0;
+	    println(""); ()
+        | #Next: 
+            node -> val;
+	    print(val+" ");
+	    par { print_list(node) ||
+            put l0(n. nil<lint>(n));
+            drop l0 }
+    }
+};;
+
+proc ctest() {
+	letc l1: LList(lint) {
+		mkl(l1)
+	};
+	letc l2: LList(lint) {
+		mkl(l2)
+	};
+	letc l3: LList(lint) {
+		concat<lint>(l1,l2,l3)
+	};
+	print_list(l3)
+};;
+
+proc ctests() {
+	letc l1: LList(lint) {
+		mkl(l1)
+	};
+	letc l2: LList(lint) {
+		mkl(l2)
+	};
+	letc l3: LList(lint) {
+		concat2<lint>(l1,l2,l3)
+	};
+	print_list(l3)
+};;
+

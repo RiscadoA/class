@@ -1,0 +1,73 @@
+type rec LList(A){
+    state Node(A)
+} and Node(A) {
+    choice of {
+        |#Nil: close
+        |#Next: pair affine A; LList(A)
+    }
+};;
+
+type ANode(A) {
+    affine Node(A)
+};;
+
+proc nil<A>(l: ANode(A)) {
+    affine l;
+    #Nil l;
+    close l
+};;
+
+proc cons<A>(a:~affine A, t:~LList(A), l: ANode(A)){
+    unfold t; // infer this ?
+    affine l;
+    #Next l;
+    l <- a;
+    fwd l t
+};;
+
+proc rec concat<A>(a:~LList(A), b:~LList(A), ab: LList(A)){
+    take a(node);
+    case node of {
+        | #Nil:
+            put a(n.nil<A>(n));
+            wait node;
+            drop a; fwd b ab 
+        | #Next: 
+            node -> val;
+            letc nodeb:LList(A) {
+                concat<A>(node,b,nodeb)
+            };
+            put a(node. cons<A>(val,nodeb,node));
+            fwd a ab
+    }
+};;
+
+proc rec concat_in_place<A>(a:~LList(A), b:~LList(A)){
+    take a(node);
+    case node of {
+        | #Nil:
+            put a(n.nil<A>(n));
+            wait node;
+            drop a; drop b 
+        | #Next: 
+            node -> val;
+            share node {
+                concat_in_place<A>(node,b)
+                ||
+                letc nl: LList(A) {
+                    unfold nl; fwd nl node
+                }; 
+                put a(nn. cons<A>(val,nl,nn));
+                drop a
+            }
+    }
+};;
+
+proc rec concat2<A>(a:~LList(A), b:~LList(A), ab: LList(A)){
+    share a {
+        concat_in_place<A>(a,b)
+        ||
+        fwd a ab
+    }
+};;
+

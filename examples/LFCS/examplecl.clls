@@ -1,0 +1,23 @@
+proc main1() {
+    letc f:recv ~lint;lint {
+        f -> x; let f (x+1)
+    };
+    f <- 2;
+    println(f);()
+};;
+
+proc main2() {
+    letc f:recv ~lint;send lint; wait {
+        f -> x; f <- (x+1); wait f; ()
+    };
+    f <- 2; f -> v; 
+    println(v); close f
+};;
+
+proc main3() {
+    letc f:send lint;recv ~lint; close {
+        f <- 2; f -> v; 
+        println(v); close f
+    };
+    f -> x; f <- (x+1); wait f; ()
+};;
