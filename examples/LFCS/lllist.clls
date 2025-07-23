@@ -29,24 +29,7 @@ proc cons<A>(a:~affine A, t:~ BList(A), l: ANode(A)){
     fwd l t
 };;
 
-proc rec concat<A>(a:~ BList(A), b:~ BList(A), ab: BList(A)){
-    take a(node); // *a -> node;
-    case node of {
-        | #Nil:
-            put a(n.nil<A>(n)); // a := { n.nil<A>(n) };
-            wait node;
-            drop a; fwd b ab 
-        | #Next: 
-            node -> val;
-            letc nodeb: BList(A) {
-                concat<A>(node,b,nodeb)
-            };
-            put a(node. cons<A>(val,nodeb,node));
-            fwd a ab
-    }
-};;
-
-proc rec concat_in_place<A>(a:~ BList(A), b:~ BList(A)){
+proc rec concat_in_place<A>(a:~ UBList(A), b:~ UBList(A)){
     take a(node);
     case node of {
         | #Nil:
@@ -71,11 +54,12 @@ proc rec concat_in_place<A>(a:~ BList(A), b:~ BList(A)){
 
 proc rec concat2<A>(a:~ BList(A), b:~ BList(A), ab: BList(A)){
     borrow a {
-    concat_in_place<A>(a,b) || fwd a ab
+    clltype a; concat_in_place<A>(a,b) || fwd ab a
     }
 };;
 
 proc rec print_list(l0:~ BList(lint)) {
+    unfold l0;
     take l0(node);
     case node of {
         | #Nil:
@@ -108,11 +92,40 @@ proc mkl(l2: BList(lint)) {
 	lcons(2,l1,l2)	
 };;
 
-proc ctests() {
+proc ctests0() {
 	letc l1: BList(lint) { mkl(l1) };
-	letc l2: BList(lint) { mkl(l2) };
-	letc l3: BList(lint) { concat<lint>(l1,l2,l3) };
+	letc l2: BList(lint) { lcons(3,l1,l2) };
+	print_list(l2)
+};;
+
+proc ctests1() {
+	letc l1: BList(lint) { lempty(l1) };
+	letc l2: BList(lint) { lempty(l2) };
+	letc l3: BList(lint) { concat2<lint>(l1,l2,l3) };
 	print_list(l3)
 };;
 
+proc ctests2() {
+	letc l1: BList(lint) { mkl(l1) };
+	letc l2: BList(lint) { lempty(l2) };
+	letc l3: BList(lint) { concat2<lint>(l1,l2,l3) };
+	print_list(l3)
+};;
+
+
+proc ctests3() {
+	letc l1: BList(lint) { mkl(l1) };
+	letc l2: BList(lint) { mkl(l2) };
+	letc l3: BList(lint) { concat2<lint>(l1,l2,l3) };
+	print_list(l3)
+};;
+
+proc ctests4() {
+	letc l1: BList(lint) { mkl(l1) };
+	letc l2: BList(lint) { mkl(l2) };
+	letc l3: BList(lint) { concat2<lint>(l1,l2,l3) };
+	letc l4: BList(lint) { mkl(l4) };
+	letc l5: BList(lint) { concat2<lint>(l3,l4,l5) };
+	print_list(l5)
+};;
 

@@ -76,16 +76,21 @@ public class ASTShare extends ASTNode {
 
     public void typecheck(Env<ASTType> ed, Env<ASTType> eg, Env<EnvEntry> ep) throws Exception {
     	this.eg = eg;
-	this.inferUses(sh,ed,ep);
+	//	this.inferUses(sh,ed,ep);
 
 	ASTType ty = ed.find(sh);
-
+	/*
         ty = ty.unfoldType(ep);
         ty = ASTType.unfoldRec(ty);
+	*/
+	ty = ty.unfoldType(ep);
+	ty = ASTType.unfoldRecInfer(ty, this, sh,ep);
+	
 	if (ty instanceof ASTUsageT) {
 	    ASTUsageT tys = (ASTUsageT)ty;
 	    if(tys.islin() && con) throw new TypeError("Line " + lineno + " :" +"SHARE: "+sh+" is not of USAGE type.");
 	    Env<ASTType> eglhs = eg.assoc("$DUMMY",new ASTBotT());
+	    ed.upd(sh,ty);
 	    lhs.typecheck(ed,eglhs,ep);
 	    lhs.linclose(ed,ep);
 	    ed.upd(sh,ty);
@@ -129,8 +134,8 @@ public class ASTShare extends ASTNode {
     public void runproc(Env<EnvEntry> ep, Env<LinSession> ed, Env<Server> eg, Logger logger) throws Exception{
     	LinSession session = (LinSession) ed.find(sh);
 
+	session.incUsages(1);
 	if (con) {
-	    session.incUsages(1);
 	    CLLSj.threadPool.submit(
 				    new Runnable(){
 					public void run(){ try {
@@ -143,52 +148,53 @@ public class ASTShare extends ASTNode {
 	rhs.runproc(ep, ed, eg, logger);
     }
 
-    public void samLCS(Env<SessionField> frame, Env<EnvEntry> ep, SAMCont p_cont) throws Exception
+    public void samLCS(boolean con, Env<SessionField> frame, Env<EnvEntry> ep, SAMCont p_cont) throws Exception
     {
-	CLLSj.threadPool.submit(
-				new Runnable(){
-				    public void run(){ try {
-					    SAM.SAMloop(lhs,frame, ep);
-					} catch (Exception e) {e.printStackTrace(System.out);} }
-				});
-	p_cont.code = rhs;
-	p_cont.frame = frame;
-	p_cont.epnm = ep;
+	if (con) {
+	    CLLSj.threadPool.submit(
+				    new Runnable(){
+					public void run(){ try {
+						SAM.SAMloop(lhs,frame, ep);
+					    } catch (Exception e) {e.printStackTrace(System.out);} }
+				    });
+	    p_cont.code = rhs;
+	    p_cont.frame = frame;
+	    p_cont.epnm = ep;
+	} else {
+	    /* sequentialize */
+	    SAM.SAMloop(lhs,frame,ep);
+	    p_cont.code = rhs;
+	    p_cont.frame = frame;
+	    p_cont.epnm = ep;	    
+	}	    
     }	    
 	
     public void samL(Env<SessionField> frame, Env<EnvEntry> ep, SAMCont p_cont) throws Exception
     {
-	if (con)  {
-	    SessionField sf = frame.find(sh);
-	    if (sf instanceof MVar) 
-		{
-		    MVar v = (MVar)sf;
-		    v.increfc();
-		    samLCS( frame, ep, p_cont);		    
-		    return;
-		}
-	    else
-		{
-		    IndexedSessionRef sref = (IndexedSessionRef)sf;
-		    int doffset = sref.getOffset();
-		    SessionRecord srec = sref.getSessionRec();	    	
-		    if (!srec.getPol()) {
-			MVar v = (MVar)srec.readSlot(doffset);
-			if (CLLSj.trace) {
-			    System.out.println("share-op "+sh+" "+srec+" @ "+doffset+" "+v);
-			} 
-			sref.incOffset();
-			p_cont.code = this;
-			v.increfc();
-			samLCS(frame.assoc(sh,v), ep, p_cont);		    
-		    } else throw new SAMError("share-op - "+sh);
-		} 
-	} else  {	    
-	    SAM.SAMloop(lhs,frame,ep);
-	    p_cont.code = rhs;
-	    p_cont.frame = frame;
-	    p_cont.epnm = ep;
-	}
+	SessionField sf = frame.find(sh);
+	if (sf instanceof MVar) 
+	    {
+		MVar v = (MVar)sf;
+		v.increfc();  /* inc ref count for share */
+		samLCS(con, frame, ep, p_cont);		    
+		return;
+	    }
+	else
+	    {
+		IndexedSessionRef sref = (IndexedSessionRef)sf;
+		int doffset = sref.getOffset();
+		SessionRecord srec = sref.getSessionRec();	    	
+		if (!srec.getPol()) {
+		    MVar v = (MVar)srec.readSlot(doffset);
+		    if (CLLSj.trace) {
+			System.out.println("share-op "+sh+" "+srec+" @ "+doffset+" "+v);
+		    } 
+		    sref.incOffset();
+		    p_cont.code = this;
+		    v.increfc(); /* inc ref count for share */
+		    samLCS(con, frame.assoc(sh,v), ep, p_cont);	  /*  cast session to mvar in environment */	    
+		} else throw new SAMError("share-op - "+sh);
+	    } 
     }
     
 }
