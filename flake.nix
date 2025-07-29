@@ -14,6 +14,8 @@
           jdk24
           maven
           rlwrap
+          haskell-language-server
+          ghc
         ];
       };
     });
