@@ -472,11 +472,19 @@ TOKEN :
   |
   < STATE: "state" >
   |
+  < LSTATE: "lstate" >
+  |
   < STATEL: "statel" >
+  |
+  < LSTATEL: "lstatel" >
   |
   < USAGE: "usage" >
   |
+  < LUSAGE: "lusage" >
+  |
   < USAGEL: "usagel" >
+  |
+  < LUSAGEL: "lusagel" >
   |
   < STATEB: "state!" >
   |
@@ -802,11 +810,19 @@ ASTType SType() throws Exception:
     |
     <USAGE> l=SType()  { t = new ASTUsageT(l, false); }
     |
-    <USAGEL> l=SType()  { t = new ASTUsageLT(l, true); }
+    <LUSAGE> l=SType()  { t = new ASTUsageT(l, true); }
+    |
+    <USAGEL> l=SType()  { t = new ASTUsageLT(l, false); }
+    |
+    <LUSAGEL> l=SType()  { t = new ASTUsageLT(l, true); }
     |
     <STATE> l=SType()  { t = new ASTCellT(l, false); }
     |
-    <STATEL> l=SType()  { t = new ASTCellLT(l, true); }
+    <LSTATE> l=SType()  { t = new ASTCellT(l, true); }
+    |
+    <STATEL> l=SType()  { t = new ASTCellLT(l, false); }
+    |
+    <LSTATEL> l=SType()  { t = new ASTCellLT(l, true); }
     |
     <USAGEB> l=SType()  { t = new ASTUsageBT(l); }
     |
