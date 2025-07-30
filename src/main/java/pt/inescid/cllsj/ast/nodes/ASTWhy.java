@@ -114,7 +114,8 @@ public class ASTWhy extends ASTNode {
     } else if (ty instanceof ASTCoBasicType) {
       ASTCoBasicType tyr = (ASTCoBasicType) ty;
       ed.upd(ch, null);
-      eg = eg.assoc(ch, tyr.lift());
+      __type = tyr.lift();
+      eg = eg.assoc(ch, __type);
       rhs.typecheck(ed, eg, ep);
     } else
       throw new TypeError(
