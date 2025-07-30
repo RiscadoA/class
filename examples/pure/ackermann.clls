@@ -89,7 +89,7 @@ proc ackermann_main(;m:colint, n:colint){
 };;
 
 proc main(){
-        ackermann_main(;4,1)
+        ackermann_main(;3,3)
 };;
 
 
