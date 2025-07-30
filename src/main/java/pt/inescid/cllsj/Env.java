@@ -152,12 +152,12 @@ public class Env<X> {
           ASTTypeDef tn = ((TypeDefEntry) assoc).getTypeDef();
           Env<EnvEntry> ep = (Env<EnvEntry>) this;
           System.out.print("(");
-          for (String param : tn.getArgs()) {
+          for (String param : tn.args) {
             System.out.print(param + " ");
             ep = ep.assoc(param, new TypeEntry(new ASTIdT(param)));
           }
-          System.out.print(")" + tn.getType() + " ");
-          System.out.println(tn.getType().toStr(ep));
+          System.out.print(")" + tn.rhs + " ");
+          System.out.println(tn.rhs.toStr(ep));
         } catch (Exception _e) {
           System.out.println(" ?X? ");
         }

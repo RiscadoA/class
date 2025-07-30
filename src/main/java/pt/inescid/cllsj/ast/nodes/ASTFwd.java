@@ -7,6 +7,7 @@ import pt.inescid.cllsj.CLLSj;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.IndexedSessionRef;
+import pt.inescid.cllsj.LabelSet;
 import pt.inescid.cllsj.LinSession;
 import pt.inescid.cllsj.LinSessionValue;
 import pt.inescid.cllsj.MVar;
@@ -17,6 +18,8 @@ import pt.inescid.cllsj.SAMError;
 import pt.inescid.cllsj.Server;
 import pt.inescid.cllsj.SessionClosure;
 import pt.inescid.cllsj.SessionField;
+import pt.inescid.cllsj.SessionFieldAffine;
+import pt.inescid.cllsj.SessionFieldUnfold;
 import pt.inescid.cllsj.SessionRecord;
 import pt.inescid.cllsj.Trail;
 import pt.inescid.cllsj.TypeError;
@@ -92,18 +95,19 @@ public class ASTFwd extends ASTNode {
   private Pair<ASTType, ASTType> fwdInferRec(
       ASTNode here, String ch1, ASTType t1, String ch2, ASTType t2, Env<EnvEntry> ep, boolean rec)
       throws Exception {
-    ASTType t1n = ASTType.unfoldRec(t1);
+    //	ASTType t1n = ASTType.unfoldRec(t1);
+
+    ASTType t1n = (t1 instanceof ASTRecT) ? ((ASTRecT) t1).getin() : ((ASTCoRecT) t1).getin();
     ASTNode parent = here.getanc();
     Function<ASTNode, ASTNode> f =
         (ASTNode x) -> {
           ASTUnfold n = new ASTUnfold(ch1, x);
           n.rec = rec;
-          n.tyrhs = t1n;
           n.setrhs(t1n);
-          // System.out.println("FWD infer UNFOLD "+ch1);
+          // System.out.println("FWD infer UNFOLD "+ch1+" "+rec+" "+x);
           return n;
         };
-    // System.out.println("FWD infer REC UNFOLD PARENT "+parent);
+    // System.out.println("FWD infer REC UNFOLD PARENT "+parent+" "+t1.toStr(ep)+" "+t1n.toStr(ep));
     parent.ASTInsertPipe(f, here);
     return fwdInfer(here, ch1, t1n, ch2, t2, ep);
   }
@@ -129,7 +133,7 @@ public class ASTFwd extends ASTNode {
   private Pair<ASTType, ASTType> fwdInfer(
       ASTNode here, String ch1, ASTType t1, String ch2, ASTType t2, Env<EnvEntry> ep)
       throws Exception {
-    if (t1.equalst(t2, ep, true, new Trail())) return new Pair(t1, t2);
+    if (t1.equalst(t2.dual(ep), ep, true, new Trail())) return new Pair(t1, t2);
     // System.out.println("fwdInfer t1 = "+t1.toStr(ep)+" t2 = "+t2.toStr(ep));
     if (t1 instanceof ASTRecT) {
       try {
@@ -206,10 +210,10 @@ public class ASTFwd extends ASTNode {
 
     ASTNode parentc = this.getanc();
 
-    Pair<ASTType, ASTType> p2 = fwdInfer(this, ch1, t1s, ch2, tdual, ep);
+    Pair<ASTType, ASTType> p2 = fwdInfer(this, ch1, t1s, ch2, t2s, ep);
 
     t1s = p2.fst;
-    tdual = p2.snd;
+    tdual = p2.snd.dual(ep);
 
     if (!t1s.equalst(tdual, ep, true, new Trail())) {
 
@@ -252,17 +256,21 @@ public class ASTFwd extends ASTNode {
 
   public void subs(String x, String y) { // implements x/y (substitutes y by x)
     if (y == ch1) ch1 = x;
-    if (y == ch2) ch2 = x;
+    if (y == ch2)
+      ;
+    ch2 = x;
   }
 
   public void runproc(Env<EnvEntry> ep, Env<LinSession> ed, Env<Server> eg, Logger logger)
       throws Exception {
 
-    // System.out.println("FWD START "+ch1+" : "+ch2);
-
     // when forwarding a cell, make sure the cell is on channel ch1
-    ASTType typeCh2i = typeCh2.unfoldType(ep);
+    ASTType typeCh2i = ASTType.unfoldRec(typeCh2);
+    // was unfoldtype, attention, concurrent interpreter do not unfold op!
+    //	ASTType typeCh2i = typeCh2.unfoldType(ep);
     String ch1i, ch2i;
+    // System.out.println("FWD START "+ch1+" : "+typeCh2i.dual(ep).toStr(ep)+" "+ch2+" :
+    // "+typeCh2i.toStr(ep));
 
     if (typeCh2i instanceof ASTCellT
         || typeCh2i instanceof ASTCellLT
@@ -270,6 +278,8 @@ public class ASTFwd extends ASTNode {
         || typeCh2i instanceof ASTCellBLT) {
       ch1i = ch2;
       ch2i = ch1;
+      // System.out.println("FWD SWITCH "+ch1i+" : "+typeCh2i.toStr(ep)+" "+ch2i+" :
+      // "+typeCh2i.dual(ep).toStr(ep));
     } else {
       ch1i = ch1;
       ch2i = ch2;
@@ -281,11 +291,13 @@ public class ASTFwd extends ASTNode {
       LinSession session1 = (LinSession) ed.find(ch1i);
       LinSession session2 = (LinSession) ed.find(ch2i);
 
+      // System.out.println("Set fwd -"+ session1 + " -> " + session2);
+
       session1.setFwdSession(session2);
 
-      // System.out.println("Set fwd "+ session1.getId() + " -> " + session2.getId());
+      // System.out.println("Set fwd +"+ session1 + " -> " + session2);
 
-      logger.info("Set fwd " + session1.getId() + " -> " + session2.getId());
+      logger.info("Set fwd -" + session1 + " -> " + session2);
 
     } catch (TypeError ee) {
       System.out.println("FWD ERR " + ee.msg);
@@ -412,22 +424,41 @@ public class ASTFwd extends ASTNode {
               + frm.find(wch)
               + ")");
 
-    SessionRecord.freeSessionRecord(srec1);
-
     int doffset2 = ((IndexedSessionRef) (frm.find(wch))).getOffset();
 
-    // System.out.println("DOFFSET2 "+ doffset1+" "+doffset2);
+    // flush linear session to process
+
     for (int vix = doffset1; vix < doffset2; vix++) {
       SessionField v = srec1.readSlot(vix);
-      // System.out.println("v = "+ v);
       if (v instanceof SessionClosure) {
+        // System.out.println("To flush v = "+ v);
         SessionClosure vclos = (SessionClosure) v;
         ASTSend sendn = new ASTSend(wch, vclos.getId(), null, vclos.getBody(), cont);
         sendn.tys_lhs = new ASTOneT(); // dummy place holder
         cont.setanc(sendn);
         cont = sendn;
+      } else if (v instanceof LabelSet) {
+        // System.out.println("To flush v = "+ v);
+        String lab = ((LabelSet) v).getLabel();
+        ASTSelect sel = new ASTSelect(wch, lab, cont);
+        cont.setanc(sel);
+        cont = sel;
+      } else if (v instanceof SessionFieldUnfold) {
+        // System.out.println("To flush v = "+ v);
+        ASTUnfold unf = new ASTUnfold(wch, cont);
+        cont.setanc(unf);
+        cont = unf;
+      } else if (v instanceof SessionFieldAffine) {
+        ASTAffine aff = new ASTAffine(wch, cont);
+        cont.setanc(aff);
+        cont = aff;
+      } else {
+        System.out.println("fwd lin to conc = " + v);
+        int n = 0 / 0;
       }
     }
+
+    SessionRecord.freeSessionRecord(srec1);
 
     frm.upd(wch, lsv2);
 
@@ -453,21 +484,24 @@ public class ASTFwd extends ASTNode {
     // sf2 = sequential queue (holds positive endpoint, is in write mode, suspended process will
     // read)
     // lsv1 = blocking channel (holds negative endpoint, will read)
-    // <empty> ch1- | fwd -ch1 ch2+ | ch2<q,Q>(rhc) ==>  <q> | rhc | Q !!
+    // <P> ch1- | fwd -ch1 ch2+ | ch2<q,Q>(rhc) ==>  <q>;P | rhc | Q !!
     // corresponds to (SFwdMc)
 
     SessionRecord srec2 = sf2.getSessionRec();
     boolean pol2 = srec2.getPol();
     int doffset2 = sf2.getOffset();
 
-    ASTNode cont = srec2.getCont();
+    ASTNode contq = srec2.getCont();
     Env<SessionField> frm = srec2.getFrame();
     Env<EnvEntry> epn = srec2.getFrameP();
     String rch = srec2.getcch();
 
     if (CLLSj.trace)
       System.out.println(
-          "fwdc-op-sc "
+          "fwdc-op-cs "
+              + ch1i
+              + " "
+              + channel1
               + " "
               + ch2i
               + " "
@@ -476,60 +510,137 @@ public class ASTFwd extends ASTNode {
               + rch
               + " ("
               + frm.find(rch)
-              + ") "
-              + ch1i
-              + " "
-              + channel1);
-
-    SessionRecord.freeSessionRecord(srec2);
+              + ") ");
 
     int doffset1 = ((IndexedSessionRef) (frm.find(rch))).getOffset();
 
-    // System.out.println("DOFFSET2 "+ doffset1+" "+doffset2);
+    // if (true || rch.equals(ch1i)) {
 
-    ASTNode nbody = this;
-    this.ch2 = rch; // set positive endpoint of fwd to new assync channel where cont will read
+    // ( ch1<q> P |rch| Q )  (if rch = ch1)
 
-    // push sends at head of this forwarder to create "virtual" queue
+    // ( P |ch1| rzh<q>;fwd ch1 rzh ) |rzh-rch| Q
+
+    String rzh = ASTNode.gensym();
+    ASTNode cont = new ASTFwd(ch1i, rzh);
+    ((ASTFwd) cont).typeCh2 = typeCh2;
 
     for (int vix = doffset1; vix < doffset2; vix++) {
       SessionField v = srec2.readSlot(vix);
-      // System.out.println("v = "+ v);
       if (v instanceof SessionClosure) {
+        // System.out.println("To flush v = "+ v);
         SessionClosure vclos = (SessionClosure) v;
-        ASTSend sendn = new ASTSend(rch, vclos.getId(), null, vclos.getBody(), nbody);
+        ASTSend sendn = new ASTSend(rzh, vclos.getId(), null, vclos.getBody(), cont);
         sendn.tys_lhs = new ASTOneT(); // dummy place holder
         cont.setanc(sendn);
-        nbody = sendn;
+        cont = sendn;
+      } else if (v instanceof LabelSet) {
+        // System.out.println("To flush v = "+ v);
+        String lab = ((LabelSet) v).getLabel();
+        ASTSelect sel = new ASTSelect(rzh, lab, cont);
+        cont.setanc(sel);
+        cont = sel;
+      } else if (v instanceof SessionFieldUnfold) {
+        // System.out.println("To flush v = "+ v);
+        ASTUnfold unf = new ASTUnfold(rzh, cont);
+        cont.setanc(unf);
+        cont = unf;
+      } else if (v instanceof SessionFieldAffine) {
+        ASTAffine aff = new ASTAffine(rzh, cont);
+        cont.setanc(aff);
+        cont = aff;
+      } else {
+        // unreachable
+        System.out.println("unexpected queue value = " + v);
+        int n = 0 / 0;
       }
     }
 
-    LinSessionValue ncut = new LinSessionValue(rch);
-    Env<SessionField> edCut1 = frame.assoc(rch, ncut);
-    Env<SessionField> edCut2 = frm.assoc(rch, ncut);
+    LinSessionValue ns = new LinSessionValue(rzh);
+
+    Env<SessionField> edCut1 = frame.assoc(rzh, ns);
+    Env<SessionField> edCut2 = frm.assoc(rch, ns);
+
+    final ASTNode contf = contq;
+
     CLLSj.threadPool.submit(
         new Runnable() {
           public void run() {
             try {
-              SAM.SAMloop(cont, edCut2, ep);
+              SAM.SAMloop(contf, edCut2, ep);
             } catch (Exception e) {
               e.printStackTrace(System.out);
             }
           }
         });
-    p_cont.code = nbody;
+
+    p_cont.code = cont;
     p_cont.frame = edCut1;
     p_cont.epnm = ep;
 
+    SessionRecord.freeSessionRecord(srec2);
+
     /*
-    ASTCut nccut = new ASTCut(rch,new ASTOneT(), cont, nbody); // better made with async queues
-    nccut.con = true;
+       } else {
 
-    p_cont.code = nccut;
-    p_cont.frame = frame;
-    p_cont.epnm = epn;
+       // ( rhc<q> fwd rch ch1 |ch1| P ) |rch| Q  (if rch != ch1)
+
+       String cposch = ch2i;
+       System.out.println("To cposch = "+ cposch);
+       ASTNode cont = this;
+
+       for (int vix=doffset1;vix<doffset2;vix++)
+       {
+       SessionField v = srec2.readSlot(vix);
+       if (v instanceof SessionClosure) {
+       System.out.println("To flush v = "+ v);
+       SessionClosure vclos = (SessionClosure)v;
+       ASTSend sendn = new ASTSend(cposch,vclos.getId(),null,vclos.getBody(),cont);
+       sendn.tys_lhs = new ASTOneT(); // dummy place holder
+       cont.setanc(sendn);
+       cont = sendn;
+       } else if (v instanceof LabelSet) {
+       System.out.println("To flush v = "+ v);
+       String lab = ((LabelSet)v).getLabel();
+       ASTSelect sel = new ASTSelect(cposch,lab,cont);
+       cont.setanc(sel);
+       cont = sel;
+       } else if (v instanceof SessionFieldUnfold) {
+       System.out.println("To flush v = "+ v);
+       ASTUnfold unf = new ASTUnfold(cposch,cont);
+       cont.setanc(unf);
+       cont = unf;
+       } else {
+       // unreachable
+       System.out.println("unexpected queue value = "+ v);
+       int n = 0/0;
+       }
+
+       }
+
+       LinSessionValue ns = new LinSessionValue(cposch);
+
+       Env<SessionField> edCut1 = frame.assoc(cposch,ns);
+       Env<SessionField> edCut2 = frm.assoc(rch,ns);
+       edCut1.crawl();
+       edCut2.crawl();
+       final ASTNode contf = contq;
+       System.out.println("contq ="+ contq);
+
+       CLLSj.threadPool.submit(
+       new Runnable(){
+       public void run(){ try {
+       SAM.SAMloop(contf,edCut2, ep);
+       } catch (Exception e) {e.printStackTrace(System.out);} }
+       });
+
+       System.out.println("p_cont.code ="+ cont);
+       p_cont.code = cont;
+       p_cont.frame = edCut1;
+       p_cont.epnm = ep;
+
+       SessionRecord.freeSessionRecord(srec2);
+       }
     */
-
   }
 
   public void SAMLSfwd(Env<EnvEntry> ep, Env<SessionField> frame, SAMCont p_cont) throws Exception {
@@ -547,6 +658,8 @@ public class ASTFwd extends ASTNode {
       ch1i = ch1;
       ch2i = ch2;
     }
+
+    if (CLLSj.trace) System.out.println("fwdc-op-cc " + ch2i + " " + ch1i);
 
     try {
 
@@ -566,9 +679,11 @@ public class ASTFwd extends ASTNode {
         LinSessionValue lsv2 = (LinSessionValue) sv2;
         LinSession channel2 = lsv2.getLin();
 
-        channel1.setFwdSession(channel2);
         if (CLLSj.trace)
           System.out.println("fwdc-op-cc " + ch2 + " " + channel2 + " " + ch1 + " " + channel1);
+
+        channel1.setFwdSession(channel2);
+
         p_cont.code = null;
       }
     } catch (TypeError ee) {
@@ -588,6 +703,7 @@ public class ASTFwd extends ASTNode {
 
     SessionField sf11 = frame.find(ch1);
     SessionField sf12 = frame.find(ch2);
+    // System.out.println("fwd-op lc "+ ch2 + " <- " + ch1 + " " +sf12 + " "+sf11);
 
     if (sf11 instanceof LinSessionValue || sf12 instanceof LinSessionValue) {
       SAMLSfwd(ep, frame, p_cont);

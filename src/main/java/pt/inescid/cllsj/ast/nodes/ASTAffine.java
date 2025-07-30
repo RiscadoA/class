@@ -146,8 +146,11 @@ public class ASTAffine extends ASTNode {
         } catch (Exception e) {
         }
         if (tyId != null) {
+          // System.out.println(" Aff "+ ch+" FOUND name "+id+" "+tyId.toStr(ep));
           tyId = tyId.unfoldType(ep);
-          // tyId = ASTType.unfoldRec(tyId);
+
+          //				tyId = ASTType.unfoldRec(tyId);   // HERE !!
+
           if (tyId instanceof ASTRecT || tyId instanceof ASTCoRecT)
             System.out.println(" REC AFFINE " + tyId.toStr(ep));
 
@@ -155,9 +158,24 @@ public class ASTAffine extends ASTNode {
             // System.out.println("\n\nusage-free "+ch+" ->"+id);
             usageSet.put(id, tyId);
           } else if (tyId instanceof ASTCoAffineT) {
+            // THIS CODE NEEDS REWORK - context inference
             // System.out.println("\n\nco-affine-free "+ch+" ->"+id);
-            coaffineSet.put(id, tyId);
+            ASTType typein = ((ASTCoAffineT) tyId).getin();
+            if (typein instanceof ASTWhyT) {
+              // System.out.println(" Aff "+ ch+" FOUND Coff ? name "+id);
+              // infer use and then infer ?
+              ed.upd(ch, typein);
+              this.getanc().ASTInsertUse(id, typein, this, true);
+              // System.out.println(" USE inserted "+ id);
+              // System.out.println(" Aff "+ ch+" FOUND ASTWhyT name "+id);
+              ASTWhyT t = (ASTWhyT) typein;
+              tyId = t.getin();
+              // System.out.println(" WHY? inserted "+id);
+              this.getanc().ASTInsertWhyNot(id, tyId, this);
+              ed.updmove(id);
+            } else coaffineSet.put(id, tyId);
           } else if (tyId instanceof ASTWhyT) {
+            // System.out.println(" Aff "+ ch+" FOUND ASTWhyT name "+id);
             ASTWhyT t = (ASTWhyT) tyId;
             tyId = t.getin();
             this.getanc().ASTInsertWhyNot(id, tyId, this);
@@ -225,7 +243,7 @@ public class ASTAffine extends ASTNode {
     CLLSj.inc_affines(+1);
     //        System.out.println("+AFFINE:  "+ch);
     String selection = (String) channel.receive();
-    //	CLLSj.inc_affines(-1);
+    CLLSj.inc_affines(-1);
     //       System.out.println("-AFFINE: " + selection +" "+ch);
 
     if (selection.equals("USE")) {

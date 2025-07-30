@@ -112,9 +112,12 @@ public class ASTClose extends ASTNode {
     SessionField srefi = frame.find(ch); // concurrent channel
     if (srefi instanceof LinSessionValue) {
       if (CLLSj.trace) {
-        System.out.println("cclose-op " + ch);
+        System.out.println("cclose-op pre " + ch);
       }
       ((Channel) (((LinSessionValue) srefi).getLin())).send("END");
+      if (CLLSj.trace) {
+        System.out.println("cclose-op post " + ch);
+      }
       p_cont.code = null;
     } else {
       IndexedSessionRef sref = (IndexedSessionRef) frame.find(ch);
@@ -122,9 +125,11 @@ public class ASTClose extends ASTNode {
       SessionRecord srec = sref.getSessionRec();
 
       if (srec.getPol()) {
+
         if (CLLSj.trace) {
           System.out.println("clos-op " + ch + " " + srec + " @ " + doffset);
         }
+
         srec.writeSlot(CloseTok, doffset);
         sref.incOffset();
 

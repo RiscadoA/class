@@ -9,9 +9,11 @@ import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.IndexedSessionRef;
 import pt.inescid.cllsj.LinSession;
+import pt.inescid.cllsj.LinSessionValue;
 import pt.inescid.cllsj.SAMCont;
 import pt.inescid.cllsj.SAMError;
 import pt.inescid.cllsj.Server;
+import pt.inescid.cllsj.SessionClosure;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.SessionRecord;
 import pt.inescid.cllsj.TypeError;
@@ -97,6 +99,7 @@ public class ASTWhy extends ASTNode {
 
   public void typecheck(Env<ASTType> ed, Env<ASTType> eg, Env<EnvEntry> ep) throws Exception {
     this.eg = eg;
+
     this.inferUses(ch, ed, ep);
     ASTType ty = ed.find(ch);
     ty = ty.unfoldType(ep);
@@ -111,8 +114,7 @@ public class ASTWhy extends ASTNode {
     } else if (ty instanceof ASTCoBasicType) {
       ASTCoBasicType tyr = (ASTCoBasicType) ty;
       ed.upd(ch, null);
-      __type = tyr.lift();
-      eg = eg.assoc(ch, __type);
+      eg = eg.assoc(ch, tyr.lift());
       rhs.typecheck(ed, eg, ep);
     } else
       throw new TypeError(
@@ -165,7 +167,6 @@ public class ASTWhy extends ASTNode {
       System.exit(0);
     } else {
       // polarity -
-      // System.out.println("SAM-WHY "+ch+"@"+doffset+ " - ");
       SessionField sf = srec.readSlot(doffset);
       sref.incOffset();
       if (sf == null) throw new SAMError("SAM-WHY-read-FAILURE");
@@ -176,55 +177,39 @@ public class ASTWhy extends ASTNode {
   }
 
   public void samL(Env<SessionField> frame, Env<EnvEntry> ep, SAMCont p_cont) throws Exception {
+    SessionField sf0 = frame.find(ch);
 
-    IndexedSessionRef sref = (IndexedSessionRef) frame.find(ch);
-    int doffset = sref.getOffset();
-    SessionRecord srec = sref.getSessionRec();
-    boolean pol = srec.getPol();
-
-    if (pol) {
-      int i = 9 / 0;
-      /*
-         if (CLLSj.trace) {
-      System.out.println("why?-op [-] "+ srec.getcch());
-         }
-         ASTNode cont = srec.getCont();
-         Env<SessionField> frm  = srec.getFrame();
-         Env<EnvEntry> epn  = srec.getFrameP();
-         boolean pold = srec.getPolDual();
-
-         srec.setPolDual(srec.getPol());   // this session dies so don't really care
-         srec.setPol(pold);
-
-         srec.setCont(this); // may this should be GC'ed ?
-         srec.setcch(ch);
-         srec.setFrame(frame);
-         srec.setFrameP(ep);
-
-         p_cont.code = cont;
-         p_cont.frame = frm;
-         p_cont.epnm = epn;
-         return;
-         */
-    } else {
-      if (CLLSj.trace) {
-        System.out.println("why?-op " + ch + " " + srec + " @ " + doffset);
-      }
-
-      SessionField sf = srec.readSlot(doffset);
-      // System.out.println("why?-op "+sf);
-      if (sf == null) throw new SAMError("SAM-WHY-read-FAILURE");
-      srec.writeSlot(null, doffset);
-      sref.incOffset();
-      // frame.upd(ch, sf);
-      frame = frame.assoc(ch, sf);
+    if (sf0 instanceof LinSessionValue) {
+      LinSessionValue lsv = (LinSessionValue) sf0;
+      Channel channel = lsv.getLin();
+      SessionClosure clos = (SessionClosure) channel.receive();
+      frame = frame.assoc(ch, clos);
       p_cont.code = rhs;
       p_cont.frame = frame;
       p_cont.epnm = ep;
-      SessionField sf0 = frame.find(ch);
-      if (sf0 != sf) throw new SAMError("UPDATE-WHY");
-      SessionRecord.freeSessionRecord(srec);
-      return;
+
+    } else {
+      IndexedSessionRef sref = (IndexedSessionRef) sf0;
+      int doffset = sref.getOffset();
+      SessionRecord srec = sref.getSessionRec();
+      boolean pol = srec.getPol();
+      if (!pol) {
+        if (CLLSj.trace) {
+          System.out.println("why?-op " + ch + " " + srec + " @ " + doffset);
+        }
+
+        SessionField sf = srec.readSlot(doffset);
+        if (sf == null) throw new SAMError("SAM-WHY-read-FAILURE");
+        srec.writeSlot(null, doffset);
+        sref.incOffset();
+        frame = frame.assoc(ch, sf);
+        p_cont.code = rhs;
+        p_cont.frame = frame;
+        p_cont.epnm = ep;
+        SessionRecord.freeSessionRecord(srec);
+      } else {
+        throw new SAMError("SAM-WHY-UNEXPECTED-POLARITY");
+      }
     }
   }
 

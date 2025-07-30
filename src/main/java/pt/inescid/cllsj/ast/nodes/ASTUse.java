@@ -155,7 +155,8 @@ public class ASTUse extends ASTNode {
   public void runproc(Env<EnvEntry> ep, Env<LinSession> ed, Env<Server> eg, Logger logger)
       throws Exception {
     Channel channel = (Channel) ed.find(ch);
-    //	System.out.println("+ USE "+ch);
+
+    // System.out.println("RUN-USE "+ch);
 
     CLLSj.inc_coaff(+1);
     channel.send("USE");
@@ -178,9 +179,9 @@ public class ASTUse extends ASTNode {
       System.out.println("use-op-lc " + ch + " " + channel);
     }
     // System.out.println("+USE:  "+ch);
-    // CLLSj.inc_coaff(+1);
+    CLLSj.inc_coaff(+1);
     SessionFieldAffine arg = (SessionFieldAffine) channel.receive();
-    // CLLSj.inc_coaff(-1);
+    CLLSj.inc_coaff(-1);
     // System.out.println("-USE:  "+ch);
     // System.out.println("++USE ACK:  "+ch);
     channel.send(SFUSE); // ack

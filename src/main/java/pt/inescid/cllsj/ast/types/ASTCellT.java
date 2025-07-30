@@ -6,10 +6,17 @@ import pt.inescid.cllsj.Trail;
 import pt.inescid.cllsj.ast.ASTTypeVisitor;
 
 public class ASTCellT extends ASTType {
-  public ASTType t;
 
-  public ASTCellT(ASTType _t) {
+  public ASTType t;
+  boolean lin;
+
+  public ASTCellT(ASTType _t, boolean _lin) {
     t = _t;
+    lin = _lin;
+  }
+
+  public boolean islin() {
+    return lin;
   }
 
   public ASTType getin() {
@@ -17,17 +24,11 @@ public class ASTCellT extends ASTType {
   }
 
   public boolean equalst(ASTType tc, Env<EnvEntry> e, boolean lit, Trail trail) throws Exception {
-    // System.out.println(" CELLT <-> "+tc+" \n");
     tc = tc.unfoldType(e);
-    //	tc = ASTType.unfoldRec(tc);
     if (tc instanceof ASTCellT) {
       ASTCellT w = (ASTCellT) tc;
-      // System.out.println("CELLT equalst "+this+" == "+w.getin()+" "+t);
-      return w.getin().equalst(t, e, lit, trail);
+      return (w.islin() == lin) && w.getin().equalst(t, e, lit, trail);
     }
-    // else if (tc instanceof ASTIdT) {
-    //    return false;
-    // }
     return false;
   }
 
@@ -36,7 +37,7 @@ public class ASTCellT extends ASTType {
   }
 
   public ASTType dual(Env<EnvEntry> e) throws Exception {
-    return new ASTUsageT(t.dual(e));
+    return new ASTUsageT(t.dual(e), lin);
   }
 
   public ASTType unfoldType(Env<EnvEntry> e) throws Exception {
@@ -46,11 +47,12 @@ public class ASTCellT extends ASTType {
   }
 
   public String toStr(Env<EnvEntry> e) throws Exception {
-    return "CELL " + t.toStr(e);
+    String timage = lin ? "LSTATE" : "STATE";
+    return timage + " " + t.toStr(e);
   }
 
   public ASTType subst(Env<ASTType> e) {
-    return new ASTCellT(t.subst(e));
+    return new ASTCellT(t.subst(e), lin);
   }
 
   public int SetOffsets(int base) throws Exception {

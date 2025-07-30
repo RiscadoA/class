@@ -10,9 +10,7 @@ import pt.inescid.cllsj.SyntaxError;
 import pt.inescid.cllsj.TypeEntry;
 import pt.inescid.cllsj.TypeError;
 import pt.inescid.cllsj.ast.ASTNodeVisitor;
-import pt.inescid.cllsj.ast.types.ASTCoRecT;
-import pt.inescid.cllsj.ast.types.ASTIdT;
-import pt.inescid.cllsj.ast.types.ASTType;
+import pt.inescid.cllsj.ast.types.*;
 
 public class ASTProcDef extends ASTNode {
   String id;
@@ -251,11 +249,11 @@ public class ASTProcDef extends ASTNode {
             "Line "
                 + lineno
                 + " :"
-                + "Recursive process definition ("
+                + "Recursive process definition "
                 + id
-                + ") must have a first linear parameter.");
+                + " (first) linear parameter must be of corecursive type.");
       tfirst = argtypes.get(0).unfoldType(ep);
-      if (tfirst instanceof ASTCoRecT) {
+      if (tfirst instanceof ASTCoRecT || tfirst instanceof ASTUsageT) {
         // tfirst = ASTType.unfoldRec(tfirst);
         // tfirst = ASTType.unfoldRecInfer(tfirst, rhs, args.get(0)); // rhs was this
         this.rCall = true;

@@ -21,8 +21,7 @@ import pt.inescid.cllsj.Trail;
 import pt.inescid.cllsj.TypeError;
 import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.types.ASTAffineT;
-import pt.inescid.cllsj.ast.types.ASTBangT;
-import pt.inescid.cllsj.ast.types.ASTCellBT;
+import pt.inescid.cllsj.ast.types.ASTBotT;
 import pt.inescid.cllsj.ast.types.ASTCellT;
 import pt.inescid.cllsj.ast.types.ASTType;
 
@@ -34,6 +33,7 @@ public class ASTCell extends ASTNode {
   ASTType type;
   ASTNode rhs;
   boolean linear;
+  boolean statecell;
   ASTType ty_rhs;
 
   public ASTCell(String _chr, String _chc, ASTType _type, ASTNode _rhs) {
@@ -124,6 +124,14 @@ public class ASTCell extends ASTNode {
     rhs = newCont;
   }
 
+  static ASTType rewpaytype(ASTType payl) {
+    if (payl instanceof ASTCellT || payl instanceof ASTAffineT) {
+      return payl;
+    } else {
+      return new ASTAffineT(payl);
+    }
+  }
+
   public void typecheck(Env<ASTType> ed, Env<ASTType> eg, Env<EnvEntry> ep) throws Exception {
     this.eg = eg;
 
@@ -140,11 +148,12 @@ public class ASTCell extends ASTNode {
 
     if (ty instanceof ASTCellT) {
       ASTCellT tyr = (ASTCellT) ty;
-      ASTType payl2 = tyr.t; // .unfoldType(ep);
-      // payl2 = ASTType.unfoldRec(payl2);
-      ASTType payl = new ASTAffineT(payl2);
+      ASTType payl2 = tyr.getin().unfoldType(ep);
 
+      ASTType payl = ASTCell.rewpaytype(payl2);
       ty_rhs = payl;
+
+      statecell = (payl instanceof ASTCellT); // for the interpreter
 
       ed.upd(ch, null);
 
@@ -164,15 +173,14 @@ public class ASTCell extends ASTNode {
       ed = ed.assoc(chc, (payl));
 
       if (rhs instanceof ASTExpr) {
-        ASTExpr pe = (ASTExpr) rhs;
+        ASTExpr pexpr = (ASTExpr) rhs;
         try {
-          ASTNode rhsc = compileExpr(chc, pe, payl2, ep);
-          rhs = new ASTAffine(chc, rhsc);
-          rhsc.setanc(rhs);
+          ASTNode rhsc = compileExpr(chc, pexpr, payl, ep);
+          rhs = rhsc;
+          rhs.setanc(this);
         } catch (Exception ee) {
-          if (pe instanceof ASTVId) {
-            String x = ((ASTVId) pe).ch;
-
+          if (pexpr instanceof ASTVId) {
+            String x = ((ASTVId) pexpr).ch;
             try { // checks if free name is linear or unrestricted
               ed.find(x);
               rhs = new ASTFwd(chc, x);
@@ -191,35 +199,18 @@ public class ASTCell extends ASTNode {
                     + ": cannot be parsed as cell of basic expression nor as free cell.");
         }
       }
+
       rhs.setanc(this);
 
-      rhs.typecheck(ed, eg, ep);
+      Env<ASTType> eglhs = eg.assoc("$DUMMY", new ASTBotT());
+
+      // lhs = ASTInferLinClose(lhs,cho,ed,ep);
+
+      rhs.typecheck(ed, eglhs, ep);
       rhs.linclose(ed, ep);
       rhs.linclose(chc, ed, ep);
       linear = true;
 
-    } else if (ty instanceof ASTCellBT) {
-      ASTCellBT tyr = (ASTCellBT) ty;
-      ASTType payl = tyr.t.unfoldType(ep);
-      ed.upd(ch, null);
-      payl = new ASTBangT(payl);
-      if (typeex != null && typeex.equalst(payl, ep, true, new Trail())) {
-        ed = ed.assoc(chc, (payl));
-        rhs.typecheck(ed, eg, ep);
-        rhs.linclose(ed, ep);
-        rhs.linclose(chc, ed, ep);
-        linear = false;
-      } else if (typeex != null)
-        throw new TypeError(
-            "Line "
-                + lineno
-                + " :"
-                + "CELL "
-                + chc
-                + " type mismatch; found="
-                + payl.toStr(ep)
-                + " expected="
-                + typeex.toStr(ep));
     } else
       throw new TypeError(
           "Line " + lineno + " :" + "CELL: " + ch + " is neither of STATE nor of STATE! type.");
@@ -243,10 +234,12 @@ public class ASTCell extends ASTNode {
     ASTType ts = type == null ? null : type.subst(e);
     ASTCell p = new ASTCell(ch, chc, ts, rhs.subst(e));
     p.rhs.setanc(p);
+    p.linear = linear;
+    p.statecell = statecell;
     return p;
   }
 
-  public void subs(String x, String y) { // implements x/y (substitutes y by x)
+  public void subs(String x, String y) { // implements x/y (substitutes y by x) in place
     if (y == ch) ch = x;
     else if (x == chc) { // we rename the bound name chs to fresh to avoid capturing name x
       String fresh = ASTNode.gensym();
@@ -259,7 +252,7 @@ public class ASTCell extends ASTNode {
   public void runproc(Env<EnvEntry> ep, Env<LinSession> ed, Env<Server> eg, Logger logger)
       throws Exception {
     Cell cell = (Cell) ed.find(ch);
-    cell.setCell(chc, rhs, ep, ed, eg, logger, linear);
+    cell.setCell(chc, rhs, ep, ed, eg, logger, linear, statecell);
   }
 
   public void samL(Env<SessionField> frame, Env<EnvEntry> ep, SAMCont p_cont) throws Exception {

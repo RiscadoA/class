@@ -7,30 +7,18 @@ import pt.inescid.cllsj.LinSession;
 import pt.inescid.cllsj.Server;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.TypeError;
-import pt.inescid.cllsj.VBool;
+import pt.inescid.cllsj.VInt;
 import pt.inescid.cllsj.Value;
 import pt.inescid.cllsj.ast.ASTExprVisitor;
-import pt.inescid.cllsj.ast.types.ASTBotT;
-import pt.inescid.cllsj.ast.types.ASTCoLboolT;
-import pt.inescid.cllsj.ast.types.ASTCoLstringT;
-import pt.inescid.cllsj.ast.types.ASTLCointT;
-import pt.inescid.cllsj.ast.types.ASTType;
+import pt.inescid.cllsj.ast.types.*;
 
-public class ASTNEq extends ASTExpr {
+public class ASTMod extends ASTExpr {
 
   ASTExpr lhs, rhs;
 
-  public ASTNEq(ASTExpr _lhs, ASTExpr _rhs) {
+  public ASTMod(ASTExpr _lhs, ASTExpr _rhs) {
     lhs = _lhs;
     rhs = _rhs;
-  }
-
-  public ASTExpr getLhs() {
-    return lhs;
-  }
-
-  public ASTExpr getRhs() {
-    return rhs;
   }
 
   public void ASTupdCont(ASTNode newCont, ASTNode caller) throws Exception {
@@ -70,25 +58,21 @@ public class ASTNEq extends ASTExpr {
     Env<ASTType> egrhs = eg.assoc("$DUMMY", new ASTBotT());
 
     ASTType rhst = rhs.etypecheck(ed, egrhs, ep, lin);
-
-    if (!((lhst instanceof ASTLCointT && rhst instanceof ASTLCointT)
-        || (lhst instanceof ASTCoLstringT && rhst instanceof ASTCoLstringT)
-        || (lhst instanceof ASTCoLboolT && rhst instanceof ASTCoLboolT)))
-      throw new TypeError(
-          "Line " + lineno + " :" + "!= : expression arguments not of the same co-type");
-    return new ASTCoLboolT();
-  }
-
-  public Value eval(Env<LinSession> ed, Env<Server> eg) throws Exception {
-    Value vleft = lhs.eval(ed, eg);
-    Value vright = rhs.eval(ed, eg);
-    return new VBool(!vleft.equal(vright));
+    if (!(lhst instanceof ASTLCointT && rhst instanceof ASTLCointT))
+      throw new TypeError("Line " + lineno + " :" + "+ : expression arguments not of COINT type");
+    return new ASTLCointT();
   }
 
   public Value sameval(Env<SessionField> env) throws Exception {
-    Value vleft = lhs.sameval(env);
-    Value vright = rhs.sameval(env);
-    return new VBool(!vleft.equal(vright));
+    VInt vleft = (VInt) lhs.sameval(env);
+    VInt vright = (VInt) rhs.sameval(env);
+    return new VInt(vleft.get() % vright.get());
+  }
+
+  public Value eval(Env<LinSession> ed, Env<Server> eg) throws Exception {
+    VInt vleft = (VInt) lhs.eval(ed, eg);
+    VInt vright = (VInt) rhs.eval(ed, eg);
+    return new VInt(vleft.get() % vright.get());
   }
 
   @Override

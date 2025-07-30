@@ -17,7 +17,6 @@ import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.Trail;
 import pt.inescid.cllsj.TypeError;
 import pt.inescid.cllsj.ast.ASTNodeVisitor;
-import pt.inescid.cllsj.ast.types.ASTAffineT;
 import pt.inescid.cllsj.ast.types.ASTBotT;
 import pt.inescid.cllsj.ast.types.ASTType;
 import pt.inescid.cllsj.ast.types.ASTUsageLT;
@@ -132,12 +131,12 @@ public class ASTPut extends ASTNode {
 
     if (ty instanceof ASTUsageLT) {
       ASTUsageLT tys = (ASTUsageLT) ty;
-      tys_payl = tys.getin().dual(ep).unfoldType(ep);
+      tys_payl = ASTCell.rewpaytype(tys.getin().dual(ep));
 
       if (type != null) {
         type = type.unfoldType(ep);
         // type = ASTType.unfoldRec(type);
-        if (!type.equalst(new ASTAffineT(tys_payl), ep, true, new Trail()))
+        if (!type.equalst(tys_payl, ep, true, new Trail()))
           throw new TypeError(
               "Line "
                   + lineno
@@ -151,22 +150,24 @@ public class ASTPut extends ASTNode {
       }
 
       ed.upd(chs, null);
-      ed = ed.assoc(cho, new ASTAffineT(tys_payl));
+      ed = ed.assoc(cho, tys_payl);
 
       if (lhs instanceof ASTExpr) {
         ASTExpr pe = (ASTExpr) lhs;
         try {
+          // System.out.println("Compile PUT "+pe);
           ASTNode lhsc = compileExpr(cho, pe, tys_payl, ep);
-          lhs = new ASTAffine(cho, lhsc);
-          lhsc.setanc(lhs);
+          lhs = lhsc;
+          lhsc.setanc(this);
         } catch (Exception ee) {
           if (pe instanceof ASTVId) {
             String x = ((ASTVId) pe).ch;
             try { // check if the free put is a linear or unrestricted name
               ASTType t2 = ed.find(x);
-              lhs = compileFwd(cho, x, new ASTAffineT(tys_payl), t2, ep);
+              // System.out.println("VID PUT "+t2.toStr(ep));
+              lhs = compileFwd(cho, x, tys_payl, t2, ep);
               lhs.setanc(this);
-            } catch (Exception e) {
+            } catch (Exception e) { // use less
               ASTFwdB f = new ASTFwdB(cho, x);
               lhs = new ASTAffine(cho, f);
               f.setanc(lhs);
@@ -191,7 +192,7 @@ public class ASTPut extends ASTNode {
       lhs.linclose(ed, ep);
       lhs.linclose(cho, ed, ep);
 
-      ed.upd(chs, new ASTUsageT(tys.getin().unfoldType(ep)));
+      ed.upd(chs, new ASTUsageT(tys.getin().unfoldType(ep), tys.islin()));
 
       Env<ASTType> egrhs = eg.assoc("$DUMMY", new ASTBotT());
 
@@ -258,7 +259,8 @@ public class ASTPut extends ASTNode {
 
   public void samL(Env<SessionField> frame, Env<EnvEntry> ep, SAMCont p_cont) throws Exception {
     SessionField sf = (SessionField) frame.find(chs);
-    int sessionSize = tys_payl.SetOffsets(0, ep) + 2; // to consider affine(tys_payl)
+    int sessionSize = tys_payl.SetOffsets(0, ep) + 2;
+    // to consider affine(tys_payl)
     // System.out.println("sf="+sf+" "+sessionSize+" "+tys_payl);
 
     if (sf instanceof MVar) {

@@ -135,9 +135,10 @@ public abstract class ASTType {
           ASTUnfold unf = (ASTUnfold) here.getanc();
           unf.rec = false;
           return unfoldRecInfer(tyco, here, ch, ep);
-        } else {
-          return t;
-        }
+        } else if (t instanceof ASTNotT) {
+          t = t.unfoldType(ep);
+          return unfoldRecInfer(t, here, ch, ep);
+        } else return t;
       }
     }
   }
@@ -187,6 +188,23 @@ public abstract class ASTType {
         parent.ASTInsertPipe(f, here);
         ASTUnfold unf = (ASTUnfold) here.getanc();
         unf.rec = false;
+        return unfoldRecInferParameter(tyco, formal, here, ch, ep);
+      } else if (t instanceof ASTCoAffineT) {
+        if (CLLSj.trace_level == 5)
+          System.out.println("ASTCoAffineT use infer " + here + " " + CLLSj.trace_level);
+
+        ASTCoAffineT t0 = (ASTCoAffineT) t;
+        ASTType tyco = t0.getin().unfoldType(ep);
+
+        Function<ASTNode, ASTNode> f =
+            (ASTNode x) -> {
+              ASTUse n = new ASTUse(ch, x);
+              n.setrhs(tyco);
+              return n;
+            };
+        ASTNode parent = here.getanc();
+        parent.ASTInsertPipe(f, here);
+        ASTUse unf = (ASTUse) here.getanc();
         return unfoldRecInferParameter(tyco, formal, here, ch, ep);
       } else {
         return t;

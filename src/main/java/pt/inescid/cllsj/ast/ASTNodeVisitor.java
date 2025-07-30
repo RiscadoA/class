@@ -134,6 +134,14 @@ public abstract class ASTNodeVisitor {
     visit((ASTNode) node);
   }
 
+  public void visit(ASTShareL node) {
+    visit((ASTNode) node);
+  }
+
+  public void visit(ASTShareR node) {
+    visit((ASTNode) node);
+  }
+
   public void visit(ASTExpr node) {
     visit((ASTNode) node);
   }

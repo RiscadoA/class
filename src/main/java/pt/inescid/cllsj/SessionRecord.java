@@ -44,8 +44,6 @@ public class SessionRecord {
     statsnew[_size]++;
     if (cache[_size] == null) {
       statsalloc[_size]++;
-      // System.out.println("alloc "+_size);
-      // if (_size == 14)  { _size = _size / 0; }
       return new SessionRecord(_size);
     } else {
       SessionRecord sr = cache[_size];

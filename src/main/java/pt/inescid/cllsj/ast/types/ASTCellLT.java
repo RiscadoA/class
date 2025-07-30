@@ -7,9 +7,15 @@ import pt.inescid.cllsj.ast.ASTTypeVisitor;
 
 public class ASTCellLT extends ASTType {
   private ASTType t;
+  private boolean lin;
 
-  public ASTCellLT(ASTType _t) {
+  public ASTCellLT(ASTType _t, boolean _lin) {
     t = _t;
+    lin = _lin;
+  }
+
+  public boolean islin() {
+    return lin;
   }
 
   public ASTType getin() {
@@ -20,7 +26,7 @@ public class ASTCellLT extends ASTType {
     tc = tc.unfoldType(e);
     if (tc instanceof ASTCellLT) {
       ASTCellLT w = (ASTCellLT) tc;
-      return w.getin().equalst(t, e, lit, trail);
+      return (w.islin() == lin) && w.getin().equalst(t, e, lit, trail);
     }
     return false;
   }
@@ -30,21 +36,20 @@ public class ASTCellLT extends ASTType {
   }
 
   public ASTType dual(Env<EnvEntry> e) throws Exception {
-    return new ASTUsageLT(t.dual(e));
+    return new ASTUsageLT(t.dual(e), lin);
   }
 
   public ASTType unfoldType(Env<EnvEntry> e) throws Exception {
-    // ASTType ty=t.unfoldType(e);
-    // return new ASTCellLT(ty);
     return this;
   }
 
   public String toStr(Env<EnvEntry> e) throws Exception {
-    return "STATEL " + t.toStr(e);
+    String timage = lin ? "LSTATEL" : "STATEL";
+    return timage + t.toStr(e);
   }
 
   public ASTType subst(Env<ASTType> e) {
-    return new ASTCellLT(t.subst(e));
+    return new ASTCellLT(t.subst(e), lin);
   }
 
   public int SetOffsets(int base) throws Exception {

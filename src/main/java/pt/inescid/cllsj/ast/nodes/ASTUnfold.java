@@ -30,7 +30,7 @@ import pt.inescid.cllsj.ast.types.ASTWhyT;
 public class ASTUnfold extends ASTNode {
   String ch;
   ASTNode rhs;
-  public boolean rec;
+  public boolean rec = true;
   ASTType tyrhs;
 
   public ASTUnfold(String _ch, ASTNode _rhs) {

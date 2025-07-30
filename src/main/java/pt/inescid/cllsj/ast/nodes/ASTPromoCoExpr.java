@@ -93,8 +93,12 @@ public class ASTPromoCoExpr extends ASTNode {
                   + " expected="
                   + idt.toStr(ep));
         ed.upd(ch, null);
-      } else throw new TypeError("Line " + lineno + " :" + "LET " + ch + " not of !-basic type");
-    } else throw new TypeError("Line " + lineno + " :" + "LET " + ch + " not of basic type");
+      } else
+        throw new TypeError(
+            "Line " + lineno + " :" + "LET " + ch + " not of basic type, found " + idtb.toStr(ep));
+    } else
+      throw new TypeError(
+          "Line " + lineno + " :" + "LET " + ch + " not of !-basic type, found " + idt.toStr(ep));
   }
 
   public Set<String> fn(Set<String> s) {
@@ -104,7 +108,7 @@ public class ASTPromoCoExpr extends ASTNode {
   }
 
   public Set<String> fnLinear(Set<String> s) {
-    s = expr.fnLinear(s);
+    // s=expr.fnLinear(s);
     s.add(ch);
     return s;
   }

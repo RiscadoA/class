@@ -9,10 +9,9 @@ import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.LinSession;
 import pt.inescid.cllsj.Server;
 import pt.inescid.cllsj.TypeError;
+import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.types.ASTBotT;
 import pt.inescid.cllsj.ast.types.ASTType;
-import pt.inescid.cllsj.ast.types.ASTUsageBLT;
-import pt.inescid.cllsj.ast.types.ASTUsageBT;
 import pt.inescid.cllsj.ast.types.ASTUsageLT;
 import pt.inescid.cllsj.ast.types.ASTUsageT;
 
@@ -88,19 +87,12 @@ public class ASTShareR extends ASTNode {
     ty = ty.unfoldType(ep);
     if (ty instanceof ASTUsageLT) {
       ASTUsageLT tys = (ASTUsageLT) ty;
+      if (tys.islin())
+        throw new TypeError("Line " + lineno + " :" + "SHARER: " + sh + " is not of USAGEL.");
       Env<ASTType> egrhs = eg.assoc("$DUMMY", new ASTBotT());
       rhs.typecheck(ed, egrhs, ep);
       rhs.linclose(ed, ep);
-      ed.upd(sh, new ASTUsageT(tys.getin()));
-      Env<ASTType> eglhs = eg.assoc("$DUMMY", new ASTBotT());
-      lhs.typecheck(ed, eglhs, ep);
-      lhs.linclose(ed, ep);
-    } else if (ty instanceof ASTUsageBLT) {
-      ASTUsageBLT tys = (ASTUsageBLT) ty;
-      Env<ASTType> egrhs = eg.assoc("$DUMMY", new ASTBotT());
-      rhs.typecheck(ed, egrhs, ep);
-      rhs.linclose(ed, ep);
-      ed.upd(sh, new ASTUsageBT(tys.getin()));
+      ed.upd(sh, new ASTUsageT(tys.getin(), false));
       Env<ASTType> eglhs = eg.assoc("$DUMMY", new ASTBotT());
       lhs.typecheck(ed, eglhs, ep);
       lhs.linclose(ed, ep);
@@ -163,5 +155,10 @@ public class ASTShareR extends ASTNode {
             }
           }
         });
+  }
+
+  @Override
+  public void accept(ASTNodeVisitor visitor) {
+    visitor.visit(this);
   }
 }

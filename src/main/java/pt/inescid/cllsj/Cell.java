@@ -21,7 +21,8 @@ public interface Cell {
       Env<LinSession> _ed,
       Env<Server> _eg,
       Logger logger,
-      boolean _linear);
+      boolean _linear,
+      boolean _state);
 
   void setEmptyCell(Logger logger);
 

@@ -9,6 +9,7 @@ import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.IndexedSessionRef;
 import pt.inescid.cllsj.LinSession;
+import pt.inescid.cllsj.LinSessionValue;
 import pt.inescid.cllsj.SAMCont;
 import pt.inescid.cllsj.Server;
 import pt.inescid.cllsj.SessionField;
@@ -171,7 +172,13 @@ public class ASTCoExpr extends ASTNode {
       p_cont.epnm = epn;
 
     } else {
-      int u = 0 / 0;
+      if (CLLSj.trace) {
+        System.out.println("coexpr-op " + ch + " " + sf);
+      }
+      LinSessionValue lsv = (LinSessionValue) sf;
+      Channel channel = lsv.getLin();
+      channel.send(v);
+      p_cont.code = null;
     }
   }
 

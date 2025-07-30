@@ -8,9 +8,15 @@ import pt.inescid.cllsj.ast.ASTTypeVisitor;
 public class ASTUsageT extends ASTType {
 
   ASTType t;
+  boolean lin;
 
-  public ASTUsageT(ASTType _t) {
+  public ASTUsageT(ASTType _t, boolean _lin) {
     t = _t;
+    lin = _lin;
+  }
+
+  public boolean islin() {
+    return lin;
   }
 
   public ASTType getin() {
@@ -18,13 +24,10 @@ public class ASTUsageT extends ASTType {
   }
 
   public boolean equalst(ASTType ty, Env<EnvEntry> e, boolean lit, Trail trail) throws Exception {
-    // System.out.println("DEBUG equalst ASTUsageT: before unfold:  "+this.toStr(e) + " == "+
-    // ty.toStr(e));
     ty = ty.unfoldType(e);
-    // ty = ASTType.unfoldRec(ty);
     if (ty instanceof ASTUsageT) {
       ASTUsageT w = (ASTUsageT) ty;
-      return w.getin().equalst(t, e, lit, trail);
+      return (w.islin() == lin) && w.getin().equalst(t, e, lit, trail);
     }
     return false;
   }
@@ -34,20 +37,20 @@ public class ASTUsageT extends ASTType {
   }
 
   public ASTType dual(Env<EnvEntry> e) throws Exception {
-    return new ASTCellT(t.dual(e));
+    return new ASTCellT(t.dual(e), lin);
   }
 
   public ASTType unfoldType(Env<EnvEntry> e) throws Exception {
-    //	return new ASTUsageT(t.unfoldType(e));
     return this;
   }
 
   public String toStr(Env<EnvEntry> e) throws Exception {
-    return "USAGE " + t.toStr(e);
+    String timage = lin ? "LUSAGE" : "USAGE";
+    return timage + " " + t.toStr(e);
   }
 
   public ASTType subst(Env<ASTType> e) {
-    return new ASTUsageT(t.subst(e));
+    return new ASTUsageT(t.subst(e), lin);
   }
 
   public int SetOffsets(int base, Env<EnvEntry> e) throws Exception {
