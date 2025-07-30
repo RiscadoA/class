@@ -303,9 +303,6 @@ public class ASTSend extends ASTNode {
     channel.send(sessionOut);
     CLLSj.inc_sends(-1);
 
-    logger.info("SEND-SEND on session " + channel.getId());
-    // System.out.println("[RunStatus] SEND on "+session.id+" end.");
-
     CLLSj.threadPool.submit(
         new Runnable() {
           public void run() {
@@ -344,10 +341,10 @@ public class ASTSend extends ASTNode {
       LinSessionValue lsv = (LinSessionValue) sf;
       Channel channel = lsv.getLin();
       SessionClosure clos = new SessionClosure(cho, sessionSize, argType.isPos(ep), lhs, frame, ep);
-      if (CLLSj.trace) {
-        System.out.println("send-op-lc " + chs + " " + channel);
-      }
       channel.send(clos);
+      if (CLLSj.trace) {
+        System.out.println("send-op-lc " + chs + " " + channel + " " + rhs);
+      }
       p_cont.code = rhs;
       p_cont.frame = frame;
       p_cont.epnm = ep;
@@ -359,7 +356,7 @@ public class ASTSend extends ASTNode {
       ASTType contType = ((ASTSendT) type).getrhs().unfoldType(ep);
 
       if (CLLSj.trace) {
-        System.out.println("send-op " + chs + " " + srec + " @ " + doffset + " tyrhs = " + tys_rhs);
+        System.out.println("send-op " + chs + " " + srec + " @ " + doffset);
       }
 
       SessionClosure clos = new SessionClosure(cho, sessionSize, argType.isPos(ep), lhs, frame, ep);

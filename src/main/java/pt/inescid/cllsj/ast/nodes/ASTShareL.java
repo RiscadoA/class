@@ -9,10 +9,9 @@ import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.LinSession;
 import pt.inescid.cllsj.Server;
 import pt.inescid.cllsj.TypeError;
+import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.types.ASTBotT;
 import pt.inescid.cllsj.ast.types.ASTType;
-import pt.inescid.cllsj.ast.types.ASTUsageBLT;
-import pt.inescid.cllsj.ast.types.ASTUsageBT;
 import pt.inescid.cllsj.ast.types.ASTUsageLT;
 import pt.inescid.cllsj.ast.types.ASTUsageT;
 
@@ -76,6 +75,7 @@ public class ASTShareL extends ASTNode {
       lhs = lhs.ASTweakeningOnLeaf(ch, typ, exp);
       return this;
     }
+    ;
     rhs = rhs.ASTweakeningOnLeaf(ch, typ, exp);
     return this;
   }
@@ -88,25 +88,16 @@ public class ASTShareL extends ASTNode {
     ty = ty.unfoldType(ep);
     if (ty instanceof ASTUsageLT) {
       ASTUsageLT tys = (ASTUsageLT) ty;
+      if (tys.islin())
+        throw new TypeError("Line " + lineno + " :" + "SHAREL: " + sh + " is not of USAGEL.");
       Env<ASTType> eglhs = eg.assoc("$DUMMY", new ASTBotT());
       lhs.typecheck(ed, eglhs, ep);
       lhs.linclose(ed, ep);
-      ed.upd(sh, new ASTUsageT(tys.getin()));
+      ed.upd(sh, new ASTUsageT(tys.getin(), false));
       Env<ASTType> egrhs = eg.assoc("$DUMMY", new ASTBotT());
       rhs.typecheck(ed, egrhs, ep);
       rhs.linclose(ed, ep);
-    } else if (ty instanceof ASTUsageBLT) {
-      ASTUsageBLT tys = (ASTUsageBLT) ty;
-      Env<ASTType> eglhs = eg.assoc("$DUMMY", new ASTBotT());
-      lhs.typecheck(ed, eglhs, ep);
-      lhs.linclose(ed, ep);
-      ed.upd(sh, new ASTUsageBT(tys.getin()));
-      Env<ASTType> egrhs = eg.assoc("$DUMMY", new ASTBotT());
-      rhs.typecheck(ed, egrhs, ep);
-      rhs.linclose(ed, ep);
-    } else
-      throw new TypeError(
-          "Line " + lineno + " :" + "SHAREL: " + sh + " is neither of USAGEL nor of USAGE!L type.");
+    } else throw new TypeError("Line " + lineno + " :" + "SHAREL: " + sh + " is not of USAGEL.");
   }
 
   public Set<String> fn(Set<String> s) {
@@ -163,5 +154,10 @@ public class ASTShareL extends ASTNode {
             }
           }
         });
+  }
+
+  @Override
+  public void accept(ASTNodeVisitor visitor) {
+    visitor.visit(this);
   }
 }

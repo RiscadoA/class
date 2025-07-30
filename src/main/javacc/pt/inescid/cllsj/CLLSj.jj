@@ -85,7 +85,7 @@ static {
     catch (Exception e) { e.printStackTrace(System.out); }
 }
 
-  public static void main(String args[]) {
+public static void main(String args[]) {
     ed = new Env<ASTType>();
     eg = new Env<ASTType>();
     ep = new Env<EnvEntry>();
@@ -141,17 +141,18 @@ static {
     //System.out.println("maximum pool size = " + ((ThreadPoolExecutor) threadPool).getMaximumPoolSize() );
     FileInputStream fboot;
     try {
-      fboot = new FileInputStream("lib/init.clls");
+     fboot = new FileInputStream("lib/init.clls");
     } catch (FileNotFoundException ex) {
-      System.out.println("Cannot find lib/init.cls");
+
+    System.out.println("Cannot find lib/init.cls");
       return;
     };
     processFile(System.getProperty("user.dir"),new CLLSj(fboot), true);
-    System.out.println ("CLASS-LSAM driver demo version 10.0, July 2024\n");
+    System.out.println ("CLASS-LSAM driver demo version 10.0, Jan 2025\n");
     unsafe = false;
     processFile(System.getProperty("user.dir"),new CLLSj(System.in), false);
     System.exit(0);
-  }
+}
 
 public static void processFile(String path, CLLSj parser, boolean inc)
 {
@@ -552,7 +553,9 @@ TOKEN :
   < SAML: "sam" >
   |
   < SAMR: "samr" >
-  |  
+  | 
+  < MOD : "mod">
+  | 
   < lab: "#"( ["A"-"Z", "a"-"z","_","0"-"9"] )+ >
   |
   < Id: ["A"-"Z", "a"-"z"] ( ["A"-"Z", "a"-"z","_", "0"-"9"] )* >
@@ -797,13 +800,13 @@ ASTType SType() throws Exception:
     |
     <CCLOSE> { t = WAITTYPE; }
     |
-    <USAGE> l=SType()  { t = new ASTUsageT(l); }
+    <USAGE> l=SType()  { t = new ASTUsageT(l, false); }
     |
-    <USAGEL> l=SType()  { t = new ASTUsageLT(l); }
+    <USAGEL> l=SType()  { t = new ASTUsageLT(l, true); }
     |
-    <STATE> l=SType()  { t = new ASTCellT(l); }
+    <STATE> l=SType()  { t = new ASTCellT(l, false); }
     |
-    <STATEL> l=SType()  { t = new ASTCellLT(l); }
+    <STATEL> l=SType()  { t = new ASTCellLT(l, true); }
     |
     <USAGEB> l=SType()  { t = new ASTUsageBT(l); }
     |
@@ -1011,6 +1014,8 @@ Token c1,c2;
 	c1 = <TIMES> p2=Fact() { p = new ASTMul(p1,p2); p.lineno = c1.beginLine; p1.setanc(p); p2.setanc(p); p1 = p;}
 	|
 	c1 = <DIV> p2=Fact() { p=new ASTDiv(p1,p2); p.lineno = c1.beginLine; p1.setanc(p); p2.setanc(p); p1 = p;}
+	|
+	c1 = <MOD> p2=Fact() { p=new ASTMod(p1,p2); p.lineno = c1.beginLine; p1.setanc(p); p2.setanc(p); p1 = p;}
 	)* 
 	{ return p1; }
 }
@@ -1062,39 +1067,6 @@ String str;
    p1 = p; })?
  { return p1; }
 
-}
-
-ASTNode If() throws Exception:
-{
-ASTNode p1,p2,p;
-ASTExpr pe;
-Token c1;
-}
-{
-(
-  c1 = <IF>
-  pe=Expr()
-  (<THEN>)?
-  <LBRA>
-  p1=Proc()
-  <RBRA>
-  (<ELSE>)?
-  (
-    <LBRA>
-    p2=Proc()
-    <RBRA>
-    |
-    p2=If()
-  )
-  {
-    p = new ASTIf(pe,p1,p2);
-    pe.setanc(p);
-    p1.setanc(p);
-    p2.setanc(p);
-    p.lineno = c1.beginLine;
-    return p;
-  }
-)
 }
 
 ASTNode Proc() throws Exception:
@@ -1170,7 +1142,23 @@ boolean b;
       p2.setanc(p);
     }
     |
-    p=If()
+    c1 = <IF>
+    pe=Expr()
+    (<THEN>)?
+    <LBRA>
+    p1=Proc()
+    <RBRA>
+    (<ELSE>)?
+    <LBRA>
+    p2=Proc()
+    <RBRA>
+    { 
+      p = new ASTIf(pe,p1,p2);
+      pe.setanc(p);
+      p1.setanc(p);
+      p2.setanc(p);
+      p.lineno = c1.beginLine; 
+    }
     |
     c1 = <LET>
     c2=<Id>
@@ -1319,15 +1307,6 @@ boolean b;
     |
     c2 = <UNFOLD> c1=<Id> <SEMIC> p1 = Proc() { p = new ASTUnfold(c1.image,p1);p.lineno = c2.beginLine; p1.setanc(p);  }
     |
-    <MUT> c1=<Id> <LBRA>  { p = new ASTCellM(c1.image); }
-    	  ( c2 = <lab> (<COL> t =Type())?
-	    <EQ1> c3=<Id> 
-	     <COMMA>
-	    { ((ASTCellM)p).addSlot(c2.image,c3.image,t);} )+
-	  <DOT>
-	  p1 = Proc()
-    <RBRA> { ((ASTCellM)p).setrhs(p1); p1.setanc(p); }
-    |
     c3 = <CELL> c1=<Id> <LPAR>
     (LOOKAHEAD(2)
     c2=<Id> ( <COL> t=Type())? <DOT> p1=Proc() <RPAR>
@@ -1365,29 +1344,27 @@ boolean b;
       p.lineno = c2.beginLine;
     }
     |
-    c3 = <PUT>  { b = true; } c1=<Id> (<DOT> c3=<lab> { b = false; })? <LPAR>   
+    c3 = <PUT>  c1=<Id> <LPAR>   
     (LOOKAHEAD(2)
     c2=<Id> (<COL> t=Type())? <DOT> p1=Proc() <RPAR> <SEMIC> p2=Proc()
-    { if (b) p = new ASTPut(c1.image,c2.image,t,p1,p2);
-      	     else p = new ASTPutM(c1.image,c3.image,c2.image,t,p1,p2);
+    { p = new ASTPut(c1.image,c2.image,t,p1,p2);   
       p.lineno = c3.beginLine;
       p1.setanc(p);
-      p2.setanc(p);}
+      p2.setanc(p);
+    }
     |
     pe = Expr()  <RPAR> <SEMIC> p2=Proc()
     {
-       if (b) p = new ASTPut(c1.image,ASTType.gensym(),null,pe,p2);
-       else p = new ASTPutM(c1.image,c3.image, ASTType.gensym(),null,pe,p2);
+       p = new ASTPut(c1.image,ASTType.gensym(),null,pe,p2);
        p.lineno = c3.beginLine;  pe.setanc(p);  p2.setanc(p);
     }
     )
     |
-    c3 = <TAKE> { b = true; } c1=<Id> (<DOT> c3=<lab> { b = false; })?  // take x.#l (x:T); P
+    c3 = <TAKE>  c1=<Id> 
         <LPAR> c2=<Id> (<COL> t=Type())? <RPAR> <SEMIC> p1=Proc()
-          { if (b) { p = new ASTTake(c1.image,c2.image,t,p1);}
-	    else   { p = new ASTTakeM(c1.image,c3.image,c2.image,t,p1); };
-	    p.lineno = c3.beginLine; p1.setanc(p);
-	    }
+          {p = new ASTTake(c1.image,c2.image,t,p1);	    
+      p.lineno = c3.beginLine; p1.setanc(p);
+      }
     |
     c3 = <LOCK> c1=<Id> <SEMIC> p1=Proc()
     { p = new ASTLock(c1.image,p1); p.lineno = c3.beginLine;  p1.setanc(p);}

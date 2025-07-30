@@ -19,7 +19,6 @@ import pt.inescid.cllsj.SessionRecord;
 import pt.inescid.cllsj.Trail;
 import pt.inescid.cllsj.TypeError;
 import pt.inescid.cllsj.ast.ASTNodeVisitor;
-import pt.inescid.cllsj.ast.types.ASTCoAffineT;
 import pt.inescid.cllsj.ast.types.ASTType;
 import pt.inescid.cllsj.ast.types.ASTUsageLT;
 import pt.inescid.cllsj.ast.types.ASTUsageT;
@@ -132,7 +131,10 @@ public class ASTTake extends ASTNode {
 
     if (ty instanceof ASTUsageT) {
       ASTUsageT tyr = (ASTUsageT) ty;
-      ty_lhs = new ASTCoAffineT(tyr.getin());
+      //	    ty_lhs =  new ASTCoAffineT(tyr.getin());
+
+      ty_lhs = ASTCell.rewpaytype(tyr.getin().dual(ep)).dual(ep);
+
       if (typee != null && !typee.equalst(ty_lhs, ep, true, new Trail()))
         throw new TypeError(
             "Line "
@@ -144,14 +146,14 @@ public class ASTTake extends ASTNode {
                 + ty_lhs.toStr(ep)
                 + " declared="
                 + typee.toStr(ep));
+
       Env<ASTType> ext = ed.assoc(chi, ty_lhs);
-      ext.upd(chr, new ASTUsageLT(tyr.getin().unfoldType(ep)));
+      ext.upd(chr, new ASTUsageLT(tyr.getin().unfoldType(ep), tyr.islin()));
+
       ep = ASTNode.propagateRVar(ep, chr, chi);
-      //  System.out.println("HERE -TAKE");
+
       rhs.typecheck(ext, eg, ep);
-
       rhs.linclose(ed, ep);
-
       rhs = ASTInferLinClose(rhs, chi, ext, ep);
 
     } else throw new TypeError("Line " + lineno + " :" + "TAKE: " + chr + " is not of USAGE type.");
@@ -194,7 +196,6 @@ public class ASTTake extends ASTNode {
       throws Exception {
     Cell cell = (Cell) ed.find(chr);
     LinSession session = cell.take(chi);
-    logger.info("TAKE cell " + cell.getId() + " on session " + chi);
     rhs.runproc(ep, ed.assoc(chi, session), eg, logger);
   }
 

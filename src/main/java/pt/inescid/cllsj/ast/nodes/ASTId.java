@@ -228,7 +228,7 @@ public class ASTId extends ASTNode {
       ASTType formal = itgargt.next();
 
       formal = formal.unfoldType(ep);
-      // formal = ASTType.unfoldRec(formal);
+      formal = ASTType.unfoldRec(formal); // was commented away
 
       ASTType formalDual = formal.dual(ep);
       if (!(gexpr instanceof ASTVId)) {
@@ -274,12 +274,10 @@ public class ASTId extends ASTNode {
         continue;
       }
 
-      ASTType actual = pt.unfoldType(ep);
-      // System.out.println("TC ID " + id + " "+par+" S 2 actual=" + actual.toStr(ep) + " formal =
-      // "+formal.toStr(ep));
+      ASTType actual = pt; // .unfoldType(ep);
 
-      if (!formal.sameTopType(actual))
-        actual = ASTType.unfoldRecInferParameter(actual, formal, this, par, ep);
+      // System.out.println("PT = "+pt.toStr(ep));
+      actual = ASTType.unfoldRecInferParameter(actual, formal, this, par, ep);
 
       if (!formal.equalst(actual, ep, true, new Trail())) {
         try {
@@ -393,19 +391,14 @@ public class ASTId extends ASTNode {
                 + actual.toStr(ep));
       }
     }
-
-    exprs.clear();
-    gexprs.clear();
   }
 
   public Set<String> fn(Set<String> s) {
     Iterator<ASTExpr> its = exprs.iterator();
     while (its.hasNext()) s = its.next().fn(s);
-    s.addAll(pars);
 
     Iterator<ASTExpr> itsG = gexprs.iterator();
     while (itsG.hasNext()) s = itsG.next().fn(s);
-    s.addAll(gpars);
 
     return s;
   }
@@ -607,8 +600,17 @@ public class ASTId extends ASTNode {
       Iterator<ASTType> itypes = pe.argtypes.iterator();
 
       ASTType recAnchor = null;
-      String recPar = null;
+      // String  recPar = null;
       String recArg = null;
+
+      Iterator<ASTType> tits = tparsGen.iterator();
+      // Env<EnvEntry> nep = ep;
+      for (String targ : pe.targsGen) {
+        ASTType titn = tits.next();
+        ASTType tpar = titn.unfoldType(ep);
+
+        epDef = epDef.assoc(targ, new TypeEntry(tpar));
+      }
 
       for (String arg : pe.args) {
 
@@ -617,8 +619,10 @@ public class ASTId extends ASTNode {
         if (recArg == null) recArg = arg;
 
         if (recAnchor == null) { // just need the first !
-          recAnchor = itypes.next().unfoldType(ep);
-          recPar = par;
+          ASTType typearg = itypes.next();
+          // System.out.println("par ="+par+" typearg= "+typearg.toStr(epDef));
+          recAnchor = typearg.unfoldType(epDef);
+          // recPar = par;
         }
 
         // SAM
@@ -631,15 +635,6 @@ public class ASTId extends ASTNode {
         String gpar = gits.next();
         SessionField session = frame.find(gpar);
         newframe = newframe.assoc(garg, session);
-      }
-
-      Iterator<ASTType> tits = tparsGen.iterator();
-      // Env<EnvEntry> nep = ep;
-      for (String targ : pe.targsGen) {
-        ASTType titn = tits.next();
-        ASTType tpar = titn.unfoldType(ep);
-
-        epDef = epDef.assoc(targ, new TypeEntry(tpar));
       }
 
       p_cont.code = pe.rhs;

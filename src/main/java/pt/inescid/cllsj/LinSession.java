@@ -5,6 +5,7 @@ import java.util.concurrent.locks.*;
 import java.util.logging.*;
 import pt.inescid.cllsj.ast.nodes.ASTDiscard;
 import pt.inescid.cllsj.ast.nodes.ASTNode;
+import pt.inescid.cllsj.ast.nodes.ASTRelease;
 
 public class LinSession extends Session implements Cell, Channel {
 
@@ -41,6 +42,7 @@ public class LinSession extends Session implements Cell, Channel {
   private static int n = 0;
 
   private boolean linear;
+  public boolean statecell;
 
   public LinSession() {
     message2take = false;
@@ -126,37 +128,6 @@ public class LinSession extends Session implements Cell, Channel {
   }
 
   public HashMap<String, LabelCell> cells = new HashMap<String, LabelCell>();
-
-  /* public void merge(HashMap<String,LabelCell> pend) throws Exception {
-  // "this" is the endpoint target of the final merge (fwdSession)
-  lock.lock();
-
-       	if(fwdSession!=null) {
-      //System.out.println("go fwd merge");
-      fwdSession.merge(pend);
-  	    //System.out.println("back fwd merge");
-             lock.unlock();
-  } else {
-      for (Map.Entry<String, LabelCell> set : pend.entrySet()) {
-  	String key = set.getKey();
-  	LabelCell c2 = set.getValue();
-  	LabelCell c1 = cells.get(key);
-  	if (c1!=null) { // c1.label in cells and in pending
-  	    Object cc1 = c1.obj();
-  	    if (cc1 == null) {
-  		//System.out.println("DUP"+key+":"+c1.obj()+"->"+c2.obj()); // copy to
-  		c1.merge(c2.obj());
-  	    } else {
-  		//System.out.println("DUP"+key+":"+c2.obj()+"->"+c1.obj()); // copy to
-  		c2.merge(c1.obj());
-  	    }
-  	} else { // c1.label in pending but not in cells, so add
-  	    cells.put(key,c2);
-  	}
-      }
-      lock.unlock();}
-     }
-     */
 
   private LabelCell getorallocLC(String lab) {
     LabelCell c = cells.get(lab);
@@ -319,10 +290,11 @@ public class LinSession extends Session implements Cell, Channel {
       Env<LinSession> _ed,
       Env<Server> _eg,
       Logger _logger,
-      boolean _linear) {
+      boolean _linear,
+      boolean _state) {
     lock.lock();
     if (fwdSession == null) {
-      // System.out.println(usages + " SETCELL "+this);
+      // System.out.println(usages + " SETCELL "+this+" "+_chi+" "+_state);
       cell = true;
       chi = _chi;
       rhs = _rhs;
@@ -333,12 +305,11 @@ public class LinSession extends Session implements Cell, Channel {
       lockCell = false;
       condition.signalAll();
       linear = _linear;
+      statecell = _state;
       lock.unlock();
     } else {
-      // cell = false;
       lock.unlock();
-      // System.out.println(usages + "FWD SETCELL "+this);
-      fwdSession.setCell(_chi, _rhs, _ep, _ed, _eg, _logger, _linear);
+      fwdSession.setCell(_chi, _rhs, _ep, _ed, _eg, _logger, _linear, _state);
     }
   }
 
@@ -379,6 +350,8 @@ public class LinSession extends Session implements Cell, Channel {
       Env<LinSession> ed_r = ed;
       String chi_r = chi;
       Env<Server> eg_r = eg;
+      // System.out.println("Take: contents = " +_chi+" "+rhs_r);
+
       CLLSj.threadPool.submit(
           new Runnable() {
             public void run() {
@@ -432,11 +405,11 @@ public class LinSession extends Session implements Cell, Channel {
       condition.await();
     }
     if (cell) {
+      // System.out.println(usages + " FREE CELL "+this+" "+chi);
       if (fwdSession != null) {
         System.out.println("fwdSession != null");
         System.exit(0);
       }
-      // System.out.println(usages + " FREE CELL "+this);
       usages = usages - 1;
       if (usages == 0 && linear) {
 
@@ -447,18 +420,33 @@ public class LinSession extends Session implements Cell, Channel {
         LinSession session = new LinSession(chi);
         Env<LinSession> edCut = ed.assoc(chi, session);
 
-        CLLSj.threadPool.submit(
-            new Runnable() {
-              public void run() {
-                try {
-                  // System.out.println(usages + " DISCARD CELL contents "+chi+" "+this+" "+rhs);
-                  rhs.runproc(ep, edCut, eg, logger);
-                } catch (Exception e) {
-                  e.printStackTrace(System.out);
+        if (statecell) {
+          // System.out.println("STATE CELL RELEASE payload");
+          CLLSj.threadPool.submit(
+              new Runnable() {
+                public void run() {
+                  try {
+                    rhs.runproc(ep, edCut, eg, logger);
+                  } catch (Exception e) {
+                    e.printStackTrace(System.out);
+                  }
                 }
-              }
-            });
-        (new ASTDiscard(chi)).runproc(ep, edCut, eg, logger);
+              });
+          (new ASTRelease(chi)).runproc(ep, edCut, eg, logger);
+        } else {
+          // System.out.println("STATE CELL DISCARD payload");
+          CLLSj.threadPool.submit(
+              new Runnable() {
+                public void run() {
+                  try {
+                    rhs.runproc(ep, edCut, eg, logger);
+                  } catch (Exception e) {
+                    e.printStackTrace(System.out);
+                  }
+                }
+              });
+          (new ASTDiscard(chi)).runproc(ep, edCut, eg, logger);
+        }
       }
       lock.unlock();
       ch = "\n";

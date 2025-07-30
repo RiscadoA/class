@@ -38,6 +38,10 @@ public abstract class ASTExprVisitor {
     visit((ASTExpr) expr);
   }
 
+  public void visit(ASTMod expr) {
+    visit((ASTExpr) expr);
+  }
+
   public void visit(ASTEq expr) {
     visit((ASTExpr) expr);
   }

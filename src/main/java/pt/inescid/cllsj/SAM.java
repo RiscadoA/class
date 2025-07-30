@@ -9,7 +9,7 @@ public class SAM {
 
   static void tracedef(ASTNode n, boolean t) {
     String msg = t ? ("SAM START THREAD ") : ("SAM STOP THREAD ");
-    System.out.print(msg + " " + n + " ");
+    System.out.print(msg + "\n " + n + " ");
     if (n instanceof ASTId) {
       System.out.print(((ASTId) n).getId());
     }

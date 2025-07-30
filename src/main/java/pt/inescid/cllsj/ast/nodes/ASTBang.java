@@ -9,6 +9,7 @@ import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.IndexedSessionRef;
 import pt.inescid.cllsj.LinSession;
+import pt.inescid.cllsj.LinSessionValue;
 import pt.inescid.cllsj.SAMCont;
 import pt.inescid.cllsj.SAMError;
 import pt.inescid.cllsj.Server;
@@ -188,8 +189,8 @@ public class ASTBang extends ASTNode {
 
   public Set<String> fnLinear(Set<String> s) {
     s.add(chr);
-    s = rhs.fnLinear(s);
-    s.remove(chi);
+    // s = rhs.fnLinear(s);
+    // s.remove(chi);
     return s;
   }
 
@@ -224,43 +225,56 @@ public class ASTBang extends ASTNode {
   }
 
   public void samL(Env<SessionField> frame, Env<EnvEntry> ep, SAMCont p_cont) throws Exception {
-
-    IndexedSessionRef sref = (IndexedSessionRef) frame.find(chr);
-    int doffset = sref.getOffset();
-    SessionRecord srec = sref.getSessionRec();
+    SessionField sf0 = frame.find(chr);
     int sessionSize = type.SetOffsets(0, ep) + 1;
 
-    if (srec.getPol()) {
-
-      if (CLLSj.trace) {
-        System.out.println("bang-op " + chr + " " + srec + " @ " + doffset);
-      }
+    if (sf0 instanceof LinSessionValue) {
+      LinSessionValue lsv = (LinSessionValue) sf0;
+      Channel channel = lsv.getLin();
 
       SessionClosure clos = new SessionClosure(chi, sessionSize, type.isPos(ep), rhs, frame, ep);
-
-      srec.writeSlot(clos, doffset);
-      sref.incOffset();
-
-      ASTNode cont = srec.getCont();
-      Env<SessionField> frm = srec.getFrame();
-      Env<EnvEntry> epn = srec.getFrameP();
-
-      boolean pold = srec.getPolDual();
-
-      srec.setPolDual(srec.getPol());
-      srec.setPol(false); // polarity for other endpoint
-
-      srec.setcch(chr);
-      srec.setCont(null);
-      srec.setFrame(frame);
-      srec.setFrameP(ep);
-
-      p_cont.code = cont;
-      p_cont.frame = frm;
-      p_cont.epnm = epn;
-
+      if (CLLSj.trace) {
+        System.out.println("bang-op-lc " + chr + " " + channel);
+      }
+      channel.send(clos);
+      p_cont.code = null;
     } else {
-      throw new SAMError("bang-op - " + chr);
+      IndexedSessionRef sref = (IndexedSessionRef) sf0;
+      int doffset = sref.getOffset();
+      SessionRecord srec = sref.getSessionRec();
+
+      if (srec.getPol()) {
+
+        if (CLLSj.trace) {
+          System.out.println("bang-op " + chr + " " + srec + " @ " + doffset);
+        }
+
+        SessionClosure clos = new SessionClosure(chi, sessionSize, type.isPos(ep), rhs, frame, ep);
+
+        srec.writeSlot(clos, doffset);
+        sref.incOffset();
+
+        ASTNode cont = srec.getCont();
+        Env<SessionField> frm = srec.getFrame();
+        Env<EnvEntry> epn = srec.getFrameP();
+
+        boolean pold = srec.getPolDual();
+
+        srec.setPolDual(srec.getPol());
+        srec.setPol(false); // polarity for other endpoint
+
+        srec.setcch(chr);
+        srec.setCont(null);
+        srec.setFrame(frame);
+        srec.setFrameP(ep);
+
+        p_cont.code = cont;
+        p_cont.frame = frm;
+        p_cont.epnm = epn;
+
+      } else {
+        throw new SAMError("bang-op - " + chr);
+      }
     }
   }
 

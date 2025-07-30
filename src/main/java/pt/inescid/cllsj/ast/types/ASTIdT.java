@@ -296,8 +296,7 @@ public class ASTIdT extends ASTType {
   }
 
   public int SetOffsets(int base, Env<EnvEntry> ep) throws Exception {
-    // offset = base+10; // must redo
-    return base + 10;
+    return base + 2;
   }
 
   @Override
