@@ -1085,6 +1085,39 @@ String str;
 
 }
 
+ASTNode If() throws Exception:
+{
+ASTNode p1,p2,p;
+ASTExpr pe;
+Token c1;
+}
+{
+(
+  c1 = <IF>
+  pe=Expr()
+  (<THEN>)?
+  <LBRA>
+  p1=Proc()
+  <RBRA>
+  (<ELSE>)?
+  (
+    <LBRA>
+    p2=Proc()
+    <RBRA>
+    |
+    p2=If()
+  )
+  {
+    p = new ASTIf(pe,p1,p2);
+    pe.setanc(p);
+    p1.setanc(p);
+    p2.setanc(p);
+    p.lineno = c1.beginLine;
+    return p;
+  }
+)
+}
+
 ASTNode Proc() throws Exception:
 {
 ASTNode p1,p2,p;
@@ -1158,23 +1191,7 @@ boolean b;
       p2.setanc(p);
     }
     |
-    c1 = <IF>
-    pe=Expr()
-    (<THEN>)?
-    <LBRA>
-    p1=Proc()
-    <RBRA>
-    (<ELSE>)?
-    <LBRA>
-    p2=Proc()
-    <RBRA>
-    { 
-      p = new ASTIf(pe,p1,p2);
-      pe.setanc(p);
-      p1.setanc(p);
-      p2.setanc(p);
-      p.lineno = c1.beginLine; 
-    }
+    p=If()
     |
     c1 = <LET>
     c2=<Id>
