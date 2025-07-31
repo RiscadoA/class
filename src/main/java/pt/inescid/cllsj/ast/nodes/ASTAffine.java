@@ -38,11 +38,16 @@ public class ASTAffine extends ASTNode {
   HashMap<String, ASTType> coaffineSet;
   ASTType contType;
 
-  public ASTAffine(String _ch, ASTNode _rhs) {
+  public ASTAffine(String _ch, ASTNode _rhs, ASTType _contType) {
     ch = _ch;
     rhs = _rhs;
     usageSet = new HashMap<String, ASTType>();
     coaffineSet = new HashMap<String, ASTType>();
+    contType = _contType;
+  }
+
+  public ASTAffine(String _ch, ASTNode _rhs) {
+    this(_ch, _rhs, null);
   }
 
   public String getCh() {

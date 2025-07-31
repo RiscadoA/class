@@ -1,6 +1,6 @@
 proc main() {
     cut {
-        cell a(b. affine b; cell b(1))
+        cell a(b. cell b(1))
         |a: ~state state lint|
         take a(b);
         take b(x);
@@ -23,6 +23,7 @@ proc main() {
         println(x);
         put b(0);
         put a(b);
+
         release a
     }
 };;

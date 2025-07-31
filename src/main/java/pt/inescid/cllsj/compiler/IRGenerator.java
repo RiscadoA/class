@@ -533,15 +533,16 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTCell node) {
-    if (!(node.getTypeRhs() instanceof ASTAffineT) || !(node.getRhs() instanceof ASTAffine)) {
+    if (!(node.getTypeRhs() instanceof ASTAffineT && node.getRhs() instanceof ASTAffine) &&
+    !(node.getTypeRhs() instanceof ASTCellT && node.getRhs() instanceof ASTCell)) {
       throw new RuntimeException(
-          "The compiler assumes that the right hand side of a cell is an affine process, but got: "
+          "The compiler assumes that the right hand side of a cell is an affine process, or another cell, but got: "
               + node.getRhs().getClass().getSimpleName()
               + " with type "
               + node.getTypeRhs().getClass().getSimpleName());
     }
 
-    IRBlock closure = process.addBlock("put_closure");
+    IRBlock closure = process.addBlock("cell_closure");
 
     block.add(new IRNewSession(record(node.getChc()), closure.getLabel()));
 
@@ -561,45 +562,65 @@ public class IRGenerator extends ASTNodeVisitor {
     block.add(new IRPushCell(record(node.getCh()), record(node.getChc())));
     block.add(new IRReturn(record(node.getCh())));
 
-    visitBlock(closure, node.getRhs());
+    if (node.getRhs() instanceof ASTCell) {
+      // To avoid duplicating the code, we just wrap the right hand side in an ASTAffine node.
+      visitBlock(closure, new ASTAffine(node.getChc(), node.getRhs(), node.getTypeRhs()));
+    } else {
+      visitBlock(closure, node.getRhs());
+    }
   }
 
   @Override
   public void visit(ASTPut node) {
-    if (!(node.getLhs() instanceof ASTAffine)) {
+    if (node.getLhs() instanceof ASTAffine) {
+      IRBlock closure = process.addBlock("put_closure");
+
+      block.add(new IRNewSession(record(node.getCho()), closure.getLabel()));
+
+      // If an exponential occurs in both sides, we need to increment its reference count.
+      Set<String> exponentials = exponentialNamesFreeIn(node);
+      for (String name : exponentials) {
+        if (nameFreeIn(node.getLhs(), name) && nameFreeIn(node.getRhs(), name)) {
+          block.add(new IRIncRefExponential(exponential(name)));
+        }
+      }
+
+      // The argument always is affine, and thus, always has a positive type.
+      // Thus, we flip to it.
+      block.add(new IRFlip(record(node.getCho())));
+      block.add(new IRPutCell(record(node.getChs()), record(node.getCho())));
+
+      // Continue with the right hand side of the put.
+      node.getRhs().accept(this);
+
+      visitBlock(closure, node.getLhs());
+    } else if (node.getLhs() instanceof ASTFwd) {
+      ASTFwd fwd = (ASTFwd) node.getLhs();
+
+      // If the left hand side is a forward, we just forward the value to the channel.
+      // This only happens when the left hand side is a cell.
+      if (!(fwd.getCh2Type() instanceof ASTUsageT)) {
+        throw new RuntimeException(
+            "The compiler assumes that the type of forward within a put is usage, but got: "
+                + fwd.getCh2Type().getClass().getSimpleName());
+      }
+
+      String ch = fwd.getCh1() == node.getCho() ? fwd.getCh2() : fwd.getCh1();
+      block.add(new IRPutCell(record(node.getChs()), record(ch)));
+      node.getRhs().accept(this);
+    } else {
       throw new RuntimeException(
-          "The compiler assumes that the left hand side of a put is an affine process, but got: "
+          "The compiler assumes that the left hand side of a put is an affine or forward process, but got: "
               + node.getLhs().getClass().getSimpleName());
     }
-
-    IRBlock closure = process.addBlock("put_closure");
-
-    block.add(new IRNewSession(record(node.getCho()), closure.getLabel()));
-
-    // If an exponential occurs in both sides, we need to increment its reference count.
-    Set<String> exponentials = exponentialNamesFreeIn(node);
-    for (String name : exponentials) {
-      if (nameFreeIn(node.getLhs(), name) && nameFreeIn(node.getRhs(), name)) {
-        block.add(new IRIncRefExponential(exponential(name)));
-      }
-    }
-
-    // The argument always is affine, and thus, always has a positive type.
-    // Thus, we flip to it.
-    block.add(new IRFlip(record(node.getCho())));
-    block.add(new IRPutCell(record(node.getChs()), record(node.getCho())));
-
-    // Continue with the right hand side of the put.
-    node.getRhs().accept(this);
-
-    visitBlock(closure, node.getLhs());
   }
 
   @Override
   public void visit(ASTTake node) {
-    if (!(node.getChiType() instanceof ASTCoAffineT)) {
+    if (!(node.getChiType() instanceof ASTCoAffineT) && 
+        !(node.getChiType() instanceof ASTUsageT)) {
       throw new RuntimeException(
-          "The compiler assumes that its argument has a coaffine type, but got: "
+          "The compiler assumes that its argument has a coaffine or usage type, but got: "
               + node.getChiType().getClass().getSimpleName());
     }
 
@@ -865,15 +886,14 @@ public class IRGenerator extends ASTNodeVisitor {
 
     @Override
     public void visit(ASTCell node) {
-      // An extra end point is needed since a closure is created for the cell's content.
       count += 1;
-      node.getRhs().accept(this);
     }
 
     @Override
     public void visit(ASTPut node) {
-      count += 1;
-      node.getLhs().accept(this);
+      if (!(node.getLhs() instanceof ASTFwd)) {
+        count += 1;
+      }
       node.getRhs().accept(this);
     }
 
