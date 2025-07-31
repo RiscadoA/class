@@ -391,14 +391,19 @@ public class ASTId extends ASTNode {
                 + actual.toStr(ep));
       }
     }
+
+    exprs.clear();
+    gexprs.clear();
   }
 
   public Set<String> fn(Set<String> s) {
     Iterator<ASTExpr> its = exprs.iterator();
     while (its.hasNext()) s = its.next().fn(s);
+    s.addAll(pars);
 
     Iterator<ASTExpr> itsG = gexprs.iterator();
     while (itsG.hasNext()) s = itsG.next().fn(s);
+    s.addAll(gpars);
 
     return s;
   }
