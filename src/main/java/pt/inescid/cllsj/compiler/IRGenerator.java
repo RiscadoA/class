@@ -533,8 +533,8 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTCell node) {
-    if (!(node.getTypeRhs() instanceof ASTAffineT && node.getRhs() instanceof ASTAffine) &&
-    !(node.getTypeRhs() instanceof ASTCellT && node.getRhs() instanceof ASTCell)) {
+    if (!(node.getTypeRhs() instanceof ASTAffineT && node.getRhs() instanceof ASTAffine)
+        && !(node.getTypeRhs() instanceof ASTCellT && node.getRhs() instanceof ASTCell)) {
       throw new RuntimeException(
           "The compiler assumes that the right hand side of a cell is an affine process, or another cell, but got: "
               + node.getRhs().getClass().getSimpleName()
@@ -617,8 +617,7 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTTake node) {
-    if (!(node.getChiType() instanceof ASTCoAffineT) && 
-        !(node.getChiType() instanceof ASTUsageT)) {
+    if (!(node.getChiType() instanceof ASTCoAffineT) && !(node.getChiType() instanceof ASTUsageT)) {
       throw new RuntimeException(
           "The compiler assumes that its argument has a coaffine or usage type, but got: "
               + node.getChiType().getClass().getSimpleName());
