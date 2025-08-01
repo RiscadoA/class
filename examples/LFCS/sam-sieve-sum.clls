@@ -71,3 +71,8 @@ proc main_ss(;np:colint)
 	};
     printfirstN(primes;np)
  };;
+
+proc main() {
+   main_ss(;100)
+};;
+
