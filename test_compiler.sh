@@ -32,6 +32,15 @@ else
     echo "Found $count test files"
 fi
 
+# If CLLS_FLAGS is set, print it
+if [ -z "$CLLS_FLAGS" ]; then
+    CLLS_FLAGS=""
+else
+    CLLS_FLAGS="$CLLS_FLAGS "
+fi
+CLLS_FLAGS="$CLLS_FLAGS-P"
+echo "Using flags: $CLLS_FLAGS"
+
 success=0
 failed=0
 processed=0
@@ -46,7 +55,7 @@ do
     errfile=$(dirname $file)/$basename.err
 
     baseout=bin/$(dirname $file)/$basename
-    flags="-P -o $baseout"
+    flags="$CLLS_FLAGS -o $baseout"
     mkdir -p $(dirname $baseout)
 
     echo -n "($processed/$count) Compiling $file... "
