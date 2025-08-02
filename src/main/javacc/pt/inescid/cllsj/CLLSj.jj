@@ -114,6 +114,8 @@ public static void main(String args[]) {
           compiler.onlyAST = true;
         } else if (args[i].equals("-s")) {
           compiler.disableConcurrency = true;
+        } else if (args[i].equals("-e")) {
+          compiler.optimizePrimitiveExponentials = false;
         } else if (args[i].equals("-p")) {
           if (i + 1 >= args.length) {
             failed = true;

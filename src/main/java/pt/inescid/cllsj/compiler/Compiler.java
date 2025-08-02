@@ -23,6 +23,7 @@ public class Compiler {
   public boolean onlyIR = false;
   public boolean onlyAST = false;
   public boolean disableConcurrency = false;
+  public boolean optimizePrimitiveExponentials = true;
 
   public int compile(String path) {
     ASTProgram ast;
@@ -84,6 +85,7 @@ public class Compiler {
       gen.trace = trace;
       gen.profile = profile;
       gen.disableConcurrency = disableConcurrency;
+      gen.optimizePrimitiveExponentials = optimizePrimitiveExponentials;
       output = gen.generate(ir);
     } catch (Exception e) {
       System.err.println("C Generation error: " + e.getMessage());
