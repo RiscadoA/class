@@ -22,6 +22,7 @@ public class Compiler {
   public boolean profile = false;
   public boolean onlyIR = false;
   public boolean onlyAST = false;
+  public boolean disableConcurrency = false;
 
   public int compile(String path) {
     ASTProgram ast;
@@ -78,7 +79,7 @@ public class Compiler {
 
     String output;
     try {
-      output = CGenerator.generate(ir, entryProcess, trace, profile);
+      output = CGenerator.generate(ir, entryProcess, trace, profile, disableConcurrency);
     } catch (Exception e) {
       System.err.println("C Generation error: " + e.getMessage());
       e.printStackTrace();

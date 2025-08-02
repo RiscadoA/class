@@ -112,6 +112,8 @@ public static void main(String args[]) {
           compiler.onlyIR = true;
         } else if (args[i].equals("-a")) {
           compiler.onlyAST = true;
+        } else if (args[i].equals("-s")) {
+          compiler.disableConcurrency = true;
         } else if (args[i].equals("-p")) {
           if (i + 1 >= args.length) {
             failed = true;

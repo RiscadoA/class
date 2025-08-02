@@ -8,7 +8,7 @@ debug=false
 run=false
 ofile=""
 
-while getopts ":dOtPirap:o:" opt; do
+while getopts ":dOtPirasp:o:" opt; do
     case $opt in
         d)
             Cflags="$Cflags -g -O0"
@@ -30,6 +30,9 @@ while getopts ":dOtPirap:o:" opt; do
         a)
             onlyast=true
             CLLSflags="$CLLSflags -a"
+            ;;
+        s)
+            CLLSflags="$CLLSflags -s"
             ;;
         r)
             run=true
@@ -60,6 +63,7 @@ if [ -z $1 ]; then
     echo "    -P: Compile with profiling enabled" >&2
     echo "    -i: Only generate IR code" >&2
     echo "    -a: Only generate AST" >&2
+    echo "    -s: Disable concurrency" >&2
     echo "    -O: Compile with optimization flags" >&2
     echo "    -r: Run the compiled program after compilation" >&2
     echo "    -p <process>: Specify the name of the entry process" >&2
