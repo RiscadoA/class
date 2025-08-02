@@ -79,7 +79,12 @@ public class Compiler {
 
     String output;
     try {
-      output = CGenerator.generate(ir, entryProcess, trace, profile, disableConcurrency);
+      CGenerator gen = new CGenerator();
+      gen.entryProcess = entryProcess;
+      gen.trace = trace;
+      gen.profile = profile;
+      gen.disableConcurrency = disableConcurrency;
+      output = gen.generate(ir);
     } catch (Exception e) {
       System.err.println("C Generation error: " + e.getMessage());
       e.printStackTrace();
