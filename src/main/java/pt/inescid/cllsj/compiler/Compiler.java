@@ -17,13 +17,13 @@ import pt.inescid.cllsj.ast.nodes.ASTProgramWithIncludes;
 import pt.inescid.cllsj.compiler.ir.IRProgram;
 
 public class Compiler {
-  public static int compile(
-      String path,
-      String entryProcess,
-      boolean trace,
-      boolean profile,
-      boolean onlyIR,
-      boolean onlyAST) {
+  public String entryProcess = "main";
+  public boolean trace = false;
+  public boolean profile = false;
+  public boolean onlyIR = false;
+  public boolean onlyAST = false;
+
+  public int compile(String path) {
     ASTProgram ast;
     try {
       ast = Compiler.parse(Path.of(path));
