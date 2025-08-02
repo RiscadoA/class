@@ -486,13 +486,17 @@ public class CGenerator extends IRInstructionVisitor {
             for (int i = 0; i < process.getExponentialCount(); ++i) {
               String oldExponential = exponential("env", process.getRecordCount(), i);
               String newExponential = exponential("new_env", process.getRecordCount(), i);
-              switchTypeId(process.getExponentialType(i), () -> {
-                putAssign(oldExponential, newExponential);
-              }, () -> {
-                putAssign(oldExponential, newExponential);
-              }, () -> {
-                putCloneExponential(oldExponential, newExponential);
-              });
+              switchTypeId(
+                  process.getExponentialType(i),
+                  () -> {
+                    putAssign(oldExponential, newExponential);
+                  },
+                  () -> {
+                    putAssign(oldExponential, newExponential);
+                  },
+                  () -> {
+                    putCloneExponential(oldExponential, newExponential);
+                  });
             }
             for (int i = 0; i < process.getTypeVariableCount(); ++i) {
               putAssign(
@@ -1150,28 +1154,35 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRNewExponential instruction) {
-    Runnable forInt = () -> {
-      putAssign(
-          exponentialInteger(instruction.getExponential()), pop(instruction.getRecord(), "int"));
-      putFreeRecord(record(instruction.getRecord()));
-    };
+    Runnable forInt =
+        () -> {
+          putAssign(
+              exponentialInteger(instruction.getExponential()),
+              pop(instruction.getRecord(), "int"));
+          putFreeRecord(record(instruction.getRecord()));
+        };
 
-    Runnable forBool = () -> {
-      putAssign(
-          exponentialBool(instruction.getExponential()), pop(instruction.getRecord(), "unsigned char"));
-      putFreeRecord(record(instruction.getRecord()));
-    };
+    Runnable forBool =
+        () -> {
+          putAssign(
+              exponentialBool(instruction.getExponential()),
+              pop(instruction.getRecord(), "unsigned char"));
+          putFreeRecord(record(instruction.getRecord()));
+        };
 
-    Runnable forOther = () -> {
-      // Initialize a new exponential structure.
-      putAllocExponential(exponential(instruction.getExponential()));
-      putAssign(exponentialRefCount(instruction.getExponential()), 1);
-      putAssign(exponentialRecord(instruction.getExponential()), record(instruction.getRecord()));
-      String recordBufferManagerName = recordBufferManagerName(recordType(instruction.getRecord()));
-      putAssign(
-          exponentialManager(instruction.getExponential()),
-          recordBufferManagerName.isEmpty() ? "NULL" : ("&" + recordBufferManagerName));
-    };
+    Runnable forOther =
+        () -> {
+          // Initialize a new exponential structure.
+          putAllocExponential(exponential(instruction.getExponential()));
+          putAssign(exponentialRefCount(instruction.getExponential()), 1);
+          putAssign(
+              exponentialRecord(instruction.getExponential()), record(instruction.getRecord()));
+          String recordBufferManagerName =
+              recordBufferManagerName(recordType(instruction.getRecord()));
+          putAssign(
+              exponentialManager(instruction.getExponential()),
+              recordBufferManagerName.isEmpty() ? "NULL" : ("&" + recordBufferManagerName));
+        };
 
     switchTypeId(recordType(instruction.getRecord()), forInt, forBool, forOther);
     putAssign(record(instruction.getRecord()), "NULL");
@@ -1179,160 +1190,193 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRPushExponential instruction) {
-    Runnable forInt = () -> {
-      putPush(instruction.getRecord(), "int", exponentialInteger(instruction.getExponential()));
-    };
+    Runnable forInt =
+        () -> {
+          putPush(instruction.getRecord(), "int", exponentialInteger(instruction.getExponential()));
+        };
 
-    Runnable forBool = () -> {
-            putPush(
-          instruction.getRecord(), "unsigned char", exponentialBool(instruction.getExponential()));
-    };
+    Runnable forBool =
+        () -> {
+          putPush(
+              instruction.getRecord(),
+              "unsigned char",
+              exponentialBool(instruction.getExponential()));
+        };
 
-    Runnable forOther = () -> {
-      putPushExponential(instruction.getRecord(), exponential(instruction.getExponential()));
-    };
+    Runnable forOther =
+        () -> {
+          putPushExponential(instruction.getRecord(), exponential(instruction.getExponential()));
+        };
 
     switchTypeId(exponentialType(instruction.getExponential()), forInt, forBool, forOther);
   }
 
   @Override
   public void visit(IRPopExponential instruction) {
-    Runnable forInt = () -> {
-      putAssign(
-          exponentialInteger(instruction.getArgExponential()), pop(instruction.getRecord(), "int"));
-    };
+    Runnable forInt =
+        () -> {
+          putAssign(
+              exponentialInteger(instruction.getArgExponential()),
+              pop(instruction.getRecord(), "int"));
+        };
 
-    Runnable forBool = () -> {
-      putAssign(
-          exponentialBool(instruction.getArgExponential()),
-          pop(instruction.getRecord(), "unsigned char"));
-    };
+    Runnable forBool =
+        () -> {
+          putAssign(
+              exponentialBool(instruction.getArgExponential()),
+              pop(instruction.getRecord(), "unsigned char"));
+        };
 
-    Runnable forOther = () -> {
-      putAssign(
-          exponential(instruction.getArgExponential()), popExponential(instruction.getRecord()));
-    };
+    Runnable forOther =
+        () -> {
+          putAssign(
+              exponential(instruction.getArgExponential()),
+              popExponential(instruction.getRecord()));
+        };
 
-    switchTypeId(
-        exponentialType(instruction.getArgExponential()), forInt, forBool, forOther);
+    switchTypeId(exponentialType(instruction.getArgExponential()), forInt, forBool, forOther);
   }
 
   @Override
   public void visit(IRCallExponential instruction) {
     IRType type = exponentialType(instruction.getExponential());
 
-    Runnable forIntAndBool = () -> {
-      putAllocRecord(record(instruction.getArgRecord()), type);
-      putAssign(read(instruction.getArgRecord()), 0);
-      putAssign(written(instruction.getArgRecord()), 0);
-      putAssign(recordContEnv(instruction.getArgRecord()), "NULL");
-    };
+    Runnable forIntAndBool =
+        () -> {
+          putAllocRecord(record(instruction.getArgRecord()), type);
+          putAssign(read(instruction.getArgRecord()), 0);
+          putAssign(written(instruction.getArgRecord()), 0);
+          putAssign(recordContEnv(instruction.getArgRecord()), "NULL");
+        };
 
-    Runnable forInt = () -> {
-      forIntAndBool.run();
-      putPush(instruction.getArgRecord(), "int", exponentialInteger(instruction.getExponential()));
-    };
+    Runnable forInt =
+        () -> {
+          forIntAndBool.run();
+          putPush(
+              instruction.getArgRecord(), "int", exponentialInteger(instruction.getExponential()));
+        };
 
-    Runnable forBool = () -> {
-      forIntAndBool.run();
-      putPush(instruction.getArgRecord(), "unsigned char", exponentialBool(instruction.getExponential()));
-    };
+    Runnable forBool =
+        () -> {
+          forIntAndBool.run();
+          putPush(
+              instruction.getArgRecord(),
+              "unsigned char",
+              exponentialBool(instruction.getExponential()));
+        };
 
-    Runnable forOther = () -> {
-      Runnable cloneRecord =
-          () -> {
-            putManagerReset();
-            putManagerPushProcessTypes();
+    Runnable forOther =
+        () -> {
+          Runnable cloneRecord =
+              () -> {
+                putManagerReset();
+                putManagerPushProcessTypes();
+                putIfElse(
+                    recordContEnv(exponentialRecord(instruction.getExponential())) + " != NULL",
+                    () -> {
+                      // The exponential record has a continuation environment, which means it
+                      // hasn't been
+                      // closed yet. In that case, just clone the whole environment, and fetch the
+                      // new
+                      // record from the new environment.
+                      //
+                      // The record's index in the environment is always 0.
+                      putCloneEnvironment(
+                          recordContEnv(exponentialRecord(instruction.getExponential())), TMP_ENV);
+                      putAssign(record(instruction.getArgRecord()), record(TMP_ENV, 0));
+                    },
+                    () -> {
+                      // Otherwise, the record has already been closed. In that case, we allocate a
+                      // new
+                      // record with a buffer big enough to accomodate all written data, and then,
+                      // clone
+                      // the buffer using the record buffer manager.
+                      putAllocRecord(
+                          record(instruction.getArgRecord()),
+                          written(exponentialRecord(instruction.getExponential())));
+                      putAssign(
+                          read(instruction.getArgRecord()),
+                          read(exponentialRecord(instruction.getExponential())));
+                      putAssign(
+                          written(instruction.getArgRecord()),
+                          written(exponentialRecord(instruction.getExponential())));
+                      putAssign(recordContEnv(instruction.getArgRecord()), "NULL");
+
+                      putIfElse(
+                          exponentialManager(instruction.getExponential()) + " != NULL",
+                          () -> {
+                            putCloneRecordBuffer(
+                                exponentialManager(instruction.getExponential()),
+                                exponentialRecord(instruction.getExponential()),
+                                record(instruction.getArgRecord()));
+                          },
+                          () -> {
+                            putCloneRecordBuffer(
+                                "",
+                                exponentialRecord(instruction.getExponential()),
+                                record(instruction.getArgRecord()));
+                          });
+                    });
+              };
+
+          if (instruction.shouldDecreaseRefCount()) {
             putIfElse(
-                recordContEnv(exponentialRecord(instruction.getExponential())) + " != NULL",
+                decrementAtomic(exponentialRefCount(instruction.getExponential())) + " == 0",
                 () -> {
-                  // The exponential record has a continuation environment, which means it hasn't been
-                  // closed yet. In that case, just clone the whole environment, and fetch the new
-                  // record from the new environment.
-                  //
-                  // The record's index in the environment is always 0.
-                  putCloneEnvironment(
-                      recordContEnv(exponentialRecord(instruction.getExponential())), TMP_ENV);
-                  putAssign(record(instruction.getArgRecord()), record(TMP_ENV, 0));
+                  // If the reference count is 1, and we would decrement it, we don't clone the
+                  // record.
+                  // Instead, we just use the record directly and deallocate the wrapping
+                  // exponential.
+                  putAssign(
+                      record(instruction.getArgRecord()),
+                      exponentialRecord(instruction.getExponential()));
+                  putFreeExponential(exponential(instruction.getExponential()));
                 },
                 () -> {
-                  // Otherwise, the record has already been closed. In that case, we allocate a new
-                  // record with a buffer big enough to accomodate all written data, and then, clone
-                  // the buffer using the record buffer manager.
-                  putAllocRecord(
-                      record(instruction.getArgRecord()),
-                      written(exponentialRecord(instruction.getExponential())));
-                  putAssign(
-                      read(instruction.getArgRecord()),
-                      read(exponentialRecord(instruction.getExponential())));
-                  putAssign(
-                      written(instruction.getArgRecord()),
-                      written(exponentialRecord(instruction.getExponential())));
-                  putAssign(recordContEnv(instruction.getArgRecord()), "NULL");
-
-                  putIfElse(
-                      exponentialManager(instruction.getExponential()) + " != NULL",
-                      () -> {
-                        putCloneRecordBuffer(
-                            exponentialManager(instruction.getExponential()),
-                            exponentialRecord(instruction.getExponential()),
-                            record(instruction.getArgRecord()));
-                      },
-                      () -> {
-                        putCloneRecordBuffer(
-                            "",
-                            exponentialRecord(instruction.getExponential()),
-                            record(instruction.getArgRecord()));
-                      });
+                  cloneRecord.run();
                 });
-          };
-
-      if (instruction.shouldDecreaseRefCount()) {
-        putIfElse(
-            decrementAtomic(exponentialRefCount(instruction.getExponential())) + " == 0",
-            () -> {
-              // If the reference count is 1, and we would decrement it, we don't clone the record.
-              // Instead, we just use the record directly and deallocate the wrapping exponential.
-              putAssign(
-                  record(instruction.getArgRecord()),
-                  exponentialRecord(instruction.getExponential()));
-              putFreeExponential(exponential(instruction.getExponential()));
-            },
-            () -> {
-              cloneRecord.run();
-            });
-      } else {
-        cloneRecord.run();
-      }
-    };
+          } else {
+            cloneRecord.run();
+          }
+        };
 
     switchTypeId(type, forInt, forBool, forOther);
   }
 
   @Override
   public void visit(IRIncRefExponential instruction) {
-    switchTypeId(exponentialType(instruction.getExponential()), () -> {}, () -> {}, () -> {
-      putIncrement(exponentialRefCount(instruction.getExponential()));
-
-    });
+    switchTypeId(
+        exponentialType(instruction.getExponential()),
+        () -> {},
+        () -> {},
+        () -> {
+          putIncrement(exponentialRefCount(instruction.getExponential()));
+        });
   }
 
   @Override
   public void visit(IRDecRefExponential instruction) {
-    switchTypeId(exponentialType(instruction.getExponential()), () -> {}, () -> {}, () -> {
-      putDecRefExponential(
-          exponential(instruction.getExponential()),
-          exponentialType(instruction.getExponential()),
-          true);
-
-    });
+    switchTypeId(
+        exponentialType(instruction.getExponential()),
+        () -> {},
+        () -> {},
+        () -> {
+          putDecRefExponential(
+              exponential(instruction.getExponential()),
+              exponentialType(instruction.getExponential()),
+              true);
+        });
   }
 
   @Override
   public void visit(IRDetachExponential instruction) {
-    switchTypeId(exponentialType(instruction.getExponential()), () -> {}, () -> {}, () -> {
-      putAssign(exponential(instruction.getExponential()), "NULL");
-    });
+    switchTypeId(
+        exponentialType(instruction.getExponential()),
+        () -> {},
+        () -> {},
+        () -> {
+          putAssign(exponential(instruction.getExponential()), "NULL");
+        });
   }
 
   @Override
@@ -1466,9 +1510,12 @@ public class CGenerator extends IRInstructionVisitor {
   private String typeInitializer(IRType type) {
     String name = recordBufferManagerName(type);
     String managerValue = name.isEmpty() ? "NULL" : "&" + name;
-    return "(struct type){.size = " + size(type)
-      + ", .id = " + typeId(type)
-    + ", .manager = " + managerValue + "}";
+    return "(struct type){.size = "
+        + size(type)
+        + (optimizePrimitiveExponentials ? ", .id = " + typeId(type) : "")
+        + ", .manager = "
+        + managerValue
+        + "}";
   }
 
   private String typeManager(String type) {
@@ -2571,11 +2618,12 @@ public class CGenerator extends IRInstructionVisitor {
 
     @Override
     public void visit(IRExponentialT type) {
-      if (optimizePrimitiveExponentials && (type.getInner() instanceof IRIntT || type.getInner() instanceof IRBoolT)) {
+      if (optimizePrimitiveExponentials
+          && (type.getInner() instanceof IRIntT || type.getInner() instanceof IRBoolT)) {
         return; // Primitive exponentials do not require a buffer manager.
       } else if (optimizePrimitiveExponentials && type.getInner() instanceof IRVarT) {
         separate();
-        name += "exponential_var" + ((IRVarT)type.getInner()).getType();
+        name += "exponential_var" + ((IRVarT) type.getInner()).getType();
       } else {
         separate();
         name += "exponential";
@@ -2824,13 +2872,18 @@ public class CGenerator extends IRInstructionVisitor {
 
     @Override
     public void visit(IRExponentialT type) {
-      putIfWrittenAndUnread(() -> {
-        switchTypeId(type.getInner(), () -> {}, () -> {}, () -> {
-          putCloneExponential(
-              access(oldBuffer, "struct exponential*"),
-              access(newBuffer, "struct exponential*"));
-        });
-      });
+      putIfWrittenAndUnread(
+          () -> {
+            switchTypeId(
+                type.getInner(),
+                () -> {},
+                () -> {},
+                () -> {
+                  putCloneExponential(
+                      access(oldBuffer, "struct exponential*"),
+                      access(newBuffer, "struct exponential*"));
+                });
+          });
     }
 
     @Override
@@ -2980,11 +3033,16 @@ public class CGenerator extends IRInstructionVisitor {
 
     @Override
     public void visit(IRExponentialT type) {
-      putIfWrittenAndUnread(() -> {
-        switchTypeId(type.getInner(), () -> {}, () -> {}, () -> {
-          putCleanExponential(type.getInner(), access(buffer, "struct exponential*"));
-        });
-      });
+      putIfWrittenAndUnread(
+          () -> {
+            switchTypeId(
+                type.getInner(),
+                () -> {},
+                () -> {},
+                () -> {
+                  putCleanExponential(type.getInner(), access(buffer, "struct exponential*"));
+                });
+          });
     }
 
     @Override
