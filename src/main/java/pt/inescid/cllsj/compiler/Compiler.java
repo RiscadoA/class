@@ -27,6 +27,7 @@ public class Compiler {
   public boolean optimizeExponentialExpressionToForward = true;
   public boolean optimizeSendForward = true;
   public boolean optimizeTailCalls = true;
+  public boolean optimizeFlipForward = true;
 
   public int compile(String path) {
     ASTProgram ast;
@@ -75,6 +76,17 @@ public class Compiler {
       ir = gen.generate(ep, ast);
     } catch (Exception e) {
       System.err.println("IR generation error: " + e.getMessage());
+      e.printStackTrace();
+      return 1;
+    }
+
+    try {
+      IROptimizer optimizer = new IROptimizer();
+      if (optimizeFlipForward) {
+        optimizer.optimizeFlipForward(ir);
+      }
+    } catch (Exception e) {
+      System.err.println("IR optimization error: " + e.getMessage());
       e.printStackTrace();
       return 1;
     }

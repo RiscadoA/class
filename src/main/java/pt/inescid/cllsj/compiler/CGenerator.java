@@ -79,6 +79,7 @@ public class CGenerator extends IRInstructionVisitor {
       putStatement(counterType + " env_allocs = 0");
       putStatement(counterType + " env_frees = 0");
       putStatement(counterType + " record_allocs = 0");
+      putStatement(counterType + " record_reallocs = 0");
       putStatement(counterType + " record_frees = 0");
       putStatement(counterType + " exponential_allocs = 0");
       putStatement(counterType + " exponential_frees = 0");
@@ -661,6 +662,7 @@ public class CGenerator extends IRInstructionVisitor {
       putDebugLn("  Environment allocations: %ld", "env_allocs");
       putDebugLn("  Environment frees: %ld", "env_frees");
       putDebugLn("  Record allocations: %ld", "record_allocs");
+      putDebugLn("  Record reallocations: %ld", "record_reallocs");
       putDebugLn("  Record frees: %ld", "record_frees");
       putDebugLn("  Exponential allocations: %ld", "exponential_allocs");
       putDebugLn("  Exponential frees: %ld", "exponential_frees");
@@ -842,7 +844,8 @@ public class CGenerator extends IRInstructionVisitor {
 
     // If we're recursively calling the same process, we might be able to do tail call optimization.
     if (optimizeTailCalls && instruction.getProcessName().equals(procName) && sameTypes) {
-      // We must increment the end points as we might decrement them twice, if this ends up not being a tail call.
+      // We must increment the end points as we might decrement them twice, if this ends up not
+      // being a tail call.
       putStatement(incrementAtomic(environmentEndPoints()));
       putIfElse(
           decrementAtomic(environmentEndPoints()) + " == 1",
@@ -963,6 +966,93 @@ public class CGenerator extends IRInstructionVisitor {
         });
 
     // Finally, free the negative record and jump to the continuation.
+    putFreeRecord(TMP_RECORD);
+    putAssign(ENV, TMP_ENV);
+    putComputedGoto(TMP_CONT);
+  }
+
+  @Override
+  public void visit(IRFlipForward i) {
+    // First of all, we need to check if we need to, and if so, expand the buffer of the negative
+    // record.
+    // This is a pessimistic check, as we don't know the actual size of the buffer at runtime.
+    String currentSize = size(recordType(i.getNegRecord()));
+    String desiredSize =
+        currentSize + " + " + written(i.getPosRecord()) + " - " + read(i.getPosRecord());
+    putIf(
+        currentSize + " < " + desiredSize,
+        () -> {
+          putReallocRecord(record(i.getNegRecord()), desiredSize);
+        });
+
+    // Copy the unread data on the positive buffer into the negative record's buffer.
+    putStatement(
+        "memcpy("
+            + buffer(i.getNegRecord())
+            + " + "
+            + written(i.getNegRecord())
+            + ", "
+            + buffer(i.getPosRecord())
+            + " + "
+            + read(i.getPosRecord())
+            + ", "
+            + written(i.getPosRecord())
+            + " - "
+            + read(i.getPosRecord())
+            + ")");
+    putStatement(
+        written(i.getNegRecord())
+            + " += "
+            + written(i.getPosRecord())
+            + " - "
+            + read(i.getPosRecord()));
+
+    // Set the continuation of the negative record to the continuation of the positive record.
+    putAssign(TMP_CONT, recordCont(i.getNegRecord()));
+    putAssign(TMP_ENV, recordContEnv(i.getNegRecord()));
+    putAssign(recordCont(i.getNegRecord()), recordCont(i.getPosRecord()));
+    putAssign(recordContEnv(i.getNegRecord()), recordContEnv(i.getPosRecord()));
+    putAssign(recordContRecord(i.getNegRecord()), recordContRecord(i.getPosRecord()));
+
+    // Overwrite the positive record on its continuation environment with the negative record.
+    // We only do this if the positive record has a continuation environment.
+    putAssign(TMP_RECORD, record(i.getPosRecord()));
+    putIf(
+        recordContEnv(i.getPosRecord()) + " != NULL",
+        () -> {
+          putAssign(
+              record(recordContEnv(i.getPosRecord()), recordContRecord(i.getPosRecord())),
+              record(i.getNegRecord()));
+        });
+
+    // Decrement the end points and free the environment if necessary.
+    putIfElse(
+        decrementAtomic(environmentEndPoints()) + " == 0",
+        () -> putFreeEnvironment(ENV),
+        () -> {
+          // If the environment was not freed, and if the records won't be used in this environment
+          // anymore, we need to remove their bindings. This is necessary to prevent them from being
+          // cloned or freed again later on.
+
+          // The positive record will be deleted, but it's binding may now point to the negative
+          // record. If it doesn't, then we set it to null.
+          putIf(
+              TMP_RECORD + " == " + record(i.getPosRecord()),
+              () -> {
+                putAssign(record(i.getPosRecord()), "NULL");
+              });
+
+          // The negative record will only be needed if either the environment we're going to jump
+          // to or its continuation environment are the current environment. If not, we also need to
+          // remove its binding from the current environment.
+          putIf(
+              ENV + " != " + recordContEnv(i.getNegRecord()) + " && " + ENV + " != " + TMP_ENV,
+              () -> {
+                putAssign(record(i.getNegRecord()), "NULL");
+              });
+        });
+
+    // Finally, free the positive record and jump to the continuation.
     putFreeRecord(TMP_RECORD);
     putAssign(ENV, TMP_ENV);
     putComputedGoto(TMP_CONT);
@@ -1912,6 +2002,13 @@ public class CGenerator extends IRInstructionVisitor {
 
   private void putAllocRecord(String var, IRType type) {
     putAllocRecord(var, size(type));
+  }
+
+  private void putReallocRecord(String var, String bufferSize) {
+    putAssign(var, "realloc(" + var + ", sizeof(struct record) + " + bufferSize + ")");
+    if (profile) {
+      putIncrement("record_reallocs");
+    }
   }
 
   private void putFreeRecord(String var) {

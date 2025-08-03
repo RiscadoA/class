@@ -62,6 +62,10 @@ public abstract class IRInstructionVisitor {
     visit((IRInstruction) instruction);
   }
 
+  public void visit(IRFlipForward instruction) {
+    visit((IRInstruction) instruction);
+  }
+
   public void visit(IRCallProcess instruction) {
     visit((IRInstruction) instruction);
   }
