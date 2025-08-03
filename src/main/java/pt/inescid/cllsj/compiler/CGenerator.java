@@ -78,9 +78,13 @@ public class CGenerator extends IRInstructionVisitor {
     if (profile) {
       putStatement(counterType + " env_allocs = 0");
       putStatement(counterType + " env_frees = 0");
+      putStatement(counterType + " env_current = 0");
+      putStatement(counterType + " env_peak = 0");
       putStatement(counterType + " record_allocs = 0");
       putStatement(counterType + " record_reallocs = 0");
       putStatement(counterType + " record_frees = 0");
+      putStatement(counterType + " record_current = 0");
+      putStatement(counterType + " record_peak = 0");
       putStatement(counterType + " exponential_allocs = 0");
       putStatement(counterType + " exponential_frees = 0");
       putStatement(counterType + " task_allocs = 0");
@@ -439,6 +443,21 @@ public class CGenerator extends IRInstructionVisitor {
     decIndent();
     putLine("}");
 
+    // Utility function for atomically setting an integer to the maximum of its current value and a given value.
+    if (!disableConcurrency) {
+      putBlankLine();
+      putLine("void atomic_store_max(atomic_ulong* value, unsigned long new_value) {");
+      incIndent();
+      putStatement("unsigned long old_value = atomic_load(value)");
+      putWhile("new_value > old_value", () -> {
+          putIf("atomic_compare_exchange_weak(value, &old_value, new_value)", () -> {
+            putStatement("break");
+          });
+      });
+      decIndent();
+      putLine("}");
+    }
+
     // Generate environment managers and the main function to a different string, so that we can
     // insert record cloner and cleaner functions later.
     String headerCode = code;
@@ -615,7 +634,7 @@ public class CGenerator extends IRInstructionVisitor {
     putLabel("end");
     if (!disableConcurrency) {
       putStatement("pthread_mutex_lock(&thread_stops_mutex)");
-      putIncrement("thread_stops");
+      putIncrementAtomic("thread_stops");
       putStatement("pthread_cond_signal(&thread_stops_cond_var)");
       putStatement("pthread_mutex_unlock(&thread_stops_mutex)");
     }
@@ -661,9 +680,11 @@ public class CGenerator extends IRInstructionVisitor {
       }
       putDebugLn("  Environment allocations: %ld", "env_allocs");
       putDebugLn("  Environment frees: %ld", "env_frees");
+      putDebugLn("  Environment peak: %ld", "env_peak");
       putDebugLn("  Record allocations: %ld", "record_allocs");
       putDebugLn("  Record reallocations: %ld", "record_reallocs");
       putDebugLn("  Record frees: %ld", "record_frees");
+      putDebugLn("  Record peak: %ld", "record_peak");
       putDebugLn("  Exponential allocations: %ld", "exponential_allocs");
       putDebugLn("  Exponential frees: %ld", "exponential_frees");
       putDebugLn("  Task allocations: %ld", "task_allocs");
@@ -1195,7 +1216,7 @@ public class CGenerator extends IRInstructionVisitor {
       putAllocTask(TMP_TASK);
       putAssign(taskCont(TMP_TASK), labelAddress(blockLabel(instruction.getLabel())));
       putAssign(taskContEnv(TMP_TASK), ENV);
-      putIncrement("thread_inits");
+      putIncrementAtomic("thread_inits");
       putStatement("pthread_create(&" + TMP_THREAD + ", NULL, thread, (void*)" + TMP_TASK + ")");
     }
   }
@@ -1513,7 +1534,7 @@ public class CGenerator extends IRInstructionVisitor {
         () -> {},
         () -> {},
         () -> {
-          putIncrement(exponentialRefCount(instruction.getExponential()));
+          putIncrementAtomic(exponentialRefCount(instruction.getExponential()));
         });
   }
 
@@ -1544,7 +1565,7 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRIncRefCell instruction) {
-    putIncrement(cellRefCount(peekCell(instruction.getRecord())));
+    putIncrementAtomic(cellRefCount(peekCell(instruction.getRecord())));
   }
 
   @Override
@@ -1959,7 +1980,9 @@ public class CGenerator extends IRInstructionVisitor {
             + " * sizeof(struct type))");
     putAssign(environmentManager(var), "&" + manager);
     if (profile) {
-      putIncrement("env_allocs");
+      putIncrementAtomic("env_allocs");
+      putIncrementAtomic("env_current");
+      putAssignMaxAtomic("env_peak", "env_current");
     }
   }
 
@@ -1989,14 +2012,17 @@ public class CGenerator extends IRInstructionVisitor {
     }
     putLine("free(" + var + ");");
     if (profile) {
-      putIncrement("env_frees");
+      putIncrementAtomic("env_frees");
+      putDecrementAtomic("env_current");
     }
   }
 
   private void putAllocRecord(String var, String bufferSize) {
     putAssign(var, "malloc(sizeof(struct record) + " + bufferSize + ")");
     if (profile) {
-      putIncrement("record_allocs");
+      putIncrementAtomic("record_allocs");
+      putIncrementAtomic("record_current");
+      putAssignMaxAtomic("record_peak", "record_current");
     }
   }
 
@@ -2007,35 +2033,36 @@ public class CGenerator extends IRInstructionVisitor {
   private void putReallocRecord(String var, String bufferSize) {
     putAssign(var, "realloc(" + var + ", sizeof(struct record) + " + bufferSize + ")");
     if (profile) {
-      putIncrement("record_reallocs");
+      putIncrementAtomic("record_reallocs");
     }
   }
 
   private void putFreeRecord(String var) {
     putLine("free(" + var + ");");
     if (profile) {
-      putIncrement("record_frees");
+      putIncrementAtomic("record_frees");
+      putDecrementAtomic("record_current");
     }
   }
 
   private void putAllocTask(String var) {
     putAssign(var, "malloc(sizeof(struct task))");
     if (profile) {
-      putIncrement("task_allocs");
+      putIncrementAtomic("task_allocs");
     }
   }
 
   private void putFreeTask(String var) {
     putLine("free(" + var + ");");
     if (profile) {
-      putIncrement("task_frees");
+      putIncrementAtomic("task_frees");
     }
   }
 
   private void putAllocExponential(String var) {
     putAssign(var, "malloc(sizeof(struct exponential))");
     if (profile) {
-      putIncrement("exponential_allocs");
+      putIncrementAtomic("exponential_allocs");
     }
   }
 
@@ -2045,7 +2072,7 @@ public class CGenerator extends IRInstructionVisitor {
     }
     putLine("free(" + var + ");");
     if (profile) {
-      putIncrement("exponential_frees");
+      putIncrementAtomic("exponential_frees");
     }
   }
 
@@ -2132,7 +2159,7 @@ public class CGenerator extends IRInstructionVisitor {
     putIf(
         newExponential + " != NULL",
         () -> {
-          putIncrement(exponentialRefCount(newExponential));
+          putIncrementAtomic(exponentialRefCount(newExponential));
         });
   }
 
@@ -2176,7 +2203,7 @@ public class CGenerator extends IRInstructionVisitor {
       putStatement("pthread_mutex_init(&" + cellMutex(var) + ", NULL)");
     }
     if (profile) {
-      putIncrement("cell_allocs");
+      putIncrementAtomic("cell_allocs");
     }
   }
 
@@ -2189,7 +2216,7 @@ public class CGenerator extends IRInstructionVisitor {
     }
     putStatement("free(" + var + ")");
     if (profile) {
-      putIncrement("cell_frees");
+      putIncrementAtomic("cell_frees");
     }
   }
 
@@ -2238,8 +2265,16 @@ public class CGenerator extends IRInstructionVisitor {
     putStatement(var + " = " + value);
   }
 
-  private void putIncrement(String var) {
-    putStatement("++" + var);
+  private void putIncrementAtomic(String var) {
+    putStatement(incrementAtomic(var));
+  }
+
+  private void putDecrementAtomic(String var) {
+    putStatement(decrementAtomic(var));
+  }
+
+  private void putAssignMaxAtomic(String var, String value) {
+    putStatement("atomic_store_max(&" + var + ", " + value + ")");
   }
 
   private void putManagerPushRecordPair(String first, String second) {

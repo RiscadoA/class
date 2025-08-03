@@ -23,7 +23,7 @@ proc rec filter(fouts:IntStream, fins:~IntStream;n:~lint)
      	 {  
 	    case fouts of { 
 	    |#next:  send fouts (v); filter(fouts, fins;n) 
-	    |#stop:  #stop fins; wait fins; close fouts
+	    |#stop:  #stop fins; fwd fins fouts
 	 }
 	 }
  };;
@@ -98,6 +98,9 @@ proc mainc_ss(;np:colint)
 
 
 proc main() {
-  mainc_ss(;98)
+	cut {
+		scan(n)
+		|n: ~!lint|
+	  	mainc_ss(;n)
+	}
 };;
-

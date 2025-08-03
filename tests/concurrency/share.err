@@ -3,9 +3,11 @@ Profiling results:
   Thread stops: 2
   Environment allocations: 6
   Environment frees: 6
+  Environment peak: 2
   Record allocations: 6
   Record reallocations: 0
   Record frees: 6
+  Record peak: 2
   Exponential allocations: 0
   Exponential frees: 0
   Task allocations: 3
