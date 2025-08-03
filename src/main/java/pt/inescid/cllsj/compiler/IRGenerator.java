@@ -35,26 +35,26 @@ public class IRGenerator extends ASTNodeVisitor {
   private Stack<Environment> environments = new Stack<>();
   private Env<EnvEntry> ep;
 
-  public static IRProgram generate(Env<EnvEntry> ep, ASTProgram ast) {
-    final IRGenerator gen = new IRGenerator();
+  public boolean optimizeExponentialExpressionToForward = true;
 
+  public IRProgram generate(Env<EnvEntry> ep, ASTProgram ast) {
     for (ASTProcDef procDef : ast.getProcDefs()) {
-      gen.ep = ep;
+      this.ep = ep;
       for (int i = 0; i < procDef.getTArgs().size(); ++i) {
         TypeEntry entry = new TypeEntry(new ASTIdT(procDef.getTArgsGen().get(i)));
-        gen.ep = gen.ep.assoc(procDef.getTArgs().get(i), entry);
-        gen.ep = gen.ep.assoc(procDef.getTArgsGen().get(i), entry);
+        this.ep = this.ep.assoc(procDef.getTArgs().get(i), entry);
+        this.ep = this.ep.assoc(procDef.getTArgsGen().get(i), entry);
       }
 
       Environment.forEachProcessPolarity(
           procDef,
           (suffix, env) -> {
-            gen.addProcess(procDef.hasArguments(), env, procDef.getRhs());
+            addProcess(procDef.hasArguments(), env, procDef.getRhs());
           },
-          gen.ep);
+          this.ep);
     }
 
-    return gen.program;
+    return program;
   }
 
   // ==================================== AST node visitors =====================================
@@ -368,8 +368,10 @@ public class IRGenerator extends ASTNodeVisitor {
   public void visit(ASTPromoCoExpr node) {
     GeneratedExpression expr = generateExpression(node.getExpr());
 
-    if (expr.expr instanceof IRExponentialVar) {
-      block.add(new IRPushExponential(record(node.getCh()), ((IRExponentialVar)expr.expr).getExponential()));
+    if (optimizeExponentialExpressionToForward && expr.expr instanceof IRExponentialVar) {
+      block.add(
+          new IRPushExponential(
+              record(node.getCh()), ((IRExponentialVar) expr.expr).getExponential()));
     } else {
       block.add(new IRPushExpression(record(node.getCh()), expr.getExpr(), true));
       expr.cleanUp(block, Optional.empty(), true);

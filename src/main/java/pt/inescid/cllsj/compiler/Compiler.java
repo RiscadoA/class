@@ -24,6 +24,7 @@ public class Compiler {
   public boolean onlyAST = false;
   public boolean disableConcurrency = false;
   public boolean optimizePrimitiveExponentials = true;
+  public boolean optimizeExponentialExpressionToForward = true;
 
   public int compile(String path) {
     ASTProgram ast;
@@ -66,7 +67,9 @@ public class Compiler {
 
     IRProgram ir;
     try {
-      ir = IRGenerator.generate(ep, ast);
+      IRGenerator gen = new IRGenerator();
+      gen.optimizeExponentialExpressionToForward = optimizeExponentialExpressionToForward;
+      ir = gen.generate(ep, ast);
     } catch (Exception e) {
       System.err.println("IR generation error: " + e.getMessage());
       e.printStackTrace();

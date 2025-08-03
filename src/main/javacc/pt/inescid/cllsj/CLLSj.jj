@@ -112,10 +112,12 @@ public static void main(String args[]) {
           compiler.onlyIR = true;
         } else if (args[i].equals("-a")) {
           compiler.onlyAST = true;
-        } else if (args[i].equals("-s")) {
+        } else if (args[i].equals("--no-concurrency")) {
           compiler.disableConcurrency = true;
-        } else if (args[i].equals("-e")) {
+        } else if (args[i].equals("--no-optimize-primitive-exponentials")) {
           compiler.optimizePrimitiveExponentials = false;
+        } else if (args[i].equals("--no-optimize-exponential-expression-to-forward")) {
+          compiler.optimizeExponentialExpressionToForward = false;
         } else if (args[i].equals("-p")) {
           if (i + 1 >= args.length) {
             failed = true;
@@ -131,7 +133,17 @@ public static void main(String args[]) {
       }
 
       if (failed || input == null) {
-        System.err.println("Usage: CLLSj [-c <input-file>] [-t] [-P] [-i] [-a] [-p <entry-process>]");
+        System.err.println("Usage: CLLSj [OPTS...] [-t] [-P] [-i] [-a]");
+        System.err.println("    -c <input-file>: Uses the given file as input, instead of STDIN");
+        System.err.println("    -p <entry-process>: Specify the name of the entry process (default: main)");
+        System.err.println("    -t: Enable trace logs on generated programs");
+        System.err.println("    -P: Enable memory profiling on generated programs");
+        System.err.println("    -i: Generate only IR code instead of C code");
+        System.err.println("    -a: Generate only an AST instead of C code");
+        System.err.println("    --no-concurrency: Prevents generation of thread-aware code");
+        System.err.println("    --no-optimize-primitive-exponentials: Disables primitive exponential optimization");
+        System.err.println("    --no-optimize-exponential-expression-to-forward: Disables exponential expression variable optimization to forward");
+
         System.exit(1);
       }
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-CLLSflags=""
+CLLSflags=$CLLS_FLAGS
 Cflags="-std=c11"
 onlyir=false
 onlyast=false
@@ -31,12 +31,6 @@ while getopts ":dOtPirasep:o:" opt; do
             onlyast=true
             CLLSflags="$CLLSflags -a"
             ;;
-        s)
-            CLLSflags="$CLLSflags -s"
-            ;;
-        e)
-            CLLSflags="$CLLSflags -e"
-            ;;
         r)
             run=true
             ;;
@@ -60,18 +54,17 @@ done
 shift $((OPTIND-1))
 
 if [ -z $1 ]; then
-    echo "Usage: $0 [-d] [-t] [-i] [-a] [-s] [-e] [-O] [-r] [-p <process>] [-o <output>] <input>" >&2
+    echo "Usage: $0 [-d] [-t] [-i] [-a] [-O] [-r] [-p <process>] [-o <output>] <input>" >&2
     echo "    -d: Compile with debug flags / Run with gdb" >&2
     echo "    -t: Compile with tracing enabled" >&2
     echo "    -P: Compile with profiling enabled" >&2
     echo "    -i: Only generate IR code" >&2
     echo "    -a: Only generate AST" >&2
-    echo "    -s: Disable concurrency" >&2
-    echo "    -e: Compile without primitive exponential optimizations" >&2
     echo "    -O: Compile with optimization flags" >&2
     echo "    -r: Run the compiled program after compilation" >&2
     echo "    -p <process>: Specify the name of the entry process" >&2
     echo "    -o <output>: Specify the output file (defaults to bin/<input>)" >&2
+    echo "Picks up other compilation flags from the CLLS_FLAGS environment variable" >&2
     exit 1
 fi
 
