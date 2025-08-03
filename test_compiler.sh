@@ -32,7 +32,6 @@ else
     echo "Found $count test files"
 fi
 
-# If CLLS_FLAGS is set, print it
 if [ -z "$CLLS_FLAGS" ]; then
     CLLS_FLAGS=""
 else

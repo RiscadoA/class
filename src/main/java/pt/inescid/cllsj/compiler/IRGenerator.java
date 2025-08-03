@@ -368,8 +368,12 @@ public class IRGenerator extends ASTNodeVisitor {
   public void visit(ASTPromoCoExpr node) {
     GeneratedExpression expr = generateExpression(node.getExpr());
 
-    block.add(new IRPushExpression(record(node.getCh()), expr.getExpr(), true));
-    expr.cleanUp(block, Optional.empty(), true);
+    if (expr.expr instanceof IRExponentialVar) {
+      block.add(new IRPushExponential(record(node.getCh()), ((IRExponentialVar)expr.expr).getExponential()));
+    } else {
+      block.add(new IRPushExpression(record(node.getCh()), expr.getExpr(), true));
+      expr.cleanUp(block, Optional.empty(), true);
+    }
     block.add(new IRReturn(record(node.getCh())));
   }
 
