@@ -23,6 +23,8 @@ public class Compiler {
   public boolean onlyIR = false;
   public boolean onlyAST = false;
   public boolean disableConcurrency = false;
+  public int customAllocatorSizeDivisor = 32;
+  public int customAllocatorLevels = 8;
   public boolean optimizePrimitiveExponentials = true;
   public boolean optimizeExponentialExpressionToForward = true;
   public boolean optimizeSendForward = true;
@@ -103,6 +105,8 @@ public class Compiler {
       gen.trace = trace;
       gen.profile = profile;
       gen.disableConcurrency = disableConcurrency;
+      gen.customAllocatorSizeDivisor = customAllocatorSizeDivisor;
+      gen.customAllocatorLevels = customAllocatorLevels;
       gen.optimizePrimitiveExponentials = optimizePrimitiveExponentials;
       gen.optimizeTailCalls = optimizeTailCalls;
       output = gen.generate(ir);

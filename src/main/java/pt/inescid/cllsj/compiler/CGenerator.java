@@ -49,6 +49,9 @@ public class CGenerator extends IRInstructionVisitor {
   public boolean optimizePrimitiveExponentials = true;
   public boolean optimizeTailCalls = true;
 
+  public int customAllocatorSizeDivisor = 32;
+  public int customAllocatorLevels = 8;
+
   private Set<IRType> usedRecordManagers = new HashSet<>();
 
   public String generate(IRProgram ir) {
@@ -95,6 +98,132 @@ public class CGenerator extends IRInstructionVisitor {
       putStatement(counterType + " cell_frees = 0");
       putBlankLine();
     }
+
+    // Define the allocation data structures used for custom memory allocation.
+    if (customAllocatorLevels > 0) {
+      putLine("struct allocation {");
+      incIndent();
+      putLine("int level;");
+      putLine("struct allocation* next;");
+      putLine("char data[];");
+      decIndent();
+      putLine("};");
+      putBlankLine();
+
+      putStatement("struct allocation* allocator_list[" + customAllocatorLevels + "]");
+      if (!disableConcurrency) {
+        putStatement("pthread_mutex_t allocator_mutex[" + customAllocatorLevels + "]");
+      }
+      putBlankLine();
+    }
+
+    // Define the allocation functions.
+    if (customAllocatorLevels == 0) {
+      putLine("#define managed_alloc(size) malloc(size)");
+    } else {
+      putLine("void* managed_alloc(size_t size) {");
+      incIndent();
+      // Compute the level of the allocator to use based on the size.
+      putStatement(
+          "int level = (size + "
+              + customAllocatorSizeDivisor
+              + " - 1) / "
+              + customAllocatorSizeDivisor);
+      putIfElse(
+          "level >= " + customAllocatorLevels,
+          () -> {
+            putStatement("struct allocation* alloc = malloc(sizeof(struct allocation) + size)");
+            putStatement("alloc->level = " + (customAllocatorLevels - 1));
+            putStatement("return alloc->data");
+          },
+          () -> {
+            if (!disableConcurrency) {
+             putStatement("pthread_mutex_lock(&allocator_mutex[level])");
+            }
+            putIfElse(
+                "allocator_list[level] == NULL",
+                () -> {
+                  if (!disableConcurrency) {
+                    putStatement("pthread_mutex_unlock(&allocator_mutex[level])");
+                  }
+                  putStatement(
+                      "struct allocation* alloc = malloc(sizeof(struct allocation) + (level + 1) * "
+                          + customAllocatorSizeDivisor
+                          + ")");
+                  putStatement("alloc->level = level");
+                  putStatement("return alloc->data");
+                },
+                () -> {
+                  putStatement("struct allocation* alloc = allocator_list[level]");
+                  putStatement("allocator_list[level] = alloc->next");
+                  if (!disableConcurrency) {
+                    putStatement("pthread_mutex_unlock(&allocator_mutex[level])");\
+                  }
+                  putStatement("return alloc->data");
+                });
+          });
+      decIndent();
+      putLine("}");
+    }
+    putBlankLine();
+    if (customAllocatorLevels == 0) {
+      putLine("#define managed_calloc(size) calloc(1, size)");
+    } else {
+      putLine("void* managed_calloc(size_t size) {");
+      incIndent();
+      putStatement("void* ptr = managed_alloc(size)");
+      putStatement("memset(ptr, 0, size)");
+      putStatement("return ptr");
+      decIndent();
+      putLine("}");
+    }
+    putBlankLine();
+    if (customAllocatorLevels == 0) {
+      putLine("#define managed_free(ptr) free(ptr)");
+    } else {
+      putLine("void managed_free(void* ptr) {");
+      incIndent();
+      putStatement(
+          "struct allocation* alloc = (struct allocation*)((char*)ptr - "
+              + "sizeof(struct allocation))");
+      putStatement("int level = alloc->level");
+      if (!disableConcurrency) {
+        putStatement("pthread_mutex_lock(&allocator_mutex[level])");
+      }
+      putStatement("alloc->next = allocator_list[level]");
+      putStatement("allocator_list[level] = alloc");
+      if (!disableConcurrency) {
+        putStatement("pthread_mutex_unlock(&allocator_mutex[level])");
+      }
+      decIndent();
+      putLine("}");
+    }
+    putBlankLine();
+    if (customAllocatorLevels == 0) {
+      putLine("#define managed_realloc(ptr, size) realloc(ptr, size)");
+    } else {
+      putLine("void* managed_realloc(void* ptr, size_t size) {");
+      incIndent();
+      putStatement(
+          "struct allocation* alloc = (struct allocation*)((char*)ptr - "
+              + "sizeof(struct allocation))");
+      putStatement("int level = alloc->level");
+      putIfElse(
+          "size <= " + customAllocatorSizeDivisor + " * (level + 1)",
+          () -> {
+            putStatement("return alloc->data");
+          },
+          () -> {
+            putStatement("void* new_ptr = managed_alloc(size)");
+            putStatement(
+                "memcpy(new_ptr, alloc->data, " + customAllocatorSizeDivisor + " * (level + 1))");
+            putStatement("managed_free(alloc->data)");
+            putStatement("return new_ptr");
+          });
+      decIndent();
+      putLine("}");
+    }
+    putBlankLine();
 
     // Define the record struct.
     putLine("struct record {");
@@ -259,7 +388,7 @@ public class CGenerator extends IRInstructionVisitor {
     put(MANAGER_STATE + "->what ## _capacity = " + MANAGER_STATE + "->what ## _capacity * 2 + 1;");
     put(
         MANAGER_STATE
-            + "->what = realloc("
+            + "->what = managed_realloc("
             + MANAGER_STATE
             + "->what, "
             + MANAGER_STATE
@@ -319,7 +448,7 @@ public class CGenerator extends IRInstructionVisitor {
     // Functions used for operations on string expressions.
     putLine("char* string_create(const char* str) {");
     incIndent();
-    putLine("char* clone = malloc(strlen(str) + 1);");
+    putLine("char* clone = managed_alloc(strlen(str) + 1);");
     putStatement("strcpy(clone, str)");
     if (profile) {
       putStatement("string_allocs += 1");
@@ -330,7 +459,7 @@ public class CGenerator extends IRInstructionVisitor {
     putBlankLine();
     putLine("void string_drop(char* str) {");
     incIndent();
-    putStatement("free(str)");
+    putStatement("managed_free(str)");
     if (profile) {
       putStatement("string_frees += 1");
     }
@@ -339,11 +468,11 @@ public class CGenerator extends IRInstructionVisitor {
     putBlankLine();
     putLine("char* string_concat(char* str1, char* str2) {");
     incIndent();
-    putStatement("char* concat = malloc(strlen(str1) + strlen(str2) + 1)");
+    putStatement("char* concat = managed_alloc(strlen(str1) + strlen(str2) + 1)");
     putStatement("strcpy(concat, str1)");
     putStatement("strcat(concat, str2)");
-    putStatement("free(str1)");
-    putStatement("free(str2)");
+    putStatement("managed_free(str1)");
+    putStatement("managed_free(str2)");
     if (profile) {
       putStatement("string_allocs += 1");
       putStatement("string_frees += 2");
@@ -355,7 +484,7 @@ public class CGenerator extends IRInstructionVisitor {
     putLine("void string_print(const char* fmt, char* str) {");
     incIndent();
     putStatement("printf(fmt, str)");
-    putStatement("free(str)");
+    putStatement("managed_free(str)");
     if (profile) {
       putStatement("string_frees += 1");
     }
@@ -364,7 +493,7 @@ public class CGenerator extends IRInstructionVisitor {
     putBlankLine();
     putLine("char* string_from_int(int value) {");
     incIndent();
-    putStatement("char* str = malloc(12)");
+    putStatement("char* str = managed_alloc(12)");
     putStatement("sprintf(str, \"%d\", value)");
     if (profile) {
       putStatement("string_allocs += 1");
@@ -376,8 +505,8 @@ public class CGenerator extends IRInstructionVisitor {
     putLine("int string_equal(char* str1, char* str2) {");
     incIndent();
     putStatement("int result = strcmp(str1, str2) == 0");
-    putStatement("free(str1)");
-    putStatement("free(str2)");
+    putStatement("managed_free(str1)");
+    putStatement("managed_free(str2)");
     if (profile) {
       putStatement("string_frees += 2");
     }
@@ -443,17 +572,22 @@ public class CGenerator extends IRInstructionVisitor {
     decIndent();
     putLine("}");
 
-    // Utility function for atomically setting an integer to the maximum of its current value and a given value.
+    // Utility function for atomically setting an integer to the maximum of its current value and a
+    // given value.
     if (!disableConcurrency) {
       putBlankLine();
       putLine("void atomic_store_max(atomic_ulong* value, unsigned long new_value) {");
       incIndent();
       putStatement("unsigned long old_value = atomic_load(value)");
-      putWhile("new_value > old_value", () -> {
-          putIf("atomic_compare_exchange_weak(value, &old_value, new_value)", () -> {
-            putStatement("break");
+      putWhile(
+          "new_value > old_value",
+          () -> {
+            putIf(
+                "atomic_compare_exchange_weak(value, &old_value, new_value)",
+                () -> {
+                  putStatement("break");
+                });
           });
-      });
       decIndent();
       putLine("}");
     }
@@ -584,7 +718,7 @@ public class CGenerator extends IRInstructionVisitor {
     putBlankLine();
 
     // Initialize the manager.
-    putAssign(MANAGER_STATE, "calloc(1, sizeof(struct manager_state))");
+    putAssign(MANAGER_STATE, "managed_calloc(sizeof(struct manager_state))");
     putBlankLine();
 
     // Initialize the task list.
@@ -638,7 +772,7 @@ public class CGenerator extends IRInstructionVisitor {
       putStatement("pthread_cond_signal(&thread_stops_cond_var)");
       putStatement("pthread_mutex_unlock(&thread_stops_mutex)");
     }
-    putStatement("free(" + MANAGER_STATE + ")");
+    putStatement("managed_free(" + MANAGER_STATE + ")");
 
     decIndent();
     putLine("}");
@@ -653,6 +787,12 @@ public class CGenerator extends IRInstructionVisitor {
 
     putLine("int main() {");
     incIndent();
+    for (int i = 0; i < customAllocatorLevels; ++i) {
+      putAssign("allocator_list[" + i + "]", "NULL");
+      if (!disableConcurrency) {
+        putStatement("pthread_mutex_init(&allocator_mutex[" + i + "], NULL)");
+      }
+    }
     if (!disableConcurrency) {
       putStatement("pthread_cond_init(&thread_stops_cond_var, NULL)");
       putStatement("pthread_mutex_init(&thread_stops_mutex, NULL)");
@@ -670,6 +810,9 @@ public class CGenerator extends IRInstructionVisitor {
       putStatement("pthread_mutex_unlock(&thread_stops_mutex)");
       putStatement("pthread_mutex_destroy(&thread_stops_mutex)");
       putStatement("pthread_cond_destroy(&thread_stops_cond_var)");
+      for (int i = 0; i < customAllocatorLevels; ++i) {
+        putStatement("pthread_mutex_destroy(&allocator_mutex[" + i + "])");
+      }
       putBlankLine();
     }
     if (profile) {
@@ -1472,7 +1615,7 @@ public class CGenerator extends IRInstructionVisitor {
                     () -> {
                       // Otherwise, the record has already been closed. In that case, we allocate a
                       // new
-                      // record with a buffer big enough to accomodate all written data, and then,
+                      // record with a buffer big enough to accommodate all written data, and then,
                       // clone
                       // the buffer using the record buffer manager.
                       putAllocRecord(
@@ -1971,7 +2114,7 @@ public class CGenerator extends IRInstructionVisitor {
       String var, String manager, String recordCount, String exponentialCount, String typeCount) {
     putAssign(
         var,
-        "calloc(1, sizeof(struct environment) + "
+        "managed_calloc(sizeof(struct environment) + "
             + recordCount
             + " * sizeof(struct record*) + "
             + exponentialCount
@@ -2010,7 +2153,7 @@ public class CGenerator extends IRInstructionVisitor {
     if (trace && procName != null) {
       putDebugLn("[endCall(" + procName + ")]");
     }
-    putLine("free(" + var + ");");
+    putLine("managed_free(" + var + ");");
     if (profile) {
       putIncrementAtomic("env_frees");
       putDecrementAtomic("env_current");
@@ -2018,7 +2161,7 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   private void putAllocRecord(String var, String bufferSize) {
-    putAssign(var, "malloc(sizeof(struct record) + " + bufferSize + ")");
+    putAssign(var, "managed_alloc(sizeof(struct record) + " + bufferSize + ")");
     if (profile) {
       putIncrementAtomic("record_allocs");
       putIncrementAtomic("record_current");
@@ -2031,14 +2174,14 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   private void putReallocRecord(String var, String bufferSize) {
-    putAssign(var, "realloc(" + var + ", sizeof(struct record) + " + bufferSize + ")");
+    putAssign(var, "managed_realloc(" + var + ", sizeof(struct record) + " + bufferSize + ")");
     if (profile) {
       putIncrementAtomic("record_reallocs");
     }
   }
 
   private void putFreeRecord(String var) {
-    putLine("free(" + var + ");");
+    putLine("managed_free(" + var + ");");
     if (profile) {
       putIncrementAtomic("record_frees");
       putDecrementAtomic("record_current");
@@ -2046,21 +2189,21 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   private void putAllocTask(String var) {
-    putAssign(var, "malloc(sizeof(struct task))");
+    putAssign(var, "managed_alloc(sizeof(struct task))");
     if (profile) {
       putIncrementAtomic("task_allocs");
     }
   }
 
   private void putFreeTask(String var) {
-    putLine("free(" + var + ");");
+    putLine("managed_free(" + var + ");");
     if (profile) {
       putIncrementAtomic("task_frees");
     }
   }
 
   private void putAllocExponential(String var) {
-    putAssign(var, "malloc(sizeof(struct exponential))");
+    putAssign(var, "managed_alloc(sizeof(struct exponential))");
     if (profile) {
       putIncrementAtomic("exponential_allocs");
     }
@@ -2070,7 +2213,7 @@ public class CGenerator extends IRInstructionVisitor {
     if (trace) {
       putDebugLn("[freeExponential(" + var + ")]");
     }
-    putLine("free(" + var + ");");
+    putLine("managed_free(" + var + ");");
     if (profile) {
       putIncrementAtomic("exponential_frees");
     }
@@ -2197,7 +2340,7 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   private void putAllocCell(String var) {
-    putAssign(var, "malloc(sizeof(struct cell))");
+    putAssign(var, "managed_alloc(sizeof(struct cell))");
 
     if (!disableConcurrency) {
       putStatement("pthread_mutex_init(&" + cellMutex(var) + ", NULL)");
@@ -2214,7 +2357,7 @@ public class CGenerator extends IRInstructionVisitor {
     if (!disableConcurrency) {
       putStatement("pthread_mutex_destroy(&" + cellMutex(var) + ")");
     }
-    putStatement("free(" + var + ")");
+    putStatement("managed_free(" + var + ")");
     if (profile) {
       putIncrementAtomic("cell_frees");
     }
