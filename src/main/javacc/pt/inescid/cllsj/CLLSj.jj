@@ -120,6 +120,8 @@ public static void main(String args[]) {
           compiler.optimizeExponentialExpressionToForward = false;
         } else if (args[i].equals("--no-optimize-send-forward")) {
           compiler.optimizeSendForward = false;
+        } else if (args[i].equals("--no-optimize-tail-calls")) {
+          compiler.optimizeTailCalls = false;
         } else if (args[i].equals("-p")) {
           if (i + 1 >= args.length) {
             failed = true;
@@ -146,6 +148,7 @@ public static void main(String args[]) {
         System.err.println("    --no-optimize-primitive-exponentials: Disables primitive exponential optimization");
         System.err.println("    --no-optimize-exponential-expression-to-forward: Disables exponential expression variable optimization to forward");
         System.err.println("    --no-optimize-send-forward: Disables send forward optimization");
+        System.err.println("    --no-optimize-tail-calls: Disables tail call optimization");
 
         System.exit(1);
       }

@@ -26,6 +26,7 @@ public class Compiler {
   public boolean optimizePrimitiveExponentials = true;
   public boolean optimizeExponentialExpressionToForward = true;
   public boolean optimizeSendForward = true;
+  public boolean optimizeTailCalls = true;
 
   public int compile(String path) {
     ASTProgram ast;
@@ -91,6 +92,7 @@ public class Compiler {
       gen.profile = profile;
       gen.disableConcurrency = disableConcurrency;
       gen.optimizePrimitiveExponentials = optimizePrimitiveExponentials;
+      gen.optimizeTailCalls = optimizeTailCalls;
       output = gen.generate(ir);
     } catch (Exception e) {
       System.err.println("C Generation error: " + e.getMessage());

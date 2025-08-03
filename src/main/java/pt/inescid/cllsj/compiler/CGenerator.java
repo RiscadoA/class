@@ -1,6 +1,7 @@
 package pt.inescid.cllsj.compiler;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
@@ -45,7 +46,8 @@ public class CGenerator extends IRInstructionVisitor {
   public boolean trace = false;
   public boolean profile = false;
   public boolean disableConcurrency = false;
-  public boolean optimizePrimitiveExponentials = false;
+  public boolean optimizePrimitiveExponentials = true;
+  public boolean optimizeTailCalls = true;
 
   private Set<IRType> usedRecordManagers = new HashSet<>();
 
@@ -781,39 +783,110 @@ public class CGenerator extends IRInstructionVisitor {
   public void visit(IRCallProcess instruction) {
     IRProcess process = ir.getProcesses().get(instruction.getProcessName());
 
-    if (instruction.getLinearArguments().isEmpty()
-        && instruction.getExponentialArguments().isEmpty()
-        && instruction.getTypeArguments().isEmpty()) {
-      if (!entryCall) {
-        putIf(decrementAtomic(environmentEndPoints()) + " == 0", () -> putFreeEnvironment(ENV));
-      } else {
-        entryCall = false;
+    Runnable notATailCall =
+        () -> {
+          if (instruction.getLinearArguments().isEmpty()
+              && instruction.getExponentialArguments().isEmpty()
+              && instruction.getTypeArguments().isEmpty()) {
+            if (!entryCall) {
+              putIf(
+                  decrementAtomic(environmentEndPoints()) + " == 0", () -> putFreeEnvironment(ENV));
+            } else {
+              entryCall = false;
+            }
+            putAllocEnvironment(ENV, instruction.getProcessName());
+          } else {
+            putAllocEnvironment(TMP_ENV, instruction.getProcessName());
+
+            // Bind the arguments to the new environment
+            for (LinearArgument arg : instruction.getLinearArguments()) {
+              putAssign(record(TMP_ENV, arg.getTargetRecord()), record(ENV, arg.getSourceRecord()));
+            }
+            for (ExponentialArgument arg : instruction.getExponentialArguments()) {
+              putAssign(
+                  exponential(TMP_ENV, process.getRecordCount(), arg.getTargetExponential()),
+                  exponential(ENV, recordCount, arg.getSourceExponential()));
+            }
+            for (TypeArgument arg : instruction.getTypeArguments()) {
+              putAssign(
+                  type(
+                      TMP_ENV,
+                      process.getRecordCount(),
+                      process.getExponentialCount(),
+                      arg.getTargetType()),
+                  typeInitializer(arg.getSourceType()));
+            }
+
+            putIf(
+                decrementAtomic(environmentEndPoints(ENV)) + " == 0",
+                () -> putFreeEnvironment(ENV));
+            putAssign(ENV, TMP_ENV);
+          }
+        };
+
+    // Check if the type arguments are the same as the types in the current environment.
+    // That condition is necessary to perform a tail call.
+    boolean sameTypes = true;
+    for (TypeArgument arg : instruction.getTypeArguments()) {
+      if (!(arg.getSourceType() instanceof IRVarT)) {
+        sameTypes = false;
+        break;
       }
-      putAllocEnvironment(ENV, instruction.getProcessName());
+
+      IRVarT var = (IRVarT) arg.getSourceType();
+      if (var.getType() != arg.getTargetType()) {
+        sameTypes = false;
+        break;
+      }
+    }
+
+    // If we're recursively calling the same process, we might be able to do tail call optimization.
+    if (optimizeTailCalls && instruction.getProcessName().equals(procName) && sameTypes) {
+      // We must increment the end points as we might decrement them twice, if this ends up not being a tail call.
+      putStatement(incrementAtomic(environmentEndPoints()));
+      putIfElse(
+          decrementAtomic(environmentEndPoints()) + " == 1",
+          () -> {
+            // Instead of allocating a new environment, we'll just reuse the current one.
+            // We need this map to store the record and exponential swaps that we need to do.
+            Map<Integer, Integer> recordMap = new HashMap<>();
+            Map<Integer, Integer> exponentialMap = new HashMap<>();
+
+            for (LinearArgument arg : instruction.getLinearArguments()) {
+              // If the binding is the same, we don't need to do anything.
+              int sourceRecord =
+                  recordMap.getOrDefault(arg.getSourceRecord(), arg.getSourceRecord());
+              if (sourceRecord != arg.getTargetRecord()) {
+                recordMap.put(arg.getTargetRecord(), sourceRecord);
+
+                // Swap the records.
+                putAssign(TMP_RECORD, record(arg.getTargetRecord()));
+                putAssign(record(arg.getTargetRecord()), record(sourceRecord));
+                putAssign(record(sourceRecord), TMP_RECORD);
+              }
+            }
+            for (ExponentialArgument arg : instruction.getExponentialArguments()) {
+              // If the binding is the same, we don't need to do anything.
+              int sourceExponential =
+                  exponentialMap.getOrDefault(
+                      arg.getSourceExponential(), arg.getSourceExponential());
+              if (sourceExponential != arg.getTargetExponential()) {
+                exponentialMap.put(arg.getTargetExponential(), sourceExponential);
+
+                // Swap the exponentials.
+                putAssign(TMP_EXPONENTIAL, exponential(arg.getTargetExponential()));
+                putAssign(exponential(arg.getTargetExponential()), exponential(sourceExponential));
+                putAssign(exponential(sourceExponential), TMP_EXPONENTIAL);
+              }
+            }
+
+            if (trace && procName != null) {
+              putDebugLn("[tailCall(" + procName + ")]");
+            }
+          },
+          notATailCall);
     } else {
-      putAllocEnvironment(TMP_ENV, instruction.getProcessName());
-
-      // Bind the arguments to the new environment
-      for (LinearArgument arg : instruction.getLinearArguments()) {
-        putAssign(record(TMP_ENV, arg.getTargetRecord()), record(ENV, arg.getSourceRecord()));
-      }
-      for (ExponentialArgument arg : instruction.getExponentialArguments()) {
-        putAssign(
-            exponential(TMP_ENV, process.getRecordCount(), arg.getTargetExponential()),
-            exponential(ENV, recordCount, arg.getSourceExponential()));
-      }
-      for (TypeArgument arg : instruction.getTypeArguments()) {
-        putAssign(
-            type(
-                TMP_ENV,
-                process.getRecordCount(),
-                process.getExponentialCount(),
-                arg.getTargetType()),
-            typeInitializer(arg.getSourceType()));
-      }
-
-      putIf(decrementAtomic(environmentEndPoints(ENV)) + " == 0", () -> putFreeEnvironment(ENV));
-      putAssign(ENV, TMP_ENV);
+      notATailCall.run();
     }
 
     putAssign(environmentEndPoints(), process.getEndPoints());
@@ -1763,6 +1836,14 @@ public class CGenerator extends IRInstructionVisitor {
 
   private String blockLabel(String label) {
     return "block_" + procName + "_" + label;
+  }
+
+  private String incrementAtomic(String var) {
+    if (disableConcurrency) {
+      return "++" + var;
+    } else {
+      return "atomic_fetch_add(&" + var + ", 1) + 1";
+    }
   }
 
   private String decrementAtomic(String var) {

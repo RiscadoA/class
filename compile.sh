@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 CLLSflags=$CLLS_FLAGS
-Cflags="-std=c11"
+Cflags="$C_FLAGS -std=c11"
 onlyir=false
 onlyast=false
 debug=false
