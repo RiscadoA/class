@@ -12,18 +12,20 @@ import pt.inescid.cllsj.ast.types.*;
 import pt.inescid.cllsj.compiler.ir.type.*;
 
 public class ASTIntoIRType extends ASTTypeVisitor {
+  private IRGenerator gen;
   private Env<EnvEntry> ep;
   private Map<String, Integer> typeMap = new HashMap<>();
   private IRType ir;
 
-  public static IRType convert(Env<EnvEntry> ep, ASTType type, Map<String, Integer> typeMap) {
+  public static IRType convert(
+      IRGenerator gen, Env<EnvEntry> ep, ASTType type, Map<String, Integer> typeMap) {
     ASTIntoIRType converter = new ASTIntoIRType(ep, typeMap);
     type.accept(converter);
     return converter.ir;
   }
 
   private IRType recurse(Env<EnvEntry> ep, ASTType type) {
-    return convert(ep, type, typeMap);
+    return convert(gen, ep, type, typeMap);
   }
 
   private ASTIntoIRType(Env<EnvEntry> ep, Map<String, Integer> typeMap) {

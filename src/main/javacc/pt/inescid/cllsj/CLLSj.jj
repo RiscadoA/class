@@ -118,6 +118,8 @@ public static void main(String args[]) {
           compiler.optimizePrimitiveExponentials = false;
         } else if (args[i].equals("--no-optimize-exponential-expression-to-forward")) {
           compiler.optimizeExponentialExpressionToForward = false;
+        } else if (args[i].equals("--no-optimize-send-forward")) {
+          compiler.optimizeSendForward = false;
         } else if (args[i].equals("-p")) {
           if (i + 1 >= args.length) {
             failed = true;
@@ -143,6 +145,7 @@ public static void main(String args[]) {
         System.err.println("    --no-concurrency: Prevents generation of thread-aware code");
         System.err.println("    --no-optimize-primitive-exponentials: Disables primitive exponential optimization");
         System.err.println("    --no-optimize-exponential-expression-to-forward: Disables exponential expression variable optimization to forward");
+        System.err.println("    --no-optimize-send-forward: Disables send forward optimization");
 
         System.exit(1);
       }
