@@ -204,9 +204,11 @@ public class CGenerator extends IRInstructionVisitor {
     } else {
       putLine("void* managed_realloc(void* ptr, size_t size) {");
       incIndent();
-      putIf("ptr == NULL", () -> {
-        putStatement("return managed_alloc(size)");
-      });
+      putIf(
+          "ptr == NULL",
+          () -> {
+            putStatement("return managed_alloc(size)");
+          });
       putStatement(
           "struct allocation* alloc = (struct allocation*)((char*)ptr - "
               + "sizeof(struct allocation))");
@@ -2669,11 +2671,6 @@ public class CGenerator extends IRInstructionVisitor {
     }
 
     @Override
-    public void visit(IRAffineT type) {
-      type.getInner().accept(this);
-    }
-
-    @Override
     public void visit(IRCellT type) {
       size += "sizeof(struct cell*)";
     }
@@ -3021,11 +3018,6 @@ public class CGenerator extends IRInstructionVisitor {
     }
 
     @Override
-    public void visit(IRAffineT type) {
-      type.getInner().accept(this);
-    }
-
-    @Override
     public void visit(IRCloseT type) {}
 
     @Override
@@ -3305,11 +3297,6 @@ public class CGenerator extends IRInstructionVisitor {
     public void visit(IRCloseT type) {}
 
     @Override
-    public void visit(IRAffineT type) {
-      type.getInner().accept(this);
-    }
-
-    @Override
     public void visit(IRCellT type) {
       putIfWritten(
           () -> {
@@ -3459,11 +3446,6 @@ public class CGenerator extends IRInstructionVisitor {
 
     @Override
     public void visit(IRCloseT type) {}
-
-    @Override
-    public void visit(IRAffineT type) {
-      type.getInner().accept(this);
-    }
 
     @Override
     public void visit(IRCellT type) {

@@ -212,12 +212,12 @@ public class ASTIntoIRType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTAffineT type) {
-    ir = new IRAffineT(recurse(ep, type.getin()));
+    type.getin().accept(this);
   }
 
   @Override
   public void visit(ASTCoAffineT type) {
-    ir = new IRAffineT(recurse(ep, type.getin()));
+    type.getin().accept(this);
   }
 
   @Override
