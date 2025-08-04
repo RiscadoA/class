@@ -204,6 +204,9 @@ public class CGenerator extends IRInstructionVisitor {
     } else {
       putLine("void* managed_realloc(void* ptr, size_t size) {");
       incIndent();
+      putIf("ptr == NULL", () -> {
+        putStatement("return managed_alloc(size)");
+      });
       putStatement(
           "struct allocation* alloc = (struct allocation*)((char*)ptr - "
               + "sizeof(struct allocation))");
