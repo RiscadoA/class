@@ -138,7 +138,7 @@ public class CGenerator extends IRInstructionVisitor {
           },
           () -> {
             if (!disableConcurrency) {
-             putStatement("pthread_mutex_lock(&allocator_mutex[level])");
+              putStatement("pthread_mutex_lock(&allocator_mutex[level])");
             }
             putIfElse(
                 "allocator_list[level] == NULL",
@@ -157,7 +157,7 @@ public class CGenerator extends IRInstructionVisitor {
                   putStatement("struct allocation* alloc = allocator_list[level]");
                   putStatement("allocator_list[level] = alloc->next");
                   if (!disableConcurrency) {
-                    putStatement("pthread_mutex_unlock(&allocator_mutex[level])");\
+                    putStatement("pthread_mutex_unlock(&allocator_mutex[level])");
                   }
                   putStatement("return alloc->data");
                 });
