@@ -4,7 +4,7 @@ import pt.inescid.cllsj.compiler.ir.IRTypeVisitor;
 
 // Serves as a marker that there's a polarity flip in the buffer.
 public class IRFlipT extends IRType {
-  IRType cont;
+  private IRType cont;
 
   public IRFlipT(IRType cont) {
     this.cont = cont;

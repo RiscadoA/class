@@ -1179,7 +1179,7 @@ public class IRGenerator extends ASTNodeVisitor {
         // Insert the type variable into the new environment.
         int index = env.insertTypeVariable(typeName, typeGenName);
         env.setPolarity(index, parent.isPositive(typeGenName));
-        outInheritedTypes.add(new TypeArgument(new IRVarT(i), index));
+        outInheritedTypes.add(new TypeArgument(new IRVarT(i, Optional.empty()), index));
       }
 
       if (linear != null) {
@@ -1266,7 +1266,7 @@ public class IRGenerator extends ASTNodeVisitor {
         // Insert the type variable into the new environment.
         int index = env.insertTypeVariable(typeName, typeGenName);
         env.setPolarity(index, parent.isPositive(typeGenName));
-        outTypeArgs.add(new IRCallProcess.TypeArgument(new IRVarT(i), index));
+        outTypeArgs.add(new IRCallProcess.TypeArgument(new IRVarT(i, Optional.empty()), index));
       }
 
       node.accept(env.new TypeAssigner());
