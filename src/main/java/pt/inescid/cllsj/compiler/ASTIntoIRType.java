@@ -16,21 +16,28 @@ public class ASTIntoIRType extends ASTTypeVisitor {
   private Env<EnvEntry> ep;
   private Map<String, Integer> typeMap = new HashMap<>();
   private IRType ir;
+  private boolean lastPolarity;
 
   public static IRType convert(
       IRGenerator gen, Env<EnvEntry> ep, ASTType type, Map<String, Integer> typeMap) {
-    ASTIntoIRType converter = new ASTIntoIRType(ep, typeMap);
+    ASTIntoIRType converter = new ASTIntoIRType(ep, typeMap, type.isPosCatch(ep));
     type.accept(converter);
     return converter.ir;
   }
 
   private IRType recurse(Env<EnvEntry> ep, ASTType type) {
-    return convert(gen, ep, type, typeMap);
+    IRType result = convert(gen, ep, type, typeMap);
+    if (type.isPosCatch(ep) != lastPolarity) {
+      return new IRFlipT(result);
+    } else {
+      return result;
+    }
   }
 
-  private ASTIntoIRType(Env<EnvEntry> ep, Map<String, Integer> typeMap) {
+  private ASTIntoIRType(Env<EnvEntry> ep, Map<String, Integer> typeMap, boolean lastPolarity) {
     this.ep = ep;
     this.typeMap = typeMap;
+    this.lastPolarity = lastPolarity;
   }
 
   private Map<String, Integer> insertType(String id) {

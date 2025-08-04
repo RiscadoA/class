@@ -2674,6 +2674,11 @@ public class CGenerator extends IRInstructionVisitor {
     public void visit(IRCellT type) {
       size += "sizeof(struct cell*)";
     }
+
+    @Override
+    public void visit(IRFlipT type) {
+      type.getCont().accept(this);
+    }
   }
 
   // ========================== Visitor used to generate expression code ==========================
@@ -3026,6 +3031,11 @@ public class CGenerator extends IRInstructionVisitor {
       name += "cell";
       type.getInner().accept(this);
     }
+
+    @Override
+    public void visit(IRFlipT type) {
+      type.getCont().accept(this);
+    }
   }
 
   // ====================== Visitors used to generate record buffer managers ======================
@@ -3310,6 +3320,11 @@ public class CGenerator extends IRInstructionVisitor {
                 cellRecord(access(newBuffer, "struct cell*")));
           });
     }
+
+    @Override
+    public void visit(IRFlipT type) {
+      type.getCont().accept(this);
+    }
   }
 
   private class RecordBufferCleaner extends IRTypeVisitor {
@@ -3458,6 +3473,11 @@ public class CGenerator extends IRInstructionVisitor {
             putCleanRecord(type.getInner(), cellRecord(access(buffer, "struct cell*")));
             putFreeCell(access(buffer, "struct cell*"));
           });
+    }
+
+    @Override
+    public void visit(IRFlipT type) {
+      type.getCont().accept(this);
     }
   }
 }
