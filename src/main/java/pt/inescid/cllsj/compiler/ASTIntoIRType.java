@@ -87,12 +87,20 @@ public class ASTIntoIRType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTSendT type) {
-    ir = new IRSessionT(recurse(ep, type.getlhs()), recurse(ep, type.getrhs()));
+    ir =
+        new IRSessionT(
+            recurse(ep, type.getlhs()),
+            recurse(ep, type.getrhs()),
+            ASTTypeIsValue.check(ep, typeMap, type.getlhs(), false));
   }
 
   @Override
   public void visit(ASTRecvT type) {
-    ir = new IRSessionT(recurse(ep, type.getlhs()), recurse(ep, type.getrhs()));
+    ir =
+        new IRSessionT(
+            recurse(ep, type.getlhs()),
+            recurse(ep, type.getrhs()),
+            ASTTypeIsValue.check(ep, typeMap, type.getlhs(), true));
   }
 
   @Override

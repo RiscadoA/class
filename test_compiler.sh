@@ -33,12 +33,10 @@ else
 fi
 
 if [ -z "$CLLS_FLAGS" ]; then
-    CLLS_FLAGS=""
+    echo "Using default flags"
 else
-    CLLS_FLAGS="$CLLS_FLAGS "
+    echo "Using flags: $CLLS_FLAGS"
 fi
-CLLS_FLAGS="$CLLS_FLAGS-P"
-echo "Using flags: $CLLS_FLAGS"
 
 success=0
 failed=0
@@ -54,7 +52,7 @@ do
     errfile=$(dirname $file)/$basename.err
 
     baseout=bin/$(dirname $file)/$basename
-    flags="$CLLS_FLAGS -o $baseout"
+    flags="-P -o $baseout"
     mkdir -p $(dirname $baseout)
 
     echo -n "($processed/$count) Compiling $file... "

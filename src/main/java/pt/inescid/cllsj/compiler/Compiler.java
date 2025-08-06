@@ -30,6 +30,7 @@ public class Compiler {
   public boolean optimizeSendForward = true;
   public boolean optimizeTailCalls = true;
   public boolean optimizeFlipForward = true;
+  public boolean optimizeSendValue = true;
 
   public int compile(String path) {
     ASTProgram ast;
@@ -75,6 +76,7 @@ public class Compiler {
       IRGenerator gen = new IRGenerator();
       gen.optimizeExponentialExpressionToForward = optimizeExponentialExpressionToForward;
       gen.optimizeSendForward = optimizeSendForward;
+      gen.optimizeSendValue = optimizeSendValue;
       ir = gen.generate(ep, ast);
     } catch (Exception e) {
       System.err.println("IR generation error: " + e.getMessage());
@@ -109,6 +111,7 @@ public class Compiler {
       gen.customAllocatorLevels = customAllocatorLevels;
       gen.optimizePrimitiveExponentials = optimizePrimitiveExponentials;
       gen.optimizeTailCalls = optimizeTailCalls;
+      gen.optimizeSendValue = optimizeSendValue;
       output = gen.generate(ir);
     } catch (Exception e) {
       System.err.println("C Generation error: " + e.getMessage());

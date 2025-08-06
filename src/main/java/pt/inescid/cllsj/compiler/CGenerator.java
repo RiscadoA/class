@@ -48,6 +48,7 @@ public class CGenerator extends IRInstructionVisitor {
   public boolean disableConcurrency = false;
   public boolean optimizePrimitiveExponentials = true;
   public boolean optimizeTailCalls = true;
+  public boolean optimizeSendValue = true;
 
   public int customAllocatorSizeDivisor = 32;
   public int customAllocatorLevels = 8;
@@ -281,6 +282,9 @@ public class CGenerator extends IRInstructionVisitor {
     incIndent();
     if (optimizePrimitiveExponentials) {
       putLine("int id;");
+    }
+    if (optimizeSendValue) {
+      putLine("int flags;");
     }
     putLine("int size;");
     putLine(
@@ -985,7 +989,10 @@ public class CGenerator extends IRInstructionVisitor {
                       process.getRecordCount(),
                       process.getExponentialCount(),
                       arg.getTargetType()),
-                  typeInitializer(arg.getSourceType()));
+                  typeInitializer(
+                      arg.getSourceType(),
+                      arg.getSourceTypeValueRequisites(),
+                      arg.getSourceTypePolarity()));
             }
 
             putIf(
@@ -1145,7 +1152,7 @@ public class CGenerator extends IRInstructionVisitor {
     // First of all, we need to check if we need to, and if so, expand the buffer of the negative
     // record.
     // This is a pessimistic check, as we don't know the actual size of the buffer at runtime.
-    String currentSize = size(recordType(i.getNegRecord()));
+    String currentSize = maxSize(recordType(i.getNegRecord()));
     String desiredSize =
         currentSize + " + " + written(i.getPosRecord()) + " - " + read(i.getPosRecord());
     putIf(
@@ -1277,6 +1284,29 @@ public class CGenerator extends IRInstructionVisitor {
   @Override
   public void visit(IRPushSession instruction) {
     putPushRecord(instruction.getRecord(), record(instruction.getArgRecord()));
+  }
+
+  @Override
+  public void visit(IRPushValue instruction) {
+    String value = buffer(instruction.getArgRecord()) + " + " + read(instruction.getArgRecord());
+    String size = written(instruction.getArgRecord()) + " - " + read(instruction.getArgRecord());
+    String dst = buffer(instruction.getRecord()) + " + " + written(instruction.getRecord());
+    putStatement("memcpy(" + dst + ", " + value + ", " + size + ")");
+    putAssign(written(instruction.getRecord()), written(instruction.getRecord()) + " + " + size);
+    putFreeRecord(record(instruction.getArgRecord()));
+    putAssign(record(instruction.getArgRecord()), "NULL");
+  }
+
+  @Override
+  public void visit(IRPopValue instruction) {
+    String value = buffer(instruction.getRecord()) + " + " + read(instruction.getRecord());
+    String size = valueSize(recordType(instruction.getArgRecord()), value);
+    putAllocRecord(record(instruction.getArgRecord()), size);
+    putAssign(recordContEnv(instruction.getArgRecord()), "NULL");
+    putAssign(read(instruction.getArgRecord()), 0);
+    putAssign(written(instruction.getArgRecord()), size);
+    putStatement("memcpy(" + buffer(instruction.getArgRecord()) + ", " + value + ", " + size + ")");
+    putAssign(read(instruction.getRecord()), read(instruction.getRecord()) + " + " + size);
   }
 
   @Override
@@ -1471,7 +1501,11 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRPushType instruction) {
-    putPushType(instruction.getRecord(), instruction.getType());
+    putPushType(
+        instruction.getRecord(),
+        instruction.getType(),
+        instruction.getValueRequisites(),
+        instruction.isPositive());
     putPushPolarity(instruction.getRecord(), instruction.isPositive());
   }
 
@@ -1789,6 +1823,18 @@ public class CGenerator extends IRInstructionVisitor {
     putStatement("exit(1);");
   }
 
+  @Override
+  public void visit(IRBranchOnValue instruction) {
+    putIfElse(
+        typeIsValue(instruction.getRequisites()),
+        () -> {
+          putConstantGoto(blockLabel(instruction.getIsValue()));
+        },
+        () -> {
+          putConstantGoto(blockLabel(instruction.getIsNotValue()));
+        });
+  }
+
   // =============================== Expression building helpers ================================
 
   private String taskNext(String task) {
@@ -1839,12 +1885,21 @@ public class CGenerator extends IRInstructionVisitor {
     }
   }
 
-  private String typeInitializer(IRType type) {
+  private String typeInitializer(IRType type, IRValueRequisites valueRequisites, boolean polarity) {
     String name = recordBufferManagerName(type);
     String managerValue = name.isEmpty() ? "NULL" : "&" + name;
+
+    String flags = "";
+    if (optimizeSendValue) {
+      flags = ", .flags = ";
+      flags += "(" + typeIsValue(valueRequisites) + ") << 1";
+      flags += " | " + (polarity ? "1" : "0");
+    }
+
     return "(struct type){.size = "
-        + size(type)
+        + maxSize(type)
         + (optimizePrimitiveExponentials ? ", .id = " + typeId(type) : "")
+        + flags
         + ", .manager = "
         + managerValue
         + "}";
@@ -1902,6 +1957,54 @@ public class CGenerator extends IRInstructionVisitor {
       putLine("}");
     } else {
       forOther.run();
+    }
+  }
+
+  private String typeFlags(String type) {
+    return type + ".flags";
+  }
+
+  private String typeIsValue(String type) {
+    return "((" + typeFlags(type) + " & 2) != 0)";
+  }
+
+  private String typePolarity(String type) {
+    return "((" + typeFlags(type) + " & 1) != 0)";
+  }
+
+  private String typeIsValue(IRValueRequisites requisites) {
+    if (!optimizeSendValue) {
+      throw new UnsupportedOperationException(
+          "Cannot check if type is value when optimizeSendValue is false");
+    }
+
+    if (!requisites.canBeValue()) {
+      return "0";
+    }
+
+    StringBuilder sb = new StringBuilder("1");
+    for (int i : requisites.getTypesWhichMustBeValues()) {
+      sb.append(" && ");
+      sb.append(typeIsValue(type(i)));
+    }
+    for (Map.Entry<Integer, Boolean> e : requisites.getRequiredTypePolarities().entrySet()) {
+      sb.append(" && ");
+      if (!e.getValue()) {
+        sb.append("!");
+      }
+      sb.append(typePolarity(type(e.getKey())));
+    }
+    return sb.toString();
+  }
+
+  private void switchTypeIsValue(
+      IRValueRequisites requisites, Runnable ifValue, Runnable ifNotValue) {
+    if (requisites.mustBeValue()) {
+      ifValue.run();
+    } else if (requisites.canBeValue()) {
+      putIfElse(typeIsValue(requisites), ifValue, ifNotValue);
+    } else {
+      ifNotValue.run();
     }
   }
 
@@ -2175,7 +2278,7 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   private void putAllocRecord(String var, IRType type) {
-    putAllocRecord(var, size(type));
+    putAllocRecord(var, maxSize(type));
   }
 
   private void putReallocRecord(String var, String bufferSize) {
@@ -2397,8 +2500,9 @@ public class CGenerator extends IRInstructionVisitor {
     putPush(record, "unsigned char", isPositive ? "1" : "0");
   }
 
-  private void putPushType(int record, IRType type) {
-    putPush(record, "struct type", typeInitializer(type));
+  private void putPushType(
+      int record, IRType type, IRValueRequisites valueRequisites, boolean polarity) {
+    putPush(record, "struct type", typeInitializer(type, valueRequisites, polarity));
   }
 
   private void putPushCell(int record, String cell) {
@@ -2583,15 +2687,34 @@ public class CGenerator extends IRInstructionVisitor {
 
   // ========================== Type visitor used to determine type size ==========================
 
-  private String size(IRType type) {
-    SizeCalculator calc = new SizeCalculator();
+  private String maxSize(IRType type) {
+    SizeCalculator calc = new SizeCalculator(Optional.empty());
+    type.accept(calc);
+    return calc.size;
+  }
+
+  private String valueSize(IRType type, String buffer) {
+    SizeCalculator calc = new SizeCalculator(Optional.of(buffer));
     type.accept(calc);
     return calc.size;
   }
 
   private class SizeCalculator extends IRTypeVisitor {
     private String size = "";
+    private String currentOffset = "";
     private int definedTypes = 0;
+    private Optional<String> buffer;
+
+    public SizeCalculator(Optional<String> buffer) {
+      this.buffer = buffer;
+    }
+
+    private String recurse(IRType type) {
+      SizeCalculator calc = new SizeCalculator(buffer.map(b -> b + currentOffset));
+      calc.definedTypes = definedTypes;
+      type.accept(calc);
+      return "(" + calc.size + ")";
+    }
 
     @Override
     public void visit(IRType type) {
@@ -2605,17 +2728,50 @@ public class CGenerator extends IRInstructionVisitor {
 
     @Override
     public void visit(IRSessionT type) {
-      size += "sizeof(struct record*) + ";
+      String argSize;
+
+      if (optimizeSendValue && type.getValueRequisites().mustBeValue()) {
+        argSize = recurse(type.getArg());
+      } else if (optimizeSendValue && type.getValueRequisites().canBeValue()) {
+        argSize =
+            "("
+                + typeIsValue(type.getValueRequisites())
+                + " ? "
+                + recurse(type.getArg())
+                + " : sizeof(struct record*))";
+      } else {
+        argSize = "sizeof(struct record*)";
+        size += "sizeof(struct record*) + ";
+        currentOffset += " + sizeof(struct record*)";
+      }
+
+      size += argSize + " + ";
+      String oldOffset = currentOffset;
+      currentOffset += " + " + argSize;
       type.getCont().accept(this);
+      currentOffset = oldOffset;
     }
 
     @Override
     public void visit(IRTagT type) {
       size += "sizeof(unsigned char)";
-      for (IRType choice : type.getChoices()) {
-        size += " + (";
-        choice.accept(this);
+      String oldOffset = currentOffset;
+      for (int i = 0; i < type.getChoices().size(); ++i) {
+        if (buffer.isEmpty()) {
+          size += " + (";
+        } else {
+          // Read the chosen tag from the buffer
+          // We do this in order to determine the actual size of the value
+          String tag = "*(unsigned char*)(" + buffer.get() + currentOffset + ")";
+          size += " + (" + tag + " != " + i + " ? 0 : (";
+        }
+        currentOffset += " + sizeof(unsigned char)";
+        type.getChoices().get(i).accept(this);
+        currentOffset = oldOffset;
         size += ")";
+        if (buffer.isPresent()) {
+          size += ")";
+        }
       }
     }
 
@@ -2873,7 +3029,8 @@ public class CGenerator extends IRInstructionVisitor {
 
     @Override
     public void visit(IRSessionT type) {
-      code = "struct record*";
+      throw new UnsupportedOperationException(
+          "Session types should not be used as C types directly, as their type depends on they being a value or not");
     }
 
     @Override
@@ -2971,7 +3128,23 @@ public class CGenerator extends IRInstructionVisitor {
     @Override
     public void visit(IRSessionT type) {
       separate();
-      name += "session_arg";
+      name += "session";
+      if (optimizeSendValue) {
+        if (type.getValueRequisites().mustBeValue()) {
+          name += "value";
+        } else if (type.getValueRequisites().canBeValue()) {
+          name += "valueif";
+          for (int t : type.getValueRequisites().getTypesWhichMustBeValues()) {
+            if (type.getValueRequisites().getRequiredTypePolarities().containsKey(t)) {
+              boolean p = type.getValueRequisites().getRequiredTypePolarities().get(t);
+              name += "_" + (p ? "p" : "n") + t;
+            } else {
+              name += "_" + t;
+            }
+          }
+        }
+      }
+      name += "_arg";
       type.getArg().accept(this);
       name += "_cont";
       type.getCont().accept(this);
@@ -3220,14 +3393,22 @@ public class CGenerator extends IRInstructionVisitor {
     public void visit(IRSessionT type) {
       putIfWritten(
           () -> {
-            putIfUnread(
+            switchTypeIsValue(
+                type.getValueRequisites(),
                 () -> {
-                  putCloneRecord(
-                      type.getArg(),
-                      access(oldBuffer, "struct record*"),
-                      access(newBuffer, "struct record*"));
+                  recurse(type.getArg(), "0");
+                  recurse(type.getCont(), valueSize(type.getArg(), oldBuffer));
+                },
+                () -> {
+                  putIfUnread(
+                      () -> {
+                        putCloneRecord(
+                            type.getArg(),
+                            access(oldBuffer, "struct record*"),
+                            access(newBuffer, "struct record*"));
+                      });
+                  recurse(type.getCont(), "sizeof(struct record*)");
                 });
-            recurse(type.getCont(), "sizeof(struct record*)");
           });
     }
 
@@ -3286,7 +3467,8 @@ public class CGenerator extends IRInstructionVisitor {
     public void visit(IRRecT type) {
       putIfWritten(
           () -> {
-            putManagerPushType(typeInitializer(type.getInner()));
+            putManagerPushType(
+                typeInitializer(type.getInner(), IRValueRequisites.notValue(), false));
             type.getInner().accept(this);
             putManagerPopType();
           });
@@ -3384,11 +3566,19 @@ public class CGenerator extends IRInstructionVisitor {
     public void visit(IRSessionT type) {
       putIfWritten(
           () -> {
-            putIfUnread(
+            switchTypeIsValue(
+                type.getValueRequisites(),
                 () -> {
-                  putCleanRecord(type.getArg(), access(buffer, "struct record*"));
+                  recurse(type.getArg(), "0");
+                  recurse(type.getCont(), valueSize(type.getArg(), buffer));
+                },
+                () -> {
+                  putIfUnread(
+                      () -> {
+                        putCleanRecord(type.getArg(), access(buffer, "struct record*"));
+                      });
+                  recurse(type.getCont(), "sizeof(struct record*)");
                 });
-            recurse(type.getCont(), "sizeof(struct record*)");
           });
     }
 
@@ -3442,7 +3632,8 @@ public class CGenerator extends IRInstructionVisitor {
     public void visit(IRRecT type) {
       putIfWritten(
           () -> {
-            putManagerPushType(typeInitializer(type.getInner()));
+            putManagerPushType(
+                typeInitializer(type.getInner(), IRValueRequisites.notValue(), false));
             type.getInner().accept(this);
             putManagerPopType();
           });
