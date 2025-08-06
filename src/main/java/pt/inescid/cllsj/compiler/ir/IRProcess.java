@@ -70,6 +70,15 @@ public class IRProcess {
     return blocks;
   }
 
+  public IRBlock getBlock(String label) {
+    for (IRBlock block : blocks) {
+      if (block.getLabel().equals(label)) {
+        return block;
+      }
+    }
+    throw new IllegalArgumentException("Block with label " + label + " does not exist");
+  }
+
   @Override
   public String toString() {
     String result = entry.toString();

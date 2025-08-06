@@ -1,14 +1,25 @@
 package pt.inescid.cllsj.compiler;
 
+import java.util.HashMap;
+import java.util.Map;
 import pt.inescid.cllsj.compiler.ir.IRBlock;
 import pt.inescid.cllsj.compiler.ir.IRProcess;
 import pt.inescid.cllsj.compiler.ir.IRProgram;
+import pt.inescid.cllsj.compiler.ir.flow.IRFlow;
 import pt.inescid.cllsj.compiler.ir.instructions.IRFlip;
 import pt.inescid.cllsj.compiler.ir.instructions.IRFlipForward;
 import pt.inescid.cllsj.compiler.ir.instructions.IRForward;
 import pt.inescid.cllsj.compiler.ir.instructions.IRInstruction;
 
 public class IROptimizer {
+  private Map<String, IRFlow> processFlows = new HashMap<>();
+
+  public void analyze(IRProgram program) {
+    for (Map.Entry<String, IRProcess> e : program.getProcesses().entrySet()) {
+      processFlows.put(e.getKey(), IRAnalyzer.analyze(e.getValue()));
+    }
+  }
+
   public void optimizeFlipForward(IRProgram ir) {
     for (IRProcess process : ir.getProcesses().values()) {
       optimizeFlipForward(process.getEntry());

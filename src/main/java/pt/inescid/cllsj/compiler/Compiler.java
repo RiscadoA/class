@@ -86,6 +86,7 @@ public class Compiler {
 
     try {
       IROptimizer optimizer = new IROptimizer();
+      optimizer.analyze(ir);
       if (optimizeFlipForward) {
         optimizer.optimizeFlipForward(ir);
       }

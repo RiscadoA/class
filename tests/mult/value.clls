@@ -1,0 +1,14 @@
+proc main() {
+    cut {
+        send z(y.
+            send y(1);
+            let y 2
+        );
+        let z 3
+        |z: recv recv ~lint; ~lint; ~lint|
+        recv z(y);
+        recv y(x);
+        println(x + y + z);
+        ()
+    }
+};;

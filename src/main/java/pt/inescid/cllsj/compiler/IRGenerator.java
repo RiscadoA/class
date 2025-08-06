@@ -75,10 +75,12 @@ public class IRGenerator extends ASTNodeVisitor {
             countEndPoints(node));
     program.addProcess(env.getName(), process);
     environments.push(env);
-    visitBlock(process.getEntry(), () -> {
-      entryConsumer.accept(block);
-      node.accept(this);
-    });
+    visitBlock(
+        process.getEntry(),
+        () -> {
+          entryConsumer.accept(block);
+          node.accept(this);
+        });
     environments.pop();
     process = oldProcess;
   }
@@ -513,8 +515,7 @@ public class IRGenerator extends ASTNodeVisitor {
           // If the session type is negative, we can't immediately run the closure.
           // Thus, after we enter into the process, we just flip back.
           flipIfNegative(env.record(node.getChi()), node.getType());
-        }
-  );
+        });
 
     // Call the process we generated above.
     // The reason we use a separate process here at all is to decouple the right
@@ -594,8 +595,7 @@ public class IRGenerator extends ASTNodeVisitor {
           // If the session type is negative, we should not immediately run the code.
           // Thus, after we enter into the process, we just flip back.
           flipIfNegative(env.record(node.getCh()), node.getContType());
-        }
-    );
+        });
 
     // Call the process we generated above.
     // The reason we use a separate process here at all is to decouple the right
