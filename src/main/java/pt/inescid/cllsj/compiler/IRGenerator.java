@@ -66,7 +66,6 @@ public class IRGenerator extends ASTNodeVisitor {
   private void addProcess(
       boolean hasArguments, Environment env, ASTNode node, Consumer<IRBlock> entryConsumer) {
     IRProcess oldProcess = process;
-    IRBlock oldBlock = block;
     process =
         new IRProcess(
             hasArguments,
@@ -76,11 +75,12 @@ public class IRGenerator extends ASTNodeVisitor {
             countEndPoints(node));
     program.addProcess(env.getName(), process);
     environments.push(env);
-    entryConsumer.accept(process.getEntry());
-    visitBlock(process.getEntry(), node);
+    visitBlock(process.getEntry(), () -> {
+      entryConsumer.accept(block);
+      node.accept(this);
+    });
     environments.pop();
     process = oldProcess;
-    block = oldBlock;
   }
 
   private void addProcess(boolean hasArguments, Environment env, ASTNode node) {
@@ -88,8 +88,14 @@ public class IRGenerator extends ASTNodeVisitor {
   }
 
   private void visitBlock(IRBlock block, ASTNode node) {
+    visitBlock(block, () -> node.accept(this));
+  }
+
+  private void visitBlock(IRBlock block, Runnable runnable) {
+    IRBlock oldBlock = this.block;
     this.block = block;
-    node.accept(this);
+    runnable.run();
+    this.block = oldBlock;
   }
 
   @Override
@@ -178,8 +184,6 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTSend node) {
-    IRBlock contBlock = block;
-
     // If an exponential occurs in both sides, we need to increment its reference count.
     Set<String> exponentials = exponentialNamesFreeIn(node);
     for (String name : exponentials) {
@@ -203,51 +207,50 @@ public class IRGenerator extends ASTNodeVisitor {
       // This execution order is different from the one in the SAM specification, but by computing
       // the values earlier, we benefit more from the exponential pre-computation.
       if (isPositive(node.getLhsType())) {
-        block.add(new IRFlip(record(node.getCho())));
+        flip(record(node.getCho()));
       }
 
       visitBlock(closure, node.getLhs());
     }
 
-    Consumer<IRBlock> ifValue =
-        block -> {
+    Runnable ifValue =
+        () -> {
           block.add(new IRPushValue(record(node.getChs()), pushedRecord));
         };
 
-    Consumer<IRBlock> ifNotValue =
-        block -> {
+    Runnable ifNotValue =
+        () -> {
           block.add(new IRPushSession(record(node.getChs()), pushedRecord));
         };
 
     if (optimizeSendValue) {
       IRValueRequisites valueRequisites = valueRequisites(node.getLhsType(), false);
       if (valueRequisites.mustBeValue()) {
-        ifValue.accept(contBlock);
+        ifValue.run();
       } else if (valueRequisites.canBeValue()) {
         IRBlock valueBlock = process.addBlock("send_value");
         IRBlock nonValueBlock = process.addBlock("send_non_value");
 
-        contBlock.add(
+        block.add(
             new IRBranchOnValue(valueRequisites, valueBlock.getLabel(), nonValueBlock.getLabel()));
+        block = process.addBlock("send_cont");
 
-        contBlock = process.addBlock("send_cont");
-
-        ifValue.accept(valueBlock);
-        valueBlock.add(new IRJump(contBlock.getLabel()));
-        ifNotValue.accept(nonValueBlock);
-        nonValueBlock.add(new IRJump(contBlock.getLabel()));
+        visitBlock(valueBlock, ifValue);
+        valueBlock.add(new IRJump(block.getLabel()));
+        visitBlock(nonValueBlock, ifNotValue);
+        nonValueBlock.add(new IRJump(block.getLabel()));
       } else {
-        ifNotValue.accept(contBlock);
+        ifNotValue.run();
       }
     } else {
-      ifNotValue.accept(contBlock);
+      ifNotValue.run();
     }
 
     // Flip if the remainder of the session type is negative.
-    if (!isPositive(node.getRhsType())) {
-      contBlock.add(new IRFlip(record(node.getChs())));
-    }
-    visitBlock(contBlock, node.getRhs());
+    flipIfNegative(record(node.getChs()), node.getRhsType());
+
+    node.getRhs().accept(this);
+    ;
   }
 
   @Override
@@ -303,9 +306,7 @@ public class IRGenerator extends ASTNodeVisitor {
 
     // Initialize the continuation record, and flip to it if its session type is positive.
     block.add(new IRNewSession(nextRecord, closure.getLabel()));
-    if (isPositive(node.getTypeRhs())) {
-      block.add(new IRFlip(nextRecord));
-    }
+    flipIfPositive(nextRecord, node.getTypeRhs());
     block.add(new IRPushSession(previousRecord, nextRecord));
     block.add(
         new IRPushType(
@@ -359,9 +360,8 @@ public class IRGenerator extends ASTNodeVisitor {
     block.add(new IRPushTag(record(node.getCh()), node.getLabelIndex()));
 
     // Flip if the remainder of the session type is negative.
-    if (!isPositive(node.getRhsType())) {
-      block.add(new IRFlip(record(node.getCh())));
-    }
+    flipIfNegative(record(node.getCh()), node.getRhsType());
+
     node.getRhs().accept(this);
   }
 
@@ -512,10 +512,9 @@ public class IRGenerator extends ASTNodeVisitor {
         entry -> {
           // If the session type is negative, we can't immediately run the closure.
           // Thus, after we enter into the process, we just flip back.
-          if (!isPositive(node.getType())) {
-            process.getEntry().add(new IRFlip(env.record(node.getChi())));
-          }
-        });
+          flipIfNegative(env.record(node.getChi()), node.getType());
+        }
+  );
 
     // Call the process we generated above.
     // The reason we use a separate process here at all is to decouple the right
@@ -564,12 +563,11 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTUnfold node) {
+    flip(record(node.getCh()));
+
     if (node.rec) {
       block.add(new IRPushUnfold(record(node.getCh())));
-
-      if (!isPositive(node.getRhsType())) {
-        block.add(new IRFlip(record(node.getCh())));
-      }
+      flipIfNegative(record(node.getCh()), node.getRhsType());
     } else {
       block.add(new IRPopUnfold(record(node.getCh())));
     }
@@ -595,10 +593,9 @@ public class IRGenerator extends ASTNodeVisitor {
         entry -> {
           // If the session type is negative, we should not immediately run the code.
           // Thus, after we enter into the process, we just flip back.
-          if (!isPositive(node.getContType())) {
-            process.getEntry().add(new IRFlip(env.record(node.getCh())));
-          }
-        });
+          flipIfNegative(env.record(node.getCh()), node.getContType());
+        }
+    );
 
     // Call the process we generated above.
     // The reason we use a separate process here at all is to decouple the right
@@ -651,9 +648,7 @@ public class IRGenerator extends ASTNodeVisitor {
     }
 
     // Flip to the argument if its session type is positive.
-    if (isPositive(node.getTypeRhs())) {
-      block.add(new IRFlip(record(node.getChc())));
-    }
+    flipIfPositive(record(node.getChc()), node.getTypeRhs());
 
     block.add(new IRPushCell(record(node.getCh()), record(node.getChc())));
     block.add(new IRReturn(record(node.getCh())));
@@ -683,7 +678,7 @@ public class IRGenerator extends ASTNodeVisitor {
 
       // The argument always is affine, and thus, always has a positive type.
       // Thus, we flip to it.
-      block.add(new IRFlip(record(node.getCho())));
+      flip(record(node.getCho()));
       block.add(new IRPutCell(record(node.getChs()), record(node.getCho())));
 
       // Continue with the right hand side of the put.
@@ -755,6 +750,24 @@ public class IRGenerator extends ASTNodeVisitor {
   }
 
   // ======================================== Utilities =========================================
+
+  private void flip(int record) {
+    IRBlock contBlock = process.addBlock("flip");
+    block.add(new IRFlip(record, contBlock.getLabel()));
+    block = contBlock;
+  }
+
+  private void flipIfNegative(int record, ASTType type) {
+    if (!isPositive(type)) {
+      flip(record);
+    }
+  }
+
+  private void flipIfPositive(int record, ASTType type) {
+    if (isPositive(type)) {
+      flip(record);
+    }
+  }
 
   private void decExponentialRefIfUnused(IRBlock block, ASTNode node, String name) {
     if (!nameFreeIn(node, name)) {

@@ -1236,18 +1236,15 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRFlip i) {
-    String label = makeLabel("flip");
-
     putAssign(TMP_CONT, recordCont(i.getRecord()));
     putAssign(TMP_ENV, recordContEnv(i.getRecord()));
 
-    putAssign(recordCont(i.getRecord()), labelAddress(label));
+    putAssign(recordCont(i.getRecord()), labelAddress(blockLabel(i.getContLabel())));
     putAssign(recordContEnv(i.getRecord()), ENV);
     putAssign(recordContRecord(i.getRecord()), i.getRecord());
 
     putAssign(ENV, TMP_ENV);
     putComputedGoto(TMP_CONT);
-    putLabel(label);
   }
 
   @Override
@@ -1763,13 +1760,11 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRPushUnfold instruction) {
-    new IRFlip(instruction.getRecord()).accept(this);
     putAssign(written(instruction.getRecord()), 0);
   }
 
   @Override
   public void visit(IRPopUnfold instruction) {
-    new IRFlip(instruction.getRecord()).accept(this);
     putAssign(read(instruction.getRecord()), 0);
   }
 

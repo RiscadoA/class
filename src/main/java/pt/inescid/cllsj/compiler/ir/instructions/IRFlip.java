@@ -4,13 +4,19 @@ import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 
 public class IRFlip extends IRInstruction {
   private int record;
+  private String contLabel;
 
-  public IRFlip(int record) {
+  public IRFlip(int record, String contLabel) {
     this.record = record;
+    this.contLabel = contLabel;
   }
 
   public int getRecord() {
     return record;
+  }
+
+  public String getContLabel() {
+    return contLabel;
   }
 
   @Override
@@ -20,6 +26,6 @@ public class IRFlip extends IRInstruction {
 
   @Override
   public String toString() {
-    return "flip(" + record + ")";
+    return "flip(" + record + ", " + contLabel + ")";
   }
 }
