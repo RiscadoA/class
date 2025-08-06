@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.TypeEntry;
@@ -12,23 +13,52 @@ import pt.inescid.cllsj.ast.types.*;
 import pt.inescid.cllsj.compiler.ir.type.*;
 
 public class ASTIntoIRType extends ASTTypeVisitor {
+  private IRGenerator gen;
   private Env<EnvEntry> ep;
   private Map<String, Integer> typeMap = new HashMap<>();
   private IRType ir;
+  private Optional<Boolean> currentPolarity;
+  private Optional<Boolean> lastPolarity;
 
-  public static IRType convert(Env<EnvEntry> ep, ASTType type, Map<String, Integer> typeMap) {
-    ASTIntoIRType converter = new ASTIntoIRType(ep, typeMap);
+  public static IRType convert(
+      IRGenerator gen, Env<EnvEntry> ep, ASTType type, Map<String, Integer> typeMap) {
+    return convert(gen, ep, type, typeMap, Optional.empty());
+  }
+
+  public static IRType convert(
+      IRGenerator gen,
+      Env<EnvEntry> ep,
+      ASTType type,
+      Map<String, Integer> typeMap,
+      Optional<Boolean> lastPolarity) {
+    ASTIntoIRType converter =
+        new ASTIntoIRType(ep, typeMap, type.getPolarityCatch(ep), lastPolarity);
     type.accept(converter);
     return converter.ir;
   }
 
   private IRType recurse(Env<EnvEntry> ep, ASTType type) {
-    return convert(ep, type, typeMap);
+    IRType result = convert(gen, ep, type, typeMap, currentPolarity);
+    Optional<Boolean> resultPolarity = type.getPolarityCatch(ep);
+
+    if (resultPolarity.isPresent()
+        && lastPolarity.isPresent()
+        && resultPolarity.get() != lastPolarity.get()) {
+      return new IRFlipT(result);
+    } else {
+      return result;
+    }
   }
 
-  private ASTIntoIRType(Env<EnvEntry> ep, Map<String, Integer> typeMap) {
+  private ASTIntoIRType(
+      Env<EnvEntry> ep,
+      Map<String, Integer> typeMap,
+      Optional<Boolean> currentPolarity,
+      Optional<Boolean> lastPolarity) {
     this.ep = ep;
     this.typeMap = typeMap;
+    this.currentPolarity = currentPolarity;
+    this.lastPolarity = lastPolarity;
   }
 
   private Map<String, Integer> insertType(String id) {
@@ -57,12 +87,20 @@ public class ASTIntoIRType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTSendT type) {
-    ir = new IRSessionT(recurse(ep, type.getlhs()), recurse(ep, type.getrhs()));
+    ir =
+        new IRSessionT(
+            recurse(ep, type.getlhs()),
+            recurse(ep, type.getrhs()),
+            ASTTypeIsValue.check(ep, typeMap, type.getlhs(), false));
   }
 
   @Override
   public void visit(ASTRecvT type) {
-    ir = new IRSessionT(recurse(ep, type.getlhs()), recurse(ep, type.getrhs()));
+    ir =
+        new IRSessionT(
+            recurse(ep, type.getlhs()),
+            recurse(ep, type.getrhs()),
+            ASTTypeIsValue.check(ep, typeMap, type.getlhs(), true));
   }
 
   @Override
@@ -125,7 +163,7 @@ public class ASTIntoIRType extends ASTTypeVisitor {
         throw new IllegalArgumentException(
             "Type not found in environment: " + type.getid() + " (contains {" + knownTypes + "})");
       }
-      ir = new IRVarT(typeMap.get(type.getid()));
+      ir = new IRVarT(typeMap.get(type.getid()), lastPolarity.map(p -> !p));
     } else {
       unfolded.accept(this);
     }
@@ -183,7 +221,7 @@ public class ASTIntoIRType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTNotT type) {
-    type.getin().accept(this);
+    ir = convert(gen, ep, type.getin(), typeMap, lastPolarity.map(p -> !p));
   }
 
   @Override
@@ -210,12 +248,12 @@ public class ASTIntoIRType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTAffineT type) {
-    ir = new IRAffineT(recurse(ep, type.getin()));
+    type.getin().accept(this);
   }
 
   @Override
   public void visit(ASTCoAffineT type) {
-    ir = new IRAffineT(recurse(ep, type.getin()));
+    type.getin().accept(this);
   }
 
   @Override

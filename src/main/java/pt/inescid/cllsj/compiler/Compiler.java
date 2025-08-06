@@ -17,13 +17,22 @@ import pt.inescid.cllsj.ast.nodes.ASTProgramWithIncludes;
 import pt.inescid.cllsj.compiler.ir.IRProgram;
 
 public class Compiler {
-  public static int compile(
-      String path,
-      String entryProcess,
-      boolean trace,
-      boolean profile,
-      boolean onlyIR,
-      boolean onlyAST) {
+  public String entryProcess = "main";
+  public boolean trace = false;
+  public boolean profile = false;
+  public boolean onlyIR = false;
+  public boolean onlyAST = false;
+  public boolean disableConcurrency = false;
+  public int customAllocatorSizeDivisor = 32;
+  public int customAllocatorLevels = 8;
+  public boolean optimizePrimitiveExponentials = true;
+  public boolean optimizeExponentialExpressionToForward = true;
+  public boolean optimizeSendForward = true;
+  public boolean optimizeTailCalls = true;
+  public boolean optimizeFlipForward = true;
+  public boolean optimizeSendValue = true;
+
+  public int compile(String path) {
     ASTProgram ast;
     try {
       ast = Compiler.parse(Path.of(path));
@@ -64,9 +73,24 @@ public class Compiler {
 
     IRProgram ir;
     try {
-      ir = IRGenerator.generate(ep, ast);
+      IRGenerator gen = new IRGenerator();
+      gen.optimizeExponentialExpressionToForward = optimizeExponentialExpressionToForward;
+      gen.optimizeSendForward = optimizeSendForward;
+      gen.optimizeSendValue = optimizeSendValue;
+      ir = gen.generate(ep, ast);
     } catch (Exception e) {
       System.err.println("IR generation error: " + e.getMessage());
+      e.printStackTrace();
+      return 1;
+    }
+
+    try {
+      IROptimizer optimizer = new IROptimizer();
+      if (optimizeFlipForward) {
+        optimizer.optimizeFlipForward(ir);
+      }
+    } catch (Exception e) {
+      System.err.println("IR optimization error: " + e.getMessage());
       e.printStackTrace();
       return 1;
     }
@@ -78,7 +102,17 @@ public class Compiler {
 
     String output;
     try {
-      output = CGenerator.generate(ir, entryProcess, trace, profile);
+      CGenerator gen = new CGenerator();
+      gen.entryProcess = entryProcess;
+      gen.trace = trace;
+      gen.profile = profile;
+      gen.disableConcurrency = disableConcurrency;
+      gen.customAllocatorSizeDivisor = customAllocatorSizeDivisor;
+      gen.customAllocatorLevels = customAllocatorLevels;
+      gen.optimizePrimitiveExponentials = optimizePrimitiveExponentials;
+      gen.optimizeTailCalls = optimizeTailCalls;
+      gen.optimizeSendValue = optimizeSendValue;
+      output = gen.generate(ir);
     } catch (Exception e) {
       System.err.println("C Generation error: " + e.getMessage());
       e.printStackTrace();

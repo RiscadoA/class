@@ -20,6 +20,6 @@ public class IRExponentialT extends IRType {
 
   @Override
   public String toString() {
-    return "exponential " + inner.toString();
+    return "exponential(" + inner.toString() + ")";
   }
 }

@@ -2,6 +2,7 @@ package pt.inescid.cllsj.compiler.ir.instructions;
 
 import java.util.List;
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
+import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
 import pt.inescid.cllsj.compiler.ir.type.IRType;
 
 public class IRCallProcess extends IRInstruction {
@@ -43,15 +44,31 @@ public class IRCallProcess extends IRInstruction {
 
   public static class TypeArgument {
     private IRType sourceType;
+    private IRValueRequisites sourceTypeValueRequisites;
+    private boolean sourceTypePolarity;
     private int targetType;
 
-    public TypeArgument(IRType sourceType, int targetType) {
+    public TypeArgument(
+        IRType sourceType,
+        IRValueRequisites sourceTypeValueRequisites,
+        boolean sourceTypePolarity,
+        int targetType) {
       this.sourceType = sourceType;
+      this.sourceTypeValueRequisites = sourceTypeValueRequisites;
+      this.sourceTypePolarity = sourceTypePolarity;
       this.targetType = targetType;
     }
 
     public IRType getSourceType() {
       return sourceType;
+    }
+
+    public IRValueRequisites getSourceTypeValueRequisites() {
+      return sourceTypeValueRequisites;
+    }
+
+    public boolean getSourceTypePolarity() {
+      return sourceTypePolarity;
     }
 
     public int getTargetType() {
@@ -100,7 +117,13 @@ public class IRCallProcess extends IRInstruction {
   public String toString() {
     String str = "callProcess(" + processName;
     for (TypeArgument arg : this.typeArguments) {
-      str += ", T" + arg.getTargetType() + " <- " + arg.getTargetType();
+      str +=
+          ", T"
+              + arg.getTargetType()
+              + " <- "
+              + arg.getSourceType()
+              + " "
+              + arg.getSourceTypeValueRequisites();
     }
     for (LinearArgument arg : this.linearArguments) {
       str += ", L" + arg.getTargetRecord() + " <- " + arg.getSourceRecord();

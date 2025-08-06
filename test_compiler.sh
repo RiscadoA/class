@@ -32,6 +32,12 @@ else
     echo "Found $count test files"
 fi
 
+if [ -z "$CLLS_FLAGS" ]; then
+    echo "Using default flags"
+else
+    echo "Using flags: $CLLS_FLAGS"
+fi
+
 success=0
 failed=0
 processed=0
