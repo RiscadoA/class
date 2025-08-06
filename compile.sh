@@ -11,7 +11,7 @@ ofile=""
 while getopts ":dOtPirap:o:" opt; do
     case $opt in
         d)
-            Cflags="$Cflags -g -O0"
+            Cflags="$Cflags -g -O2"
             debug=true
             ;;
         O)

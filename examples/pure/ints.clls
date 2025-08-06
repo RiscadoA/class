@@ -1,0 +1,18 @@
+proc g(n:~!lint, r:lint) {
+let r 3*n
+};;
+
+proc unsafe_rec f(n:~!lint,t:lint)
+{
+  if (n==0) {
+	let t 1 
+  } else { 
+	letc r0:lint { f(n-1,r0) };
+        let t n*r0
+  }
+};;
+
+proc main() {
+ letc r:lint { f(7,r) };
+ println (r); ()
+};;
