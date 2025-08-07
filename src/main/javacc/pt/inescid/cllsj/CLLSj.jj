@@ -112,6 +112,8 @@ public static void main(String args[]) {
           compiler.onlyIR = true;
         } else if (args[i].equals("-a")) {
           compiler.onlyAST = true;
+        } else if (args[i].equals("-A")) {
+          compiler.onlyAnalyze = true;
         } else if (args[i].equals("--no-concurrency")) {
           compiler.disableConcurrency = true;
         } else if (args[i].equals("--no-custom-allocator")) {
@@ -159,13 +161,14 @@ public static void main(String args[]) {
       }
 
       if (failed || input == null) {
-        System.err.println("Usage: CLLSj [OPTS...] [-t] [-P] [-i] [-a]");
+        System.err.println("Usage: CLLSj [OPTS...]");
         System.err.println("    -c <input-file>: Uses the given file as input, instead of STDIN");
         System.err.println("    -p <entry-process>: Specify the name of the entry process (default: main)");
         System.err.println("    -t: Enable trace logs on generated programs");
         System.err.println("    -P: Enable memory profiling on generated programs");
         System.err.println("    -i: Generate only IR code instead of C code");
         System.err.println("    -a: Generate only an AST instead of C code");
+        System.err.println("    -A: Generate only an IR analysis instead of C code");
         System.err.println("    --custom-allocator-levels <levels>: Sets the number of levels in the custom allocator");
         System.err.println("    --custom-allocator-size-divisor <divisor>: Sets the divisor in the custom allocator");
         System.err.println("    --no-concurrency: Prevents generation of thread-aware code");

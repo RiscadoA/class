@@ -12,9 +12,11 @@ import pt.inescid.cllsj.compiler.ir.instructions.IRFreeSession;
 import pt.inescid.cllsj.compiler.ir.instructions.IRInstruction;
 import pt.inescid.cllsj.compiler.ir.instructions.IRNewSession;
 import pt.inescid.cllsj.compiler.ir.instructions.IRNextTask;
+import pt.inescid.cllsj.compiler.ir.instructions.IRPopClose;
 import pt.inescid.cllsj.compiler.ir.instructions.IRPopSession;
 import pt.inescid.cllsj.compiler.ir.instructions.IRPopValue;
 import pt.inescid.cllsj.compiler.ir.instructions.IRPrint;
+import pt.inescid.cllsj.compiler.ir.instructions.IRPushClose;
 import pt.inescid.cllsj.compiler.ir.instructions.IRPushExpression;
 import pt.inescid.cllsj.compiler.ir.instructions.IRPushSession;
 import pt.inescid.cllsj.compiler.ir.instructions.IRPushValue;
@@ -83,12 +85,15 @@ public class IRAnalyzer extends IRInstructionVisitor {
     Optional<IRFlow> previousFlow = this.flow;
     IRFlowState previousState = this.state;
     IRFlow currentFlow = new IRFlow(block);
+    this.flow = Optional.of(currentFlow);
     flows.put(block, currentFlow);
     if (previousFlow.isPresent()) {
+      previousFlow.get().addBranch(currentFlow);
       currentFlow.addSource(previousFlow.get());
     }
 
     // Visit each instruction in the block, one by one.
+    currentFlow.addState(state);
     for (IRInstruction instruction : block.getInstructions()) {
       state = state.clone();
       instruction.accept(this);
@@ -179,12 +184,12 @@ public class IRAnalyzer extends IRInstructionVisitor {
     IRFlowRecord argRecord = state.record(instruction.getArgRecord());
     Optional<Integer> slotCount = slotCount(instruction.getArgRecord());
 
+    argRecord.doNewSession(Optional.empty());
     if (record.slotsAreKnown() && slotCount.isPresent()) {
       for (int i = 0; i < slotCount.get(); ++i) {
         argRecord.doPush(record.doPop().orElseThrow());
       }
     }
-    argRecord.doNewSession(Optional.empty());
   }
 
   @Override
@@ -194,4 +199,10 @@ public class IRAnalyzer extends IRInstructionVisitor {
 
   @Override
   public void visit(IRPrint instruction) {}
+
+  @Override
+  public void visit(IRPushClose instruction) {}
+
+  @Override
+  public void visit(IRPopClose instruction) {}
 }

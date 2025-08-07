@@ -4,11 +4,12 @@ CLLSflags=$CLLS_FLAGS
 Cflags="$C_FLAGS -std=c11"
 onlyir=false
 onlyast=false
+onlyanalyze=false
 debug=false
 run=false
 ofile=""
 
-while getopts ":dOtPirasep:o:" opt; do
+while getopts ":dOtPiraAsep:o:" opt; do
     case $opt in
         d)
             Cflags="$Cflags -g -O2"
@@ -30,6 +31,10 @@ while getopts ":dOtPirasep:o:" opt; do
         a)
             onlyast=true
             CLLSflags="$CLLSflags -a"
+            ;;
+        A)
+            onlyanalyze=true
+            CLLSflags="$CLLSflags -A"
             ;;
         r)
             run=true
@@ -73,16 +78,21 @@ if [ -z $ofile ]; then
     cfile=bin/${basename%.*}.c
     irfile=bin/${basename%.*}.ir
     astfile=bin/${basename%.*}.ast
+    analysisfile=bin/${basename%.*}.flow
     pfile=bin/${basename%.*}
     mkdir -p bin
 else
     cfile=$ofile.c
     irfile=$ofile.ir
     astfile=$ofile.ast
+    analysisfile=$ofile.flow
     pfile=$ofile
 fi
 
-if [ $onlyast = true ]; then
+if [ $onlyanalyze = true ]; then
+    echo "@@@@@@ Generating IR analysis to $analysisfile..." >&2 &&
+    mvn -q exec:java -Dexec.args="$CLLSflags -c $1" > $analysisfile
+elif [ $onlyast = true ]; then
     echo "@@@@@@ Generating AST to $astfile..." >&2 &&
     mvn -q exec:java -Dexec.args="$CLLSflags -c $1" > $astfile
 elif [ $onlyir = true ]; then

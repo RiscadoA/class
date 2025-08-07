@@ -42,4 +42,23 @@ public class IRFlowState {
     clone.pendingContinuations.addAll(this.pendingContinuations);
     return clone;
   }
+
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
+    for (Map.Entry<Integer, IRFlowRecord> entry : records.entrySet()) {
+      sb.append("record ")
+          .append(entry.getKey())
+          .append(": ")
+          .append(entry.getValue())
+          .append("\n");
+    }
+    sb.append("pending_continuations: ");
+    if (pendingContinuations.isEmpty()) {
+      sb.append("none");
+    } else {
+      sb.append(String.join(", ", pendingContinuations));
+    }
+    return sb.toString();
+  }
 }

@@ -3,7 +3,6 @@ package pt.inescid.cllsj.compiler.ir.flow;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import java.util.Queue;
 import java.util.function.Consumer;
 
 public class IRFlowRecord {
@@ -112,6 +111,33 @@ public class IRFlowRecord {
     IRFlowRecord clone = new IRFlowRecord(index);
     clone.continuation = this.continuation;
     clone.slots.addAll(this.slots);
+    clone.readCursor = this.readCursor;
+    clone.slotsKnown = this.slotsKnown;
     return clone;
+  }
+
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
+    sb.append("continuation=");
+    if (continuation.isEmpty()) {
+      sb.append("unknown");
+    } else {
+      sb.append(continuation.get());
+    }
+    if (slotsKnown) {
+      sb.append(" read=" + readCursor);
+      sb.append(" slots=[");
+      for (int i = 0; i < slots.size(); ++i) {
+        sb.append(slots.get(i).toString());
+        if (i < slots.size() - 1) {
+          sb.append(", ");
+        }
+      }
+      sb.append("]");
+    } else {
+      sb.append(" slots=unknown");
+    }
+    return sb.toString();
   }
 }

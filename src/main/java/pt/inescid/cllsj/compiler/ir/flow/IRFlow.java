@@ -5,6 +5,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import pt.inescid.cllsj.compiler.ir.IRBlock;
+import pt.inescid.cllsj.compiler.ir.instructions.IRInstruction;
 
 public class IRFlow {
   private IRBlock block;
@@ -14,9 +15,6 @@ public class IRFlow {
 
   // Blocks which can lead to this flow
   private Set<IRFlow> sources = new HashSet<>();
-
-  // Closure blocks which can run after this flow
-  private Set<IRFlow> forks = new HashSet<>();
 
   // Blocks into which this one can diverge
   private Set<IRFlow> branches = new HashSet<>();
@@ -37,10 +35,6 @@ public class IRFlow {
     return sources;
   }
 
-  public Set<IRFlow> getForks() {
-    return forks;
-  }
-
   public Set<IRFlow> getBranches() {
     return branches;
   }
@@ -53,11 +47,60 @@ public class IRFlow {
     sources.add(source);
   }
 
-  public void addFork(IRFlow fork) {
-    forks.add(fork);
-  }
-
   public void addBranch(IRFlow branch) {
     branches.add(branch);
+  }
+
+  private void printLabels(StringBuffer sb, Set<IRFlow> flows) {
+    if (flows.isEmpty()) {
+      sb.append("none");
+    } else {
+      sb.append(
+          String.join(
+              ", ",
+              flows.stream()
+                  .map(IRFlow::getBlock)
+                  .map(IRBlock::getLabel)
+                  .map(l -> l == null ? "entry" : l)
+                  .toList()));
+    }
+  }
+
+  private void printState(StringBuffer sb, IRFlowState state) {
+    state
+        .toString()
+        .lines()
+        .forEach(
+            line -> {
+              sb.append("    [").append(line).append("]\n");
+            });
+  }
+
+  @Override
+  public String toString() {
+    StringBuffer sb = new StringBuffer();
+    if (block.getLabel() != null) {
+      sb.append(block.getLabel() + ":\n");
+    }
+    sb.append("    [sources: ");
+    printLabels(sb, sources);
+    sb.append("]\n");
+    sb.append("    [branches: ");
+    printLabels(sb, branches);
+    sb.append("]\n\n");
+    for (int i = 0; i < block.getInstructions().size(); ++i) {
+      IRInstruction instruction = block.getInstructions().get(i);
+      printState(sb, states.get(i));
+      sb.append("        ");
+      sb.append(instruction.toString());
+      sb.append("\n");
+    }
+    printState(sb, states.getLast());
+
+    for (IRFlow branch : this.branches) {
+      sb.append("\n").append(branch.toString());
+    }
+
+    return sb.toString();
   }
 }

@@ -20,7 +20,15 @@ public class IRFlowSlot {
   }
 
   public IRFlowRecord getRecord() {
-    return record.orElseThrow(
-        () -> new IllegalStateException("Slot does not hold a known record"));
+    return record.orElseThrow(() -> new IllegalStateException("Slot does not hold a known record"));
+  }
+
+  @Override
+  public String toString() {
+    if (record.isEmpty()) {
+      return "unknown";
+    } else {
+      return "record(" + record.get().getIndex() + ")";
+    }
   }
 }

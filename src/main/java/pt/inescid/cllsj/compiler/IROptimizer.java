@@ -20,6 +20,14 @@ public class IROptimizer {
     }
   }
 
+  public void printProcessFlows() {
+    for (Map.Entry<String, IRFlow> e : processFlows.entrySet()) {
+      System.out.println(e.getKey() + ":");
+      System.out.println(e.getValue());
+      System.out.println();
+    }
+  }
+
   public void optimizeFlipForward(IRProgram ir) {
     for (IRProcess process : ir.getProcesses().values()) {
       optimizeFlipForward(process.getEntry());

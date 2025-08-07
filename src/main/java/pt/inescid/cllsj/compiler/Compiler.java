@@ -22,6 +22,7 @@ public class Compiler {
   public boolean profile = false;
   public boolean onlyIR = false;
   public boolean onlyAST = false;
+  public boolean onlyAnalyze = false;
   public boolean disableConcurrency = false;
   public int customAllocatorSizeDivisor = 32;
   public int customAllocatorLevels = 8;
@@ -87,6 +88,10 @@ public class Compiler {
     try {
       IROptimizer optimizer = new IROptimizer();
       optimizer.analyze(ir);
+      if (onlyAnalyze) {
+        optimizer.printProcessFlows();
+        return 0;
+      }
       if (optimizeFlipForward) {
         optimizer.optimizeFlipForward(ir);
       }
