@@ -34,11 +34,9 @@ public class CGenerator extends IRInstructionVisitor {
   private IRProgram ir;
   private String code = "";
   private int indentLevel = 0;
-  private int genLabelCountInBlock;
   private String procName;
   private int recordCount;
   private int exponentialCount;
-  private Optional<String> blockName;
   private boolean entryCall = true;
   private boolean inManager = false;
 
@@ -930,9 +928,7 @@ public class CGenerator extends IRInstructionVisitor {
   // ================================= IR instruction visitors ==================================
 
   private void visitBlock(String procName, IRBlock block) {
-    genLabelCountInBlock = 0;
     this.procName = procName;
-    this.blockName = Optional.ofNullable(block.getLabel());
 
     for (IRInstruction instruction : block.getInstructions()) {
       visitInstruction(instruction);
@@ -2670,14 +2666,6 @@ public class CGenerator extends IRInstructionVisitor {
 
   private void decIndent() {
     indentLevel--;
-  }
-
-  private String makeLabel(String type) {
-    if (blockName.isEmpty()) {
-      return type + "_" + genLabelCountInBlock++ + "_proc_" + procName;
-    } else {
-      return type + "_" + genLabelCountInBlock++ + "_block_" + procName + "_" + blockName.get();
-    }
   }
 
   // ========================== Type visitor used to determine type size ==========================

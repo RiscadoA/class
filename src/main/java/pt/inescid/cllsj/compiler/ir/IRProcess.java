@@ -11,18 +11,18 @@ public class IRProcess {
   private int endPoints;
   private IRBlock entry;
   private List<IRBlock> blocks;
-  private int typeVariableCount = 0;
+  private List<Boolean> typeVariablePolarities;
 
   public IRProcess(
       boolean hasArguments,
       List<IRType> recordTypes,
       List<IRType> exponentialTypes,
-      int typeVariableCount,
+      List<Boolean> typeVariablePolarites,
       int endPoints) {
     this.hasArguments = hasArguments;
     this.recordTypes = recordTypes;
     this.exponentialTypes = exponentialTypes;
-    this.typeVariableCount = typeVariableCount;
+    this.typeVariablePolarities = typeVariablePolarites;
     this.endPoints = endPoints;
     this.entry = new IRBlock(null);
     this.blocks = new ArrayList<>();
@@ -49,7 +49,11 @@ public class IRProcess {
   }
 
   public int getTypeVariableCount() {
-    return typeVariableCount;
+    return typeVariablePolarities.size();
+  }
+
+  public boolean isTypeVariablePositive(int index) {
+    return typeVariablePolarities.get(index);
   }
 
   public int getEndPoints() {

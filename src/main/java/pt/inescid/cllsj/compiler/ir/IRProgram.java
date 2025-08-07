@@ -27,7 +27,8 @@ public class IRProgram {
       }
       result += process.getKey() + "[env]:\n";
       for (int i = 0; i < process.getValue().getTypeVariableCount(); i++) {
-        result += "    type " + i + "\n";
+        String pol = process.getValue().isTypeVariablePositive(i) ? "positive" : "negative";
+        result += "    type " + i + ": " + pol + "\n";
       }
       for (int i = 0; i < process.getValue().getRecordCount(); i++) {
         result += "    record " + i + ": " + process.getValue().getRecordType(i).toString() + "\n";

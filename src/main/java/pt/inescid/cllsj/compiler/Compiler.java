@@ -26,6 +26,7 @@ public class Compiler {
   public boolean disableConcurrency = false;
   public int customAllocatorSizeDivisor = 32;
   public int customAllocatorLevels = 8;
+  public boolean optimizeIRWithAnalysis = true;
   public boolean optimizePrimitiveExponentials = true;
   public boolean optimizeExponentialExpressionToForward = true;
   public boolean optimizeSendForward = true;
@@ -87,10 +88,12 @@ public class Compiler {
 
     try {
       IROptimizer optimizer = new IROptimizer();
-      optimizer.analyze(ir);
-      if (onlyAnalyze) {
-        optimizer.printProcessFlows();
-        return 0;
+      if (optimizeIRWithAnalysis) {
+        optimizer.analyze(ir);
+        if (onlyAnalyze) {
+          optimizer.printProcessFlows();
+          return 0;
+        }
       }
       if (optimizeFlipForward) {
         optimizer.optimizeFlipForward(ir);

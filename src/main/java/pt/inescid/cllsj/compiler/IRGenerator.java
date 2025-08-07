@@ -71,7 +71,7 @@ public class IRGenerator extends ASTNodeVisitor {
             hasArguments,
             env.recordTypes(),
             env.exponentialTypes(),
-            env.typeVariableCount(),
+            env.typeVariablePolarities(),
             countEndPoints(node));
     program.addProcess(env.getName(), process);
     environments.push(env);
@@ -1420,6 +1420,10 @@ public class IRGenerator extends ASTNodeVisitor {
 
     public int typeVariableCount() {
       return polarities.size();
+    }
+
+    public List<Boolean> typeVariablePolarities() {
+      return new ArrayList<>(polarities);
     }
 
     public boolean isPositive(String typeVar) {

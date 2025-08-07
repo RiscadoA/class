@@ -7,12 +7,16 @@ import java.util.function.Consumer;
 
 public class IRFlowRecord {
   private Optional<String> continuation = Optional.empty();
-  private int index;
+  private Optional<Integer> index;
 
   private List<IRFlowSlot> slots = new ArrayList<>();
   private boolean slotsKnown = false;
 
   public IRFlowRecord(int index) {
+    this(Optional.of(index));
+  }
+
+  public IRFlowRecord(Optional<Integer> index) {
     this.index = index;
   }
 
@@ -35,7 +39,7 @@ public class IRFlowRecord {
   // Performs a write on the record.
   public void doPush(IRFlowState state, IRFlowSlot slot) {
     if (!slotsKnown) {
-      slot.markUnknown(state);
+      slot.markLost(state);
       return;
     }
 
@@ -55,15 +59,17 @@ public class IRFlowRecord {
 
   // Sets a new continuation and returns the old one.
   public Optional<String> doFlip(String continuation) {
-    Optional<String> oldContinuation = this.continuation;
-    this.continuation = Optional.of(continuation);
-    return oldContinuation;
+    return doFlip(Optional.of(continuation));
   }
 
   // Sets the continuation to unknown and returns the old continuation.
   public Optional<String> doReturn() {
+    return doFlip(Optional.empty());
+  }
+
+  public Optional<String> doFlip(Optional<String> continuation) {
     Optional<String> oldContinuation = this.continuation;
-    this.continuation = Optional.empty();
+    this.continuation = continuation;
     return oldContinuation;
   }
 
@@ -84,7 +90,7 @@ public class IRFlowRecord {
   public void markSlotsUnknown(IRFlowState state) {
     this.slotsKnown = false;
     for (IRFlowSlot slot : slots) {
-      slot.markUnknown(state);
+      slot.markLost(state);
     }
     this.slots.clear();
   }
@@ -108,14 +114,47 @@ public class IRFlowRecord {
     return slotsKnown;
   }
 
-  public int getIndex() {
+  public Optional<Integer> getSlotCount() {
+    if (!slotsKnown) {
+      return Optional.empty();
+    }
+    return Optional.of(slots.size());
+  }
+
+  public Optional<Integer> getIndex() {
     return index;
   }
 
-  public IRFlowRecord clone() {
+  public IRFlowRecord merge(IRFlowState.Cloner cloner, IRFlowRecord other) {
+    IRFlowRecord merged = this.clone(cloner);
+    if (!merged.continuation.equals(other.continuation)) {
+      merged.continuation = Optional.empty();
+    }
+    if (!merged.index.equals(other.index)) {
+      merged.index = Optional.empty();
+    }
+    if (!merged.slotsKnown || !other.slotsKnown || merged.slots.size() != other.slots.size()) {
+      merged.slots.clear();
+      merged.slotsKnown = false;
+    }
+    for (int i = 0; i < merged.slots.size(); ++i) {
+      merged.slots.set(i, merged.slots.get(i).merge(cloner, other.slots.get(i)));
+    }
+    return merged;
+  }
+
+  public IRFlowRecord clone(IRFlowState.Cloner cloner) {
+    if (cloner.getCloned(this).isPresent()) {
+      return cloner.getCloned(this).get();
+    }
+
     IRFlowRecord clone = new IRFlowRecord(index);
+    cloner.setCloned(this, clone);
+
     clone.continuation = this.continuation;
-    clone.slots.addAll(this.slots);
+    for (IRFlowSlot slot : this.slots) {
+      clone.slots.add(slot.clone(cloner));
+    }
     clone.slotsKnown = this.slotsKnown;
     return clone;
   }

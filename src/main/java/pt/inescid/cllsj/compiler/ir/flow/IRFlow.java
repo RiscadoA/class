@@ -46,8 +46,14 @@ public class IRFlow {
     return branches;
   }
 
-  public void addState(IRFlowState state) {
-    states.add(state);
+  public void addState(int index, IRFlowState state) {
+    if (states.size() == index) {
+      states.add(state);
+    } else if (states.size() > index) {
+      states.set(index, states.get(index).merge(state));
+    } else {
+      throw new UnsupportedOperationException("States added in the wrong order");
+    }
   }
 
   public void addSource(IRFlow source) {
@@ -89,6 +95,14 @@ public class IRFlow {
 
   @Override
   public String toString() {
+    return toString(new HashSet<>());
+  }
+
+  public String toString(Set<IRFlow> shown) {
+    if (!shown.add(this)) {
+      return "";
+    }
+
     StringBuffer sb = new StringBuffer();
     if (block.getLabel() != null) {
       sb.append(block.getLabel() + ":\n");
@@ -117,11 +131,11 @@ public class IRFlow {
     }
 
     for (IRFlow branch : this.branches) {
-      sb.append(branch.toString());
+      sb.append(branch.toString(shown));
     }
 
     for (IRFlow detached : this.detached) {
-      sb.append(detached.toString());
+      sb.append(detached.toString(shown));
     }
 
     return sb.toString();

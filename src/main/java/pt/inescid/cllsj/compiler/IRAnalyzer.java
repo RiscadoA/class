@@ -1,11 +1,14 @@
 package pt.inescid.cllsj.compiler;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+
 import pt.inescid.cllsj.compiler.ir.IRBlock;
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 import pt.inescid.cllsj.compiler.ir.IRProcess;
+import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
 import pt.inescid.cllsj.compiler.ir.flow.*;
 import pt.inescid.cllsj.compiler.ir.instructions.*;
 import pt.inescid.cllsj.compiler.ir.type.*;
@@ -19,36 +22,14 @@ public class IRAnalyzer extends IRInstructionVisitor {
 
   public static IRFlow analyze(IRProcess process) {
     IRAnalyzer analyzer = new IRAnalyzer(process);
+    for (int i = 0; i < process.getTypeVariableCount(); ++i) {
+      analyzer.state.bindType(i, new IRFlowType(process.isTypeVariablePositive(i)));
+    }
     return analyzer.visit(process.getEntry(), true);
   }
 
   private IRAnalyzer(IRProcess process) {
     this.process = process;
-  }
-
-  private Optional<Integer> slotCount(IRType type) {
-    if (type instanceof IRSessionT) {
-      IRSessionT sessionType = (IRSessionT) type;
-      Optional<Integer> contSlots = slotCount(sessionType.getCont());
-
-      if (sessionType.getValueRequisites().mustBeValue()) {
-        Optional<Integer> valueSlots = slotCount(sessionType.getArg());
-        if (!contSlots.isPresent() || !valueSlots.isPresent()) {
-          return Optional.empty();
-        }
-        return Optional.of(contSlots.get() + valueSlots.get());
-      } else if (sessionType.getValueRequisites().canBeValue()) {
-        return Optional.empty();
-      } else {
-        return contSlots;
-      }
-    } else {
-      return Optional.of(1);
-    }
-  }
-
-  private Optional<Integer> slotCount(int record) {
-    return slotCount(process.getRecordType(record));
   }
 
   private void visitNextPending() {
@@ -63,16 +44,20 @@ public class IRAnalyzer extends IRInstructionVisitor {
   }
 
   private IRFlow visit(IRBlock block, boolean detached) {
-    if (flows.containsKey(block)) {
-      throw new IllegalStateException("Block " + block.getLabel() + " has already been visited");
-    }
-
-    // Create a new flow object and mark the previous one as its source.
+    // Create a new flow object (if we haven't passed through it yet).
     Optional<IRFlow> previousFlow = this.flow;
     IRFlowState previousState = this.state;
-    IRFlow currentFlow = new IRFlow(block);
+    IRFlow currentFlow;
+    if (!flows.containsKey(block)) {
+      currentFlow = new IRFlow(block);
+      flows.put(block, currentFlow);
+    } else {
+      // We've already passed through the block, we'll need to merge states
+      currentFlow = flows.get(block);
+    }
     this.flow = Optional.of(currentFlow);
-    flows.put(block, currentFlow);
+
+    // Link the previous block with this one.
     if (previousFlow.isPresent()) {
       if (detached) {
         previousFlow.get().addDetached(currentFlow);
@@ -83,11 +68,12 @@ public class IRAnalyzer extends IRInstructionVisitor {
     }
 
     // Visit each instruction in the block, one by one.
-    currentFlow.addState(state);
+    int index = 0;
+    currentFlow.addState(index, state);
     for (IRInstruction instruction : block.getInstructions()) {
       state = state.clone();
       instruction.accept(this);
-      currentFlow.addState(state);
+      currentFlow.addState(++index, state);
     }
 
     this.flow = previousFlow;
@@ -123,7 +109,12 @@ public class IRAnalyzer extends IRInstructionVisitor {
 
   @Override
   public void visit(IRFreeSession instruction) {
-      state.unbindRecord(instruction.getRecord());
+    state.unbindRecord(instruction.getRecord());
+  }
+
+  @Override
+  public void visit(IRCleanRecord instruction) {
+    state.unbindRecord(instruction.getRecord());
   }
 
   @Override
@@ -171,9 +162,8 @@ public class IRAnalyzer extends IRInstructionVisitor {
   public void visit(IRPushValue instruction) {
     IRFlowRecord record = state.record(instruction.getRecord());
     IRFlowRecord argRecord = state.record(instruction.getArgRecord());
-    Optional<Integer> slotCount = slotCount(argRecord.getIndex());
-    if (slotCount.isPresent()) {
-      for (int i = 0; i < slotCount.get(); ++i) {
+    if (argRecord.slotsAreKnown()) {
+      for (int i = 0; i < argRecord.getSlotCount().get(); ++i) {
         record.doPush(state, argRecord.doPop());
       }
     } else {
@@ -187,29 +177,33 @@ public class IRAnalyzer extends IRInstructionVisitor {
   public void visit(IRPopValue instruction) {
     IRFlowRecord record = state.record(instruction.getRecord());
     IRFlowRecord argRecord = state.record(instruction.getArgRecord());
-    Optional<Integer> slotCount = slotCount(instruction.getArgRecord());
+    Optional<Integer> slotCount = state.slotCount(process.getRecordType(instruction.getArgRecord()));
 
     argRecord.doNewSession(Optional.empty());
     if (slotCount.isPresent()) {
       for (int i = 0; i < slotCount.get(); ++i) {
         argRecord.doPush(state, record.doPop());
       }
+    } else {
+      record.markSlotsUnknown(state);
     }
   }
 
   @Override
   public void visit(IRPushExpression instruction) {
-    IRFlowSlot slot;
+    // TODO: pop slots from expression
+
+    IRFlowSlot slot = IRFlowSlot.expression(instruction.getExpression());
     if (instruction.isExponential()) {
-      slot = IRFlowSlot.exponential();
-    } else {
-      slot = IRFlowSlot.expression(instruction.getExpression());
+      slot = IRFlowSlot.exponential(new IRFlowExponential(List.of(slot)));
     }
     state.record(instruction.getRecord()).doPush(state, slot);
   }
 
   @Override
-  public void visit(IRPrint instruction) {}
+  public void visit(IRPrint instruction) {
+    // TODO: pop slots from expression
+  }
 
   @Override
   public void visit(IRPushClose instruction) {
@@ -243,9 +237,97 @@ public class IRAnalyzer extends IRInstructionVisitor {
       int tag = slot.getTag();
       visit(instruction.getCases().get(tag).getLabel(), false);
     } else {
-      // We don't know the tag, we must visit both branches
+      // We don't know the tag, we must visit all branches
       for (IRPopTag.Case c : instruction.getCases().values()) {
         visit(c.getLabel(), false);
+      }
+    }
+  }
+
+  @Override
+  public void visit(IRPushCell instruction) {
+    state.record(instruction.getRecord()).doPush(state, IRFlowSlot.cell());
+    state.record(instruction.getArgRecord()).markTotallyUnknown(state);
+    state.unbindRecord(instruction.getArgRecord());
+  }
+
+  @Override
+  public void visit(IRPutCell instruction) {
+    state.record(instruction.getRecord()).doPush(state, IRFlowSlot.cell());
+    state.record(instruction.getArgRecord()).markTotallyUnknown(state);
+    state.unbindRecord(instruction.getArgRecord());
+  }
+
+  @Override
+  public void visit(IRTakeCell instruction) {
+    state.record(instruction.getRecord()).doPop();
+  }
+
+  @Override
+  public void visit(IRPushExponential instruction) {
+    IRFlowSlot slot = IRFlowSlot.exponential(state.exponential(instruction.getExponential()));
+    state.record(instruction.getRecord()).doPush(state, slot);
+  }
+
+  @Override
+  public void visit(IRPopExponential instruction) {
+    IRFlowSlot slot = state.record(instruction.getRecord()).doPop();
+    if (slot.isKnownExponential()) {
+      state.bindExponential(instruction.getArgExponential(), slot.getExponential());
+    }
+  }
+
+  @Override
+  public void visit(IRPushType instruction) {
+    IRFlowType type = new IRFlowType(instruction.getType(), instruction.isPositive(), instruction.getValueRequisites());
+    state.record(instruction.getRecord()).doPush(state, IRFlowSlot.type(type));
+  }
+
+  @Override
+  public void visit(IRPopType instruction) {
+    IRFlowSlot slot = state.record(instruction.getRecord()).doPop();
+    if (slot.isKnownType()) {
+      state.bindType(instruction.getArgType(), slot.getType());
+    }
+    if (slot.isKnownType() && slot.getType().isPositive().isPresent()) {
+      if (slot.getType().isPositive().get()) {
+        visit(instruction.getPositiveLabel(), false);
+      } else {
+        visit(instruction.getNegativeLabel(), false);
+      }
+    } else {
+      visit(instruction.getNegativeLabel(), false);
+      visit(instruction.getPositiveLabel(), false);
+    }
+  }
+
+  @Override
+  public void visit(IRNewExponential instruction) {
+    IRFlowRecord record = state.record(instruction.getRecord());
+    IRFlowExponential exponential;
+
+    IRFlowSlot slot = record.doPop();
+    if (slot.isValue() && record.getSlotCount().get() == 0) {
+      exponential = new IRFlowExponential(List.of(slot));
+    } else {
+      slot.markLost(state);
+      exponential = new IRFlowExponential();
+    }
+
+    record.markTotallyUnknown(state);
+    state.unbindRecord(instruction.getRecord());
+    state.bindExponential(instruction.getExponential(), exponential);
+  }
+
+  @Override
+  public void visit(IRCallExponential instruction) {
+    IRFlowExponential exponential = state.exponential(instruction.getExponential());
+    IRFlowRecord record = state.record(instruction.getArgRecord());
+
+    if (exponential.hasKnownValue()) {
+      record.doNewSession(Optional.empty());
+      for (IRFlowSlot slot : exponential.getValue()) {
+        record.doPush(state, slot);
       }
     }
   }
@@ -256,5 +338,141 @@ public class IRAnalyzer extends IRInstructionVisitor {
       state.record(arg.getSourceRecord()).markTotallyUnknown(state);
     }
     visitNextPending();
+  }
+
+  @Override
+  public void visit(IRForward instruction) {
+    IRFlowRecord negRecord = state.record(instruction.getNegRecord());
+    IRFlowRecord posRecord = state.record(instruction.getPosRecord());
+
+    if (negRecord.slotsAreKnown()) {
+      int slotCount = negRecord.getSlotCount().get();
+      for (int i = 0; i < slotCount; ++i) {
+        posRecord.doPush(state, negRecord.doPop());
+      }
+    } else {
+      posRecord.markSlotsUnknown(state);
+    }
+
+
+    Optional<String> posRecordCont = posRecord.doFlip(negRecord.doReturn());
+    if (posRecordCont.isPresent()) {
+      visit(posRecordCont.get(), false);
+    } else {
+      visitNextPending();
+    }
+  }
+
+  @Override
+  public void visit(IRIncRefCell instruction) {}
+
+  @Override
+  public void visit(IRDecRefCell instruction) {}
+
+  @Override
+  public void visit(IRIncRefExponential instruction) {}
+
+  @Override
+  public void visit(IRDecRefExponential instruction) {}
+
+  @Override
+  public void visit(IRDetachExponential instruction) {
+    state.unbindExponential(instruction.getExponential());
+  }
+
+  @Override
+  public void visit(IRSleep instruction) {}
+
+  @Override
+  public void visit(IRPanic instruction) {}
+
+  @Override
+  public void visit(IRScan instruction) {
+    IRFlowRecord record = state.record(instruction.getRecord());
+
+    boolean isExponential = false;
+    IRType type = instruction.getType();
+    if (type instanceof IRExponentialT) {
+      isExponential = true;
+      type = ((IRExponentialT) type).getInner();
+    }
+
+    IRFlowSlot slot;
+    if (type instanceof IRIntT) {
+      slot = IRFlowSlot.integer();
+    } else if (type instanceof IRStringT) {
+      slot = IRFlowSlot.string();
+    } else if (type instanceof IRBoolT) {
+      slot = IRFlowSlot.bool();
+    } else {
+      throw new IllegalArgumentException("Unsupported scan type: " + instruction.getType());
+    }
+
+    if (isExponential) {
+      slot = IRFlowSlot.exponential(new IRFlowExponential(List.of(slot)));
+    }
+
+    record.doPush(state, slot);
+  }
+
+  @Override
+  public void visit(IRBranch instruction) {
+    // TODO: pop slots from expression
+    visit(instruction.getThen().getLabel(), false);
+    visit(instruction.getOtherwise().getLabel(), false);
+  }
+
+  @Override
+  public void visit(IRJump instruction) {
+    visit(instruction.getLabel(), false);
+  }
+
+  @Override
+  public void visit(IRBranchOnValue instruction) {
+    Optional<Boolean> value = isValue(instruction.getRequisites());
+    if (value.isEmpty()) {
+      visit(instruction.getIsValue(), false);
+      visit(instruction.getIsNotValue(), false);
+    } else if (value.get()) {
+      visit(instruction.getIsValue(), false);
+    } else {
+      visit(instruction.getIsNotValue(), false);
+    }
+  }
+
+  private Optional<Boolean> isValue(IRValueRequisites requisites) {
+    if (requisites.mustBeValue()) {
+      return Optional.of(true);
+    } else if (requisites.canBeValue()) {
+      boolean certainlyAValue = true;
+
+      for (int t : requisites.getTypesWhichMustBeValues()) {
+        Optional<IRValueRequisites> req = state.type(t).getValueRequisites();
+        if (req.isEmpty()) {
+          certainlyAValue = false;
+          continue;
+        }
+
+        Optional<Boolean> res = isValue(req.get());
+        if (res.isEmpty()) {
+          certainlyAValue = false;
+        } else if (!res.get()) {
+          return Optional.of(false);
+        }
+      }
+
+      for (Map.Entry<Integer, Boolean> e : requisites.getRequiredTypePolarities().entrySet()) {
+        Optional<Boolean> isPositive = state.type(e.getKey()).isPositive();
+        if (isPositive.isEmpty()) {
+          certainlyAValue = false;
+        } else if (isPositive.get() != e.getValue()) {
+          return Optional.of(false);
+        }
+      }
+
+      return certainlyAValue ? Optional.of(true) : Optional.empty();
+    } else {
+      return Optional.of(false);
+    }
   }
 }
