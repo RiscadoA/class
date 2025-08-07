@@ -10,7 +10,7 @@ public class IRFlowSlot {
     UNKNOWN, CLOSE, TAG, INTEGER, BOOLEAN, STRING, RECORD, EXPONENTIAL
   }
 
-  private Type type;
+  private Type type = Type.UNKNOWN;
   private Optional<IRFlowRecord> record = Optional.empty();
   private Optional<Integer> tag = Optional.empty();
 
@@ -74,10 +74,19 @@ public class IRFlowSlot {
     return tag.orElseThrow(() -> new IllegalStateException("Slot does not hold a known tag"));
   }
 
+  public void markUnknown(IRFlowState state) {
+    if (record.isPresent()) {
+      if (record.get().getContinuation().isPresent()) {
+        state.pushPendingContinuation(record.get().getContinuation().get());
+      }
+      record.get().markTotallyUnknown(state);
+    }
+  }
+
   @Override
   public String toString() {
     switch (type) {
-      case UNKNOWN: return "unknown";
+      case UNKNOWN: return "?";
       case CLOSE: return "close";
       case TAG: return "tag(" + tag.get() + ")";
       case INTEGER: return "integer";
@@ -85,7 +94,7 @@ public class IRFlowSlot {
       case STRING: return "string";
       case RECORD: return "record(" + record.get().getIndex() + ")";
       case EXPONENTIAL: return "exponential";
-      default: return "???";
+      default: throw new IllegalStateException("Unknown slot type: " + type);
     }
   }
 }

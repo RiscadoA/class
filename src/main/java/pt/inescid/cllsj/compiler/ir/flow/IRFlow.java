@@ -96,12 +96,6 @@ public class IRFlow {
     sb.append("    [sources: ");
     printLabels(sb, sources);
     sb.append("]\n");
-    sb.append("    [detached: ");
-    printLabels(sb, detached);
-    sb.append("]\n");
-    sb.append("    [branches: ");
-    printLabels(sb, branches);
-    sb.append("]\n\n");
     for (int i = 0; i < block.getInstructions().size(); ++i) {
       IRInstruction instruction = block.getInstructions().get(i);
       printState(sb, states.get(i));
@@ -109,14 +103,25 @@ public class IRFlow {
       sb.append(instruction.toString());
       sb.append("\n");
     }
+
     printState(sb, states.getLast());
+    if (!detached.isEmpty()) {
+      sb.append("    [detached: ");
+      printLabels(sb, detached);
+      sb.append("]\n");
+    }
+    if (!branches.isEmpty()) {
+      sb.append("    [branches: ");
+      printLabels(sb, branches);
+      sb.append("]\n");
+    }
 
     for (IRFlow branch : this.branches) {
-      sb.append("\n").append(branch.toString());
+      sb.append(branch.toString());
     }
 
     for (IRFlow detached : this.detached) {
-      sb.append("\n").append(detached.toString());
+      sb.append(detached.toString());
     }
 
     return sb.toString();

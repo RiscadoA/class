@@ -57,11 +57,10 @@ public class IRFlowState {
           .append(entry.getValue())
           .append("\n");
     }
-    sb.append("pending_continuations: ");
-    if (pendingContinuations.isEmpty()) {
-      sb.append("none");
-    } else {
-      sb.append(String.join(", ", pendingContinuations));
+    for (String pending : pendingContinuations) {
+      sb.append("pending: ")
+          .append(pending)
+          .append("\n");
     }
     return sb.toString();
   }

@@ -10,7 +10,6 @@ public class IRFlowRecord {
   private int index;
 
   private List<IRFlowSlot> slots = new ArrayList<>();
-  private int readCursor = 0;
   private boolean slotsKnown = false;
 
   public IRFlowRecord(int index) {
@@ -19,38 +18,39 @@ public class IRFlowRecord {
 
   public void doNewSession(Optional<String> continuation) {
     this.slots.clear();
-    this.readCursor = 0;
     this.slotsKnown = true;
     this.continuation = continuation;
   }
 
   // Performs a read on the record.
   // If the slot being read is known, it is returned.
-  public Optional<IRFlowSlot> doPop() {
+  public IRFlowSlot doPop() {
     if (!slotsKnown) {
-      return Optional.empty();
+      return IRFlowSlot.unknown();
     }
 
-    return Optional.of(slots.get(readCursor++));
+    return slots.removeFirst();
   }
 
   // Performs a write on the record.
-  public void doPush(IRFlowSlot slot) {
+  public void doPush(IRFlowState state, IRFlowSlot slot) {
     if (!slotsKnown) {
+      slot.markUnknown(state);
       return;
     }
 
     slots.add(slot);
   }
 
-  // Peforms an unfold on the record.
-  public void doUnfold() {
-    if (!slotsKnown) {
-      return;
-    }
-
-    readCursor = 0;
+  public void doPushUnfold() {
     slots.clear();
+    slotsKnown = true;
+  }
+
+  public void doPopUnfold() {
+    if (slotsKnown) {
+      slots.clear();
+    }
   }
 
   // Sets a new continuation and returns the old one.
@@ -73,29 +73,24 @@ public class IRFlowRecord {
   }
 
   // Mark the record's continuation as unknown.
-  public void markContinuationUnknown() {
+  public void markContinuationUnknown(IRFlowState state) {
+    if (this.continuation.isPresent()) {
+      state.pushPendingContinuation(this.continuation.get());
+    }
     this.continuation = Optional.empty();
   }
 
   // Mark the record's slots as completely unknown.
   public void markSlotsUnknown(IRFlowState state) {
     this.slotsKnown = false;
-    for (int i = readCursor; i < slots.size(); i++) {
-      IRFlowSlot slot = slots.get(i);
-      if (slot.isKnownRecord()) {
-        Optional<String> cont = slot.getRecord().getContinuation();
-        if (cont.isPresent()) {
-          state.pushPendingContinuation(cont.get());
-        }
-        slot.getRecord().markContinuationUnknown();
-        slot.getRecord().markSlotsUnknown(state);
-      }
+    for (IRFlowSlot slot : slots) {
+      slot.markUnknown(state);
     }
     this.slots.clear();
   }
 
   public void markTotallyUnknown(IRFlowState state) {
-    markContinuationUnknown();
+    markContinuationUnknown(state);
     markSlotsUnknown(state);
   }
 
@@ -104,8 +99,8 @@ public class IRFlowRecord {
       return;
     }
 
-    while (readCursor < slots.size()) {
-      consumer.accept(slots.get(readCursor++));
+    while (!slots.isEmpty()) {
+      consumer.accept(slots.removeFirst());
     }
   }
 
@@ -121,7 +116,6 @@ public class IRFlowRecord {
     IRFlowRecord clone = new IRFlowRecord(index);
     clone.continuation = this.continuation;
     clone.slots.addAll(this.slots);
-    clone.readCursor = this.readCursor;
     clone.slotsKnown = this.slotsKnown;
     return clone;
   }
@@ -129,14 +123,13 @@ public class IRFlowRecord {
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("continuation=");
+    sb.append("cont=");
     if (continuation.isEmpty()) {
-      sb.append("unknown");
+      sb.append("?");
     } else {
       sb.append(continuation.get());
     }
     if (slotsKnown) {
-      sb.append(" read=" + readCursor);
       sb.append(" slots=[");
       for (int i = 0; i < slots.size(); ++i) {
         sb.append(slots.get(i).toString());
@@ -146,7 +139,7 @@ public class IRFlowRecord {
       }
       sb.append("]");
     } else {
-      sb.append(" slots=unknown");
+      sb.append(" slots=?");
     }
     return sb.toString();
   }
