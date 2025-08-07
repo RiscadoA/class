@@ -43,6 +43,16 @@ public class IRFlowRecord {
     slots.add(slot);
   }
 
+  // Peforms an unfold on the record.
+  public void doUnfold() {
+    if (!slotsKnown) {
+      return;
+    }
+
+    readCursor = 0;
+    slots.clear();
+  }
+
   // Sets a new continuation and returns the old one.
   public Optional<String> doFlip(String continuation) {
     Optional<String> oldContinuation = this.continuation;

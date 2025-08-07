@@ -19,6 +19,10 @@ public class IRFlowState {
     records.put(id, record);
   }
 
+  public void unbindRecord(int id) {
+    records.remove(id);
+  }
+
   public void pushPendingContinuation(String continuation) {
     pendingContinuations.add(continuation);
   }

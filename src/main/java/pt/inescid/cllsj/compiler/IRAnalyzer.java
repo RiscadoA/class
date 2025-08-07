@@ -7,22 +7,8 @@ import pt.inescid.cllsj.compiler.ir.IRBlock;
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 import pt.inescid.cllsj.compiler.ir.IRProcess;
 import pt.inescid.cllsj.compiler.ir.flow.*;
-import pt.inescid.cllsj.compiler.ir.instructions.IRFlip;
-import pt.inescid.cllsj.compiler.ir.instructions.IRFreeSession;
-import pt.inescid.cllsj.compiler.ir.instructions.IRInstruction;
-import pt.inescid.cllsj.compiler.ir.instructions.IRNewSession;
-import pt.inescid.cllsj.compiler.ir.instructions.IRNextTask;
-import pt.inescid.cllsj.compiler.ir.instructions.IRPopClose;
-import pt.inescid.cllsj.compiler.ir.instructions.IRPopSession;
-import pt.inescid.cllsj.compiler.ir.instructions.IRPopValue;
-import pt.inescid.cllsj.compiler.ir.instructions.IRPrint;
-import pt.inescid.cllsj.compiler.ir.instructions.IRPushClose;
-import pt.inescid.cllsj.compiler.ir.instructions.IRPushExpression;
-import pt.inescid.cllsj.compiler.ir.instructions.IRPushSession;
-import pt.inescid.cllsj.compiler.ir.instructions.IRPushValue;
-import pt.inescid.cllsj.compiler.ir.instructions.IRReturn;
-import pt.inescid.cllsj.compiler.ir.type.IRSessionT;
-import pt.inescid.cllsj.compiler.ir.type.IRType;
+import pt.inescid.cllsj.compiler.ir.instructions.*;
+import pt.inescid.cllsj.compiler.ir.type.*;
 
 // Visitor which analyses the IR of a given process and generates a control and data flow graph.
 public class IRAnalyzer extends IRInstructionVisitor {
@@ -33,7 +19,7 @@ public class IRAnalyzer extends IRInstructionVisitor {
 
   public static IRFlow analyze(IRProcess process) {
     IRAnalyzer analyzer = new IRAnalyzer(process);
-    return analyzer.visit(process.getEntry());
+    return analyzer.visit(process.getEntry(), true);
   }
 
   private IRAnalyzer(IRProcess process) {
@@ -68,15 +54,15 @@ public class IRAnalyzer extends IRInstructionVisitor {
   private void visitNextPending() {
     Optional<String> cont = state.popPendingContinuation();
     if (cont.isPresent()) {
-      visit(cont.get());
+      visit(cont.get(), true);
     }
   }
 
-  private IRFlow visit(String label) {
-    return visit(process.getBlock(label));
+  private IRFlow visit(String label, boolean detached) {
+    return visit(process.getBlock(label), detached);
   }
 
-  private IRFlow visit(IRBlock block) {
+  private IRFlow visit(IRBlock block, boolean detached) {
     if (flows.containsKey(block)) {
       throw new IllegalStateException("Block " + block.getLabel() + " has already been visited");
     }
@@ -88,7 +74,11 @@ public class IRAnalyzer extends IRInstructionVisitor {
     this.flow = Optional.of(currentFlow);
     flows.put(block, currentFlow);
     if (previousFlow.isPresent()) {
-      previousFlow.get().addBranch(currentFlow);
+      if (detached) {
+        previousFlow.get().addDetached(currentFlow);
+      } else {
+        previousFlow.get().addBranch(currentFlow);
+      }
       currentFlow.addSource(previousFlow.get());
     }
 
@@ -112,8 +102,18 @@ public class IRAnalyzer extends IRInstructionVisitor {
   }
 
   @Override
+  public void visit(IRNewTask instruction) {
+    state.pushPendingContinuation(instruction.getLabel());
+  }
+
+  @Override
   public void visit(IRNextTask instruction) {
     visitNextPending();
+  }
+
+  @Override
+  public void visit(IRNewThread instruction) {
+    state.pushPendingContinuation(instruction.getLabel());
   }
 
   @Override
@@ -122,7 +122,9 @@ public class IRAnalyzer extends IRInstructionVisitor {
   }
 
   @Override
-  public void visit(IRFreeSession instruction) {}
+  public void visit(IRFreeSession instruction) {
+      state.unbindRecord(instruction.getRecord());
+  }
 
   @Override
   public void visit(IRFlip instruction) {
@@ -130,12 +132,12 @@ public class IRAnalyzer extends IRInstructionVisitor {
         state.record(instruction.getRecord()).doFlip(instruction.getContLabel());
     if (cont.isPresent()) {
       // The continuation is known, we should flip to the next state.
-      visit(cont.get());
+      visit(cont.get(), false);
     } else {
       // Unknown continuation. Slots will be left in an unknown state.
       // Continue analyzing on the flip's continuation.
       state.record(instruction.getRecord()).markTotallyUnknown(state);
-      visit(instruction.getContLabel());
+      visit(instruction.getContLabel(), true);
     }
   }
 
@@ -143,8 +145,9 @@ public class IRAnalyzer extends IRInstructionVisitor {
   public void visit(IRReturn instruction) {
     Optional<String> cont = state.record(instruction.getRecord()).doReturn();
     if (cont.isPresent()) {
-      visit(cont.get());
+      visit(cont.get(), false);
     } else {
+      state.unbindRecord(instruction.getRecord());
       visitNextPending();
     }
   }
@@ -152,7 +155,8 @@ public class IRAnalyzer extends IRInstructionVisitor {
   @Override
   public void visit(IRPushSession instruction) {
     IRFlowRecord record = state.record(instruction.getRecord());
-    state.record(instruction.getRecord()).doPush(IRFlowSlot.record(record));
+    IRFlowRecord argRecord = state.record(instruction.getArgRecord());
+    record.doPush(IRFlowSlot.record(argRecord));
   }
 
   @Override
@@ -176,6 +180,7 @@ public class IRAnalyzer extends IRInstructionVisitor {
       argRecord.markTotallyUnknown(state);
       record.markSlotsUnknown(state);
     }
+    state.unbindRecord(instruction.getArgRecord());
   }
 
   @Override
@@ -194,15 +199,54 @@ public class IRAnalyzer extends IRInstructionVisitor {
 
   @Override
   public void visit(IRPushExpression instruction) {
-    state.record(instruction.getRecord()).doPush(IRFlowSlot.unknown());
+    IRFlowSlot slot;
+    if (instruction.isExponential()) {
+      slot = IRFlowSlot.exponential();
+    } else {
+      slot = IRFlowSlot.expression(instruction.getExpression());
+    }
+    state.record(instruction.getRecord()).doPush(slot);
   }
 
   @Override
   public void visit(IRPrint instruction) {}
 
   @Override
-  public void visit(IRPushClose instruction) {}
+  public void visit(IRPushClose instruction) {
+    state.record(instruction.getRecord()).doPush(IRFlowSlot.close());
+  }
 
   @Override
-  public void visit(IRPopClose instruction) {}
+  public void visit(IRPopClose instruction) {
+    state.record(instruction.getRecord()).doPop();
+  }
+
+  @Override
+  public void visit(IRPushUnfold instruction) {
+    state.record(instruction.getRecord()).doUnfold();
+  }
+
+  @Override
+  public void visit(IRPopUnfold instruction) {
+    state.record(instruction.getRecord()).doUnfold();
+  }
+
+  @Override
+  public void visit(IRPushTag instruction) {
+    state.record(instruction.getRecord()).doPush(IRFlowSlot.tag(instruction.getTag()));
+  }
+
+  @Override
+  public void visit(IRPopTag instruction) {
+    Optional<IRFlowSlot> slot = state.record(instruction.getRecord()).doPop();
+    if (slot.isPresent() && slot.get().isKnownTag()) {
+      int tag = slot.get().getTag();
+      visit(instruction.getCases().get(tag).getLabel(), false);
+    } else {
+      // We don't know the tag, we must visit both branches
+      for (IRPopTag.Case c : instruction.getCases().values()) {
+        visit(c.getLabel(), true);
+      }
+    }
+  }
 }
