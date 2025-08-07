@@ -186,6 +186,7 @@ public class IRAnalyzer extends IRInstructionVisitor {
       }
     } else {
       record.markSlotsUnknown(state);
+      argRecord.markSlotsUnknown(state);
     }
   }
 

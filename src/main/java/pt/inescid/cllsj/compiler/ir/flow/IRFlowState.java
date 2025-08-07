@@ -7,6 +7,7 @@ import java.util.Stack;
 
 import pt.inescid.cllsj.compiler.ir.type.IRFlipT;
 import pt.inescid.cllsj.compiler.ir.type.IRSessionT;
+import pt.inescid.cllsj.compiler.ir.type.IRTagT;
 import pt.inescid.cllsj.compiler.ir.type.IRType;
 import pt.inescid.cllsj.compiler.ir.type.IRVarT;
 
@@ -100,6 +101,8 @@ public class IRFlowState {
       } else {
         return Optional.empty();  
       }
+    } else if (type instanceof IRTagT) {
+      return Optional.empty();
     } else {
       return Optional.of(1);
     }
