@@ -31,11 +31,19 @@ public class IRProgram {
         result += "    type " + i + ": " + pol + "\n";
       }
       for (int i = 0; i < process.getValue().getRecordCount(); i++) {
-        result += "    record " + i + ": " + process.getValue().getRecordType(i).toString() + "\n";
+        result += "    ";
+        if (i < process.getValue().getRecordArgumentCount()) {
+          result += "arg ";
+        }
+        result += "record " + i + ": " + process.getValue().getRecordType(i).toString() + "\n";
       }
       for (int i = 0; i < process.getValue().getExponentialCount(); i++) {
+        result += "    ";
+        if (i < process.getValue().getExponentialArgumentCount()) {
+          result += "arg ";
+        }
         result +=
-            "    exponential "
+            "exponential "
                 + i
                 + ": "
                 + process.getValue().getExponentialType(i).toString()

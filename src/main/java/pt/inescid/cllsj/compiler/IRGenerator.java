@@ -53,7 +53,7 @@ public class IRGenerator extends ASTNodeVisitor {
           this,
           procDef,
           (suffix, env) -> {
-            addProcess(procDef.hasArguments(), env, procDef.getRhs());
+            addProcess(procDef.getArgs().size(), procDef.getGArgs().size(), env, procDef.getRhs());
           },
           this.ep);
     }
@@ -64,11 +64,12 @@ public class IRGenerator extends ASTNodeVisitor {
   // ==================================== AST node visitors =====================================
 
   private void addProcess(
-      boolean hasArguments, Environment env, ASTNode node, Consumer<IRBlock> entryConsumer) {
+      int linearArgumentCount, int exponentialArgumentCount, Environment env, ASTNode node, Consumer<IRBlock> entryConsumer) {
     IRProcess oldProcess = process;
     process =
         new IRProcess(
-            hasArguments,
+            linearArgumentCount,
+            exponentialArgumentCount,
             env.recordTypes(),
             env.exponentialTypes(),
             env.typeVariablePolarities(),
@@ -85,8 +86,8 @@ public class IRGenerator extends ASTNodeVisitor {
     process = oldProcess;
   }
 
-  private void addProcess(boolean hasArguments, Environment env, ASTNode node) {
-    addProcess(hasArguments, env, node, block -> {});
+  private void addProcess(int linearArgumentCount, int exponentialArgumentCount, Environment env, ASTNode node) {
+    addProcess(linearArgumentCount, exponentialArgumentCount, env, node, block -> {});
   }
 
   private void visitBlock(IRBlock block, ASTNode node) {
@@ -508,7 +509,8 @@ public class IRGenerator extends ASTNodeVisitor {
 
     // Generate the process for the exponential closure
     addProcess(
-        true,
+        1,
+        exponentialArgs.size(),
         env,
         node.getRhs(),
         entry -> {
@@ -588,7 +590,8 @@ public class IRGenerator extends ASTNodeVisitor {
 
     // Generate the process holding the affine right hand side.
     addProcess(
-        true,
+        linearArgs.size(),
+        exponentialArgs.size(),
         env,
         node.getRhs(),
         entry -> {
@@ -1338,7 +1341,7 @@ public class IRGenerator extends ASTNodeVisitor {
 
       // Pass all linear arguments ocurring in the node.
       for (Map.Entry<String, RecordLocation> entry : parent.records.entrySet()) {
-        if (freeNames.contains(entry.getKey())) {
+        if (freeNames.contains(entry.getKey()) && !parent.exponentials.containsKey(entry.getKey())) {
           int index =
               env.insertLinear(entry.getKey(), parent.recordTypes().get(entry.getValue().index()));
           outLinearArgs.add(new IRCallProcess.LinearArgument(entry.getValue().index(), index));

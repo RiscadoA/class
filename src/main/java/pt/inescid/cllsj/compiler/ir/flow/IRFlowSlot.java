@@ -19,8 +19,8 @@ public class IRFlowSlot {
   }
 
   private Type slotType = Type.UNKNOWN;
-  private Optional<IRFlowRecord> record = Optional.empty();
-  private Optional<IRFlowExponential> exponential = Optional.empty();
+  private Optional<Integer> recordHeapLocation = Optional.empty();
+  private Optional<Integer> exponentialHeapLocation = Optional.empty();
   private Optional<Integer> tag = Optional.empty();
   private Optional<IRFlowType> type = Optional.empty();
 
@@ -55,17 +55,17 @@ public class IRFlowSlot {
     return slot;
   }
 
-  public static IRFlowSlot record(IRFlowRecord record) {
+  public static IRFlowSlot record(int heapLocation) {
     IRFlowSlot slot = new IRFlowSlot();
     slot.slotType = Type.RECORD;
-    slot.record = Optional.of(record);
+    slot.recordHeapLocation = Optional.of(heapLocation);
     return slot;
   }
 
-  public static IRFlowSlot exponential(IRFlowExponential exponential) {
+  public static IRFlowSlot exponential(int heapLocation) {
     IRFlowSlot slot = new IRFlowSlot();
     slot.slotType = Type.EXPONENTIAL;
-    slot.exponential = Optional.of(exponential);
+    slot.exponentialHeapLocation = Optional.of(heapLocation);
     return slot;
   }
 
@@ -101,11 +101,11 @@ public class IRFlowSlot {
   }
 
   public boolean isKnownRecord() {
-    return record.isPresent();
+    return recordHeapLocation.isPresent();
   }
 
-  public IRFlowRecord getRecord() {
-    return record.orElseThrow(() -> new IllegalStateException("Slot does not hold a known record"));
+  public int getRecordHeapLocation() {
+    return recordHeapLocation.orElseThrow(() -> new IllegalStateException("Slot does not hold a known record"));
   }
 
   public boolean isKnownTag() {
@@ -117,11 +117,11 @@ public class IRFlowSlot {
   }
 
   public boolean isKnownExponential() {
-    return exponential.isPresent();
+    return exponentialHeapLocation.isPresent();
   }
 
-  public IRFlowExponential getExponential() {
-    return exponential.orElseThrow(() -> new IllegalStateException("Slot does not hold a known exponential"));
+  public int getExponentialHeapLocation() {
+    return exponentialHeapLocation.orElseThrow(() -> new IllegalStateException("Slot does not hold a known exponential"));
   }
 
   public boolean isValue() {
@@ -137,12 +137,12 @@ public class IRFlowSlot {
   }
 
   public void markLost(IRFlowState state) {
-    if (record.isPresent()) {
-      record.get().markTotallyUnknown(state);
+    if (recordHeapLocation.isPresent()) {
+      state.getHeapRecord(recordHeapLocation.get()).markTotallyUnknown(state);
     }
   }
 
-  public IRFlowSlot merge(IRFlowState.Cloner cloner, IRFlowSlot other) {
+  public IRFlowSlot merge(IRFlowSlot other) {
     if (this.slotType != other.slotType) {
       return unknown();
     }
@@ -151,9 +151,9 @@ public class IRFlowSlot {
       case TAG:
         return this.getTag() == other.getTag() ? this : unknown();
       case RECORD:
-        return record(this.getRecord().merge(cloner, other.getRecord()));
+        return this.getRecordHeapLocation() == other.getRecordHeapLocation() ? this : unknown();
       case EXPONENTIAL:
-        return exponential(this.getExponential().merge(cloner, other.getExponential()));
+        return this.getExponentialHeapLocation() == other.getExponentialHeapLocation() ? this : unknown();
       case TYPE:
         return type(this.getType().merge(other.getType()));
       default:
@@ -161,28 +161,8 @@ public class IRFlowSlot {
     }
   }
 
-  public IRFlowSlot clone(IRFlowState.Cloner cloner) {
-    IRFlowSlot clone = new IRFlowSlot();
-    clone.slotType = this.slotType;
-    
-    switch (this.slotType) {
-      case RECORD:
-        clone.record = Optional.of(this.getRecord().clone(cloner));
-        break;
-      case EXPONENTIAL:
-        clone.exponential = Optional.of(this.getExponential().clone());
-        break;
-      case TAG:
-        clone.tag = this.tag;
-        break;
-      case TYPE:
-        clone.type = Optional.of(this.getType().clone());
-        break;
-      default:
-        break;
-    }
-    
-    return clone;
+  public IRFlowSlot clone() {
+    return this;
   }
 
   @Override
@@ -201,9 +181,9 @@ public class IRFlowSlot {
       case STRING:
         return "string";
       case RECORD:
-        return "record(" + record.get().getIndex() + ")";
+        return "record(" + recordHeapLocation.get() + ")";
       case EXPONENTIAL:
-        return "exponential(" + exponential.get() + ")";
+        return "exponential(" + exponentialHeapLocation.get() + ")";
       case CELL:
         return "cell";
       case TYPE:

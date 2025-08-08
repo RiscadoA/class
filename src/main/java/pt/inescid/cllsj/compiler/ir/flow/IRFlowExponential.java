@@ -5,12 +5,16 @@ import java.util.List;
 import java.util.Optional;
 
 public class IRFlowExponential {
+  private int heapLocation;
   private Optional<List<IRFlowSlot>> value = Optional.empty();
 
-  public IRFlowExponential() {}
+  public IRFlowExponential(int heapLocation, Optional<List<IRFlowSlot>> value) {
+    this.heapLocation = heapLocation;
+    this.value = value;
+  }
 
-  public IRFlowExponential(List<IRFlowSlot> value) {
-    this.value = Optional.of(value);
+  public int getHeapLocation() {
+    return heapLocation;
   }
 
   public boolean hasKnownValue() {
@@ -26,22 +30,20 @@ public class IRFlowExponential {
     return this;
   }
 
-  public IRFlowExponential merge(IRFlowState.Cloner cloner, IRFlowExponential other) {
+  public IRFlowExponential merge(IRFlowExponential other) {
     if (other.value.isEmpty()) {
-      this.value = Optional.empty();
-      return new IRFlowExponential();
+      return new IRFlowExponential(heapLocation, Optional.empty());
     }
 
     if (other.value.get().size() != this.value.get().size()) {
-      value = Optional.empty();
-      return new IRFlowExponential();
+      return new IRFlowExponential(heapLocation, Optional.empty());
     }
 
     List<IRFlowSlot> slots = new ArrayList<>();
     for (int i = 0; i < this.value.get().size(); ++i) {
-      slots.add(this.value.get().get(i).merge(cloner, other.value.get().get(i)));
+      slots.add(this.value.get().get(i).merge(other.value.get().get(i)));
     }
-    return new IRFlowExponential(slots);
+    return new IRFlowExponential(heapLocation, Optional.of(slots));
   }
 
   @Override

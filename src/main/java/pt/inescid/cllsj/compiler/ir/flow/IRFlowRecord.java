@@ -6,18 +6,14 @@ import java.util.Optional;
 import java.util.function.Consumer;
 
 public class IRFlowRecord {
+  private int heapLocation;
   private Optional<String> continuation = Optional.empty();
-  private Optional<Integer> index;
 
   private List<IRFlowSlot> slots = new ArrayList<>();
   private boolean slotsKnown = false;
 
-  public IRFlowRecord(int index) {
-    this(Optional.of(index));
-  }
-
-  public IRFlowRecord(Optional<Integer> index) {
-    this.index = index;
+  public IRFlowRecord(int heapLocation) {
+    this.heapLocation = heapLocation;
   }
 
   public void doNewSession(Optional<String> continuation) {
@@ -121,39 +117,41 @@ public class IRFlowRecord {
     return Optional.of(slots.size());
   }
 
-  public Optional<Integer> getIndex() {
-    return index;
+  public Optional<List<IRFlowSlot>> getSlots() {
+    if (!slotsKnown) {
+      return Optional.empty();
+    }
+    return Optional.of(slots);
   }
 
-  public IRFlowRecord merge(IRFlowState.Cloner cloner, IRFlowRecord other) {
-    IRFlowRecord merged = this.clone(cloner);
+  public int getHeapLocation() {
+    return heapLocation;
+  }
+
+  public IRFlowRecord merge(IRFlowRecord other) {
+    IRFlowRecord merged = this.clone();
     if (!merged.continuation.equals(other.continuation)) {
       merged.continuation = Optional.empty();
     }
-    if (!merged.index.equals(other.index)) {
-      merged.index = Optional.empty();
+    if (merged.heapLocation != other.heapLocation) {
+      throw new IllegalArgumentException("Cannot merge records with different heap locations: " 
+          + merged.heapLocation + " != " + other.heapLocation);
     }
     if (!merged.slotsKnown || !other.slotsKnown || merged.slots.size() != other.slots.size()) {
       merged.slots.clear();
       merged.slotsKnown = false;
     }
     for (int i = 0; i < merged.slots.size(); ++i) {
-      merged.slots.set(i, merged.slots.get(i).merge(cloner, other.slots.get(i)));
+      merged.slots.set(i, merged.slots.get(i).merge(other.slots.get(i)));
     }
     return merged;
   }
 
-  public IRFlowRecord clone(IRFlowState.Cloner cloner) {
-    if (cloner.getCloned(this).isPresent()) {
-      return cloner.getCloned(this).get();
-    }
-
-    IRFlowRecord clone = new IRFlowRecord(index);
-    cloner.setCloned(this, clone);
-
+  public IRFlowRecord clone() {
+    IRFlowRecord clone = new IRFlowRecord(heapLocation);
     clone.continuation = this.continuation;
     for (IRFlowSlot slot : this.slots) {
-      clone.slots.add(slot.clone(cloner));
+      clone.slots.add(slot.clone());
     }
     clone.slotsKnown = this.slotsKnown;
     return clone;

@@ -5,7 +5,8 @@ import java.util.List;
 import pt.inescid.cllsj.compiler.ir.type.IRType;
 
 public class IRProcess {
-  private boolean hasArguments;
+  private int recordArgumentCount;
+  private int exponentialArgumentCount;
   private List<IRType> recordTypes;
   private List<IRType> exponentialTypes;
   private int endPoints;
@@ -14,12 +15,14 @@ public class IRProcess {
   private List<Boolean> typeVariablePolarities;
 
   public IRProcess(
-      boolean hasArguments,
+      int recordArgumentCount,
+      int exponentialArgumentCount,
       List<IRType> recordTypes,
       List<IRType> exponentialTypes,
       List<Boolean> typeVariablePolarites,
       int endPoints) {
-    this.hasArguments = hasArguments;
+    this.recordArgumentCount = recordArgumentCount;
+    this.exponentialArgumentCount = exponentialArgumentCount;
     this.recordTypes = recordTypes;
     this.exponentialTypes = exponentialTypes;
     this.typeVariablePolarities = typeVariablePolarites;
@@ -29,7 +32,15 @@ public class IRProcess {
   }
 
   public boolean hasArguments() {
-    return hasArguments;
+    return recordArgumentCount > 0 || exponentialArgumentCount > 0;
+  }
+
+  public int getRecordArgumentCount() {
+    return recordArgumentCount;
+  }
+
+  public int getExponentialArgumentCount() {
+    return exponentialArgumentCount;
   }
 
   public int getRecordCount() {
