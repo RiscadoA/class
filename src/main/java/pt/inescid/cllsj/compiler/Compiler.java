@@ -99,9 +99,12 @@ public class Compiler {
         if (optimizeKnownJumps) {
           optimizer.optimizeKnownJumps(ir);
         }
-      }
-      if (optimizeFlipForward) {
-        optimizer.optimizeFlipForward(ir);
+
+        if (optimizeFlipForward) {
+          optimizer.optimizeFlipForward(ir);
+        }
+
+        optimizer.removeUnreachableBlocks(ir);
       }
     } catch (Exception e) {
       System.err.println("IR optimization error: " + e.getMessage());

@@ -1118,8 +1118,10 @@ public class CGenerator extends IRInstructionVisitor {
           decrementAtomic(environmentEndPoints()) + " == 0",
           () -> putFreeEnvironment(ENV),
           () -> {
-            // If the environment was not freed, and if the records won't be used in this environment
-            // anymore, we need to remove their bindings. This is necessary to prevent them from being
+            // If the environment was not freed, and if the records won't be used in this
+            // environment
+            // anymore, we need to remove their bindings. This is necessary to prevent them from
+            // being
             // cloned or freed again later on.
 
             // The negative record will be deleted, but it's binding may now point to the positive
@@ -1131,7 +1133,8 @@ public class CGenerator extends IRInstructionVisitor {
                 });
 
             // The positive record will only be needed if either the environment we're going to jump
-            // to or its continuation environment are the current environment. If not, we also need to
+            // to or its continuation environment are the current environment. If not, we also need
+            // to
             // remove its binding from the current environment.
             putIf(
                 ENV + " != " + recordContEnv(i.getPosRecord()) + " && " + ENV + " != " + TMP_ENV,
@@ -1361,7 +1364,8 @@ public class CGenerator extends IRInstructionVisitor {
       putAssign(recordContEnv(instruction.getRecord()), "NULL");
     } else {
       putAssign(
-        recordCont(instruction.getRecord()), labelAddress(blockLabel(instruction.getLabel().get())));
+          recordCont(instruction.getRecord()),
+          labelAddress(blockLabel(instruction.getLabel().get())));
       putAssign(recordContEnv(instruction.getRecord()), ENV);
     }
     putAssign(recordContRecord(instruction.getRecord()), instruction.getRecord());
@@ -1523,17 +1527,17 @@ public class CGenerator extends IRInstructionVisitor {
     putAssign(type(instruction.getArgType()), popType(instruction.getRecord()));
     if (instruction.getPositiveLabel().isPresent() || instruction.getNegativeLabel().isPresent()) {
       putIfElse(
-        popPolarity(instruction.getRecord()),
-        () -> {
-          if (instruction.getPositiveLabel().isPresent()) {
-            putConstantGoto(blockLabel(instruction.getPositiveLabel().get()));
-          }
-        },
-        () -> {
-          if (instruction.getNegativeLabel().isPresent()) {
-            putConstantGoto(blockLabel(instruction.getNegativeLabel().get()));
-          }
-        });
+          popPolarity(instruction.getRecord()),
+          () -> {
+            if (instruction.getPositiveLabel().isPresent()) {
+              putConstantGoto(blockLabel(instruction.getPositiveLabel().get()));
+            }
+          },
+          () -> {
+            if (instruction.getNegativeLabel().isPresent()) {
+              putConstantGoto(blockLabel(instruction.getNegativeLabel().get()));
+            }
+          });
     }
   }
 

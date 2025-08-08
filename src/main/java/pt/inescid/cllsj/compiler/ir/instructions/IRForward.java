@@ -5,7 +5,7 @@ import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 public class IRForward extends IRInstruction {
   private int negRecord; // Index of the record whose session is of a reading type.
   private int posRecord; // Index of the record whose session is of a writing type.
-  
+
   // Used by the known jump optimization to avoid jumping after a forward
   // Happens when the continuation is known at compile time
   // In that case we just modify the posRecord accordingly and delete the negRecord

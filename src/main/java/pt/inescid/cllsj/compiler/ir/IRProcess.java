@@ -89,6 +89,12 @@ public class IRProcess {
     return blocks;
   }
 
+  public List<IRBlock> getBlocksIncludingEntry() {
+    List<IRBlock> allBlocks = new ArrayList<>(blocks);
+    allBlocks.add(0, entry); // Add entry block at the beginning
+    return allBlocks;
+  }
+
   public IRBlock getBlock(String label) {
     for (IRBlock block : blocks) {
       if (block.getLabel().equals(label)) {

@@ -80,6 +80,11 @@ public class IRFlow {
     branches.add(branch);
   }
 
+  public void removeOutgoing(IRFlow flow) {
+    removeDetached(flow);
+    removeBranch(flow);
+  }
+
   private void printLabels(StringBuffer sb, Set<IRFlow> flows) {
     if (flows.isEmpty()) {
       sb.append("none");

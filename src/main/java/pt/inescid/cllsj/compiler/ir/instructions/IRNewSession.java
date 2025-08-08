@@ -1,7 +1,6 @@
 package pt.inescid.cllsj.compiler.ir.instructions;
 
 import java.util.Optional;
-
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 
 public class IRNewSession extends IRInstruction {

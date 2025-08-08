@@ -5,8 +5,6 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
-import java.util.function.Consumer;
-
 import pt.inescid.cllsj.compiler.ir.IRBlock;
 import pt.inescid.cllsj.compiler.ir.IRProcess;
 import pt.inescid.cllsj.compiler.ir.IRProgram;
@@ -39,36 +37,14 @@ public class IROptimizer {
             "Analysis must be enabled to perform known jumps optimization");
       }
       optimizeKnownJumps(e.getValue(), processFlows.get(e.getKey()));
-      removeUnreachableBlocks(e.getValue(), processFlows.get(e.getKey()));
-
-
-      // Remove all references to the removed blocks
-      Consumer<IRBlock> forEachBlock = block -> {
-        for (int index = 0; index < block.getInstructions().size(); ++index) {
-          IRInstruction instruction = block.getInstructions().get(index);
-          if (instruction instanceof IRNewSession) {
-            IRNewSession i = (IRNewSession) instruction;
-            if (i.getLabel().isPresent() && !e.getValue().containsBlock(i.getLabel().get())) {
-              i.removeLabel();
-            }
-          } else if (instruction instanceof IRFlip) {
-            IRFlip i = (IRFlip) instruction;
-            if (!e.getValue().containsBlock(i.getContLabel())) {
-              block.getInstructions().set(index, new IRReturn(i.getRecord()));
-            }
-          }
-        }
-      };
-      forEachBlock.accept(e.getValue().getEntry());
-      e.getValue().getBlocks().forEach(forEachBlock);
     }
   }
 
   private void optimizeKnownJumps(IRProcess ir, Map<IRBlock, IRFlow> flows) {
-    while(true) {
+    while (true) {
       Optional<IRFlow> prev = Optional.empty();
       Optional<IRFlow> next1 = Optional.empty();
-      
+
       for (IRFlow flow : flows.values()) {
         if (flow.getBranches().size() != 1) {
           continue;
@@ -130,7 +106,8 @@ public class IROptimizer {
       subtractEndPoints(ir, prev, endPoints);
 
       // This is a troublesome instruction.
-      // If remove the pop tag, we would need to remove the push too, and, additionally, modify the type of the record
+      // If remove the pop tag, we would need to remove the push too, and, additionally, modify the
+      // type of the record
       // That is complicated and in real life, this optimization probably almost never happens.
       // So, we pop the tag anyway, and just omit the jump.
       i.getCases().clear();
@@ -153,7 +130,8 @@ public class IROptimizer {
       // We're removing a single end point of the process.
       subtractEndPoints(ir, prev, 1);
     } else {
-      throw new UnsupportedOperationException("Unexpected block ending instruction type: " + last.getClass().getSimpleName());
+      throw new UnsupportedOperationException(
+          "Unexpected block ending instruction type: " + last.getClass().getSimpleName());
     }
 
     // Add the next block's instructions to the current block
@@ -180,7 +158,7 @@ public class IROptimizer {
     IRBlock block = flow.getBlock();
     for (int index = block.getInstructions().size() - 1; index >= 0; --index) {
       IRInstruction instruction = block.getInstructions().get(index);
-        IRFlowState nextState = flow.getStates().get(index + 1);
+      IRFlowState nextState = flow.getStates().get(index + 1);
 
       if (instruction instanceof IRNewSession) {
         IRNewSession i = (IRNewSession) instruction;
@@ -193,7 +171,7 @@ public class IROptimizer {
         if (nextState.getBoundRecord(i.getRecord()).getHeapLocation() == recordLocation) {
           i.setContLabel(label);
           return;
-        } 
+        }
       }
     }
 
@@ -234,12 +212,18 @@ public class IROptimizer {
         }
       }
 
-      subtractEndPoints(ir, source, endPoints);
+      subtractEndPoints(ir, source, endPoints, visited);
+    }
+  }
+
+  public void removeUnreachableBlocks(IRProgram ir) {
+    for (Map.Entry<String, IRProcess> e : ir.getProcesses().entrySet()) {
+      removeUnreachableBlocks(e.getValue(), processFlows.get(e.getKey()));
     }
   }
 
   private void removeUnreachableBlocks(IRProcess ir, Map<IRBlock, IRFlow> flows) {
-    while(true) {
+    while (true) {
       Optional<IRBlock> toRemove = Optional.empty();
 
       for (IRBlock block : ir.getBlocks()) {
@@ -264,47 +248,71 @@ public class IROptimizer {
         }
       }
     }
-  }
 
-  public void optimizeFlipForward(IRProgram ir) {
-    for (IRProcess process : ir.getProcesses().values()) {
-      optimizeFlipForward(process.getEntry());
-      for (IRBlock block : process.getBlocks()) {
-        optimizeFlipForward(block);
+    // Remove all references to the removed blocks
+    for (IRBlock block : ir.getBlocksIncludingEntry()) {
+      for (int index = 0; index < block.getInstructions().size(); ++index) {
+        IRInstruction instruction = block.getInstructions().get(index);
+        if (instruction instanceof IRNewSession) {
+          IRNewSession i = (IRNewSession) instruction;
+          if (i.getLabel().isPresent() && !ir.containsBlock(i.getLabel().get())) {
+            i.removeLabel();
+          }
+        } else if (instruction instanceof IRFlip) {
+          IRFlip i = (IRFlip) instruction;
+          if (!ir.containsBlock(i.getContLabel())) {
+            block.getInstructions().set(index, new IRReturn(i.getRecord()));
+          }
+        }
       }
     }
   }
 
-  private void optimizeFlipForward(IRBlock ir) {
-    int size = ir.getInstructions().size();
-    if (size < 2) {
-      return; // Not what we're looking for
-    }
-    IRInstruction maybeFlip = ir.getInstructions().get(size - 2);
-    IRInstruction maybeForward = ir.getInstructions().get(size - 1);
-    if (!(maybeFlip instanceof IRFlip && maybeForward instanceof IRForward)) {
-      return; // Not what we're looking for
-    }
-    IRFlip flip = (IRFlip) maybeFlip;
-    IRForward forward = (IRForward) maybeForward;
-    if (flip.getRecord() != forward.getNegRecord()) {
-      return; // Not what we're looking for
-    }
-    int x = forward.getNegRecord();
-    int y = forward.getPosRecord();
+  public void optimizeFlipForward(IRProgram ir) {
+    for (Map.Entry<String, IRProcess> e : ir.getProcesses().entrySet()) {
+      Map<IRBlock, IRFlow> flows = processFlows.get(e.getKey());
+      for (IRBlock flipBlock : e.getValue().getBlocksIncludingEntry()) {
+        if (!flows.containsKey(flipBlock)) {
+          continue;
+        }
+        IRFlow flipFlow = flows.get(flipBlock);
 
-    // We've found a block of the form:
-    //
-    //     flip(x)
-    //     forward(-x, +y)
-    //
-    // Our goal is to avoid the flip entirely by executing the forward earlier
-    // The tradeoff here is that we might need to allocate more memory for the merged record
-    // What we gain is that we deallocate unnecessary memory earlier and avoid a costly flip.
+        IRInstruction maybeFlip = flipBlock.getInstructions().getLast();
+        if (!(maybeFlip instanceof IRFlip)) {
+          continue; // Not what we're looking for
+        }
+        IRFlip flip = (IRFlip) maybeFlip;
+        IRBlock forwardBlock = e.getValue().getBlock(flip.getContLabel());
+        IRInstruction maybeForward = forwardBlock.getInstructions().getFirst();
+        if (!(maybeForward instanceof IRForward)) {
+          continue; // Not what we're looking for
+        }
+        IRForward forward = (IRForward) maybeForward;
+        if (flip.getRecord() != forward.getNegRecord() || !forward.shouldReturn()) {
+          continue; // Not what we're looking for
+        }
+        int x = forward.getNegRecord();
+        int y = forward.getPosRecord();
 
-    ir.getInstructions().removeLast();
-    ir.getInstructions().removeLast();
+        // We've found two blocks of the form:
+        //
+        //     ...
+        //     flip(x, cont)
+        // cont:
+        //     forward(-x, +y)
+        //
+        // Our goal is to avoid the flip entirely by executing the forward earlier
+        // The tradeoff here is that we might need to allocate more memory for the merged record
+        // What we gain is that we deallocate unnecessary memory earlier and avoid a costly flip.
 
-    ir.add(new IRFlipForward(x, y));
+        IRFlow forwardFlow = flows.get(forwardBlock);
+        flipBlock.getInstructions().removeLast();
+        flipBlock.getInstructions().add(new IRFlipForward(x, y));
+        flipFlow.getStates().removeLast();
+        flipFlow.getStates().add(forwardFlow.getStates().get(1));
+        flipFlow.removeOutgoing(forwardFlow);
+        forwardFlow.removeSource(flipFlow);
+      }
+    }
   }
 }
