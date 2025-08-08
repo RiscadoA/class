@@ -20,6 +20,10 @@ public class IRPopTag extends IRInstruction {
     public int getEndPoints() {
       return endPoints;
     }
+
+    public void subtractEndPoints(int n) {
+      this.endPoints -= n;
+    }
   }
 
   private int record;

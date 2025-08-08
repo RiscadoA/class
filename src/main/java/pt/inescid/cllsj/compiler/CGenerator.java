@@ -1093,8 +1093,10 @@ public class CGenerator extends IRInstructionVisitor {
             + read(i.getNegRecord()));
 
     // Set the continuation of the positive record to the continuation of the negative record.
-    putAssign(TMP_CONT, recordCont(i.getPosRecord()));
-    putAssign(TMP_ENV, recordContEnv(i.getPosRecord()));
+    if (i.shouldReturn()) {
+      putAssign(TMP_CONT, recordCont(i.getPosRecord()));
+      putAssign(TMP_ENV, recordContEnv(i.getPosRecord()));
+    }
     putAssign(recordCont(i.getPosRecord()), recordCont(i.getNegRecord()));
     putAssign(recordContEnv(i.getPosRecord()), recordContEnv(i.getNegRecord()));
     putAssign(recordContRecord(i.getPosRecord()), recordContRecord(i.getNegRecord()));
@@ -1111,36 +1113,40 @@ public class CGenerator extends IRInstructionVisitor {
         });
 
     // Decrement the end points and free the environment if necessary.
-    putIfElse(
-        decrementAtomic(environmentEndPoints()) + " == 0",
-        () -> putFreeEnvironment(ENV),
-        () -> {
-          // If the environment was not freed, and if the records won't be used in this environment
-          // anymore, we need to remove their bindings. This is necessary to prevent them from being
-          // cloned or freed again later on.
+    if (i.shouldReturn()) {
+      putIfElse(
+          decrementAtomic(environmentEndPoints()) + " == 0",
+          () -> putFreeEnvironment(ENV),
+          () -> {
+            // If the environment was not freed, and if the records won't be used in this environment
+            // anymore, we need to remove their bindings. This is necessary to prevent them from being
+            // cloned or freed again later on.
 
-          // The negative record will be deleted, but it's binding may now point to the positive
-          // record. If it doesn't, then we set it to null.
-          putIf(
-              TMP_RECORD + " == " + record(i.getNegRecord()),
-              () -> {
-                putAssign(record(i.getNegRecord()), "NULL");
-              });
+            // The negative record will be deleted, but it's binding may now point to the positive
+            // record. If it doesn't, then we set it to null.
+            putIf(
+                TMP_RECORD + " == " + record(i.getNegRecord()),
+                () -> {
+                  putAssign(record(i.getNegRecord()), "NULL");
+                });
 
-          // The positive record will only be needed if either the environment we're going to jump
-          // to or its continuation environment are the current environment. If not, we also need to
-          // remove its binding from the current environment.
-          putIf(
-              ENV + " != " + recordContEnv(i.getPosRecord()) + " && " + ENV + " != " + TMP_ENV,
-              () -> {
-                putAssign(record(i.getPosRecord()), "NULL");
-              });
-        });
+            // The positive record will only be needed if either the environment we're going to jump
+            // to or its continuation environment are the current environment. If not, we also need to
+            // remove its binding from the current environment.
+            putIf(
+                ENV + " != " + recordContEnv(i.getPosRecord()) + " && " + ENV + " != " + TMP_ENV,
+                () -> {
+                  putAssign(record(i.getPosRecord()), "NULL");
+                });
+          });
+    }
 
     // Finally, free the negative record and jump to the continuation.
     putFreeRecord(TMP_RECORD);
-    putAssign(ENV, TMP_ENV);
-    putComputedGoto(TMP_CONT);
+    if (i.shouldReturn()) {
+      putAssign(ENV, TMP_ENV);
+      putComputedGoto(TMP_CONT);
+    }
   }
 
   @Override
@@ -1304,6 +1310,12 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRPopTag instruction) {
+    if (instruction.getCases().isEmpty()) {
+      // After optimizing, we might end up with pop tags which don't jump.
+      putStatement(popTag(instruction.getRecord()));
+      return;
+    }
+
     putLine("switch (" + popTag(instruction.getRecord()) + ") {");
     incIndent();
 
@@ -1345,9 +1357,13 @@ public class CGenerator extends IRInstructionVisitor {
   @Override
   public void visit(IRNewSession instruction) {
     putAllocRecord(record(instruction.getRecord()), recordType(instruction.getRecord()));
-    putAssign(
-        recordCont(instruction.getRecord()), labelAddress(blockLabel(instruction.getLabel())));
-    putAssign(recordContEnv(instruction.getRecord()), ENV);
+    if (instruction.getLabel().isEmpty()) {
+      putAssign(recordContEnv(instruction.getRecord()), "NULL");
+    } else {
+      putAssign(
+        recordCont(instruction.getRecord()), labelAddress(blockLabel(instruction.getLabel().get())));
+      putAssign(recordContEnv(instruction.getRecord()), ENV);
+    }
     putAssign(recordContRecord(instruction.getRecord()), instruction.getRecord());
     putAssign(read(instruction.getRecord()), 0);
     putAssign(written(instruction.getRecord()), 0);
@@ -1505,10 +1521,20 @@ public class CGenerator extends IRInstructionVisitor {
   @Override
   public void visit(IRPopType instruction) {
     putAssign(type(instruction.getArgType()), popType(instruction.getRecord()));
-    putIfElse(
+    if (instruction.getPositiveLabel().isPresent() || instruction.getNegativeLabel().isPresent()) {
+      putIfElse(
         popPolarity(instruction.getRecord()),
-        () -> putConstantGoto(blockLabel(instruction.getPositiveLabel())),
-        () -> putConstantGoto(blockLabel(instruction.getNegativeLabel())));
+        () -> {
+          if (instruction.getPositiveLabel().isPresent()) {
+            putConstantGoto(blockLabel(instruction.getPositiveLabel().get()));
+          }
+        },
+        () -> {
+          if (instruction.getNegativeLabel().isPresent()) {
+            putConstantGoto(blockLabel(instruction.getNegativeLabel().get()));
+          }
+        });
+    }
   }
 
   @Override

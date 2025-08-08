@@ -1,7 +1,6 @@
 package pt.inescid.cllsj.compiler.ir.flow;
 
 import java.util.Optional;
-
 import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
 import pt.inescid.cllsj.compiler.ir.type.IRType;
 

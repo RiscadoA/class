@@ -4,7 +4,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-
 import pt.inescid.cllsj.compiler.ir.IRBlock;
 import pt.inescid.cllsj.compiler.ir.IRExpressionVisitor;
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
@@ -36,7 +35,7 @@ public class IRAnalyzer extends IRInstructionVisitor {
   private IRFlowState state = new IRFlowState();
   private IRProcess process;
 
-  public static IRFlow analyze(IRProcess process) {
+  public static Map<IRBlock, IRFlow> analyze(IRProcess process) {
     IRAnalyzer analyzer = new IRAnalyzer(process);
     for (int i = 0; i < process.getTypeVariableCount(); ++i) {
       analyzer.state.bindType(i, new IRFlowType(process.isTypeVariablePositive(i)));
@@ -47,7 +46,8 @@ public class IRAnalyzer extends IRInstructionVisitor {
     for (int i = 0; i < process.getExponentialArgumentCount(); ++i) {
       analyzer.state.bindExponential(i, analyzer.state.allocateExponential(Optional.empty()));
     }
-    return analyzer.visit(process.getEntry(), true);
+    analyzer.visit(process.getEntry(), true);
+    return analyzer.flows;
   }
 
   private IRAnalyzer(IRProcess process) {
@@ -61,11 +61,11 @@ public class IRAnalyzer extends IRInstructionVisitor {
     }
   }
 
-  private IRFlow visit(String label, boolean detached) {
-    return visit(process.getBlock(label), detached);
+  private void visit(String label, boolean detached) {
+    visit(process.getBlock(label), detached);
   }
 
-  private IRFlow visit(IRBlock block, boolean detached) {
+  private void visit(IRBlock block, boolean detached) {
     // Create a new flow object (if we haven't passed through it yet).
     Optional<IRFlow> previousFlow = this.flow;
     IRFlowState previousState = this.state;
@@ -100,7 +100,6 @@ public class IRAnalyzer extends IRInstructionVisitor {
 
     this.flow = previousFlow;
     this.state = previousState;
-    return currentFlow;
   }
 
   @Override
@@ -127,7 +126,7 @@ public class IRAnalyzer extends IRInstructionVisitor {
   @Override
   public void visit(IRNewSession instruction) {
     IRFlowRecord record = state.allocateRecord();
-    record.doNewSession(Optional.of(instruction.getLabel()));
+    record.doNewSession(instruction.getLabel());
     state.bindRecord(instruction.getRecord(), record);
   }
 
@@ -208,7 +207,8 @@ public class IRAnalyzer extends IRInstructionVisitor {
     IRFlowRecord argRecord = state.allocateRecord();
     state.bindRecord(instruction.getArgRecord(), argRecord);
 
-    Optional<Integer> slotCount = state.slotCount(process.getRecordType(instruction.getArgRecord()), record.getSlots());
+    Optional<Integer> slotCount =
+        state.slotCount(process.getRecordType(instruction.getArgRecord()), record.getSlots());
 
     if (slotCount.isPresent()) {
       argRecord.doNewSession(Optional.empty());
@@ -257,7 +257,9 @@ public class IRAnalyzer extends IRInstructionVisitor {
 
   @Override
   public void visit(IRPushTag instruction) {
-    state.getBoundRecord(instruction.getRecord()).doPush(state, IRFlowSlot.tag(instruction.getTag()));
+    state
+        .getBoundRecord(instruction.getRecord())
+        .doPush(state, IRFlowSlot.tag(instruction.getTag()));
   }
 
   @Override
@@ -305,13 +307,16 @@ public class IRAnalyzer extends IRInstructionVisitor {
     if (slot.isKnownExponential()) {
       state.bindExponential(instruction.getArgExponential(), slot.getExponentialHeapLocation());
     } else {
-      state.bindExponential(instruction.getArgExponential(), state.allocateExponential(Optional.empty()));
+      state.bindExponential(
+          instruction.getArgExponential(), state.allocateExponential(Optional.empty()));
     }
   }
 
   @Override
   public void visit(IRPushType instruction) {
-    IRFlowType type = new IRFlowType(instruction.getType(), instruction.isPositive(), instruction.getValueRequisites());
+    IRFlowType type =
+        new IRFlowType(
+            instruction.getType(), instruction.isPositive(), instruction.getValueRequisites());
     state.getBoundRecord(instruction.getRecord()).doPush(state, IRFlowSlot.type(type));
   }
 
@@ -323,13 +328,21 @@ public class IRAnalyzer extends IRInstructionVisitor {
     }
     if (slot.isKnownType() && slot.getType().isPositive().isPresent()) {
       if (slot.getType().isPositive().get()) {
-        visit(instruction.getPositiveLabel(), false);
+        if (instruction.getPositiveLabel().isPresent()) {
+          visit(instruction.getPositiveLabel().get(), false);
+        }
       } else {
-        visit(instruction.getNegativeLabel(), false);
+        if (instruction.getNegativeLabel().isPresent()) {
+          visit(instruction.getNegativeLabel().get(), false);
+        }
       }
     } else {
-      visit(instruction.getNegativeLabel(), false);
-      visit(instruction.getPositiveLabel(), false);
+      if (instruction.getNegativeLabel().isPresent()) {
+        visit(instruction.getNegativeLabel().get(), false);
+      }
+      if (instruction.getPositiveLabel().isPresent()) {
+        visit(instruction.getPositiveLabel().get(), false);
+      }
     }
   }
 
@@ -392,10 +405,12 @@ public class IRAnalyzer extends IRInstructionVisitor {
     state.freeRecord(negRecord);
     state.bindRecord(instruction.getNegRecord(), instruction.getPosRecord());
 
-    if (posRecordCont.isPresent()) {
-      visit(posRecordCont.get(), false);
-    } else {
-      visitNextPending();
+    if (instruction.shouldReturn()) {
+      if (posRecordCont.isPresent()) {
+        visit(posRecordCont.get(), false);
+      } else {
+        visitNextPending();
+      }
     }
   }
 
@@ -420,7 +435,9 @@ public class IRAnalyzer extends IRInstructionVisitor {
   public void visit(IRSleep instruction) {}
 
   @Override
-  public void visit(IRPanic instruction) {}
+  public void visit(IRPanic instruction) {
+    visitNextPending();
+  }
 
   @Override
   public void visit(IRScan instruction) {
@@ -495,7 +512,7 @@ public class IRAnalyzer extends IRInstructionVisitor {
         slot = IRFlowSlot.bool();
       } else {
         throw new UnsupportedOperationException(
-          "Unsupported type: " + type.getClass().getSimpleName());
+            "Unsupported type: " + type.getClass().getSimpleName());
       }
     }
 

@@ -1,8 +1,6 @@
 package pt.inescid.cllsj.compiler.ir.flow;
 
 import java.util.Optional;
-import pt.inescid.cllsj.compiler.ir.expressions.*;
-import pt.inescid.cllsj.compiler.ir.type.*;
 
 public class IRFlowSlot {
   private static enum Type {
@@ -91,7 +89,8 @@ public class IRFlowSlot {
   }
 
   public int getRecordHeapLocation() {
-    return recordHeapLocation.orElseThrow(() -> new IllegalStateException("Slot does not hold a known record"));
+    return recordHeapLocation.orElseThrow(
+        () -> new IllegalStateException("Slot does not hold a known record"));
   }
 
   public boolean isKnownTag() {
@@ -107,11 +106,15 @@ public class IRFlowSlot {
   }
 
   public int getExponentialHeapLocation() {
-    return exponentialHeapLocation.orElseThrow(() -> new IllegalStateException("Slot does not hold a known exponential"));
+    return exponentialHeapLocation.orElseThrow(
+        () -> new IllegalStateException("Slot does not hold a known exponential"));
   }
 
   public boolean isValue() {
-    return slotType == Type.INTEGER || slotType == Type.BOOL || slotType == Type.STRING || slotType == Type.EXPONENTIAL;
+    return slotType == Type.INTEGER
+        || slotType == Type.BOOL
+        || slotType == Type.STRING
+        || slotType == Type.EXPONENTIAL;
   }
 
   public boolean isKnownType() {
@@ -139,7 +142,9 @@ public class IRFlowSlot {
       case RECORD:
         return this.getRecordHeapLocation() == other.getRecordHeapLocation() ? this : unknown();
       case EXPONENTIAL:
-        return this.getExponentialHeapLocation() == other.getExponentialHeapLocation() ? this : unknown();
+        return this.getExponentialHeapLocation() == other.getExponentialHeapLocation()
+            ? this
+            : unknown();
       case TYPE:
         return type(this.getType().merge(other.getType()));
       default:

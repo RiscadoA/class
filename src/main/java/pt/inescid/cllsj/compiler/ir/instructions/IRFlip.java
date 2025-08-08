@@ -19,6 +19,10 @@ public class IRFlip extends IRInstruction {
     return contLabel;
   }
 
+  public void setContLabel(String contLabel) {
+    this.contLabel = contLabel;
+  }
+
   @Override
   public void accept(IRInstructionVisitor visitor) {
     visitor.visit(this);

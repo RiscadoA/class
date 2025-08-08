@@ -1,22 +1,32 @@
 package pt.inescid.cllsj.compiler.ir.instructions;
 
+import java.util.Optional;
+
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 
 public class IRNewSession extends IRInstruction {
   private int record; // Index of the record to be initialized.
-  private String label; // Label for the initial continuation.
+  private Optional<String> label; // Label for the initial continuation.
 
   public IRNewSession(int record, String label) {
     this.record = record;
-    this.label = label;
+    this.label = Optional.of(label);
   }
 
   public int getRecord() {
     return record;
   }
 
-  public String getLabel() {
+  public Optional<String> getLabel() {
     return label;
+  }
+
+  public void setLabel(String label) {
+    this.label = Optional.of(label);
+  }
+
+  public void removeLabel() {
+    this.label = Optional.empty();
   }
 
   @Override
@@ -26,6 +36,12 @@ public class IRNewSession extends IRInstruction {
 
   @Override
   public String toString() {
-    return "newSession(" + record + ", " + label + ")";
+    StringBuilder sb = new StringBuilder("newSession(");
+    sb.append(record);
+    if (label.isPresent()) {
+      sb.append(", ").append(label.get());
+    }
+    sb.append(")");
+    return sb.toString();
   }
 }

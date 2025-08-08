@@ -21,6 +21,10 @@ public class IRBranch extends IRInstruction {
       return endPoints;
     }
 
+    public void subtractEndPoints(int n) {
+      this.endPoints -= n;
+    }
+
     @Override
     public String toString() {
       return label + " (" + endPoints + ")";

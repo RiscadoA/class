@@ -134,8 +134,11 @@ public class IRFlowRecord {
       merged.continuation = Optional.empty();
     }
     if (merged.heapLocation != other.heapLocation) {
-      throw new IllegalArgumentException("Cannot merge records with different heap locations: " 
-          + merged.heapLocation + " != " + other.heapLocation);
+      throw new IllegalArgumentException(
+          "Cannot merge records with different heap locations: "
+              + merged.heapLocation
+              + " != "
+              + other.heapLocation);
     }
     if (!merged.slotsKnown || !other.slotsKnown || merged.slots.size() != other.slots.size()) {
       merged.slots.clear();

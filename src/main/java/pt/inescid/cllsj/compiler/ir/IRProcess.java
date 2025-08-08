@@ -71,6 +71,10 @@ public class IRProcess {
     return endPoints;
   }
 
+  public void subtractEndPoints(int endPoints) {
+    this.endPoints -= endPoints;
+  }
+
   public IRBlock getEntry() {
     return entry;
   }
@@ -92,6 +96,15 @@ public class IRProcess {
       }
     }
     throw new IllegalArgumentException("Block with label " + label + " does not exist");
+  }
+
+  public boolean containsBlock(String label) {
+    for (IRBlock block : blocks) {
+      if (block.getLabel().equals(label)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   @Override

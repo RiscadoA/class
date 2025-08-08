@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Stack;
-
 import pt.inescid.cllsj.compiler.ir.IRTypeVisitor;
 import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
 import pt.inescid.cllsj.compiler.ir.type.IRBoolT;
@@ -140,7 +139,8 @@ public class IRFlowState {
     }
     for (Map.Entry<Integer, Integer> entry : other.boundExponentials.entrySet()) {
       if (merged.boundExponentials.containsKey(entry.getKey())) {
-        merged.boundExponentials.put(entry.getKey(), merged.allocateExponential(Optional.empty()).getHeapLocation());
+        merged.boundExponentials.put(
+            entry.getKey(), merged.allocateExponential(Optional.empty()).getHeapLocation());
       } else {
         merged.boundExponentials.put(entry.getKey(), entry.getValue());
       }
@@ -174,7 +174,7 @@ public class IRFlowState {
     if (this.pendingContinuations.isEmpty()) {
       clone.pendingContinuations = Optional.empty();
     } else {
-      clone.pendingContinuations.get().addAll(this.pendingContinuations.get());      
+      clone.pendingContinuations.get().addAll(this.pendingContinuations.get());
     }
     return clone;
   }
@@ -184,10 +184,7 @@ public class IRFlowState {
     StringBuilder sb = new StringBuilder();
 
     for (Map.Entry<Integer, IRFlowRecord> entry : recordHeap.entrySet()) {
-      sb.append("record @")
-        .append(entry.getKey())
-        .append(": ")
-        .append("bind=");
+      sb.append("record @").append(entry.getKey()).append(": ").append("bind=");
       boolean foundBinding = false;
       for (Map.Entry<Integer, Integer> boundEntry : boundRecords.entrySet()) {
         if (boundEntry.getValue() == entry.getKey()) {
@@ -202,15 +199,10 @@ public class IRFlowState {
         sb.append("none");
       }
 
-      sb.append(" ")
-          .append(entry.getValue())
-          .append("\n");
+      sb.append(" ").append(entry.getValue()).append("\n");
     }
     for (Map.Entry<Integer, IRFlowExponential> entry : exponentialHeap.entrySet()) {
-      sb.append("exponential @")
-          .append(entry.getKey())
-          .append(": ")
-          .append("bind=");
+      sb.append("exponential @").append(entry.getKey()).append(": ").append("bind=");
       boolean foundBinding = false;
       for (Map.Entry<Integer, Integer> boundEntry : boundExponentials.entrySet()) {
         if (boundEntry.getValue() == entry.getKey()) {
@@ -225,16 +217,10 @@ public class IRFlowState {
         sb.append("none");
       }
 
-      sb.append(" ")
-          .append(entry.getValue())
-          .append("\n");
+      sb.append(" ").append(entry.getValue()).append("\n");
     }
     for (Map.Entry<Integer, IRFlowType> entry : boundTypes.entrySet()) {
-      sb.append("type ")
-          .append(entry.getKey())
-          .append(": ")
-          .append(entry.getValue())
-          .append("\n");
+      sb.append("type ").append(entry.getKey()).append(": ").append(entry.getValue()).append("\n");
     }
     if (pendingContinuations.isEmpty()) {
       sb.append("pending: ?\n");
@@ -288,7 +274,6 @@ public class IRFlowState {
     type.accept(counter);
     return counter.count;
   }
-  
 
   private class SlotCounter extends IRTypeVisitor {
     private Optional<List<IRFlowSlot>> value = Optional.empty();

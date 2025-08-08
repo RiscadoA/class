@@ -64,7 +64,11 @@ public class IRGenerator extends ASTNodeVisitor {
   // ==================================== AST node visitors =====================================
 
   private void addProcess(
-      int linearArgumentCount, int exponentialArgumentCount, Environment env, ASTNode node, Consumer<IRBlock> entryConsumer) {
+      int linearArgumentCount,
+      int exponentialArgumentCount,
+      Environment env,
+      ASTNode node,
+      Consumer<IRBlock> entryConsumer) {
     IRProcess oldProcess = process;
     process =
         new IRProcess(
@@ -86,7 +90,8 @@ public class IRGenerator extends ASTNodeVisitor {
     process = oldProcess;
   }
 
-  private void addProcess(int linearArgumentCount, int exponentialArgumentCount, Environment env, ASTNode node) {
+  private void addProcess(
+      int linearArgumentCount, int exponentialArgumentCount, Environment env, ASTNode node) {
     addProcess(linearArgumentCount, exponentialArgumentCount, env, node, block -> {});
   }
 
@@ -1341,7 +1346,8 @@ public class IRGenerator extends ASTNodeVisitor {
 
       // Pass all linear arguments ocurring in the node.
       for (Map.Entry<String, RecordLocation> entry : parent.records.entrySet()) {
-        if (freeNames.contains(entry.getKey()) && !parent.exponentials.containsKey(entry.getKey())) {
+        if (freeNames.contains(entry.getKey())
+            && !parent.exponentials.containsKey(entry.getKey())) {
           int index =
               env.insertLinear(entry.getKey(), parent.recordTypes().get(entry.getValue().index()));
           outLinearArgs.add(new IRCallProcess.LinearArgument(entry.getValue().index(), index));

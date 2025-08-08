@@ -33,6 +33,7 @@ public class Compiler {
   public boolean optimizeTailCalls = true;
   public boolean optimizeFlipForward = true;
   public boolean optimizeSendValue = true;
+  public boolean optimizeKnownJumps = true;
 
   public int compile(String path) {
     ASTProgram ast;
@@ -91,8 +92,12 @@ public class Compiler {
       if (optimizeIRWithAnalysis) {
         optimizer.analyze(ir);
         if (onlyAnalyze) {
-          optimizer.printProcessFlows();
+          optimizer.printProcessFlows(ir);
           return 0;
+        }
+
+        if (optimizeKnownJumps) {
+          optimizer.optimizeKnownJumps(ir);
         }
       }
       if (optimizeFlipForward) {

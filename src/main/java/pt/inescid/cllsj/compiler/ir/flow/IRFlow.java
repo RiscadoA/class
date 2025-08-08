@@ -56,12 +56,24 @@ public class IRFlow {
     }
   }
 
+  public void removeSource(IRFlow source) {
+    sources.remove(source);
+  }
+
   public void addSource(IRFlow source) {
     sources.add(source);
   }
 
+  public void removeDetached(IRFlow detached) {
+    this.detached.remove(detached);
+  }
+
   public void addDetached(IRFlow detached) {
     this.detached.add(detached);
+  }
+
+  public void removeBranch(IRFlow branch) {
+    branches.remove(branch);
   }
 
   public void addBranch(IRFlow branch) {

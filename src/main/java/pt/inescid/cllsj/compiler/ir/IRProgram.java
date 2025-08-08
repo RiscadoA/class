@@ -43,11 +43,7 @@ public class IRProgram {
           result += "arg ";
         }
         result +=
-            "exponential "
-                + i
-                + ": "
-                + process.getValue().getExponentialType(i).toString()
-                + "\n";
+            "exponential " + i + ": " + process.getValue().getExponentialType(i).toString() + "\n";
       }
       result += "    endPoints: " + process.getValue().getEndPoints() + "\n";
       result += process.getKey() + ":\n";
