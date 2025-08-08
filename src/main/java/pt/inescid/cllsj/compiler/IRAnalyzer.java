@@ -6,8 +6,25 @@ import java.util.Map;
 import java.util.Optional;
 
 import pt.inescid.cllsj.compiler.ir.IRBlock;
+import pt.inescid.cllsj.compiler.ir.IRExpressionVisitor;
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 import pt.inescid.cllsj.compiler.ir.IRProcess;
+import pt.inescid.cllsj.compiler.ir.expressions.IRAdd;
+import pt.inescid.cllsj.compiler.ir.expressions.IRAnd;
+import pt.inescid.cllsj.compiler.ir.expressions.IRBool;
+import pt.inescid.cllsj.compiler.ir.expressions.IRDiv;
+import pt.inescid.cllsj.compiler.ir.expressions.IREq;
+import pt.inescid.cllsj.compiler.ir.expressions.IRExponentialVar;
+import pt.inescid.cllsj.compiler.ir.expressions.IRExpression;
+import pt.inescid.cllsj.compiler.ir.expressions.IRGt;
+import pt.inescid.cllsj.compiler.ir.expressions.IRInt;
+import pt.inescid.cllsj.compiler.ir.expressions.IRLt;
+import pt.inescid.cllsj.compiler.ir.expressions.IRMul;
+import pt.inescid.cllsj.compiler.ir.expressions.IRNot;
+import pt.inescid.cllsj.compiler.ir.expressions.IROr;
+import pt.inescid.cllsj.compiler.ir.expressions.IRString;
+import pt.inescid.cllsj.compiler.ir.expressions.IRSub;
+import pt.inescid.cllsj.compiler.ir.expressions.IRVar;
 import pt.inescid.cllsj.compiler.ir.flow.*;
 import pt.inescid.cllsj.compiler.ir.instructions.*;
 import pt.inescid.cllsj.compiler.ir.type.*;
@@ -205,9 +222,7 @@ public class IRAnalyzer extends IRInstructionVisitor {
 
   @Override
   public void visit(IRPushExpression instruction) {
-    // TODO: pop slots from expression
-
-    IRFlowSlot slot = IRFlowSlot.expression(instruction.getExpression());
+    IRFlowSlot slot = visit(instruction.getExpression());
     if (instruction.isExponential()) {
       IRFlowExponential exponential = state.allocateExponential(Optional.of(List.of(slot)));
       slot = IRFlowSlot.exponential(exponential.getHeapLocation());
@@ -217,7 +232,7 @@ public class IRAnalyzer extends IRInstructionVisitor {
 
   @Override
   public void visit(IRPrint instruction) {
-    // TODO: pop slots from expression
+    visit(instruction.getExpression());
   }
 
   @Override
@@ -439,7 +454,7 @@ public class IRAnalyzer extends IRInstructionVisitor {
 
   @Override
   public void visit(IRBranch instruction) {
-    // TODO: pop slots from expression
+    visit(instruction.getExpression());
     visit(instruction.getThen().getLabel(), false);
     visit(instruction.getOtherwise().getLabel(), false);
   }
@@ -459,6 +474,132 @@ public class IRAnalyzer extends IRInstructionVisitor {
       visit(instruction.getIsValue(), false);
     } else {
       visit(instruction.getIsNotValue(), false);
+    }
+  }
+
+  private IRFlowSlot visit(IRExpression expression) {
+    ExpressionVisitor visitor = new ExpressionVisitor();
+    expression.accept(visitor);
+    return visitor.slot;
+  }
+
+  private class ExpressionVisitor extends IRExpressionVisitor {
+    private IRFlowSlot slot = IRFlowSlot.unknown();
+
+    private void setSlot(IRType type) {
+      if (type instanceof IRStringT) {
+        slot = IRFlowSlot.string();
+      } else if (type instanceof IRIntT) {
+        slot = IRFlowSlot.integer();
+      } else if (type instanceof IRBoolT) {
+        slot = IRFlowSlot.bool();
+      } else {
+        throw new UnsupportedOperationException(
+          "Unsupported type: " + type.getClass().getSimpleName());
+      }
+    }
+
+    @Override
+    public void visit(IRExpression expr) {
+      throw new UnsupportedOperationException(
+          "Unsupported expression: " + expr.getClass().getSimpleName());
+    }
+
+    @Override
+    public void visit(IRExponentialVar expr) {
+      IRFlowExponential exponential = state.getBoundExponential(expr.getExponential());
+      if (exponential.hasKnownValue() && exponential.getValue().size() == 1) {
+        slot = exponential.getValue().get(0);
+      }
+    }
+
+    @Override
+    public void visit(IRVar expr) {
+      slot = state.getBoundRecord(expr.getRecord()).doPop();
+    }
+
+    @Override
+    public void visit(IRString expr) {
+      slot = IRFlowSlot.string();
+    }
+
+    @Override
+    public void visit(IRBool expr) {
+      slot = IRFlowSlot.bool();
+    }
+
+    @Override
+    public void visit(IRInt expr) {
+      slot = IRFlowSlot.integer();
+    }
+
+    @Override
+    public void visit(IRNot expr) {
+      expr.getInner().accept(this);
+      setSlot(expr.getType());
+    }
+
+    @Override
+    public void visit(IROr expr) {
+      expr.getLhs().accept(this);
+      expr.getRhs().accept(this);
+      setSlot(expr.getType());
+    }
+
+    @Override
+    public void visit(IRAnd expr) {
+      expr.getLhs().accept(this);
+      expr.getRhs().accept(this);
+      setSlot(expr.getType());
+    }
+
+    @Override
+    public void visit(IRGt expr) {
+      expr.getLhs().accept(this);
+      expr.getRhs().accept(this);
+      setSlot(expr.getType());
+    }
+
+    @Override
+    public void visit(IRLt expr) {
+      expr.getLhs().accept(this);
+      expr.getRhs().accept(this);
+      setSlot(expr.getType());
+    }
+
+    @Override
+    public void visit(IREq expr) {
+      expr.getLhs().accept(this);
+      expr.getRhs().accept(this);
+      setSlot(expr.getType());
+    }
+
+    @Override
+    public void visit(IRDiv expr) {
+      expr.getLhs().accept(this);
+      expr.getRhs().accept(this);
+      setSlot(expr.getType());
+    }
+
+    @Override
+    public void visit(IRMul expr) {
+      expr.getLhs().accept(this);
+      expr.getRhs().accept(this);
+      setSlot(expr.getType());
+    }
+
+    @Override
+    public void visit(IRSub expr) {
+      expr.getLhs().accept(this);
+      expr.getRhs().accept(this);
+      setSlot(expr.getType());
+    }
+
+    @Override
+    public void visit(IRAdd expr) {
+      expr.getLhs().accept(this);
+      expr.getRhs().accept(this);
+      setSlot(expr.getType());
     }
   }
 }

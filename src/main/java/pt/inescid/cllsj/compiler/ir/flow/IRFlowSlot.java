@@ -41,20 +41,6 @@ public class IRFlowSlot {
     return slot;
   }
 
-  public static IRFlowSlot expression(IRExpression expression) {
-    IRFlowSlot slot = new IRFlowSlot();
-    if (expression.getType() instanceof IRIntT) {
-      slot.slotType = Type.INTEGER;
-    } else if (expression.getType() instanceof IRBoolT) {
-      slot.slotType = Type.BOOL;
-    } else if (expression.getType() instanceof IRStringT) {
-      slot.slotType = Type.STRING;
-    } else {
-      slot.slotType = Type.UNKNOWN;
-    }
-    return slot;
-  }
-
   public static IRFlowSlot record(int heapLocation) {
     IRFlowSlot slot = new IRFlowSlot();
     slot.slotType = Type.RECORD;
