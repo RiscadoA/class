@@ -114,6 +114,8 @@ public static void main(String args[]) {
           compiler.onlyAST = true;
         } else if (args[i].equals("-A")) {
           compiler.onlyAnalyze = true;
+        } else if (args[i].equals("--debug")) {
+          compiler.debug = true;
         } else if (args[i].equals("--no-concurrency")) {
           compiler.disableConcurrency = true;
         } else if (args[i].equals("--no-custom-allocator")) {
@@ -173,6 +175,7 @@ public static void main(String args[]) {
         System.err.println("    -i: Generate only IR code instead of C code");
         System.err.println("    -a: Generate only an AST instead of C code");
         System.err.println("    -A: Generate only an IR analysis instead of C code");
+        System.err.println("    --debug: Prints a lot of state information during execution");
         System.err.println("    --custom-allocator-levels <levels>: Sets the number of levels in the custom allocator");
         System.err.println("    --custom-allocator-size-divisor <divisor>: Sets the divisor in the custom allocator");
         System.err.println("    --no-concurrency: Prevents generation of thread-aware code");

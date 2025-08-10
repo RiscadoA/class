@@ -13,6 +13,9 @@ public class IRFlow {
   // Known state at each instruction
   private List<IRFlowState> states = new ArrayList<>();
 
+  // Location of each instruction in the flow's block.
+  private List<IRFlowLocation> locations = new ArrayList<>();
+
   // Blocks which can lead to this flow
   private Set<IRFlow> sources = new HashSet<>();
 
@@ -24,6 +27,9 @@ public class IRFlow {
 
   public IRFlow(IRBlock block) {
     this.block = block;
+    for (int i = 0; i < block.getInstructions().size(); ++i) {
+      locations.add(new IRFlowLocation(this, i));
+    }
   }
 
   public IRBlock getBlock() {
@@ -44,6 +50,18 @@ public class IRFlow {
 
   public Set<IRFlow> getBranches() {
     return branches;
+  }
+
+  public List<IRFlowLocation> getLocations() {
+    return locations;
+  }
+
+  public IRFlowLocation getLocation(int index) {
+    return locations.get(index);
+  }
+
+  public IRInstruction getInstruction(int index) {
+    return block.getInstructions().get(index);
   }
 
   public void addState(int index, IRFlowState state) {
@@ -83,6 +101,17 @@ public class IRFlow {
   public void removeOutgoing(IRFlow flow) {
     removeDetached(flow);
     removeBranch(flow);
+  }
+
+  public void addMovedInstruction(IRInstruction instruction, IRFlowLocation location) {
+    location.move(this, block.getInstructions().size());
+    locations.add(location);
+    block.getInstructions().add(instruction);
+  }
+
+  public void removeLastInstruction() {
+    getBlock().getInstructions().removeLast();
+    getLocations().removeLast().markRemoved();
   }
 
   private void printLabels(StringBuffer sb, Set<IRFlow> flows) {

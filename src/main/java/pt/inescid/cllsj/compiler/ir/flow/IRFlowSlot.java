@@ -17,7 +17,7 @@ public class IRFlowSlot {
   }
 
   private Type slotType = Type.UNKNOWN;
-  private Optional<Integer> recordHeapLocation = Optional.empty();
+  private Optional<IRFlowLocation> recordIntroductionLocation = Optional.empty();
   private Optional<Integer> exponentialHeapLocation = Optional.empty();
   private Optional<Integer> tag = Optional.empty();
   private Optional<IRFlowType> type = Optional.empty();
@@ -39,10 +39,10 @@ public class IRFlowSlot {
     return slot;
   }
 
-  public static IRFlowSlot record(int heapLocation) {
+  public static IRFlowSlot record(IRFlowLocation introductionLocation) {
     IRFlowSlot slot = new IRFlowSlot();
     slot.slotType = Type.RECORD;
-    slot.recordHeapLocation = Optional.of(heapLocation);
+    slot.recordIntroductionLocation = Optional.of(introductionLocation);
     return slot;
   }
 
@@ -85,11 +85,11 @@ public class IRFlowSlot {
   }
 
   public boolean isKnownRecord() {
-    return recordHeapLocation.isPresent();
+    return recordIntroductionLocation.isPresent();
   }
 
-  public int getRecordHeapLocation() {
-    return recordHeapLocation.orElseThrow(
+  public IRFlowLocation getRecordIntroductionLocation() {
+    return recordIntroductionLocation.orElseThrow(
         () -> new IllegalStateException("Slot does not hold a known record"));
   }
 
@@ -126,8 +126,8 @@ public class IRFlowSlot {
   }
 
   public void markLost(IRFlowState state) {
-    if (recordHeapLocation.isPresent()) {
-      state.getHeapRecord(recordHeapLocation.get()).markTotallyUnknown(state);
+    if (recordIntroductionLocation.isPresent()) {
+      state.getHeapRecord(recordIntroductionLocation.get()).markTotallyUnknown(state);
     }
   }
 
@@ -140,7 +140,9 @@ public class IRFlowSlot {
       case TAG:
         return this.getTag() == other.getTag() ? this : unknown();
       case RECORD:
-        return this.getRecordHeapLocation() == other.getRecordHeapLocation() ? this : unknown();
+        return this.getRecordIntroductionLocation() == other.getRecordIntroductionLocation()
+            ? this
+            : unknown();
       case EXPONENTIAL:
         return this.getExponentialHeapLocation() == other.getExponentialHeapLocation()
             ? this
@@ -172,7 +174,7 @@ public class IRFlowSlot {
       case STRING:
         return "string";
       case RECORD:
-        return "record(" + recordHeapLocation.get() + ")";
+        return "record(" + recordIntroductionLocation.get() + ")";
       case EXPONENTIAL:
         return "exponential(" + exponentialHeapLocation.get() + ")";
       case CELL:

@@ -221,84 +221,20 @@ public class IRGenerator extends ASTNodeVisitor {
       visitBlock(closure, node.getLhs());
     }
 
-    Runnable ifValue =
-        () -> {
-          block.add(new IRPushValue(record(node.getChs()), pushedRecord));
-        };
-
-    Runnable ifNotValue =
-        () -> {
-          block.add(new IRPushSession(record(node.getChs()), pushedRecord));
-        };
-
-    if (optimizeSendValue) {
-      IRValueRequisites valueRequisites = valueRequisites(node.getLhsType(), false);
-      if (valueRequisites.mustBeValue()) {
-        ifValue.run();
-      } else if (valueRequisites.canBeValue()) {
-        IRBlock valueBlock = process.addBlock("send_value");
-        IRBlock nonValueBlock = process.addBlock("send_non_value");
-
-        block.add(
-            new IRBranchOnValue(valueRequisites, valueBlock.getLabel(), nonValueBlock.getLabel()));
-        block = process.addBlock("send_cont");
-
-        visitBlock(valueBlock, ifValue);
-        valueBlock.add(new IRJump(block.getLabel()));
-        visitBlock(nonValueBlock, ifNotValue);
-        nonValueBlock.add(new IRJump(block.getLabel()));
-      } else {
-        ifNotValue.run();
-      }
-    } else {
-      ifNotValue.run();
-    }
+    IRValueRequisites valueRequisites = valueRequisites(node.getLhsType(), false);
+    block.add(new IRPushSession(record(node.getChs()), pushedRecord, valueRequisites));
 
     // Flip if the remainder of the session type is negative.
     flipIfNegative(record(node.getChs()), node.getRhsType());
 
     node.getRhs().accept(this);
-    ;
   }
 
   @Override
   public void visit(ASTRecv node) {
-    IRBlock contBlock = block;
-
-    Consumer<IRBlock> ifValue =
-        block -> {
-          block.add(new IRPopValue(record(node.getChr()), record(node.getChi())));
-        };
-
-    Consumer<IRBlock> ifNotValue =
-        block -> {
-          block.add(new IRPopSession(record(node.getChr()), record(node.getChi())));
-        };
-
-    if (optimizeSendValue) {
-      IRValueRequisites valueRequisites = valueRequisites(node.getChiType(), true);
-      if (valueRequisites.mustBeValue()) {
-        ifValue.accept(contBlock);
-      } else if (valueRequisites.canBeValue()) {
-        IRBlock valueBlock = process.addBlock("recv_value");
-        IRBlock nonValueBlock = process.addBlock("recv_non_value");
-        contBlock = process.addBlock("recv_cont");
-
-        block.add(
-            new IRBranchOnValue(valueRequisites, valueBlock.getLabel(), nonValueBlock.getLabel()));
-
-        ifValue.accept(valueBlock);
-        valueBlock.add(new IRJump(contBlock.getLabel()));
-        ifNotValue.accept(nonValueBlock);
-        nonValueBlock.add(new IRJump(contBlock.getLabel()));
-      } else {
-        ifNotValue.accept(contBlock);
-      }
-    } else {
-      ifNotValue.accept(contBlock);
-    }
-
-    visitBlock(contBlock, node.getRhs());
+    IRValueRequisites valueRequisites = valueRequisites(node.getChiType(), true);
+    block.add(new IRPopSession(record(node.getChr()), record(node.getChi()), valueRequisites));
+    node.getRhs().accept(this);
 
     // We don't flip to the received session here, as if it is negative, the other endpoint has
     // already been executed by the send instruction, as explained in the comment found there.
@@ -315,7 +251,7 @@ public class IRGenerator extends ASTNodeVisitor {
     // Initialize the continuation record, and flip to it if its session type is positive.
     block.add(new IRNewSession(nextRecord, closure.getLabel()));
     flipIfPositive(nextRecord, node.getTypeRhs());
-    block.add(new IRPushSession(previousRecord, nextRecord));
+    block.add(new IRPushSession(previousRecord, nextRecord, IRValueRequisites.notValue()));
     block.add(
         new IRPushType(
             previousRecord,
@@ -344,13 +280,15 @@ public class IRGenerator extends ASTNodeVisitor {
     ep = ep.assoc(node.getTyidGen(), entry);
     ep = ep.assoc(node.getTyidPar(), entry);
 
-    block.add(new IRPopSession(previousRecord, nextRecord));
+    int endPoints = countEndPoints(node.getRhs()) - 1;
+
+    block.add(new IRPopSession(previousRecord, nextRecord, IRValueRequisites.notValue()));
     block.add(
         new IRPopType(
             previousRecord,
             type(node.getTyidGen()),
-            positiveBlock.getLabel(),
-            negativeBlock.getLabel()));
+            new IRPopType.Case(positiveBlock.getLabel(), endPoints),
+            new IRPopType.Case(negativeBlock.getLabel(), endPoints)));
     positiveBlock.add(new IRFreeSession(previousRecord));
     negativeBlock.add(new IRFreeSession(previousRecord));
 
@@ -826,10 +764,16 @@ public class IRGenerator extends ASTNodeVisitor {
   }
 
   private IRValueRequisites valueRequisites(int type) {
+    if (!optimizeSendValue) {
+      return IRValueRequisites.notValue();
+    }
     return IRValueRequisites.value(Map.of(), List.of(type));
   }
 
   private IRValueRequisites valueRequisites(ASTType type, boolean isDual) {
+    if (!optimizeSendValue) {
+      return IRValueRequisites.notValue();
+    }
     return ASTTypeIsValue.check(ep, environment().typeVariables, type, isDual);
   }
 
@@ -996,6 +940,7 @@ public class IRGenerator extends ASTNodeVisitor {
 
     @Override
     public void visit(ASTRecvTy node) {
+      node.getRhs().accept(this);
       node.getRhs().accept(this);
     }
 

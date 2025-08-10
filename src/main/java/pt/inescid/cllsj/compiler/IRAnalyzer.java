@@ -31,9 +31,10 @@ import pt.inescid.cllsj.compiler.ir.type.*;
 // Visitor which analyses the IR of a given process and generates a control and data flow graph.
 public class IRAnalyzer extends IRInstructionVisitor {
   private Map<IRBlock, IRFlow> flows = new HashMap<>();
-  private Optional<IRFlow> flow = Optional.empty();
-  private IRFlowState state = new IRFlowState();
+  private IRFlow flow;
+  private IRFlowState state;
   private IRProcess process;
+  private IRFlowLocation location;
 
   public static Map<IRBlock, IRFlow> analyze(IRProcess process) {
     IRAnalyzer analyzer = new IRAnalyzer(process);
@@ -41,7 +42,7 @@ public class IRAnalyzer extends IRInstructionVisitor {
       analyzer.state.bindType(i, new IRFlowType(process.isTypeVariablePositive(i)));
     }
     for (int i = 0; i < process.getRecordArgumentCount(); ++i) {
-      analyzer.state.bindRecord(i, analyzer.state.allocateRecord());
+      analyzer.state.bindRecord(i, analyzer.state.allocateRecord(IRFlowLocation.initial(i)));
     }
     for (int i = 0; i < process.getExponentialArgumentCount(); ++i) {
       analyzer.state.bindExponential(i, analyzer.state.allocateExponential(Optional.empty()));
@@ -52,12 +53,15 @@ public class IRAnalyzer extends IRInstructionVisitor {
 
   private IRAnalyzer(IRProcess process) {
     this.process = process;
+    this.flow = new IRFlow(process.getEntry());
+    this.state = new IRFlowState();
+    this.flows.put(process.getEntry(), this.flow);
   }
 
   private void visitNextPending() {
-    Optional<String> cont = state.popPendingContinuation();
+    Optional<IRFlowContinuation> cont = state.popPendingContinuation();
     if (cont.isPresent()) {
-      visit(cont.get(), true);
+      visit(cont.get().getLabel(), true);
     }
   }
 
@@ -67,7 +71,7 @@ public class IRAnalyzer extends IRInstructionVisitor {
 
   private void visit(IRBlock block, boolean detached) {
     // Create a new flow object (if we haven't passed through it yet).
-    Optional<IRFlow> previousFlow = this.flow;
+    IRFlow previousFlow = this.flow;
     IRFlowState previousState = this.state;
     IRFlow currentFlow;
     if (!flows.containsKey(block)) {
@@ -77,16 +81,16 @@ public class IRAnalyzer extends IRInstructionVisitor {
       // We've already passed through the block, we'll need to merge states
       currentFlow = flows.get(block);
     }
-    this.flow = Optional.of(currentFlow);
+    this.flow = currentFlow;
 
     // Link the previous block with this one.
-    if (previousFlow.isPresent()) {
+    if (previousFlow != currentFlow) {
       if (detached) {
-        previousFlow.get().addDetached(currentFlow);
+        previousFlow.addDetached(currentFlow);
       } else {
-        previousFlow.get().addBranch(currentFlow);
+        previousFlow.addBranch(currentFlow);
       }
-      currentFlow.addSource(previousFlow.get());
+      currentFlow.addSource(previousFlow);
     }
 
     // Visit each instruction in the block, one by one.
@@ -94,6 +98,7 @@ public class IRAnalyzer extends IRInstructionVisitor {
     currentFlow.addState(index, state);
     for (IRInstruction instruction : block.getInstructions()) {
       state = state.clone();
+      location = currentFlow.getLocation(index);
       instruction.accept(this);
       currentFlow.addState(++index, state);
     }
@@ -110,7 +115,7 @@ public class IRAnalyzer extends IRInstructionVisitor {
 
   @Override
   public void visit(IRNewTask instruction) {
-    state.pushPendingContinuation(instruction.getLabel());
+    state.pushPendingContinuation(instruction.getLabel(), location);
   }
 
   @Override
@@ -120,13 +125,13 @@ public class IRAnalyzer extends IRInstructionVisitor {
 
   @Override
   public void visit(IRNewThread instruction) {
-    state.pushPendingContinuation(instruction.getLabel());
+    state.pushPendingContinuation(instruction.getLabel(), location);
   }
 
   @Override
   public void visit(IRNewSession instruction) {
-    IRFlowRecord record = state.allocateRecord();
-    record.doNewSession(instruction.getLabel());
+    IRFlowRecord record = state.allocateRecord(location);
+    record.doNewSession(instruction.getLabel().map(l -> new IRFlowContinuation(l, location)));
     state.bindRecord(instruction.getRecord(), record);
   }
 
@@ -145,10 +150,11 @@ public class IRAnalyzer extends IRInstructionVisitor {
   @Override
   public void visit(IRFlip instruction) {
     IRFlowRecord record = state.getBoundRecord(instruction.getRecord());
-    Optional<String> cont = record.doFlip(instruction.getContLabel());
+    Optional<IRFlowContinuation> cont =
+        record.doFlip(new IRFlowContinuation(instruction.getContLabel(), location));
     if (cont.isPresent()) {
       // The continuation is known, we should flip to the next state.
-      visit(cont.get(), false);
+      visit(cont.get().getLabel(), false);
     } else {
       // Unknown continuation. Slots will be left in an unknown state.
       record.doReturn(); // Pretend we've returned from the continuation
@@ -159,9 +165,9 @@ public class IRAnalyzer extends IRInstructionVisitor {
 
   @Override
   public void visit(IRReturn instruction) {
-    Optional<String> cont = state.getBoundRecord(instruction.getRecord()).doReturn();
+    Optional<IRFlowContinuation> cont = state.getBoundRecord(instruction.getRecord()).doReturn();
     if (cont.isPresent()) {
-      visit(cont.get(), false);
+      visit(cont.get().getLabel(), false);
     } else {
       visitNextPending();
     }
@@ -171,52 +177,58 @@ public class IRAnalyzer extends IRInstructionVisitor {
   public void visit(IRPushSession instruction) {
     IRFlowRecord record = state.getBoundRecord(instruction.getRecord());
     IRFlowRecord argRecord = state.getBoundRecord(instruction.getArgRecord());
-    record.doPush(state, IRFlowSlot.record(argRecord.getHeapLocation()));
+    Optional<Boolean> value = state.isValue(instruction.getValueRequisites());
+
+    if (value.isEmpty()) {
+      record.markSlotsUnknown(state);
+      argRecord.markTotallyUnknown(state);
+    } else if (value.get()) {
+      if (argRecord.slotsAreKnown()) {
+        int slots = argRecord.getSlotCount().get();
+        for (int i = 0; i < slots; ++i) {
+          record.doPush(state, argRecord.doPop());
+        }
+      } else {
+        argRecord.markTotallyUnknown(state);
+        record.markSlotsUnknown(state);
+      }
+      state.unbindRecord(instruction.getArgRecord());
+      state.freeRecord(argRecord);
+    } else {
+      record.doPush(state, IRFlowSlot.record(argRecord.getIntroductionLocation()));
+    }
   }
 
   @Override
   public void visit(IRPopSession instruction) {
-    IRFlowSlot slot = state.getBoundRecord(instruction.getRecord()).doPop();
-    if (slot.isKnownRecord()) {
-      state.bindRecord(instruction.getArgRecord(), slot.getRecordHeapLocation());
-    } else {
-      state.bindRecord(instruction.getArgRecord(), state.allocateRecord());
-    }
-  }
-
-  @Override
-  public void visit(IRPushValue instruction) {
     IRFlowRecord record = state.getBoundRecord(instruction.getRecord());
-    IRFlowRecord argRecord = state.getBoundRecord(instruction.getArgRecord());
-    if (argRecord.slotsAreKnown()) {
-      int slots = argRecord.getSlotCount().get();
-      for (int i = 0; i < slots; ++i) {
-        record.doPush(state, argRecord.doPop());
+    Optional<Boolean> value = state.isValue(instruction.getValueRequisites());
+
+    if (value.isEmpty()) {
+      record.markSlotsUnknown(state);
+      state.bindRecord(instruction.getArgRecord(), state.allocateRecord(location));
+    } else if (value.get()) {
+      IRFlowRecord argRecord = state.allocateRecord(location);
+      state.bindRecord(instruction.getArgRecord(), argRecord);
+
+      Optional<Integer> slotCount =
+          state.slotCount(process.getRecordType(instruction.getArgRecord()), record.getSlots());
+
+      if (slotCount.isPresent()) {
+        argRecord.doNewSession(Optional.empty());
+        for (int i = 0; i < slotCount.get(); ++i) {
+          argRecord.doPush(state, record.doPop());
+        }
+      } else {
+        record.markSlotsUnknown(state);
       }
     } else {
-      argRecord.markTotallyUnknown(state);
-      record.markSlotsUnknown(state);
-    }
-    state.unbindRecord(instruction.getArgRecord());
-    state.freeRecord(argRecord);
-  }
-
-  @Override
-  public void visit(IRPopValue instruction) {
-    IRFlowRecord record = state.getBoundRecord(instruction.getRecord());
-    IRFlowRecord argRecord = state.allocateRecord();
-    state.bindRecord(instruction.getArgRecord(), argRecord);
-
-    Optional<Integer> slotCount =
-        state.slotCount(process.getRecordType(instruction.getArgRecord()), record.getSlots());
-
-    if (slotCount.isPresent()) {
-      argRecord.doNewSession(Optional.empty());
-      for (int i = 0; i < slotCount.get(); ++i) {
-        argRecord.doPush(state, record.doPop());
+      IRFlowSlot slot = record.doPop();
+      if (slot.isKnownRecord()) {
+        state.bindRecord(instruction.getArgRecord(), slot.getRecordIntroductionLocation());
+      } else {
+        state.bindRecord(instruction.getArgRecord(), state.allocateRecord(location));
       }
-    } else {
-      record.markSlotsUnknown(state);
     }
   }
 
@@ -291,7 +303,7 @@ public class IRAnalyzer extends IRInstructionVisitor {
   @Override
   public void visit(IRTakeCell instruction) {
     state.getBoundRecord(instruction.getRecord()).doPop();
-    state.bindRecord(instruction.getArgRecord(), state.allocateRecord());
+    state.bindRecord(instruction.getArgRecord(), state.allocateRecord(location));
   }
 
   @Override
@@ -328,20 +340,20 @@ public class IRAnalyzer extends IRInstructionVisitor {
     }
     if (slot.isKnownType() && slot.getType().isPositive().isPresent()) {
       if (slot.getType().isPositive().get()) {
-        if (instruction.getPositiveLabel().isPresent()) {
-          visit(instruction.getPositiveLabel().get(), false);
+        if (instruction.getPositive().isPresent()) {
+          visit(instruction.getPositive().get().getLabel(), false);
         }
       } else {
-        if (instruction.getNegativeLabel().isPresent()) {
-          visit(instruction.getNegativeLabel().get(), false);
+        if (instruction.getNegative().isPresent()) {
+          visit(instruction.getNegative().get().getLabel(), false);
         }
       }
     } else {
-      if (instruction.getNegativeLabel().isPresent()) {
-        visit(instruction.getNegativeLabel().get(), false);
+      if (instruction.getNegative().isPresent()) {
+        visit(instruction.getNegative().get().getLabel(), false);
       }
-      if (instruction.getPositiveLabel().isPresent()) {
-        visit(instruction.getPositiveLabel().get(), false);
+      if (instruction.getPositive().isPresent()) {
+        visit(instruction.getPositive().get().getLabel(), false);
       }
     }
   }
@@ -367,7 +379,7 @@ public class IRAnalyzer extends IRInstructionVisitor {
   @Override
   public void visit(IRCallExponential instruction) {
     IRFlowExponential exponential = state.getBoundExponential(instruction.getExponential());
-    IRFlowRecord record = state.allocateRecord();
+    IRFlowRecord record = state.allocateRecord(location);
     state.bindRecord(instruction.getArgRecord(), record);
 
     if (exponential.hasKnownValue()) {
@@ -400,14 +412,14 @@ public class IRAnalyzer extends IRInstructionVisitor {
       posRecord.markSlotsUnknown(state);
     }
 
-    Optional<String> posRecordCont = posRecord.doFlip(negRecord.doReturn());
+    Optional<IRFlowContinuation> posRecordCont = posRecord.doFlip(negRecord.doReturn());
 
     state.freeRecord(negRecord);
-    state.bindRecord(instruction.getNegRecord(), instruction.getPosRecord());
+    state.bindRecord(instruction.getNegRecord(), state.getBoundRecord(instruction.getPosRecord()));
 
     if (instruction.shouldReturn()) {
       if (posRecordCont.isPresent()) {
-        visit(posRecordCont.get(), false);
+        visit(posRecordCont.get().getLabel(), false);
       } else {
         visitNextPending();
       }
@@ -479,19 +491,6 @@ public class IRAnalyzer extends IRInstructionVisitor {
   @Override
   public void visit(IRJump instruction) {
     visit(instruction.getLabel(), false);
-  }
-
-  @Override
-  public void visit(IRBranchOnValue instruction) {
-    Optional<Boolean> value = state.isValue(instruction.getRequisites());
-    if (value.isEmpty()) {
-      visit(instruction.getIsValue(), false);
-      visit(instruction.getIsNotValue(), false);
-    } else if (value.get()) {
-      visit(instruction.getIsValue(), false);
-    } else {
-      visit(instruction.getIsNotValue(), false);
-    }
   }
 
   private IRFlowSlot visit(IRExpression expression) {

@@ -42,6 +42,7 @@ public class CGenerator extends IRInstructionVisitor {
 
   public String entryProcess = "main";
   public boolean trace = false;
+  public boolean debug = false;
   public boolean profile = false;
   public boolean disableConcurrency = false;
   public boolean optimizePrimitiveExponentials = true;
@@ -936,6 +937,31 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   private void visitInstruction(IRInstruction instruction) {
+    if (debug) {
+      putDebugLn("    <proc: " + procName + "> <env: %p>", ENV);
+      for (int i = 0; i < recordCount; ++i) {
+        final int iFinal = i;
+        putDebug("    <record " + i + ": %p>", record(i));
+        putIfElse(
+            record(i) + " != NULL",
+            () ->
+                putDebugLn(
+                    " <written: %d> <read: %d> <cont_env: %p> <cont_record: %d>",
+                    written(iFinal), read(iFinal), recordContEnv(iFinal), recordContRecord(iFinal)),
+            () -> putDebugLn(""));
+      }
+      for (int i = 0; i < exponentialCount; ++i) {
+        final int iFinal = i;
+        putDebug("    <exponential " + i + ": %p>", exponential(i));
+        putIfElse(
+            exponential(i) + " != NULL",
+            () ->
+                putDebugLn(
+                    " <ref_count: %d> <record: %p>",
+                    exponentialRefCount(iFinal), exponentialRecord(iFinal)),
+            () -> putDebugLn(""));
+      }
+    }
     if (trace) {
       putDebugLn(instruction.toString());
     } else {
@@ -1142,6 +1168,14 @@ public class CGenerator extends IRInstructionVisitor {
                   putAssign(record(i.getPosRecord()), "NULL");
                 });
           });
+    } else {
+      // The negative record will be deleted, but it's binding may now point to the positive
+      // record. If it doesn't, then we set it to null.
+      putIf(
+          TMP_RECORD + " == " + record(i.getNegRecord()),
+          () -> {
+            putAssign(record(i.getNegRecord()), "NULL");
+          });
     }
 
     // Finally, free the negative record and jump to the continuation.
@@ -1280,35 +1314,43 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRPopSession instruction) {
-    putAssign(record(instruction.getArgRecord()), popRecord(instruction.getRecord()));
+    switchTypeIsValue(
+        instruction.getValueRequisites(),
+        () -> {
+          String value = buffer(instruction.getRecord()) + " + " + read(instruction.getRecord());
+          String size = valueSize(recordType(instruction.getArgRecord()), value);
+          putAllocRecord(record(instruction.getArgRecord()), size);
+          putAssign(recordContEnv(instruction.getArgRecord()), "NULL");
+          putAssign(read(instruction.getArgRecord()), 0);
+          putAssign(written(instruction.getArgRecord()), size);
+          putStatement(
+              "memcpy(" + buffer(instruction.getArgRecord()) + ", " + value + ", " + size + ")");
+          putAssign(read(instruction.getRecord()), read(instruction.getRecord()) + " + " + size);
+        },
+        () -> {
+          putAssign(record(instruction.getArgRecord()), popRecord(instruction.getRecord()));
+        });
   }
 
   @Override
   public void visit(IRPushSession instruction) {
-    putPushRecord(instruction.getRecord(), record(instruction.getArgRecord()));
-  }
-
-  @Override
-  public void visit(IRPushValue instruction) {
-    String value = buffer(instruction.getArgRecord()) + " + " + read(instruction.getArgRecord());
-    String size = written(instruction.getArgRecord()) + " - " + read(instruction.getArgRecord());
-    String dst = buffer(instruction.getRecord()) + " + " + written(instruction.getRecord());
-    putStatement("memcpy(" + dst + ", " + value + ", " + size + ")");
-    putAssign(written(instruction.getRecord()), written(instruction.getRecord()) + " + " + size);
-    putFreeRecord(record(instruction.getArgRecord()));
-    putAssign(record(instruction.getArgRecord()), "NULL");
-  }
-
-  @Override
-  public void visit(IRPopValue instruction) {
-    String value = buffer(instruction.getRecord()) + " + " + read(instruction.getRecord());
-    String size = valueSize(recordType(instruction.getArgRecord()), value);
-    putAllocRecord(record(instruction.getArgRecord()), size);
-    putAssign(recordContEnv(instruction.getArgRecord()), "NULL");
-    putAssign(read(instruction.getArgRecord()), 0);
-    putAssign(written(instruction.getArgRecord()), size);
-    putStatement("memcpy(" + buffer(instruction.getArgRecord()) + ", " + value + ", " + size + ")");
-    putAssign(read(instruction.getRecord()), read(instruction.getRecord()) + " + " + size);
+    switchTypeIsValue(
+        instruction.getValueRequisites(),
+        () -> {
+          String value =
+              buffer(instruction.getArgRecord()) + " + " + read(instruction.getArgRecord());
+          String size =
+              written(instruction.getArgRecord()) + " - " + read(instruction.getArgRecord());
+          String dst = buffer(instruction.getRecord()) + " + " + written(instruction.getRecord());
+          putStatement("memcpy(" + dst + ", " + value + ", " + size + ")");
+          putAssign(
+              written(instruction.getRecord()), written(instruction.getRecord()) + " + " + size);
+          putFreeRecord(record(instruction.getArgRecord()));
+          putAssign(record(instruction.getArgRecord()), "NULL");
+        },
+        () -> {
+          putPushRecord(instruction.getRecord(), record(instruction.getArgRecord()));
+        });
   }
 
   @Override
@@ -1367,8 +1409,8 @@ public class CGenerator extends IRInstructionVisitor {
           recordCont(instruction.getRecord()),
           labelAddress(blockLabel(instruction.getLabel().get())));
       putAssign(recordContEnv(instruction.getRecord()), ENV);
+      putAssign(recordContRecord(instruction.getRecord()), instruction.getRecord());
     }
-    putAssign(recordContRecord(instruction.getRecord()), instruction.getRecord());
     putAssign(read(instruction.getRecord()), 0);
     putAssign(written(instruction.getRecord()), 0);
   }
@@ -1525,17 +1567,31 @@ public class CGenerator extends IRInstructionVisitor {
   @Override
   public void visit(IRPopType instruction) {
     putAssign(type(instruction.getArgType()), popType(instruction.getRecord()));
-    if (instruction.getPositiveLabel().isPresent() || instruction.getNegativeLabel().isPresent()) {
+    if (instruction.getPositive().isPresent() || instruction.getNegative().isPresent()) {
       putIfElse(
           popPolarity(instruction.getRecord()),
           () -> {
-            if (instruction.getPositiveLabel().isPresent()) {
-              putConstantGoto(blockLabel(instruction.getPositiveLabel().get()));
+            if (instruction.getPositive().isPresent()) {
+              if (instruction.getNegative().isPresent()) {
+                putAssign(
+                    environmentEndPoints(),
+                    environmentEndPoints()
+                        + " - "
+                        + instruction.getNegative().get().getEndPoints());
+              }
+              putConstantGoto(blockLabel(instruction.getPositive().get().getLabel()));
             }
           },
           () -> {
-            if (instruction.getNegativeLabel().isPresent()) {
-              putConstantGoto(blockLabel(instruction.getNegativeLabel().get()));
+            if (instruction.getNegative().isPresent()) {
+              if (instruction.getPositive().isPresent()) {
+                putAssign(
+                    environmentEndPoints(),
+                    environmentEndPoints()
+                        + " - "
+                        + instruction.getPositive().get().getEndPoints());
+              }
+              putConstantGoto(blockLabel(instruction.getNegative().get().getLabel()));
             }
           });
     }
@@ -1844,18 +1900,6 @@ public class CGenerator extends IRInstructionVisitor {
     putStatement("exit(1);");
   }
 
-  @Override
-  public void visit(IRBranchOnValue instruction) {
-    putIfElse(
-        typeIsValue(instruction.getRequisites()),
-        () -> {
-          putConstantGoto(blockLabel(instruction.getIsValue()));
-        },
-        () -> {
-          putConstantGoto(blockLabel(instruction.getIsNotValue()));
-        });
-  }
-
   // =============================== Expression building helpers ================================
 
   private String taskNext(String task) {
@@ -2020,9 +2064,9 @@ public class CGenerator extends IRInstructionVisitor {
 
   private void switchTypeIsValue(
       IRValueRequisites requisites, Runnable ifValue, Runnable ifNotValue) {
-    if (requisites.mustBeValue()) {
+    if (optimizeSendValue && requisites.mustBeValue()) {
       ifValue.run();
-    } else if (requisites.canBeValue()) {
+    } else if (optimizeSendValue && requisites.canBeValue()) {
       putIfElse(typeIsValue(requisites), ifValue, ifNotValue);
     } else {
       ifNotValue.run();

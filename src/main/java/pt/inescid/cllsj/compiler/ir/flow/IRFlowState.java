@@ -22,26 +22,24 @@ import pt.inescid.cllsj.compiler.ir.type.IRTypeT;
 import pt.inescid.cllsj.compiler.ir.type.IRVarT;
 
 public class IRFlowState {
-  private static int nextRecordLocation = 0;
   private static int nextExponentialLocation = 0;
 
-  private Map<Integer, IRFlowRecord> recordHeap = new HashMap<>();
+  private Map<IRFlowLocation, IRFlowRecord> recordHeap = new HashMap<>();
   private Map<Integer, IRFlowExponential> exponentialHeap = new HashMap<>();
 
-  private Map<Integer, Integer> boundRecords = new HashMap<>();
+  private Map<Integer, IRFlowLocation> boundRecords = new HashMap<>();
   private Map<Integer, Integer> boundExponentials = new HashMap<>();
   private Map<Integer, IRFlowType> boundTypes = new HashMap<>();
-  private Optional<Stack<String>> pendingContinuations = Optional.of(new Stack<>());
+  private Optional<Stack<IRFlowContinuation>> pendingContinuations = Optional.of(new Stack<>());
 
-  public IRFlowRecord allocateRecord() {
-    int location = nextRecordLocation++;
+  public IRFlowRecord allocateRecord(IRFlowLocation location) {
     IRFlowRecord record = new IRFlowRecord(location);
     recordHeap.put(location, record);
     return record;
   }
 
   public void freeRecord(IRFlowRecord record) {
-    recordHeap.remove(record.getHeapLocation());
+    recordHeap.remove(record.getIntroductionLocation());
   }
 
   public IRFlowExponential allocateExponential(Optional<List<IRFlowSlot>> value) {
@@ -55,7 +53,7 @@ public class IRFlowState {
     exponentialHeap.remove(location);
   }
 
-  public IRFlowRecord getHeapRecord(int location) {
+  public IRFlowRecord getHeapRecord(IRFlowLocation location) {
     return recordHeap.get(location);
   }
 
@@ -88,10 +86,10 @@ public class IRFlowState {
   }
 
   public void bindRecord(int id, IRFlowRecord record) {
-    bindRecord(id, record.getHeapLocation());
+    bindRecord(id, record.getIntroductionLocation());
   }
 
-  public void bindRecord(int id, int location) {
+  public void bindRecord(int id, IRFlowLocation location) {
     boundRecords.put(id, location);
   }
 
@@ -99,33 +97,50 @@ public class IRFlowState {
     boundRecords.remove(id);
   }
 
-  public void pushPendingContinuation(String continuation) {
-    pendingContinuations.get().push(continuation);
+  public void pushPendingContinuation(IRFlowContinuation cont) {
+    pendingContinuations.get().push(cont);
   }
 
-  public Optional<String> popPendingContinuation() {
+  public void pushPendingContinuation(String label, IRFlowLocation location) {
+    pushPendingContinuation(new IRFlowContinuation(label, location));
+  }
+
+  public Optional<IRFlowContinuation> popPendingContinuation() {
     if (pendingContinuations.get().isEmpty()) {
       return Optional.empty();
     }
     return Optional.of(pendingContinuations.get().pop());
   }
 
-  public Optional<Stack<String>> getPendingContinuations() {
+  public Optional<Stack<IRFlowContinuation>> getPendingContinuations() {
     return pendingContinuations;
   }
 
   public IRFlowState merge(IRFlowState other) {
+    if (this == other) {
+      return this;
+    }
+
     IRFlowState merged = this.clone();
-    for (Map.Entry<Integer, IRFlowRecord> entry : other.recordHeap.entrySet()) {
+    for (Map.Entry<IRFlowLocation, IRFlowRecord> entry : other.recordHeap.entrySet()) {
       if (merged.recordHeap.containsKey(entry.getKey())) {
         merged.recordHeap.get(entry.getKey()).merge(entry.getValue());
       } else {
         merged.recordHeap.put(entry.getKey(), entry.getValue().clone());
       }
     }
-    for (Map.Entry<Integer, Integer> entry : other.boundRecords.entrySet()) {
+    for (Map.Entry<Integer, IRFlowLocation> entry : other.boundRecords.entrySet()) {
       if (merged.boundRecords.containsKey(entry.getKey())) {
-        merged.boundRecords.put(entry.getKey(), merged.allocateRecord().getHeapLocation());
+        if (merged.boundRecords.get(entry.getKey()) != entry.getValue()) {
+          throw new IllegalArgumentException(
+              "Cannot merge states which bind different records ("
+                  + merged.boundRecords.get(entry.getKey())
+                  + " != "
+                  + entry.getValue()
+                  + ") to the same binding ("
+                  + entry.getKey()
+                  + ")");
+        }
       } else {
         merged.boundRecords.put(entry.getKey(), entry.getValue());
       }
@@ -160,7 +175,7 @@ public class IRFlowState {
 
   public IRFlowState clone() {
     IRFlowState clone = new IRFlowState();
-    for (Map.Entry<Integer, IRFlowRecord> entry : this.recordHeap.entrySet()) {
+    for (Map.Entry<IRFlowLocation, IRFlowRecord> entry : this.recordHeap.entrySet()) {
       clone.recordHeap.put(entry.getKey(), entry.getValue().clone());
     }
     clone.boundRecords = new HashMap<>(this.boundRecords);
@@ -183,23 +198,12 @@ public class IRFlowState {
   public String toString() {
     StringBuilder sb = new StringBuilder();
 
-    for (Map.Entry<Integer, IRFlowRecord> entry : recordHeap.entrySet()) {
-      sb.append("record @").append(entry.getKey()).append(": ").append("bind=");
-      boolean foundBinding = false;
-      for (Map.Entry<Integer, Integer> boundEntry : boundRecords.entrySet()) {
-        if (boundEntry.getValue() == entry.getKey()) {
-          if (foundBinding) {
-            sb.append(",");
-          }
-          foundBinding = true;
-          sb.append(boundEntry.getKey());
-        }
-      }
-      if (!foundBinding) {
-        sb.append("none");
-      }
-
-      sb.append(" ").append(entry.getValue()).append("\n");
+    for (Map.Entry<Integer, IRFlowLocation> boundEntry : boundRecords.entrySet()) {
+      sb.append("record ").append(boundEntry.getKey());
+      sb.append(" (@").append(boundEntry.getValue());
+      sb.append("): ");
+      sb.append(recordHeap.get(boundEntry.getValue()));
+      sb.append("\n");
     }
     for (Map.Entry<Integer, IRFlowExponential> entry : exponentialHeap.entrySet()) {
       sb.append("exponential @").append(entry.getKey()).append(": ").append("bind=");
@@ -225,7 +229,7 @@ public class IRFlowState {
     if (pendingContinuations.isEmpty()) {
       sb.append("pending: ?\n");
     } else {
-      for (String pending : pendingContinuations.get()) {
+      for (IRFlowContinuation pending : pendingContinuations.get()) {
         sb.append("pending: ").append(pending).append("\n");
       }
     }

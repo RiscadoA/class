@@ -19,6 +19,7 @@ import pt.inescid.cllsj.compiler.ir.IRProgram;
 public class Compiler {
   public String entryProcess = "main";
   public boolean trace = false;
+  public boolean debug = false;
   public boolean profile = false;
   public boolean onlyIR = false;
   public boolean onlyAST = false;
@@ -122,6 +123,7 @@ public class Compiler {
       CGenerator gen = new CGenerator();
       gen.entryProcess = entryProcess;
       gen.trace = trace;
+      gen.debug = debug;
       gen.profile = profile;
       gen.disableConcurrency = disableConcurrency;
       gen.customAllocatorSizeDivisor = customAllocatorSizeDivisor;

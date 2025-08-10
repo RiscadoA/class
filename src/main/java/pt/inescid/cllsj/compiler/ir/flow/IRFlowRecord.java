@@ -6,17 +6,17 @@ import java.util.Optional;
 import java.util.function.Consumer;
 
 public class IRFlowRecord {
-  private int heapLocation;
-  private Optional<String> continuation = Optional.empty();
+  private IRFlowLocation introductionLocation;
+  private Optional<IRFlowContinuation> continuation = Optional.empty();
 
   private List<IRFlowSlot> slots = new ArrayList<>();
   private boolean slotsKnown = false;
 
-  public IRFlowRecord(int heapLocation) {
-    this.heapLocation = heapLocation;
+  public IRFlowRecord(IRFlowLocation introductionLocation) {
+    this.introductionLocation = introductionLocation;
   }
 
-  public void doNewSession(Optional<String> continuation) {
+  public void doNewSession(Optional<IRFlowContinuation> continuation) {
     this.slots.clear();
     this.slotsKnown = true;
     this.continuation = continuation;
@@ -54,23 +54,23 @@ public class IRFlowRecord {
   }
 
   // Sets a new continuation and returns the old one.
-  public Optional<String> doFlip(String continuation) {
+  public Optional<IRFlowContinuation> doFlip(IRFlowContinuation continuation) {
     return doFlip(Optional.of(continuation));
   }
 
   // Sets the continuation to unknown and returns the old continuation.
-  public Optional<String> doReturn() {
+  public Optional<IRFlowContinuation> doReturn() {
     return doFlip(Optional.empty());
   }
 
-  public Optional<String> doFlip(Optional<String> continuation) {
-    Optional<String> oldContinuation = this.continuation;
+  public Optional<IRFlowContinuation> doFlip(Optional<IRFlowContinuation> continuation) {
+    Optional<IRFlowContinuation> oldContinuation = this.continuation;
     this.continuation = continuation;
     return oldContinuation;
   }
 
   // Returns the current continuation, if known.
-  public Optional<String> getContinuation() {
+  public Optional<IRFlowContinuation> getContinuation() {
     return continuation;
   }
 
@@ -124,21 +124,23 @@ public class IRFlowRecord {
     return Optional.of(slots);
   }
 
-  public int getHeapLocation() {
-    return heapLocation;
+  public IRFlowLocation getIntroductionLocation() {
+    return introductionLocation;
   }
 
   public IRFlowRecord merge(IRFlowRecord other) {
     IRFlowRecord merged = this.clone();
-    if (!merged.continuation.equals(other.continuation)) {
+    if (merged.continuation.isEmpty()
+        || other.continuation.isEmpty()
+        || !merged.continuation.get().equals(other.continuation.get())) {
       merged.continuation = Optional.empty();
     }
-    if (merged.heapLocation != other.heapLocation) {
+    if (merged.introductionLocation != other.introductionLocation) {
       throw new IllegalArgumentException(
-          "Cannot merge records with different heap locations: "
-              + merged.heapLocation
+          "Cannot merge records with different introduction locations: "
+              + merged.introductionLocation
               + " != "
-              + other.heapLocation);
+              + other.introductionLocation);
     }
     if (!merged.slotsKnown || !other.slotsKnown || merged.slots.size() != other.slots.size()) {
       merged.slots.clear();
@@ -151,7 +153,7 @@ public class IRFlowRecord {
   }
 
   public IRFlowRecord clone() {
-    IRFlowRecord clone = new IRFlowRecord(heapLocation);
+    IRFlowRecord clone = new IRFlowRecord(introductionLocation);
     clone.continuation = this.continuation;
     for (IRFlowSlot slot : this.slots) {
       clone.slots.add(slot.clone());

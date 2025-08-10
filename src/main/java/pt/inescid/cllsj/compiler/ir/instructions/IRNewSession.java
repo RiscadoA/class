@@ -20,12 +20,8 @@ public class IRNewSession extends IRInstruction {
     return label;
   }
 
-  public void setLabel(String label) {
-    this.label = Optional.of(label);
-  }
-
-  public void removeLabel() {
-    this.label = Optional.empty();
+  public void setLabel(Optional<String> label) {
+    this.label = label;
   }
 
   @Override

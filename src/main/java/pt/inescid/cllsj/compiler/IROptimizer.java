@@ -9,7 +9,7 @@ import pt.inescid.cllsj.compiler.ir.IRBlock;
 import pt.inescid.cllsj.compiler.ir.IRProcess;
 import pt.inescid.cllsj.compiler.ir.IRProgram;
 import pt.inescid.cllsj.compiler.ir.flow.IRFlow;
-import pt.inescid.cllsj.compiler.ir.flow.IRFlowState;
+import pt.inescid.cllsj.compiler.ir.flow.IRFlowContinuation;
 import pt.inescid.cllsj.compiler.ir.instructions.*;
 
 public class IROptimizer {
@@ -72,22 +72,33 @@ public class IROptimizer {
   }
 
   private void concatFlows(IRProcess ir, IRFlow prev, IRFlow next) {
-    // Remove the last instruction on the current block
-    IRInstruction last = prev.getBlock().getInstructions().removeLast();
-    IRFlowState lastState = prev.getStates().removeLast();
-    next.getStates().removeFirst();
+    // Get the last instruction on the current block
+    IRInstruction last = prev.getBlock().getInstructions().getLast();
+    prev.getStates().removeLast(); // Duplicated state
+    Runnable removeLast =
+        () -> {
+          prev.removeLastInstruction();
+          next.getStates().removeFirst();
+        };
 
     // If the last instruction in the block modified the end point count,
     // we need to go back and subtract the end point of all branches leading here.
     // We might also need to clean up some earlier instructions.
-    if (last instanceof IRBranchOnValue || last instanceof IRJump) {
-      // No need for special handling here
+    if (last instanceof IRJump) {
+      // No need for special handling here, we simply remove the instruction
+      removeLast.run();
     } else if (last instanceof IRFlip) {
       // We need to look for the last time this record's continuation was set and
-      // change it to the label stored in this flip (e.g., last IRFlip or IRNewSession).
+      // change it to the label stored in this flip.
       IRFlip i = (IRFlip) last;
-      int recordLocation = lastState.getBoundRecord(i.getRecord()).getHeapLocation();
-      replaceContinuation(ir, prev, recordLocation, i.getContLabel());
+      IRFlowContinuation contBeforeFlip =
+          prev.getStates().getLast().getBoundRecord(i.getRecord()).getContinuation().get();
+      IRFlowContinuation contAfterFlip =
+          next.getStates().getFirst().getBoundRecord(i.getRecord()).getContinuation().get();
+
+      contBeforeFlip.replaceWritten(Optional.of(i.getContLabel()));
+      contAfterFlip.setOverride(contBeforeFlip);
+      removeLast.run();
     } else if (last instanceof IRBranch) {
       IRBranch i = (IRBranch) last;
       if (i.getThen().getLabel().equals(next.getBlock().getLabel())) {
@@ -95,6 +106,7 @@ public class IROptimizer {
       } else {
         subtractEndPoints(ir, prev, i.getThen().getEndPoints());
       }
+      removeLast.run();
     } else if (last instanceof IRPopTag) {
       IRPopTag i = (IRPopTag) last;
       int endPoints = 0;
@@ -106,37 +118,67 @@ public class IROptimizer {
       subtractEndPoints(ir, prev, endPoints);
 
       // This is a troublesome instruction.
-      // If remove the pop tag, we would need to remove the push too, and, additionally, modify the
-      // type of the record
-      // That is complicated and in real life, this optimization probably almost never happens.
-      // So, we pop the tag anyway, and just omit the jump.
+      // If remove the tag pop, we would need to remove the push too, and, additionally, modify the
+      // type of the record That is complicated and, in most cases, this optimization probably
+      // almost
+      // never happens anyway. So, we keep the instruction, and just omit the branching.
       i.getCases().clear();
-      prev.getBlock().getInstructions().add(i);
-      prev.getStates().add(lastState);
     } else if (last instanceof IRPopType) {
+      // Similarly to IRPopTag, we can remove the branch but not the instruction itself.
       IRPopType i = (IRPopType) last;
-      i.removeNegativeLabel();
-      i.removePositiveLabel();
-      prev.getBlock().getInstructions().add(i);
-      prev.getStates().add(lastState);
+      if (i.getPositive().get().getLabel().equals(next.getBlock().getLabel())) {
+        subtractEndPoints(ir, prev, i.getNegative().get().getEndPoints());
+      } else {
+        subtractEndPoints(ir, prev, i.getPositive().get().getEndPoints());
+      }
+      i.removeNegative();
+      i.removePositive();
     } else if (last instanceof IRForward) {
-      // We still want to execute the forward instruction, we just avoid the jump
+      // Once again, we keep the forward but avoid the jump to the continuation.
       IRForward i = (IRForward) last;
       i.removeReturn();
-      prev.getBlock().getInstructions().add(i);
-      prev.getStates().add(lastState);
-      subtractEndPoints(ir, prev, 1);
+
+      // We need to remove the label from the previous continuation writer, as it won't be used
+      // anymore
+      IRFlowContinuation contBeforeForward =
+          prev.getStates().getLast().getBoundRecord(i.getPosRecord()).getContinuation().get();
+      contBeforeForward.replaceWritten(Optional.empty());
+
+      // We're removing a single end point of the process, if we didn't end up creating a new return
+      // instruction
+      if (!(contBeforeForward.getWriter().getInstruction() instanceof IRReturn)) {
+        subtractEndPoints(ir, prev, 1);
+      }
     } else if (last instanceof IRReturn) {
       // We're removing a single end point of the process.
-      subtractEndPoints(ir, prev, 1);
+      IRReturn i = (IRReturn) last;
+      IRFlowContinuation contBeforeReturn =
+          prev.getStates().getLast().getBoundRecord(i.getRecord()).getContinuation().get();
+      contBeforeReturn.replaceWritten(Optional.empty());
+
+      // We're removing a single end point of the process, if we didn't end up creating a new return
+      // instruction.
+      if (!(contBeforeReturn.getWriter().getInstruction() instanceof IRReturn)) {
+        subtractEndPoints(ir, prev, 1);
+      }
+      removeLast.run();
     } else {
       throw new UnsupportedOperationException(
           "Unexpected block ending instruction type: " + last.getClass().getSimpleName());
     }
 
     // Add the next block's instructions to the current block
-    prev.getBlock().getInstructions().addAll(next.getBlock().getInstructions());
+    for (int i = 0; i < next.getBlock().getInstructions().size(); ++i) {
+      prev.addMovedInstruction(next.getInstruction(i), next.getLocation(i));
+    }
     prev.getStates().addAll(next.getStates());
+
+    // System.err.println(prev.getStates().get(0));
+    // for (int i = 0; i < prev.getBlock().getInstructions().size(); ++i) {
+    //   System.err.println(prev.getLocation(i));
+    //   System.err.println("  " + prev.getBlock().getInstructions().get(i));
+    //   System.err.println(prev.getStates().get(i + 1));
+    // }
 
     // Link with the outgoing edges of the next flow
     prev.removeBranch(next);
@@ -149,34 +191,6 @@ public class IROptimizer {
       detached.removeSource(next);
       detached.addSource(prev);
       prev.addDetached(detached);
-    }
-  }
-
-  // Goes back in the flow graph searching for the last time the continuation was set
-  // for the given record. Replaces the continuation label with the given label.
-  private void replaceContinuation(IRProcess ir, IRFlow flow, int recordLocation, String label) {
-    IRBlock block = flow.getBlock();
-    for (int index = block.getInstructions().size() - 1; index >= 0; --index) {
-      IRInstruction instruction = block.getInstructions().get(index);
-      IRFlowState nextState = flow.getStates().get(index + 1);
-
-      if (instruction instanceof IRNewSession) {
-        IRNewSession i = (IRNewSession) instruction;
-        if (nextState.getBoundRecord(i.getRecord()).getHeapLocation() == recordLocation) {
-          i.setLabel(label);
-          return;
-        }
-      } else if (instruction instanceof IRFlip) {
-        IRFlip i = (IRFlip) instruction;
-        if (nextState.getBoundRecord(i.getRecord()).getHeapLocation() == recordLocation) {
-          i.setContLabel(label);
-          return;
-        }
-      }
-    }
-
-    for (IRFlow source : flow.getSources()) {
-      replaceContinuation(ir, source, recordLocation, label);
     }
   }
 
@@ -202,6 +216,15 @@ public class IROptimizer {
           i.getThen().subtractEndPoints(endPoints);
         } else {
           i.getOtherwise().subtractEndPoints(endPoints);
+        }
+      } else if (last instanceof IRPopType) {
+        IRPopType i = (IRPopType) last;
+        if (i.getPositive().isPresent()
+            && i.getPositive().get().getLabel().equals(flow.getBlock().getLabel())) {
+          i.getPositive().get().subtractEndPoints(endPoints);
+        } else if (i.getNegative().isPresent()
+            && i.getNegative().get().getLabel().equals(flow.getBlock().getLabel())) {
+          i.getNegative().get().subtractEndPoints(endPoints);
         }
       } else if (last instanceof IRPopTag) {
         IRPopTag i = (IRPopTag) last;
@@ -245,24 +268,6 @@ public class IROptimizer {
         }
         for (IRFlow detached : flow.getDetached()) {
           detached.getSources().remove(flow);
-        }
-      }
-    }
-
-    // Remove all references to the removed blocks
-    for (IRBlock block : ir.getBlocksIncludingEntry()) {
-      for (int index = 0; index < block.getInstructions().size(); ++index) {
-        IRInstruction instruction = block.getInstructions().get(index);
-        if (instruction instanceof IRNewSession) {
-          IRNewSession i = (IRNewSession) instruction;
-          if (i.getLabel().isPresent() && !ir.containsBlock(i.getLabel().get())) {
-            i.removeLabel();
-          }
-        } else if (instruction instanceof IRFlip) {
-          IRFlip i = (IRFlip) instruction;
-          if (!ir.containsBlock(i.getContLabel())) {
-            block.getInstructions().set(index, new IRReturn(i.getRecord()));
-          }
         }
       }
     }
