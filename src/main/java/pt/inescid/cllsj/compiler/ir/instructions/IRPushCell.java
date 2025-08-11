@@ -2,17 +2,12 @@ package pt.inescid.cllsj.compiler.ir.instructions;
 
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 
-public class IRPushCell extends IRInstruction {
-  private int record;
+public class IRPushCell extends IRPush {
   private int argRecord;
 
   public IRPushCell(int record, int argRecord) {
-    this.record = record;
+    super(record);
     this.argRecord = argRecord;
-  }
-
-  public int getRecord() {
-    return record;
   }
 
   public int getArgRecord() {
@@ -26,6 +21,6 @@ public class IRPushCell extends IRInstruction {
 
   @Override
   public String toString() {
-    return "pushCell(" + record + ", " + argRecord + ")";
+    return "pushCell(" + getRecord() + ", " + argRecord + ")";
   }
 }

@@ -3,19 +3,14 @@ package pt.inescid.cllsj.compiler.ir.instructions;
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 import pt.inescid.cllsj.compiler.ir.expressions.IRExpression;
 
-public class IRPushExpression extends IRInstruction {
-  private int record;
+public class IRPushExpression extends IRPush {
   private IRExpression expression;
   private boolean isExponential;
 
   public IRPushExpression(int record, IRExpression expression, boolean isExponential) {
-    this.record = record;
+    super(record);
     this.expression = expression;
     this.isExponential = isExponential;
-  }
-
-  public int getRecord() {
-    return record;
   }
 
   public IRExpression getExpression() {
@@ -34,7 +29,7 @@ public class IRPushExpression extends IRInstruction {
   @Override
   public String toString() {
     return "pushExpression("
-        + record
+        + getRecord()
         + ", "
         + expression
         + ", "

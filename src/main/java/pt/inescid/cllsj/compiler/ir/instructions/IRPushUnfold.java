@@ -2,15 +2,9 @@ package pt.inescid.cllsj.compiler.ir.instructions;
 
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 
-public class IRPushUnfold extends IRInstruction {
-  private int record;
-
+public class IRPushUnfold extends IRPush {
   public IRPushUnfold(int record) {
-    this.record = record;
-  }
-
-  public int getRecord() {
-    return record;
+    super(record);
   }
 
   @Override
@@ -20,6 +14,6 @@ public class IRPushUnfold extends IRInstruction {
 
   @Override
   public String toString() {
-    return "pushUnfold(" + record + ")";
+    return "pushUnfold(" + getRecord() + ")";
   }
 }

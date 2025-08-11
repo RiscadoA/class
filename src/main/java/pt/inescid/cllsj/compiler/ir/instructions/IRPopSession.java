@@ -3,19 +3,14 @@ package pt.inescid.cllsj.compiler.ir.instructions;
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
 
-public class IRPopSession extends IRInstruction {
-  private int record;
+public class IRPopSession extends IRPop {
   private int argRecord; // Index where the new record will be stored.
   private IRValueRequisites valueRequisites;
 
   public IRPopSession(int record, int argRecord, IRValueRequisites valueRequisites) {
-    this.record = record;
+    super(record);
     this.argRecord = argRecord;
     this.valueRequisites = valueRequisites;
-  }
-
-  public int getRecord() {
-    return record;
   }
 
   public int getArgRecord() {
@@ -33,6 +28,6 @@ public class IRPopSession extends IRInstruction {
 
   @Override
   public String toString() {
-    return "popSession(" + record + ", " + argRecord + ", " + valueRequisites + ")";
+    return "popSession(" + getRecord() + ", " + argRecord + ", " + valueRequisites + ")";
   }
 }

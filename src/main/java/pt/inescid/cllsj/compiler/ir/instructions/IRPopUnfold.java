@@ -2,15 +2,9 @@ package pt.inescid.cllsj.compiler.ir.instructions;
 
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 
-public class IRPopUnfold extends IRInstruction {
-  private int record;
-
+public class IRPopUnfold extends IRPop {
   public IRPopUnfold(int record) {
-    this.record = record;
-  }
-
-  public int getRecord() {
-    return record;
+    super(record);
   }
 
   @Override
@@ -20,6 +14,6 @@ public class IRPopUnfold extends IRInstruction {
 
   @Override
   public String toString() {
-    return "popUnfold(" + record + ")";
+    return "popUnfold(" + getRecord() + ")";
   }
 }

@@ -2,17 +2,12 @@ package pt.inescid.cllsj.compiler.ir.instructions;
 
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 
-public class IRPushTag extends IRInstruction {
-  private int record;
+public class IRPushTag extends IRPush {
   private int tag;
 
   public IRPushTag(int record, int tag) {
-    this.record = record;
+    super(record);
     this.tag = tag;
-  }
-
-  public int getRecord() {
-    return record;
   }
 
   public int getTag() {
@@ -26,6 +21,6 @@ public class IRPushTag extends IRInstruction {
 
   @Override
   public String toString() {
-    return "pushTag(" + record + ", " + tag + ")";
+    return "pushTag(" + getRecord() + ", " + tag + ")";
   }
 }
