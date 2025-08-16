@@ -22,4 +22,9 @@ public class IRFlipT extends IRType {
   public String toString() {
     return "flip; " + cont.toString();
   }
+
+  @Override
+  public IRType removeLastSlot() {
+    return new IRFlipT(cont.removeLastSlot());
+  }
 }

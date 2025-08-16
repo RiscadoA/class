@@ -24,9 +24,9 @@ public class IRFlowRecord {
 
   // Performs a read on the record.
   // If the slot being read is known, it is returned.
-  public IRFlowSlot doPop() {
+  public IRFlowSlot doPop(IRFlowLocation location) {
     if (!slotsKnown) {
-      return IRFlowSlot.unknown();
+      return IRFlowSlot.unknown(location);
     }
 
     return slots.removeFirst();
@@ -155,9 +155,7 @@ public class IRFlowRecord {
   public IRFlowRecord clone() {
     IRFlowRecord clone = new IRFlowRecord(introductionLocation);
     clone.continuation = this.continuation;
-    for (IRFlowSlot slot : this.slots) {
-      clone.slots.add(slot.clone());
-    }
+    clone.slots.addAll(this.slots);
     clone.slotsKnown = this.slotsKnown;
     return clone;
   }

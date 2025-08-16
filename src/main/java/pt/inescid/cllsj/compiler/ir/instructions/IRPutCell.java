@@ -28,4 +28,9 @@ public class IRPutCell extends IRInstruction {
   public String toString() {
     return "putCell(" + record + ", " + argRecord + ")";
   }
+
+  @Override
+  public boolean usesRecord(int record) {
+    return this.record == record || this.argRecord == record;
+  }
 }

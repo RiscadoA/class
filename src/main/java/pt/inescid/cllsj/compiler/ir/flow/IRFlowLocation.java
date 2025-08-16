@@ -1,6 +1,9 @@
 package pt.inescid.cllsj.compiler.ir.flow;
 
 import java.util.Optional;
+import java.util.function.Consumer;
+import java.util.function.Function;
+
 import pt.inescid.cllsj.compiler.ir.instructions.IRInstruction;
 
 public class IRFlowLocation {
@@ -47,10 +50,7 @@ public class IRFlowLocation {
   }
 
   public void move(IRFlow newFlow, int newIndex) {
-    if (removed) {
-      throw new IllegalStateException("This flow location (" + this + ") has been removed");
-    }
-
+    this.removed = false;
     this.flow = newFlow;
     this.index = newIndex;
   }
@@ -63,7 +63,60 @@ public class IRFlowLocation {
     return getFlow().getBlock().getInstructions().get(getIndex());
   }
 
+  // Returns the predecessor location in the flow, if there is one and only one.
+  public Optional<IRFlowLocation> getPredecessor() {
+    if (getIndex() > 0) {
+      return Optional.of(getFlow().getLocation(getIndex() - 1));
+    } else if (getFlow().getSources().size() == 1) {
+      return getFlow().getSources().stream().findFirst().map(f -> f.getLocations().getLast());
+    } else {
+      return Optional.empty();
+    }
+  }
+
   public void replaceInstruction(IRInstruction newInstruction) {
     getFlow().getBlock().getInstructions().set(getIndex(), newInstruction);
+  }
+
+  public void insertInstructionBefore(IRInstruction newInstruction) {
+    getFlow().addInstruction(index, newInstruction, new IRFlowLocation(getFlow(), index + 1));
+  }
+
+  public void insertInstructionAfter(IRInstruction newInstruction) {
+    getFlow().addInstruction(index + 1, newInstruction, new IRFlowLocation(getFlow(), index + 1));
+  }
+
+  public void moveInstructionBefore(IRFlowLocation beforeLocation) {
+    IRInstruction instruction = getInstruction();
+    removeInstruction();
+    beforeLocation.getFlow().addInstruction(beforeLocation.getIndex(), instruction, this);
+  }
+
+  public void removeInstruction() {
+    for (int i = index + 1; i < getFlow().getBlock().getInstructions().size(); ++i) {
+      getFlow().getLocation(i).move(getFlow(), i - 1);
+    }
+    getFlow().getBlock().getInstructions().remove(index);
+    getFlow().getLocations().remove(index);
+    markRemoved();
+  }
+
+  // Calls the function for each instruction occurring before this location,
+  // starting from the instruction just before this one.
+  //
+  // If at a given point the flow has two possible predecessors, the function stops.
+  // If the function returns false, the iteration stops.
+  public void forEachBefore(Function<IRFlowLocation, Boolean> consumer) {
+    forEachBefore(consumer, true);
+  }
+
+  public void forEachBefore(Function<IRFlowLocation, Boolean> consumer, boolean first) {
+    Optional<IRFlowLocation> predecessor = getPredecessor();
+    if (!first && !consumer.apply(this)) {
+      return;
+    }
+    if (predecessor.isPresent()) {
+      predecessor.get().forEachBefore(consumer, false);
+    }
   }
 }

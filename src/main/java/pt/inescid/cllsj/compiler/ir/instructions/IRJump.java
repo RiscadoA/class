@@ -22,4 +22,9 @@ public class IRJump extends IRInstruction {
   public String toString() {
     return "jump(" + label + ")";
   }
+
+  @Override
+  public boolean usesRecord(int record) {
+    return false;
+  }
 }

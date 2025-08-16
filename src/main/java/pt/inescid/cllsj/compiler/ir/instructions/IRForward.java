@@ -48,4 +48,9 @@ public class IRForward extends IRInstruction {
     sb.append(")");
     return sb.toString();
   }
+
+  @Override
+  public boolean usesRecord(int record) {
+    return this.negRecord == record || this.posRecord == record;
+  }
 }

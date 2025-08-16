@@ -22,4 +22,9 @@ public class IRFreeSession extends IRInstruction {
   public String toString() {
     return "freeSession(" + record + ")";
   }
+
+  @Override
+  public boolean usesRecord(int record) {
+    return this.record == record;
+  }
 }

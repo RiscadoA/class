@@ -133,4 +133,14 @@ public class IRCallProcess extends IRInstruction {
     }
     return str + ")";
   }
+
+  @Override
+  public boolean usesRecord(int record) {
+    for (LinearArgument arg : linearArguments) {
+      if (arg.getSourceRecord() == record) {
+        return true;
+      }
+    }
+    return false;
+  }
 }

@@ -22,4 +22,9 @@ public class IRNewTask extends IRInstruction {
   public String toString() {
     return "newTask(" + label + ")";
   }
+
+  @Override
+  public boolean usesRecord(int record) {
+    return false;
+  }
 }

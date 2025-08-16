@@ -22,4 +22,9 @@ public class IRDetachExponential extends IRInstruction {
   public String toString() {
     return "detachExponential(" + exponential + ")";
   }
+
+  @Override
+  public boolean usesRecord(int record) {
+    return false;
+  }
 }

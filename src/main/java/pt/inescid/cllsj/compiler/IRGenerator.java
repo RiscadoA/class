@@ -774,7 +774,7 @@ public class IRGenerator extends ASTNodeVisitor {
     if (!optimizeSendValue) {
       return IRValueRequisites.notValue();
     }
-    return ASTTypeIsValue.check(ep, environment().typeVariables, type, isDual);
+    return ASTTypeIsValue.check(this, ep, environment().typeVariables, type, isDual);
   }
 
   private Environment environment() {

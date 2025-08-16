@@ -22,4 +22,9 @@ public class IRRecT extends IRType {
   public String toString() {
     return "rec " + inner.toString();
   }
+
+  @Override
+  public IRType removeLastSlot() {
+    throw new UnsupportedOperationException("Recursive types recurse, and thus, don't have a last slot");
+  }
 }

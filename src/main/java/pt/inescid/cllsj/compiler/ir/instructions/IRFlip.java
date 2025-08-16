@@ -32,4 +32,9 @@ public class IRFlip extends IRInstruction {
   public String toString() {
     return "flip(" + record + ", " + contLabel + ")";
   }
+
+  @Override
+  public boolean usesRecord(int record) {
+    return this.record == record;
+  }
 }

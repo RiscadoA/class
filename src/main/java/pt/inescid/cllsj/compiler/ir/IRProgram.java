@@ -2,6 +2,7 @@ package pt.inescid.cllsj.compiler.ir;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.BiConsumer;
 
 public class IRProgram {
   private Map<String, IRProcess> processes;
@@ -50,5 +51,9 @@ public class IRProgram {
       result += process.getValue().toString() + "\n";
     }
     return result;
+  }
+
+  public void forEachProcess(BiConsumer<String, IRProcess> consumer) {
+    processes.forEach(consumer);
   }
 }

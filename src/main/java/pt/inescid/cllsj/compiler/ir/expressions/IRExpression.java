@@ -9,4 +9,6 @@ public abstract class IRExpression {
   }
 
   public abstract IRType getType();
+
+  public abstract boolean usesRecord(int record);
 }

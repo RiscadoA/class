@@ -39,4 +39,9 @@ public class IRNewSession extends IRInstruction {
     sb.append(")");
     return sb.toString();
   }
+
+  @Override
+  public boolean usesRecord(int record) {
+    return this.record == record;
+  }
 }

@@ -12,4 +12,9 @@ public class IRCloseT extends IRType {
   public String toString() {
     return "close";
   }
+
+  @Override
+  public IRType removeLastSlot() {
+    return this;
+  }
 }

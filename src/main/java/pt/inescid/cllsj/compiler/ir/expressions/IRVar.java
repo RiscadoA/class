@@ -30,4 +30,9 @@ public class IRVar extends IRExpression {
   public String toString() {
     return "record " + record;
   }
+
+  @Override
+  public boolean usesRecord(int record) {
+    return this.record == record;
+  }
 }

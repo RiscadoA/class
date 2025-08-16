@@ -28,4 +28,9 @@ public class IRTakeCell extends IRInstruction {
   public String toString() {
     return "takeCell(" + record + ", " + argRecord + ")";
   }
+
+  @Override
+  public boolean usesRecord(int record) {
+    return this.record == record || this.argRecord == record;
+  }
 }

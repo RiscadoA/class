@@ -43,4 +43,9 @@ public class IRAdd extends IRExpression {
   public String toString() {
     return "(" + lhs + " + " + rhs + ")";
   }
+
+  @Override
+  public boolean usesRecord(int record) {
+    return lhs.usesRecord(record) || rhs.usesRecord(record);
+  }
 }

@@ -35,4 +35,9 @@ public class IROr extends IRExpression {
   public String toString() {
     return "(" + lhs + " or " + rhs + ")";
   }
+
+  @Override
+  public boolean usesRecord(int record) {
+    return lhs.usesRecord(record) || rhs.usesRecord(record);
+  }
 }

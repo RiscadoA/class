@@ -22,4 +22,9 @@ public class IRSleep extends IRInstruction {
   public String toString() {
     return "sleep(" + msecs + ")";
   }
+
+  @Override
+  public boolean usesRecord(int record) {
+    return false;
+  }
 }

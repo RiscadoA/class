@@ -30,4 +30,9 @@ public class IRPopSession extends IRPop {
   public String toString() {
     return "popSession(" + getRecord() + ", " + argRecord + ", " + valueRequisites + ")";
   }
+
+  @Override
+  public boolean usesRecord(int record) {
+    return this.getRecord() == record || this.getArgRecord() == record;
+  }
 }

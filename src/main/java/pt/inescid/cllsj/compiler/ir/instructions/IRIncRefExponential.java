@@ -22,4 +22,9 @@ public class IRIncRefExponential extends IRInstruction {
   public String toString() {
     return "incRefExponential(" + exponential + ")";
   }
+
+  @Override
+  public boolean usesRecord(int record) {
+    return false;
+  }
 }

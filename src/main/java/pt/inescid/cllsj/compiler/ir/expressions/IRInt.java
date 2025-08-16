@@ -29,4 +29,9 @@ public class IRInt extends IRExpression {
   public String toString() {
     return Integer.toString(value);
   }
+
+  @Override
+  public boolean usesRecord(int record) {
+    return false;
+  }
 }

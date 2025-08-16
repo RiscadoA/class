@@ -33,4 +33,9 @@ public class IRPrint extends IRInstruction {
     }
     return result + "(" + expression + ")";
   }
+
+  @Override
+  public boolean usesRecord(int record) {
+    return expression.usesRecord(record);
+  }
 }

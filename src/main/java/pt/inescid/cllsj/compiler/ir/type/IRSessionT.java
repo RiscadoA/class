@@ -1,5 +1,8 @@
 package pt.inescid.cllsj.compiler.ir.type;
 
+import java.util.Optional;
+import java.util.function.Function;
+
 import pt.inescid.cllsj.compiler.ir.IRTypeVisitor;
 import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
 
@@ -39,5 +42,14 @@ public class IRSessionT extends IRType {
     }
     sb.append(arg.toString()).append("); ").append(cont.toString());
     return sb.toString();
+  }
+  
+  @Override
+  public IRType removeLastSlot() {
+    if (cont instanceof IRCloseT) {
+      return new IRCloseT();
+    } else {
+      return new IRSessionT(arg, cont.removeLastSlot(), valueRequisites);
+    }
   }
 }

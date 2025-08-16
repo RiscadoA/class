@@ -22,4 +22,9 @@ public class IRReturn extends IRInstruction {
   public String toString() {
     return "return(" + record + ")";
   }
+
+  @Override
+  public boolean usesRecord(int record) {
+    return this.record == record;
+  }
 }

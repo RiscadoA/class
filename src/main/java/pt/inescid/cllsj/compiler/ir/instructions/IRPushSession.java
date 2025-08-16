@@ -30,4 +30,9 @@ public class IRPushSession extends IRPush {
   public String toString() {
     return "pushSession(" + getRecord() + ", " + argRecord + ", " + valueRequisites + ")";
   }
+
+  @Override
+  public boolean usesRecord(int record) {
+    return getRecord() == record || this.argRecord == record;
+  }
 }

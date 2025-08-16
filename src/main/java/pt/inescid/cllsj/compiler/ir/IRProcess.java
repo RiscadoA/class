@@ -51,6 +51,10 @@ public class IRProcess {
     return recordTypes.get(index);
   }
 
+  public void setRecordType(int index, IRType type) {
+    recordTypes.set(index, type);
+  }
+
   public int getExponentialCount() {
     return exponentialTypes.size();
   }

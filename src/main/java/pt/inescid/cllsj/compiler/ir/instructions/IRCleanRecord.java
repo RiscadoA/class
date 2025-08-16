@@ -22,4 +22,9 @@ public class IRCleanRecord extends IRInstruction {
   public String toString() {
     return "cleanRecord(" + record + ")";
   }
+
+  @Override
+  public boolean usesRecord(int record) {
+    return this.record == record;
+  }
 }

@@ -36,4 +36,9 @@ public class IRPushExpression extends IRPush {
         + (isExponential ? "exponential" : "linear")
         + ")";
   }
+
+  @Override
+  public boolean usesRecord(int record) {
+    return getRecord() == record || expression.usesRecord(record);
+  }
 }

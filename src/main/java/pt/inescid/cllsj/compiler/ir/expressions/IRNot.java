@@ -29,4 +29,9 @@ public class IRNot extends IRExpression {
   public String toString() {
     return "not(" + inner + ")";
   }
+
+  @Override
+  public boolean usesRecord(int record) {
+    return inner.usesRecord(record);
+  }
 }

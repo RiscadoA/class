@@ -17,4 +17,9 @@ public class IRPop extends IRInstruction {
   public void accept(IRInstructionVisitor visitor) {
     visitor.visit(this);
   }
+
+  @Override
+  public boolean usesRecord(int record) {
+    return this.record == record;
+  }
 }

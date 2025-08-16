@@ -30,4 +30,9 @@ public class IRExponentialVar extends IRExpression {
   public String toString() {
     return "exponential " + exponential;
   }
+
+  @Override
+  public boolean usesRecord(int record) {
+    return false;
+  }
 }

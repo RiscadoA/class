@@ -32,7 +32,7 @@ public class ASTIntoIRType extends ASTTypeVisitor {
       Map<String, Integer> typeMap,
       Optional<Boolean> lastPolarity) {
     ASTIntoIRType converter =
-        new ASTIntoIRType(ep, typeMap, type.getPolarityCatch(ep), lastPolarity);
+        new ASTIntoIRType(gen, ep, typeMap, type.getPolarityCatch(ep), lastPolarity);
     type.accept(converter);
     return converter.ir;
   }
@@ -51,10 +51,12 @@ public class ASTIntoIRType extends ASTTypeVisitor {
   }
 
   private ASTIntoIRType(
+      IRGenerator gen,
       Env<EnvEntry> ep,
       Map<String, Integer> typeMap,
       Optional<Boolean> currentPolarity,
       Optional<Boolean> lastPolarity) {
+    this.gen = gen;
     this.ep = ep;
     this.typeMap = typeMap;
     this.currentPolarity = currentPolarity;
@@ -91,7 +93,7 @@ public class ASTIntoIRType extends ASTTypeVisitor {
         new IRSessionT(
             recurse(ep, type.getlhs()),
             recurse(ep, type.getrhs()),
-            ASTTypeIsValue.check(ep, typeMap, type.getlhs(), false));
+            ASTTypeIsValue.check(gen, ep, typeMap, type.getlhs(), false));
   }
 
   @Override
@@ -100,7 +102,7 @@ public class ASTIntoIRType extends ASTTypeVisitor {
         new IRSessionT(
             recurse(ep, type.getlhs()),
             recurse(ep, type.getrhs()),
-            ASTTypeIsValue.check(ep, typeMap, type.getlhs(), true));
+            ASTTypeIsValue.check(gen, ep, typeMap, type.getlhs(), true));
   }
 
   @Override

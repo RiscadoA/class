@@ -92,10 +92,6 @@ public class Compiler {
       IROptimizer optimizer = new IROptimizer();
       if (optimizeIRWithAnalysis) {
         optimizer.analyze(ir);
-        if (onlyAnalyze) {
-          optimizer.printProcessFlows(ir);
-          return 0;
-        }
 
         if (optimizeKnownJumps) {
           optimizer.optimizeKnownJumps(ir);
@@ -105,7 +101,16 @@ public class Compiler {
           optimizer.optimizeFlipForward(ir);
         }
 
+        if (optimizeSendValue) {
+          optimizer.removeUnnecessaryValuePushes(ir);
+        }
+
         optimizer.removeUnreachableBlocks(ir);
+
+        if (onlyAnalyze) {
+          optimizer.printProcessFlows(ir);
+          return 0;
+        }
       }
     } catch (Exception e) {
       System.err.println("IR optimization error: " + e.getMessage());

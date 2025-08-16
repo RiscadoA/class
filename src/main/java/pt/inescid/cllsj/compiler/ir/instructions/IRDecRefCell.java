@@ -22,4 +22,9 @@ public class IRDecRefCell extends IRInstruction {
   public String toString() {
     return "decRefCell(" + record + ")";
   }
+
+  @Override
+  public boolean usesRecord(int record) {
+    return this.record == record;
+  }
 }

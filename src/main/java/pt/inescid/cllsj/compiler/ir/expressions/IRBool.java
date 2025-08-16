@@ -29,4 +29,9 @@ public class IRBool extends IRExpression {
   public String toString() {
     return Boolean.toString(value);
   }
+
+  @Override
+  public boolean usesRecord(int record) {
+    return false;
+  }
 }

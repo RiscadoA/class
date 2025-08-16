@@ -22,4 +22,9 @@ public class IRNewThread extends IRInstruction {
   public String toString() {
     return "newThread(" + label + ")";
   }
+
+  @Override
+  public boolean usesRecord(int record) {
+    return false;
+  }
 }

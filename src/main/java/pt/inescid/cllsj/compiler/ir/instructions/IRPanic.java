@@ -22,4 +22,9 @@ public class IRPanic extends IRInstruction {
   public String toString() {
     return "panic(\"" + msg + "\")";
   }
+
+  @Override
+  public boolean usesRecord(int record) {
+    return false;
+  }
 }

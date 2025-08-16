@@ -12,4 +12,9 @@ public class IRNextTask extends IRInstruction {
   public String toString() {
     return "nextTask()";
   }
+
+  @Override
+  public boolean usesRecord(int record) {
+    return false;
+  }
 }

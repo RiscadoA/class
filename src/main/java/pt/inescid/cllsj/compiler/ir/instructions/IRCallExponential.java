@@ -43,4 +43,9 @@ public class IRCallExponential extends IRInstruction {
         + (decRefCount ? ", decRefCount" : "")
         + ")";
   }
+
+  @Override
+  public boolean usesRecord(int record) {
+    return this.argRecord == record;
+  }
 }

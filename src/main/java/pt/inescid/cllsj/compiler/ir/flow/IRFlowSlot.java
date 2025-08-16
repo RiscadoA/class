@@ -22,63 +22,74 @@ public class IRFlowSlot {
   private Optional<Integer> tag = Optional.empty();
   private Optional<IRFlowType> type = Optional.empty();
 
-  public static IRFlowSlot unknown() {
-    return new IRFlowSlot();
+  // Instruction which produced this slot.
+  private Optional<IRFlowLocation> producer;
+
+  private IRFlowSlot(IRFlowLocation producer) {
+    this.producer = Optional.of(producer);
   }
 
-  public static IRFlowSlot close() {
-    IRFlowSlot slot = new IRFlowSlot();
+  private IRFlowSlot() {
+    this.producer = Optional.empty();
+  }
+
+  public static IRFlowSlot unknown(IRFlowLocation producer) {
+    return new IRFlowSlot(producer);
+  }
+
+  public static IRFlowSlot close(IRFlowLocation producer) {
+    IRFlowSlot slot = new IRFlowSlot(producer);
     slot.slotType = Type.CLOSE;
     return slot;
   }
 
-  public static IRFlowSlot tag(int tag) {
-    IRFlowSlot slot = new IRFlowSlot();
+  public static IRFlowSlot tag(IRFlowLocation producer, int tag) {
+    IRFlowSlot slot = new IRFlowSlot(producer);
     slot.slotType = Type.TAG;
     slot.tag = Optional.of(tag);
     return slot;
   }
 
-  public static IRFlowSlot record(IRFlowLocation introductionLocation) {
-    IRFlowSlot slot = new IRFlowSlot();
+  public static IRFlowSlot record(IRFlowLocation producer, IRFlowLocation introductionLocation) {
+    IRFlowSlot slot = new IRFlowSlot(producer);
     slot.slotType = Type.RECORD;
     slot.recordIntroductionLocation = Optional.of(introductionLocation);
     return slot;
   }
 
-  public static IRFlowSlot exponential(int heapLocation) {
-    IRFlowSlot slot = new IRFlowSlot();
+  public static IRFlowSlot exponential(IRFlowLocation producer, int heapLocation) {
+    IRFlowSlot slot = new IRFlowSlot(producer);
     slot.slotType = Type.EXPONENTIAL;
     slot.exponentialHeapLocation = Optional.of(heapLocation);
     return slot;
   }
 
-  public static IRFlowSlot cell() {
-    IRFlowSlot slot = new IRFlowSlot();
+  public static IRFlowSlot cell(IRFlowLocation producer) {
+    IRFlowSlot slot = new IRFlowSlot(producer);
     slot.slotType = Type.CELL;
     return slot;
   }
 
-  public static IRFlowSlot integer() {
-    IRFlowSlot slot = new IRFlowSlot();
+  public static IRFlowSlot integer(IRFlowLocation producer) {
+    IRFlowSlot slot = new IRFlowSlot(producer);
     slot.slotType = Type.INTEGER;
     return slot;
   }
 
-  public static IRFlowSlot bool() {
-    IRFlowSlot slot = new IRFlowSlot();
+  public static IRFlowSlot bool(IRFlowLocation producer) {
+    IRFlowSlot slot = new IRFlowSlot(producer);
     slot.slotType = Type.BOOL;
     return slot;
   }
 
-  public static IRFlowSlot string() {
-    IRFlowSlot slot = new IRFlowSlot();
+  public static IRFlowSlot string(IRFlowLocation producer) {
+    IRFlowSlot slot = new IRFlowSlot(producer);
     slot.slotType = Type.STRING;
     return slot;
   }
 
-  public static IRFlowSlot type(IRFlowType type) {
-    IRFlowSlot slot = new IRFlowSlot();
+  public static IRFlowSlot type(IRFlowLocation producer, IRFlowType type) {
+    IRFlowSlot slot = new IRFlowSlot(producer);
     slot.slotType = Type.TYPE;
     slot.type = Optional.of(type);
     return slot;
@@ -132,57 +143,78 @@ public class IRFlowSlot {
   }
 
   public IRFlowSlot merge(IRFlowSlot other) {
+    IRFlowSlot merged;
+    if (producer.isEmpty() || !producer.equals(other.producer)) {
+      merged = new IRFlowSlot();
+    } else {
+      merged = new IRFlowSlot(producer.get());
+    }
+
     if (this.slotType != other.slotType) {
-      return unknown();
+      return merged;
     }
+    merged.slotType = this.slotType;
 
-    switch (this.slotType) {
+    switch (merged.slotType) {
       case TAG:
-        return this.getTag() == other.getTag() ? this : unknown();
+        merged.tag = this.tag.equals(other.tag) ? this.tag : Optional.empty();
+        break;
       case RECORD:
-        return this.getRecordIntroductionLocation() == other.getRecordIntroductionLocation()
-            ? this
-            : unknown();
+        this.recordIntroductionLocation = this.recordIntroductionLocation.equals(other.recordIntroductionLocation)
+            ? this.recordIntroductionLocation
+            : Optional.empty();
       case EXPONENTIAL:
-        return this.getExponentialHeapLocation() == other.getExponentialHeapLocation()
-            ? this
-            : unknown();
+        merged.exponentialHeapLocation = this.exponentialHeapLocation.equals(other.exponentialHeapLocation)
+            ? this.exponentialHeapLocation
+            : Optional.empty();
+        break;
       case TYPE:
-        return type(this.getType().merge(other.getType()));
+        merged.type = this.type.equals(other.type) ? this.type : Optional.empty();
+        break;
       default:
-        return this;
+        break;
     }
-  }
 
-  public IRFlowSlot clone() {
-    return this;
+    return merged;
   }
 
   @Override
   public String toString() {
+    StringBuilder sb = new StringBuilder();
     switch (slotType) {
       case UNKNOWN:
-        return "?";
+        sb.append("?");
+        break;
       case CLOSE:
-        return "close";
+        sb.append("close");
       case TAG:
-        return "tag(" + tag.get() + ")";
+        sb.append("tag(").append(tag.get()).append(")");
+        break;
       case INTEGER:
-        return "integer";
+        sb.append("int");
+        break;
       case BOOL:
-        return "boolean";
+        sb.append("bool");
+        break;
       case STRING:
-        return "string";
+        sb.append("string");
+        break;
       case RECORD:
-        return "record(" + recordIntroductionLocation.get() + ")";
+        sb.append("record(").append(recordIntroductionLocation.get()).append(")");
+        break;
       case EXPONENTIAL:
-        return "exponential(" + exponentialHeapLocation.get() + ")";
+        sb.append("exp(").append(exponentialHeapLocation.get()).append(")");
+        break;
       case CELL:
-        return "cell";
+        sb.append("cell");
+        break;
       case TYPE:
-        return "type(" + type.get() + ")";
+        sb.append("type(").append(type.get()).append(")");
+        break;
       default:
         throw new IllegalStateException("Unknown slot type: " + slotType);
     }
+    sb.append("@").append(producer);
+    return sb.toString();
   }
 }

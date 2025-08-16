@@ -28,4 +28,9 @@ public class IRNewExponential extends IRInstruction {
   public String toString() {
     return "newExponential(" + exponential + ", " + record + ")";
   }
+
+  @Override
+  public boolean usesRecord(int record) {
+    return this.record == record;
+  }
 }

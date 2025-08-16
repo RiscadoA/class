@@ -30,4 +30,9 @@ public class IRFlipForward extends IRInstruction {
   public String toString() {
     return "flipForward(-" + negRecord + ", +" + posRecord + ")";
   }
+
+  @Override
+  public boolean usesRecord(int record) {
+    return this.negRecord == record || this.posRecord == record;
+  }
 }

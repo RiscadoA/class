@@ -13,8 +13,17 @@ public class IRPush extends IRInstruction {
     return record;
   }
 
+  public void setRecord(int record) {
+    this.record = record;
+  }
+
   @Override
   public void accept(IRInstructionVisitor visitor) {
     visitor.visit(this);
+  }
+
+  @Override
+  public boolean usesRecord(int record) {
+    return this.record == record;
   }
 }

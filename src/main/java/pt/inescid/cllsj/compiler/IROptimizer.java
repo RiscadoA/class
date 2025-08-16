@@ -1,15 +1,21 @@
 package pt.inescid.cllsj.compiler;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.Consumer;
+
 import pt.inescid.cllsj.compiler.ir.IRBlock;
 import pt.inescid.cllsj.compiler.ir.IRProcess;
 import pt.inescid.cllsj.compiler.ir.IRProgram;
 import pt.inescid.cllsj.compiler.ir.flow.IRFlow;
 import pt.inescid.cllsj.compiler.ir.flow.IRFlowContinuation;
+import pt.inescid.cllsj.compiler.ir.flow.IRFlowLocation;
 import pt.inescid.cllsj.compiler.ir.instructions.*;
 
 public class IROptimizer {
@@ -169,7 +175,7 @@ public class IROptimizer {
 
     // Add the next block's instructions to the current block
     for (int i = 0; i < next.getBlock().getInstructions().size(); ++i) {
-      prev.addMovedInstruction(next.getInstruction(i), next.getLocation(i));
+      prev.addInstruction(next.getLocation(i));
     }
     prev.getStates().addAll(next.getStates());
 
@@ -317,6 +323,149 @@ public class IROptimizer {
         flipFlow.getStates().add(forwardFlow.getStates().get(1));
         flipFlow.removeOutgoing(forwardFlow);
         forwardFlow.removeSource(flipFlow);
+      }
+    }
+  }
+
+  // Searches for blocks of code like:
+  //
+  //    pushX(1, x)
+  //    ...
+  //    pushSession(0, 1, value)
+  //
+  // and turns them into
+  //
+  //    pushSession(0, 1, value)
+  //    pushX(0, x)
+  //
+  // This change requires modifying the type of the record being pushed, e.g.,
+  // if 1 was of type session(Y); X, then the new type will be session(Y); close.
+  public void removeUnnecessaryValuePushes(IRProgram ir) {
+    ir.forEachProcess(
+        (name, proc) -> {
+          removeUnnecessaryValuePushes(proc, processFlows.get(name));
+        });
+  }
+
+  private void removeUnnecessaryValuePushes(IRProcess ir, Map<IRBlock, IRFlow> flows) {
+    Map<Integer, List<IRFlowLocation>> candidates = new HashMap<>();
+
+    // We search for any pushSession instruction which is certainly pushing a value
+    for (IRBlock block : ir.getBlocksIncludingEntry()) {
+      if (!flows.containsKey(block)) {
+        continue; // No flow information for this block
+      }
+      for (int i = 0; i < block.getInstructions().size(); ++i) {
+        IRInstruction instruction = block.getInstructions().get(i);
+        if (!(instruction instanceof IRPushSession)) {
+          continue; // Not what we're looking for
+        }
+        IRPushSession pushSession = (IRPushSession) instruction;
+        if (!pushSession.getValueRequisites().mustBeValue()) {
+          continue; // Not necessarily a value push
+        }
+
+        // We store the location of this instruction associated with the record being consumed.
+        List<IRFlowLocation> locs =
+            candidates.computeIfAbsent(pushSession.getArgRecord(), k -> new ArrayList<>());
+        locs.add(flows.get(block).getLocation(i));
+
+        // Now we go back in the flow and look for the first push(argRecord, ...) instruction.
+        // If there is branching, we need to check all branches.
+        // When we find it,
+      }
+    }
+
+    for (int candidate : candidates.keySet()) {
+      for (IRFlowLocation pushSessionLoc : candidates.get(candidate)) {
+        IRPushSession pushSession = (IRPushSession)pushSessionLoc.getInstruction();
+        int argRecord = pushSession.getArgRecord();
+        AtomicBoolean recordModified = new AtomicBoolean(false);
+
+        Map<Integer, IRFlowLocation> detachedExponentials = new HashMap<>();
+        Map<Integer, IRFlowLocation> decRefExponentials = new HashMap<>();
+
+        pushSessionLoc.forEachBefore(loc -> {
+          IRInstruction instr = loc.getInstruction();
+
+          if (instr instanceof IRDetachExponential) {
+            IRDetachExponential detachExponential = (IRDetachExponential)instr;
+            detachedExponentials.put(detachExponential.getExponential(), loc);
+          }
+
+          if (instr instanceof IRDecRefExponential) {
+            IRDecRefExponential decRefExponential = (IRDecRefExponential)instr;
+            decRefExponentials.putIfAbsent(decRefExponential.getExponential(), loc);
+          }
+
+          if (instr instanceof IRPush) {
+            IRPush push = (IRPush)instr;
+            if (push.getRecord() == argRecord) {
+              if (recordModified.get() == false) {
+                // If the main record wasn't modified from this push until the pushSession,
+                // then we can avoid moving the push instruction and just change the record target
+                //
+                // This requires us moving the push session instruction before this instruction
+                pushSessionLoc.moveInstructionBefore(loc);
+                push.setRecord(pushSession.getRecord());
+              } else {
+                // If it was modified, then we have no choice but to move the push instruction ahead
+
+                if (push instanceof IRScan) {
+                  // We can't move IRScan instructions, as they have side effects
+                  return false;
+                }
+
+                if (push instanceof IRPushExpression) {
+                  // These instructions have associated clean up instructions
+                  // We could also move those but that is not implemented yet, so leave them
+                  return false;
+                }
+
+                // If we pushed an exponential and later detached it, we must move the detach to after the new push.
+                // Additionally, if we decremented the reference count of exponential, we must move it too.
+                if (push instanceof IRPushExponential) {
+                  IRPushExponential pushExponential = (IRPushExponential)push;
+                  if (detachedExponentials.containsKey(pushExponential.getExponential())) {
+                    IRFlowLocation detachLoc = detachedExponentials.get(pushExponential.getExponential());
+                    pushSessionLoc.insertInstructionAfter(detachLoc.getInstruction());
+                    detachLoc.removeInstruction();
+                  }
+                  if (decRefExponentials.containsKey(pushExponential.getExponential())) {
+                    IRFlowLocation decRefLoc = decRefExponentials.get(pushExponential.getExponential());
+                    pushSessionLoc.insertInstructionAfter(decRefLoc.getInstruction());
+                    decRefLoc.removeInstruction();
+                  }
+                }
+
+                push.setRecord(pushSession.getRecord());
+                loc.removeInstruction();
+                pushSessionLoc.insertInstructionAfter(push);
+                ir.setRecordType(argRecord, ir.getRecordType(argRecord).removeLastSlot());
+              }
+              return true;
+            }
+          }
+
+          if (instr instanceof IRNewSession) {
+            IRNewSession newSession = (IRNewSession)instr;
+            if (newSession.getRecord() == argRecord) {
+              loc.removeInstruction();
+              pushSessionLoc.removeInstruction();
+              return false;
+            }
+          }
+
+          if (instr.usesRecord(argRecord)) {
+            return false;
+          }
+
+          if (instr.usesRecord(pushSession.getRecord())) {
+            recordModified.set(true);
+          }
+
+          return true; // Continue iterating
+        });
       }
     }
   }

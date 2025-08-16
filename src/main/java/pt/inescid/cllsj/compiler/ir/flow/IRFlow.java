@@ -103,10 +103,24 @@ public class IRFlow {
     removeBranch(flow);
   }
 
-  public void addMovedInstruction(IRInstruction instruction, IRFlowLocation location) {
+  public void addInstruction(IRFlowLocation location) {
+    IRInstruction instruction = location.getInstruction();
     location.move(this, block.getInstructions().size());
     locations.add(location);
     block.getInstructions().add(instruction);
+  }
+  
+  public void addInstruction(int index, IRFlowLocation location) {
+    addInstruction(index, location.getInstruction(), location);
+  }
+
+  public void addInstruction(int index, IRInstruction instruction, IRFlowLocation location) {
+    location.move(this, index);
+    locations.add(index, location);
+    block.getInstructions().add(index, instruction);
+    for (int i = index + 1; i < block.getInstructions().size(); ++i) {
+      locations.get(i).move(this, i);
+    }
   }
 
   public void removeLastInstruction() {

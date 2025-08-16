@@ -37,4 +37,9 @@ public class IRString extends IRExpression {
   public String toString() {
     return "\"" + getEscapedValue() + "\"";
   }
+
+  @Override
+  public boolean usesRecord(int record) {
+    return false;
+  }
 }

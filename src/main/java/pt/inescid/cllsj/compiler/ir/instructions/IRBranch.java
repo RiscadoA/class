@@ -62,4 +62,9 @@ public class IRBranch extends IRInstruction {
   public String toString() {
     return "branch(" + expression + ", " + then + ", " + otherwise + ")";
   }
+
+  @Override
+  public boolean usesRecord(int record) {
+    return expression.usesRecord(record);
+  }
 }
