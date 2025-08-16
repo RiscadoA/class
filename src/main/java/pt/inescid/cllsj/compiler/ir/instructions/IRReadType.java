@@ -3,7 +3,7 @@ package pt.inescid.cllsj.compiler.ir.instructions;
 import java.util.Optional;
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 
-public class IRPopType extends IRInstruction {
+public class IRReadType extends IRRead {
   public static class Case {
     private String label;
     private int endPoints;
@@ -26,20 +26,15 @@ public class IRPopType extends IRInstruction {
     }
   }
 
-  private int record;
   private int argType;
   private Optional<Case> positive;
   private Optional<Case> negative;
 
-  public IRPopType(int record, int argType, Case positive, Case negative) {
-    this.record = record;
+  public IRReadType(int record, int slot, int argType, Case positive, Case negative) {
+    super(record, slot);
     this.argType = argType;
     this.positive = Optional.of(positive);
     this.negative = Optional.of(negative);
-  }
-
-  public int getRecord() {
-    return record;
   }
 
   public int getArgType() {
@@ -69,8 +64,8 @@ public class IRPopType extends IRInstruction {
 
   @Override
   public String toString() {
-    StringBuilder sb = new StringBuilder("popType(");
-    sb.append(record).append(", ");
+    StringBuilder sb = new StringBuilder("readType(");
+    sb.append(getRecord()).append(":").append(getSlot()).append(", ");
     sb.append(argType);
     if (positive.isPresent()) {
       sb.append(", +").append(positive.get().label);

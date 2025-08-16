@@ -1,6 +1,5 @@
 package pt.inescid.cllsj.compiler.ir.type;
 
-import java.util.Optional;
 import pt.inescid.cllsj.compiler.ir.IRTypeVisitor;
 
 public class IRVarT extends IRType {
@@ -8,27 +7,19 @@ public class IRVarT extends IRType {
   // I.e., index 0 refers to the last introduced type, such that in `sendty B; sendty A; send B; A`,
   // the type variable A has index 0, and the type variable B as index 1.
   private int type;
+  private IRType cont;
 
-  // If the type needs a preceding 'IRFlipT', but we were not able to determine it at type
-  // conversion time,
-  // (e.g., because the type variable polarity is only known later in the program flow), this
-  // variable
-  // holds the polarity which, if held by the variable, would require a preceding 'IRFlipT'.
-  private Optional<Boolean> flipPolarity;
-
-  public IRVarT(int type, Optional<Boolean> flipPolarity) {
+  public IRVarT(int type, IRType cont) {
     this.type = type;
-    this.flipPolarity = flipPolarity;
+    this.cont = cont;
   }
 
   public int getType() {
     return type;
   }
 
-  // Checks if a 'IRFlipT' should have been preceding this variable, given the actual polarity of
-  // the variable.
-  public boolean hasPrecedingFlip(boolean varPolarity) {
-    return flipPolarity.isPresent() && flipPolarity.get() == varPolarity;
+  public IRType getCont() {
+    return cont;
   }
 
   public void accept(IRTypeVisitor visitor) {
@@ -37,7 +28,11 @@ public class IRVarT extends IRType {
 
   @Override
   public String toString() {
-    String fs = flipPolarity.map(p -> p ? "+" : "-").orElse("");
-    return "var" + fs + " " + type;
+    return "var " + type + "; " + cont.toString();
+  }
+
+  @Override
+  public IRType withContinuation(IRType cont) {
+    return new IRVarT(type, this.cont.withContinuation(cont));
   }
 }

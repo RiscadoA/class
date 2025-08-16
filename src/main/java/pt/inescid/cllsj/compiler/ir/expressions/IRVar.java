@@ -22,8 +22,8 @@ public class IRVar extends IRExpression {
   }
 
   @Override
-  public IRType getType() {
-    return type;
+  public IRType getType(IRType cont) {
+    return type.withContinuation(cont);
   }
 
   @Override

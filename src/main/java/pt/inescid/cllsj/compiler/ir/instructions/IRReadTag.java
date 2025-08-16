@@ -3,7 +3,7 @@ package pt.inescid.cllsj.compiler.ir.instructions;
 import java.util.Map;
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 
-public class IRPopTag extends IRInstruction {
+public class IRReadTag extends IRRead {
   public static class Case {
     private String label;
     private int endPoints;
@@ -26,16 +26,11 @@ public class IRPopTag extends IRInstruction {
     }
   }
 
-  private int record;
   private Map<Integer, Case> cases; // Cases for each tag.
 
-  public IRPopTag(int record, Map<Integer, Case> cases) {
-    this.record = record;
+  public IRReadTag(int record, int slot, Map<Integer, Case> cases) {
+    super(record, slot);
     this.cases = cases;
-  }
-
-  public int getRecord() {
-    return record;
   }
 
   public Map<Integer, Case> getCases() {
@@ -49,7 +44,7 @@ public class IRPopTag extends IRInstruction {
 
   @Override
   public String toString() {
-    String str = "popTag(" + record;
+    String str = "readTag(" + getRecord() + ":" + getSlot();
     for (Map.Entry<Integer, Case> entry : this.cases.entrySet()) {
       str +=
           ", "

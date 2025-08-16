@@ -1,8 +1,8 @@
 package pt.inescid.cllsj.compiler.ir.expressions;
 
 import pt.inescid.cllsj.compiler.ir.IRExpressionVisitor;
-import pt.inescid.cllsj.compiler.ir.type.IRIntT;
 import pt.inescid.cllsj.compiler.ir.type.IRType;
+import pt.inescid.cllsj.compiler.ir.type.slot.IRIntT;
 
 public class IRDiv extends IRExpression {
   private final IRExpression lhs;
@@ -27,8 +27,8 @@ public class IRDiv extends IRExpression {
   }
 
   @Override
-  public IRType getType() {
-    return new IRIntT();
+  public IRType getType(IRType cont) {
+    return new IRIntT(cont);
   }
 
   @Override

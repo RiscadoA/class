@@ -27,6 +27,10 @@ import pt.inescid.cllsj.compiler.ir.expressions.IRVar;
 import pt.inescid.cllsj.compiler.ir.flow.*;
 import pt.inescid.cllsj.compiler.ir.instructions.*;
 import pt.inescid.cllsj.compiler.ir.type.*;
+import pt.inescid.cllsj.compiler.ir.type.slot.IRBoolT;
+import pt.inescid.cllsj.compiler.ir.type.slot.IRExponentialT;
+import pt.inescid.cllsj.compiler.ir.type.slot.IRIntT;
+import pt.inescid.cllsj.compiler.ir.type.slot.IRStringT;
 
 // Visitor which analyses the IR of a given process and generates a control and data flow graph.
 public class IRAnalyzer extends IRInstructionVisitor {
@@ -174,7 +178,7 @@ public class IRAnalyzer extends IRInstructionVisitor {
   }
 
   @Override
-  public void visit(IRPushSession instruction) {
+  public void visit(IRWriteSession instruction) {
     IRFlowRecord record = state.getBoundRecord(instruction.getRecord());
     IRFlowRecord argRecord = state.getBoundRecord(instruction.getArgRecord());
     Optional<Boolean> value = state.isValue(instruction.getValueRequisites());
@@ -200,7 +204,7 @@ public class IRAnalyzer extends IRInstructionVisitor {
   }
 
   @Override
-  public void visit(IRPopSession instruction) {
+  public void visit(IRReadSession instruction) {
     IRFlowRecord record = state.getBoundRecord(instruction.getRecord());
     Optional<Boolean> value = state.isValue(instruction.getValueRequisites());
 
@@ -233,7 +237,7 @@ public class IRAnalyzer extends IRInstructionVisitor {
   }
 
   @Override
-  public void visit(IRPushExpression instruction) {
+  public void visit(IRWriteExpression instruction) {
     IRFlowSlot slot = visit(instruction.getExpression());
     if (instruction.isExponential()) {
       IRFlowExponential exponential = state.allocateExponential(Optional.of(List.of(slot)));
@@ -268,28 +272,28 @@ public class IRAnalyzer extends IRInstructionVisitor {
   }
 
   @Override
-  public void visit(IRPushTag instruction) {
+  public void visit(IRWriteTag instruction) {
     state
         .getBoundRecord(instruction.getRecord())
         .doPush(state, IRFlowSlot.tag(instruction.getTag()));
   }
 
   @Override
-  public void visit(IRPopTag instruction) {
+  public void visit(IRReadTag instruction) {
     IRFlowSlot slot = state.getBoundRecord(instruction.getRecord()).doPop();
     if (slot.isKnownTag()) {
       int tag = slot.getTag();
       visit(instruction.getCases().get(tag).getLabel(), false);
     } else {
       // We don't know the tag, we must visit all branches
-      for (IRPopTag.Case c : instruction.getCases().values()) {
+      for (IRReadTag.Case c : instruction.getCases().values()) {
         visit(c.getLabel(), false);
       }
     }
   }
 
   @Override
-  public void visit(IRPushCell instruction) {
+  public void visit(IRWriteCell instruction) {
     state.getBoundRecord(instruction.getRecord()).doPush(state, IRFlowSlot.cell());
     state.getBoundRecord(instruction.getArgRecord()).markTotallyUnknown(state);
   }
@@ -307,14 +311,14 @@ public class IRAnalyzer extends IRInstructionVisitor {
   }
 
   @Override
-  public void visit(IRPushExponential instruction) {
+  public void visit(IRWriteExponential instruction) {
     IRFlowExponential exponential = state.getBoundExponential(instruction.getExponential());
     IRFlowSlot slot = IRFlowSlot.exponential(exponential.getHeapLocation());
     state.getBoundRecord(instruction.getRecord()).doPush(state, slot);
   }
 
   @Override
-  public void visit(IRPopExponential instruction) {
+  public void visit(IRReadExponential instruction) {
     IRFlowSlot slot = state.getBoundRecord(instruction.getRecord()).doPop();
     if (slot.isKnownExponential()) {
       state.bindExponential(instruction.getArgExponential(), slot.getExponentialHeapLocation());
@@ -325,7 +329,7 @@ public class IRAnalyzer extends IRInstructionVisitor {
   }
 
   @Override
-  public void visit(IRPushType instruction) {
+  public void visit(IRWriteType instruction) {
     IRFlowType type =
         new IRFlowType(
             instruction.getType(), instruction.isPositive(), instruction.getValueRequisites());
@@ -333,7 +337,7 @@ public class IRAnalyzer extends IRInstructionVisitor {
   }
 
   @Override
-  public void visit(IRPopType instruction) {
+  public void visit(IRReadType instruction) {
     IRFlowSlot slot = state.getBoundRecord(instruction.getRecord()).doPop();
     if (slot.isKnownType()) {
       state.bindType(instruction.getArgType(), slot.getType());

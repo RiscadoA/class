@@ -4,22 +4,17 @@ import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
 import pt.inescid.cllsj.compiler.ir.type.IRType;
 
-public class IRPushType extends IRInstruction {
-  private int record;
+public class IRWriteType extends IRWrite {
   private IRType type;
   private boolean isPositive;
   private IRValueRequisites valueRequisites;
 
-  public IRPushType(
-      int record, IRType type, boolean isPositive, IRValueRequisites valueRequisites) {
-    this.record = record;
+  public IRWriteType(
+      int record, int slot, IRType type, boolean isPositive, IRValueRequisites valueRequisites) {
+    super(record, slot);
     this.type = type;
     this.isPositive = isPositive;
     this.valueRequisites = valueRequisites;
-  }
-
-  public int getRecord() {
-    return record;
   }
 
   public IRType getType() {
@@ -41,8 +36,8 @@ public class IRPushType extends IRInstruction {
 
   @Override
   public String toString() {
-    return "pushType("
-        + record
+    return "writeType("
+        + getRecord() + ":" + getSlot()
         + ", "
         + type
         + ", "

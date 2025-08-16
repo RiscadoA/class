@@ -13,6 +13,14 @@ import pt.inescid.cllsj.compiler.ir.instructions.IRCallProcess.ExponentialArgume
 import pt.inescid.cllsj.compiler.ir.instructions.IRCallProcess.LinearArgument;
 import pt.inescid.cllsj.compiler.ir.instructions.IRCallProcess.TypeArgument;
 import pt.inescid.cllsj.compiler.ir.type.*;
+import pt.inescid.cllsj.compiler.ir.type.branch.IRTagT;
+import pt.inescid.cllsj.compiler.ir.type.slot.IRBoolT;
+import pt.inescid.cllsj.compiler.ir.type.slot.IRCellT;
+import pt.inescid.cllsj.compiler.ir.type.slot.IRExponentialT;
+import pt.inescid.cllsj.compiler.ir.type.slot.IRIntT;
+import pt.inescid.cllsj.compiler.ir.type.slot.IRSessionT;
+import pt.inescid.cllsj.compiler.ir.type.slot.IRStringT;
+import pt.inescid.cllsj.compiler.ir.type.slot.IRTypeT;
 
 public class CGenerator extends IRInstructionVisitor {
   private static final String TMP_TASK = "tmp_task";
@@ -230,14 +238,19 @@ public class CGenerator extends IRInstructionVisitor {
     }
     putBlankLine();
 
-    // Define the record struct.
-    putLine("struct record {");
+    // Define the continuation struct.
+    putLine("struct continuation {");
     incIndent();
     putLine("void* cont;");
     putLine("struct environment* cont_env;");
     putLine("int cont_record;");
-    putLine("unsigned char read;");
-    putLine("unsigned char written;");
+    decIndent();
+    putLine("};");
+    putBlankLine();
+
+    // Define the record struct.
+    putLine("struct record {");
+    incIndent();
     putLine("char buffer[];");
     decIndent();
     putLine("};");
@@ -451,6 +464,14 @@ public class CGenerator extends IRInstructionVisitor {
     put("boolean = i < " + MANAGER_STATE + "->what ## _count; ");
     put("} while (0)");
     putLineEnd();
+    putBlankLine();
+
+    // Used to simply buffer size computations
+    putLine("size_t max(size_t lhs, size_t rhs) {");
+    incIndent();
+    putLine("return lhs > rhs ? lhs : rhs;");
+    decIndent();;
+    putLine("}");
     putBlankLine();
 
     // Functions used for operations on string expressions.
@@ -1313,7 +1334,7 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   @Override
-  public void visit(IRPopSession instruction) {
+  public void visit(IRReadSession instruction) {
     switchTypeIsValue(
         instruction.getValueRequisites(),
         () -> {
@@ -1333,7 +1354,7 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   @Override
-  public void visit(IRPushSession instruction) {
+  public void visit(IRWriteSession instruction) {
     switchTypeIsValue(
         instruction.getValueRequisites(),
         () -> {
@@ -1354,7 +1375,7 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   @Override
-  public void visit(IRPopTag instruction) {
+  public void visit(IRReadTag instruction) {
     if (instruction.getCases().isEmpty()) {
       // After optimizing, we might end up with pop tags which don't jump.
       putStatement(popTag(instruction.getRecord()));
@@ -1366,11 +1387,11 @@ public class CGenerator extends IRInstructionVisitor {
 
     // We'll take the end points of all other cases for each case, since these paths won't be taken
     Integer totalEndPoints = 0;
-    for (Map.Entry<Integer, IRPopTag.Case> entry : instruction.getCases().entrySet()) {
+    for (Map.Entry<Integer, IRReadTag.Case> entry : instruction.getCases().entrySet()) {
       totalEndPoints += entry.getValue().getEndPoints();
     }
 
-    for (Map.Entry<Integer, IRPopTag.Case> entry : instruction.getCases().entrySet()) {
+    for (Map.Entry<Integer, IRReadTag.Case> entry : instruction.getCases().entrySet()) {
       putLine("case " + entry.getKey() + ":");
       incIndent();
       putAssign(
@@ -1385,7 +1406,7 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   @Override
-  public void visit(IRPushTag instruction) {
+  public void visit(IRWriteTag instruction) {
     putPushTag(instruction.getRecord(), instruction.getTag());
   }
 
@@ -1525,7 +1546,7 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   @Override
-  public void visit(IRPushExpression instruction) {
+  public void visit(IRWriteExpression instruction) {
     if (instruction.isExponential()
         && (!optimizePrimitiveExponentials
             || instruction.getExpression().getType() instanceof IRStringT)) {
@@ -1555,7 +1576,7 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   @Override
-  public void visit(IRPushType instruction) {
+  public void visit(IRWriteType instruction) {
     putPushType(
         instruction.getRecord(),
         instruction.getType(),
@@ -1565,7 +1586,7 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   @Override
-  public void visit(IRPopType instruction) {
+  public void visit(IRReadType instruction) {
     putAssign(type(instruction.getArgType()), popType(instruction.getRecord()));
     if (instruction.getPositive().isPresent() || instruction.getNegative().isPresent()) {
       putIfElse(
@@ -1634,7 +1655,7 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   @Override
-  public void visit(IRPushExponential instruction) {
+  public void visit(IRWriteExponential instruction) {
     Runnable forInt =
         () -> {
           putPush(instruction.getRecord(), "int", exponentialInteger(instruction.getExponential()));
@@ -1657,7 +1678,7 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   @Override
-  public void visit(IRPopExponential instruction) {
+  public void visit(IRReadExponential instruction) {
     Runnable forInt =
         () -> {
           putAssign(
@@ -1860,7 +1881,7 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   @Override
-  public void visit(IRPushCell instruction) {
+  public void visit(IRWriteCell instruction) {
     // Push a new cell structure and initialize its mutex.
     putAllocCell(TMP_CELL);
     putAssign(cellRefCount(TMP_CELL), 1);
@@ -2784,27 +2805,17 @@ public class CGenerator extends IRInstructionVisitor {
     }
 
     @Override
+    public void visit(IRFlipT type) {
+      size = "max(" + size + ", ";
+      type.getCont().accept(this);
+      size += ")";
+    }
+
+    @Override
     public void visit(IRSessionT type) {
-      String argSize;
-
-      if (optimizeSendValue && type.getValueRequisites().mustBeValue()) {
-        argSize = recurse(type.getArg());
-      } else if (optimizeSendValue && type.getValueRequisites().canBeValue()) {
-        argSize =
-            "("
-                + typeIsValue(type.getValueRequisites())
-                + " ? "
-                + recurse(type.getArg())
-                + " : sizeof(struct record*))";
-      } else {
-        argSize = "sizeof(struct record*)";
-        size += "sizeof(struct record*) + ";
-        currentOffset += " + sizeof(struct record*)";
-      }
-
-      size += argSize + " + ";
       String oldOffset = currentOffset;
-      currentOffset += " + " + argSize;
+      size += "sizeof(struct record*) + ";
+      currentOffset += " + sizeof(struct record*)";
       type.getCont().accept(this);
       currentOffset = oldOffset;
     }
@@ -2813,9 +2824,9 @@ public class CGenerator extends IRInstructionVisitor {
     public void visit(IRTagT type) {
       size += "sizeof(unsigned char)";
       String oldOffset = currentOffset;
-      for (int i = 0; i < type.getChoices().size(); ++i) {
+      for (int i = 0; i < type.getBranches().size(); ++i) {
         if (buffer.isEmpty()) {
-          size += " + (";
+          size += "max(";
         } else {
           // Read the chosen tag from the buffer
           // We do this in order to determine the actual size of the value
@@ -2823,10 +2834,17 @@ public class CGenerator extends IRInstructionVisitor {
           size += " + (" + tag + " != " + i + " ? 0 : (";
         }
         currentOffset += " + sizeof(unsigned char)";
-        type.getChoices().get(i).accept(this);
+        type.getBranches().get(i).accept(this);
         currentOffset = oldOffset;
-        size += ")";
-        if (buffer.isPresent()) {
+        if (buffer.isEmpty()) {
+          size += ", ";
+        } else if (buffer.isPresent()) {
+          size += "))";
+        }
+      }
+      if (buffer.isEmpty()) {
+        size += "0";
+        for (int i = 0; i < type.getBranches().size(); ++i) {
           size += ")";
         }
       }
@@ -2886,11 +2904,6 @@ public class CGenerator extends IRInstructionVisitor {
     @Override
     public void visit(IRCellT type) {
       size += "sizeof(struct cell*)";
-    }
-
-    @Override
-    public void visit(IRFlipT type) {
-      type.getCont().accept(this);
     }
   }
 
@@ -3096,7 +3109,7 @@ public class CGenerator extends IRInstructionVisitor {
     }
 
     @Override
-    public void visit(IRTagT type) {
+    public void visit(IRBranchT type) {
       code = "unsigned char";
     }
   }
@@ -3222,7 +3235,7 @@ public class CGenerator extends IRInstructionVisitor {
     }
 
     @Override
-    public void visit(IRTagT type) {
+    public void visit(IRBranchT type) {
       separate();
       name += "tag";
       for (int i = 0; i < type.getChoices().size(); ++i) {
@@ -3486,7 +3499,7 @@ public class CGenerator extends IRInstructionVisitor {
     }
 
     @Override
-    public void visit(IRTagT type) {
+    public void visit(IRBranchT type) {
       putIfWritten(
           () -> {
             String tag = access(oldBuffer, "unsigned char");
@@ -3654,7 +3667,7 @@ public class CGenerator extends IRInstructionVisitor {
     }
 
     @Override
-    public void visit(IRTagT type) {
+    public void visit(IRBranchT type) {
       putIfWritten(
           () -> {
             String tag = access(buffer, "unsigned char");

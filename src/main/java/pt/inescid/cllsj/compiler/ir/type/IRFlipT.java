@@ -22,4 +22,9 @@ public class IRFlipT extends IRType {
   public String toString() {
     return "flip; " + cont.toString();
   }
+
+  @Override
+  public IRType withContinuation(IRType cont) {
+    return new IRFlipT(this.cont.withContinuation(cont));
+  }
 }

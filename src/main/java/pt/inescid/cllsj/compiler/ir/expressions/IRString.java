@@ -1,7 +1,7 @@
 package pt.inescid.cllsj.compiler.ir.expressions;
 
 import pt.inescid.cllsj.compiler.ir.IRExpressionVisitor;
-import pt.inescid.cllsj.compiler.ir.type.IRStringT;
+import pt.inescid.cllsj.compiler.ir.type.slot.IRStringT;
 import pt.inescid.cllsj.compiler.ir.type.IRType;
 
 public class IRString extends IRExpression {
@@ -29,8 +29,8 @@ public class IRString extends IRExpression {
   }
 
   @Override
-  public IRType getType() {
-    return new IRStringT();
+  public IRType getType(IRType cont) {
+    return new IRStringT(cont);
   }
 
   @Override

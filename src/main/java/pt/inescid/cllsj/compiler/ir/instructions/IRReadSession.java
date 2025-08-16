@@ -2,23 +2,12 @@ package pt.inescid.cllsj.compiler.ir.instructions;
 
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 
-public class IRTakeCell extends IRInstruction {
-  private int record;
-  private int slot;
+public class IRReadSession extends IRRead {
   private int argRecord; // Index where the new record will be stored.
 
-  public IRTakeCell(int record, int slot, int argRecord) {
-    this.record = record;
-    this.slot = slot;
+  public IRReadSession(int record, int slot, int argRecord) {
+    super(record, slot);
     this.argRecord = argRecord;
-  }
-
-  public int getRecord() {
-    return record;
-  }
-
-  public int getSlot() {
-    return slot;
   }
 
   public int getArgRecord() {
@@ -32,6 +21,6 @@ public class IRTakeCell extends IRInstruction {
 
   @Override
   public String toString() {
-    return "takeCell(" + record + ":" + slot + ", " + argRecord + ")";
+    return "readSession(" + getRecord() + ":" + getSlot() + ", " + argRecord + ")";
   }
 }

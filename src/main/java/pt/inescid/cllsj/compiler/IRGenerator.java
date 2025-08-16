@@ -179,13 +179,11 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTClose node) {
-    block.add(new IRPushClose(record(node.getCh())));
     block.add(new IRReturn(record(node.getCh())));
   }
 
   @Override
   public void visit(ASTCoClose node) {
-    block.add(new IRPopClose(record(node.getCh())));
     block.add(new IRFreeSession(record(node.getCh())));
     node.getRhs().accept(this);
   }
@@ -222,7 +220,16 @@ public class IRGenerator extends ASTNodeVisitor {
     }
 
     IRValueRequisites valueRequisites = valueRequisites(node.getLhsType(), false);
-    block.add(new IRPushSession(record(node.getChs()), pushedRecord, valueRequisites));
+
+    IRType argType = recordType(node.getChs());
+
+    if (valueRequisites.mustBeValue()) {
+      block.add(new IRForward(record(node.getChs()), pushedRecord, valueRequisites));
+    } else if (valueRequisites.canBeValue()) {
+
+    } else {
+      block.add(new IRWriteSession(record(node.getChs()), nextSlot(node.getChs()), pushedRecord));
+    }
 
     // Flip if the remainder of the session type is negative.
     flipIfNegative(record(node.getChs()), node.getRhsType());
@@ -233,7 +240,7 @@ public class IRGenerator extends ASTNodeVisitor {
   @Override
   public void visit(ASTRecv node) {
     IRValueRequisites valueRequisites = valueRequisites(node.getChiType(), true);
-    block.add(new IRPopSession(record(node.getChr()), record(node.getChi()), valueRequisites));
+    block.add(new IRReadSession(record(node.getChr()), record(node.getChi()), valueRequisites));
     node.getRhs().accept(this);
 
     // We don't flip to the received session here, as if it is negative, the other endpoint has
@@ -251,9 +258,9 @@ public class IRGenerator extends ASTNodeVisitor {
     // Initialize the continuation record, and flip to it if its session type is positive.
     block.add(new IRNewSession(nextRecord, closure.getLabel()));
     flipIfPositive(nextRecord, node.getTypeRhs());
-    block.add(new IRPushSession(previousRecord, nextRecord, IRValueRequisites.notValue()));
+    block.add(new IRWriteSession(previousRecord, nextRecord, IRValueRequisites.notValue()));
     block.add(
-        new IRPushType(
+        new IRWriteType(
             previousRecord,
             intoIRType(node.getType()),
             isPositive(node.getType()),
@@ -282,13 +289,13 @@ public class IRGenerator extends ASTNodeVisitor {
 
     int endPoints = countEndPoints(node.getRhs()) - 1;
 
-    block.add(new IRPopSession(previousRecord, nextRecord, IRValueRequisites.notValue()));
+    block.add(new IRReadSession(previousRecord, nextRecord, IRValueRequisites.notValue()));
     block.add(
-        new IRPopType(
+        new IRReadType(
             previousRecord,
             type(node.getTyidGen()),
-            new IRPopType.Case(positiveBlock.getLabel(), endPoints),
-            new IRPopType.Case(negativeBlock.getLabel(), endPoints)));
+            new IRReadType.Case(positiveBlock.getLabel(), endPoints),
+            new IRReadType.Case(negativeBlock.getLabel(), endPoints)));
     positiveBlock.add(new IRFreeSession(previousRecord));
     negativeBlock.add(new IRFreeSession(previousRecord));
 
@@ -303,7 +310,7 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTSelect node) {
-    block.add(new IRPushTag(record(node.getCh()), node.getLabelIndex()));
+    block.add(new IRWriteTag(record(node.getCh()), node.getLabelIndex()));
 
     // Flip if the remainder of the session type is negative.
     flipIfNegative(record(node.getCh()), node.getRhsType());
@@ -314,8 +321,8 @@ public class IRGenerator extends ASTNodeVisitor {
   @Override
   public void visit(ASTCase node) {
     Set<String> exponentials = exponentialNamesFreeIn(node);
-    Map<Integer, IRPopTag.Case> cases = new HashMap<>();
-    block.add(new IRPopTag(record(node.getCh()), cases));
+    Map<Integer, IRReadTag.Case> cases = new HashMap<>();
+    block.add(new IRReadTag(record(node.getCh()), cases));
 
     for (int i = 0; i < node.getCaseCount(); ++i) {
       String caseLabel = node.getCaseLabelFromIndex(i);
@@ -324,7 +331,7 @@ public class IRGenerator extends ASTNodeVisitor {
       int endPointCount = countEndPoints(caseNode) - 1;
 
       IRBlock caseBlock = process.addBlock("case_" + caseLabel.substring(1));
-      cases.put(i, new IRPopTag.Case(caseBlock.getLabel(), endPointCount));
+      cases.put(i, new IRReadTag.Case(caseBlock.getLabel(), endPointCount));
 
       // Decrement the reference count of any unused exponentials in this case.
       for (String name : exponentials) {
@@ -395,7 +402,7 @@ public class IRGenerator extends ASTNodeVisitor {
   public void visit(ASTCoExpr node) {
     GeneratedExpression expr = generateExpression(node.getExpr());
 
-    block.add(new IRPushExpression(record(node.getCh()), expr.getExpr(), false));
+    block.add(new IRWriteExpression(record(node.getCh()), expr.getExpr(), false));
     expr.cleanUp(block, Optional.empty(), true);
     block.add(new IRReturn(record(node.getCh())));
   }
@@ -406,10 +413,10 @@ public class IRGenerator extends ASTNodeVisitor {
 
     if (optimizeExponentialExpressionToForward && expr.expr instanceof IRExponentialVar) {
       block.add(
-          new IRPushExponential(
+          new IRWriteExponential(
               record(node.getCh()), ((IRExponentialVar) expr.expr).getExponential()));
     } else {
-      block.add(new IRPushExpression(record(node.getCh()), expr.getExpr(), true));
+      block.add(new IRWriteExpression(record(node.getCh()), expr.getExpr(), true));
       expr.cleanUp(block, Optional.empty(), true);
     }
     block.add(new IRReturn(record(node.getCh())));
@@ -476,14 +483,14 @@ public class IRGenerator extends ASTNodeVisitor {
             exponentialArgs,
             typeArgs));
     finish.add(new IRNewExponential(exponential(node.getChr() + "$bang"), record(node.getChi())));
-    finish.add(new IRPushExponential(record(node.getChr()), exponential(node.getChr() + "$bang")));
+    finish.add(new IRWriteExponential(record(node.getChr()), exponential(node.getChr() + "$bang")));
     finish.add(new IRDetachExponential(exponential(node.getChr() + "$bang")));
     finish.add(new IRReturn(record(node.getChr())));
   }
 
   @Override
   public void visit(ASTWhy node) {
-    block.add(new IRPopExponential(record(node.getCh()), exponential(node.getCh())));
+    block.add(new IRReadExponential(record(node.getCh()), exponential(node.getCh())));
     block.add(new IRFreeSession(record(node.getCh())));
     decExponentialRefIfUnused(node.getRhs(), node.getCh());
     node.getRhs().accept(this);
@@ -503,7 +510,7 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTFwdB node) {
-    block.add(new IRPushExponential(record(node.getCh1()), exponential(node.getCh2())));
+    block.add(new IRWriteExponential(record(node.getCh1()), exponential(node.getCh2())));
     block.add(new IRReturn(record(node.getCh1())));
   }
 
@@ -596,7 +603,7 @@ public class IRGenerator extends ASTNodeVisitor {
     // Flip to the argument if its session type is positive.
     flipIfPositive(record(node.getChc()), node.getTypeRhs());
 
-    block.add(new IRPushCell(record(node.getCh()), record(node.getChc())));
+    block.add(new IRWriteCell(record(node.getCh()), record(node.getChc())));
     block.add(new IRReturn(record(node.getCh())));
 
     if (node.getRhs() instanceof ASTCell) {
@@ -774,11 +781,23 @@ public class IRGenerator extends ASTNodeVisitor {
     if (!optimizeSendValue) {
       return IRValueRequisites.notValue();
     }
-    return ASTTypeIsValue.check(ep, environment().typeVariables, type, isDual);
+    return ASTTypeIsValue.check(this, ep, environment().typeVariables, type, isDual);
   }
 
   private Environment environment() {
     return environments.peek();
+  }
+
+  private int nextSlot(String ch) {
+    return environment().nextSlot(ch);
+  }
+
+  private void setSlot(String ch, int slot) {
+    environment().setSlot(ch, slot);
+  }
+
+  private IRType recordType(String ch) {
+    return environment().recordType(ch);
   }
 
   private int record(String ch) {
@@ -1133,6 +1152,7 @@ public class IRGenerator extends ASTNodeVisitor {
     private final Environment parent;
     private final Map<String, RecordLocation> records = new HashMap<>();
     private final List<IRType> recordTypes = new ArrayList<>();
+    private final List<Integer> recordSlots = new ArrayList<>();
     private final Map<String, Integer> exponentials = new HashMap<>();
     private final List<IRType> exponentialTypes = new ArrayList<>();
     private final Map<String, Integer> typeVariables = new HashMap<>();
@@ -1234,7 +1254,7 @@ public class IRGenerator extends ASTNodeVisitor {
         env.setPolarity(index, parent.isPositive(typeGenName));
         outInheritedTypes.add(
             new TypeArgument(
-                new IRVarT(i, Optional.empty()),
+                new IRVarT(i),
                 gen.valueRequisites(i),
                 parent.isPositive(typeGenName),
                 index));
@@ -1327,7 +1347,7 @@ public class IRGenerator extends ASTNodeVisitor {
         env.setPolarity(index, parent.isPositive(typeGenName));
         outTypeArgs.add(
             new IRCallProcess.TypeArgument(
-                new IRVarT(i, Optional.empty()),
+                new IRVarT(i),
                 gen.valueRequisites(i),
                 parent.isPositive(typeGenName),
                 index));
@@ -1344,8 +1364,23 @@ public class IRGenerator extends ASTNodeVisitor {
       this.gen = gen;
     }
 
+    public int nextSlot(String session) {
+      int record = record(session);
+      int slot = recordSlots.get(record);
+      recordSlots.set(record, slot + 1);
+      return slot;
+    }
+
+    private void setSlot(String session, int slot) {
+      recordSlots.set(records.get(session).index(), slot);
+    }
+
     public List<IRType> recordTypes() {
       return recordTypes;
+    }
+
+    public IRType recordType(String session) {
+      return recordTypes.get(records.get(session).index());
     }
 
     public int record(String session) {
@@ -1395,7 +1430,7 @@ public class IRGenerator extends ASTNodeVisitor {
     }
 
     public IRType intoIRType(Env<EnvEntry> ep, ASTType type) {
-      return ASTIntoIRType.convert(gen, ep, type, typeVariables);
+      return ASTIntoIRType.convert(gen, ep, type, typeVariables, polarities);
     }
 
     public String getName() {
@@ -1409,6 +1444,7 @@ public class IRGenerator extends ASTNodeVisitor {
       int index = recordTypes.size();
       records.get(session).indices.add(index);
       recordTypes.add(type);
+      recordSlots.add(0);
       return index;
     }
 

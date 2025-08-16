@@ -2,6 +2,7 @@ package pt.inescid.cllsj.compiler.ir.expressions;
 
 import pt.inescid.cllsj.compiler.ir.IRExpressionVisitor;
 import pt.inescid.cllsj.compiler.ir.type.IRType;
+import pt.inescid.cllsj.compiler.ir.type.slot.IRExponentialT;
 
 public class IRExponentialVar extends IRExpression {
   private final int exponential;
@@ -22,8 +23,8 @@ public class IRExponentialVar extends IRExpression {
   }
 
   @Override
-  public IRType getType() {
-    return type;
+  public IRType getType(IRType cont) {
+    return new IRExponentialT(type, cont);
   }
 
   @Override

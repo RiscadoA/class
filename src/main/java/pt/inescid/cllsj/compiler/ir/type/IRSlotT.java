@@ -2,10 +2,10 @@ package pt.inescid.cllsj.compiler.ir.type;
 
 import pt.inescid.cllsj.compiler.ir.IRTypeVisitor;
 
-public class IRTypeT extends IRType {
+public abstract class IRSlotT extends IRType {
   private IRType cont;
 
-  public IRTypeT(IRType cont) {
+  public IRSlotT(IRType cont) {
     this.cont = cont;
   }
 
@@ -16,10 +16,5 @@ public class IRTypeT extends IRType {
   @Override
   public void accept(IRTypeVisitor visitor) {
     visitor.visit(this);
-  }
-
-  @Override
-  public String toString() {
-    return "type(" + cont + ")";
   }
 }

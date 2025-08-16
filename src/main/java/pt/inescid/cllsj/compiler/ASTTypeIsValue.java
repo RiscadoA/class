@@ -18,8 +18,12 @@ public class ASTTypeIsValue extends ASTTypeVisitor {
   private Map<String, Integer> typeMap = new HashMap<>();
   private boolean isDual = false;
 
-  public static IRValueRequisites check(
+  public static IRValueRequisites check(IRGenerator gen,
       Env<EnvEntry> ep, Map<String, Integer> typeMap, ASTType type, boolean isDual) {
+    if (!gen.optimizeSendValue) {
+      return IRValueRequisites.notValue();
+    }
+
     ASTTypeIsValue visitor = new ASTTypeIsValue(ep, typeMap, isDual);
     type.accept(visitor);
 

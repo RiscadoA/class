@@ -22,4 +22,9 @@ public class IRRecT extends IRType {
   public String toString() {
     return "rec " + inner.toString();
   }
+
+  @Override
+  public IRType withContinuation(IRType cont) {
+    return new IRRecT(inner.withContinuation(cont));
+  }
 }

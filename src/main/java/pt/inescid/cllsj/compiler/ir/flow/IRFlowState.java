@@ -7,18 +7,18 @@ import java.util.Optional;
 import java.util.Stack;
 import pt.inescid.cllsj.compiler.ir.IRTypeVisitor;
 import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
-import pt.inescid.cllsj.compiler.ir.type.IRBoolT;
-import pt.inescid.cllsj.compiler.ir.type.IRCellT;
 import pt.inescid.cllsj.compiler.ir.type.IRCloseT;
-import pt.inescid.cllsj.compiler.ir.type.IRExponentialT;
 import pt.inescid.cllsj.compiler.ir.type.IRFlipT;
-import pt.inescid.cllsj.compiler.ir.type.IRIntT;
 import pt.inescid.cllsj.compiler.ir.type.IRRecT;
-import pt.inescid.cllsj.compiler.ir.type.IRSessionT;
-import pt.inescid.cllsj.compiler.ir.type.IRStringT;
-import pt.inescid.cllsj.compiler.ir.type.IRTagT;
+import pt.inescid.cllsj.compiler.ir.type.slot.IRStringT;
+import pt.inescid.cllsj.compiler.ir.type.IRBranchT;
 import pt.inescid.cllsj.compiler.ir.type.IRType;
-import pt.inescid.cllsj.compiler.ir.type.IRTypeT;
+import pt.inescid.cllsj.compiler.ir.type.slot.IRTypeT;
+import pt.inescid.cllsj.compiler.ir.type.slot.IRBoolT;
+import pt.inescid.cllsj.compiler.ir.type.slot.IRCellT;
+import pt.inescid.cllsj.compiler.ir.type.slot.IRExponentialT;
+import pt.inescid.cllsj.compiler.ir.type.slot.IRIntT;
+import pt.inescid.cllsj.compiler.ir.type.slot.IRSessionT;
 import pt.inescid.cllsj.compiler.ir.type.IRVarT;
 
 public class IRFlowState {
@@ -299,20 +299,7 @@ public class IRFlowState {
 
     @Override
     public void visit(IRSessionT type) {
-      Optional<Boolean> isValue = isValue(type.getValueRequisites());
-      if (isValue.isEmpty()) {
-        return;
-      }
-
-      if (isValue.get()) {
-        Optional<Integer> argSlots = recurse(type.getArg(), 0);
-        if (argSlots.isPresent()) {
-          Optional<Integer> contSlots = recurse(type.getCont(), argSlots.get());
-          count = contSlots.map(slots -> slots + argSlots.get());
-        }
-      } else {
-        count = recurse(type.getCont(), 1).map(slots -> slots + 1);
-      }
+      count = recurse(type.getCont(), 1).map(slots -> slots + 1);
     }
 
     @Override
@@ -326,7 +313,7 @@ public class IRFlowState {
     }
 
     @Override
-    public void visit(IRTagT type) {
+    public void visit(IRBranchT type) {
       if (value.isEmpty() || value.get().isEmpty()) {
         return;
       }
@@ -336,7 +323,7 @@ public class IRFlowState {
         return;
       }
 
-      IRType choice = type.getChoices().get(tag.getTag());
+      IRType choice = type.getBranches().get(tag.getTag());
       count = recurse(choice, 1);
     }
 

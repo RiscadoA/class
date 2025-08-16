@@ -239,6 +239,26 @@ public abstract class ASTType {
   //	return offset;
   // }
 
+  public ASTType dualCatch(Env<EnvEntry> ep) {
+    try {
+      return dual(ep);
+    } catch (Exception e) {
+      e.printStackTrace(System.out);
+      System.exit(1);
+      return null; // unreachable
+    }
+  }
+
+  public ASTType unfoldTypeCatch(Env<EnvEntry> ep) {
+    try {
+      return unfoldType(ep);
+    } catch (Exception e) {
+      e.printStackTrace(System.out);
+      System.exit(1);
+      return null; // unreachable
+    }
+  }
+
   public Optional<Boolean> getPolarityCatch(Env<EnvEntry> ep) {
     try {
       return getPolarity(ep);

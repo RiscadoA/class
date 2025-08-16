@@ -8,5 +8,5 @@ public abstract class IRExpression {
     visitor.visit(this);
   }
 
-  public abstract IRType getType();
+  public abstract IRType getType(IRType cont);
 }

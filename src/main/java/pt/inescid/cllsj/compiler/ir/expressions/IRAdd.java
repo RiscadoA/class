@@ -1,9 +1,10 @@
 package pt.inescid.cllsj.compiler.ir.expressions;
 
 import pt.inescid.cllsj.compiler.ir.IRExpressionVisitor;
-import pt.inescid.cllsj.compiler.ir.type.IRIntT;
-import pt.inescid.cllsj.compiler.ir.type.IRStringT;
+import pt.inescid.cllsj.compiler.ir.type.slot.IRStringT;
+import pt.inescid.cllsj.compiler.ir.type.IRCloseT;
 import pt.inescid.cllsj.compiler.ir.type.IRType;
+import pt.inescid.cllsj.compiler.ir.type.slot.IRIntT;
 
 public class IRAdd extends IRExpression {
   private final IRExpression lhs;
@@ -28,14 +29,14 @@ public class IRAdd extends IRExpression {
   }
 
   @Override
-  public IRType getType() {
-    if (lhs.getType() instanceof IRIntT && rhs.getType() instanceof IRIntT) {
-      return new IRIntT();
-    } else if (lhs.getType() instanceof IRStringT || rhs.getType() instanceof IRStringT) {
-      return new IRStringT();
+  public IRType getType(IRType cont) {
+    if (lhs.getType(cont) instanceof IRIntT && rhs.getType(cont) instanceof IRIntT) {
+      return new IRIntT(new IRCloseT());
+    } else if (lhs.getType(cont) instanceof IRStringT || rhs.getType(cont) instanceof IRStringT) {
+      return new IRStringT(new IRCloseT());
     } else {
       throw new RuntimeException(
-          "Unsupported type for add: " + lhs.getType() + " and " + rhs.getType());
+          "Unsupported type for add: " + lhs.getType(cont) + " and " + rhs.getType(cont));
     }
   }
 

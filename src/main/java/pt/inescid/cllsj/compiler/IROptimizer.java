@@ -107,10 +107,10 @@ public class IROptimizer {
         subtractEndPoints(ir, prev, i.getThen().getEndPoints());
       }
       removeLast.run();
-    } else if (last instanceof IRPopTag) {
-      IRPopTag i = (IRPopTag) last;
+    } else if (last instanceof IRReadTag) {
+      IRReadTag i = (IRReadTag) last;
       int endPoints = 0;
-      for (IRPopTag.Case c : i.getCases().values()) {
+      for (IRReadTag.Case c : i.getCases().values()) {
         if (!c.getLabel().equals(next.getBlock().getLabel())) {
           endPoints += c.getEndPoints();
         }
@@ -123,9 +123,9 @@ public class IROptimizer {
       // almost
       // never happens anyway. So, we keep the instruction, and just omit the branching.
       i.getCases().clear();
-    } else if (last instanceof IRPopType) {
+    } else if (last instanceof IRReadType) {
       // Similarly to IRPopTag, we can remove the branch but not the instruction itself.
-      IRPopType i = (IRPopType) last;
+      IRReadType i = (IRReadType) last;
       if (i.getPositive().get().getLabel().equals(next.getBlock().getLabel())) {
         subtractEndPoints(ir, prev, i.getNegative().get().getEndPoints());
       } else {
@@ -217,8 +217,8 @@ public class IROptimizer {
         } else {
           i.getOtherwise().subtractEndPoints(endPoints);
         }
-      } else if (last instanceof IRPopType) {
-        IRPopType i = (IRPopType) last;
+      } else if (last instanceof IRReadType) {
+        IRReadType i = (IRReadType) last;
         if (i.getPositive().isPresent()
             && i.getPositive().get().getLabel().equals(flow.getBlock().getLabel())) {
           i.getPositive().get().subtractEndPoints(endPoints);
@@ -226,9 +226,9 @@ public class IROptimizer {
             && i.getNegative().get().getLabel().equals(flow.getBlock().getLabel())) {
           i.getNegative().get().subtractEndPoints(endPoints);
         }
-      } else if (last instanceof IRPopTag) {
-        IRPopTag i = (IRPopTag) last;
-        for (IRPopTag.Case c : i.getCases().values()) {
+      } else if (last instanceof IRReadTag) {
+        IRReadTag i = (IRReadTag) last;
+        for (IRReadTag.Case c : i.getCases().values()) {
           if (c.getLabel().equals(flow.getBlock().getLabel())) {
             c.subtractEndPoints(endPoints);
           }

@@ -4,13 +4,19 @@ import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 
 public class IRDecRefCell extends IRInstruction {
   private int record;
+  private int slot;
 
-  public IRDecRefCell(int record) {
+  public IRDecRefCell(int record, int slot) {
     this.record = record;
+    this.slot = slot;
   }
 
   public int getRecord() {
     return record;
+  }
+
+  public int getSlot() {
+    return slot;
   }
 
   @Override
@@ -20,6 +26,6 @@ public class IRDecRefCell extends IRInstruction {
 
   @Override
   public String toString() {
-    return "decRefCell(" + record + ")";
+    return "decRefCell(" + record + ":" + slot + ")";
   }
 }
