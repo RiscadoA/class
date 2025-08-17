@@ -152,6 +152,8 @@ public static void main(String args[]) {
           compiler.optimizeSendValue = false;
         } else if (args[i].equals("--no-optimize-known-jumps")) {
           compiler.optimizeKnownJumps = false;
+        } else if (args[i].equals("--no-optimize-single-endpoint")) {
+          compiler.optimizeSingleEndpoint = false;
         } else if (args[i].equals("-p")) {
           if (i + 1 >= args.length) {
             failed = true;
@@ -188,6 +190,7 @@ public static void main(String args[]) {
         System.err.println("    --no-optimize-flip-forward: Disables flip forward optimization");
         System.err.println("    --no-optimize-send-value: Disables send value optimization");
         System.err.println("    --no-optimize-known-jumps: Disables optimization of known jumps");
+        System.err.println("    --no-optimize-single-endpoint: Disables optimization of single endpoint processes");
 
         System.exit(1);
       }

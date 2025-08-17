@@ -48,6 +48,7 @@ public class CGenerator extends IRInstructionVisitor {
   public boolean optimizePrimitiveExponentials = true;
   public boolean optimizeTailCalls = true;
   public boolean optimizeSendValue = true;
+  public boolean optimizeSingleEndpoint = true;
 
   public int customAllocatorSizeDivisor = 32;
   public int customAllocatorLevels = 8;
@@ -986,8 +987,7 @@ public class CGenerator extends IRInstructionVisitor {
               && instruction.getExponentialArguments().isEmpty()
               && instruction.getTypeArguments().isEmpty()) {
             if (!entryCall) {
-              putIf(
-                  decrementAtomic(environmentEndPoints()) + " == 0", () -> putFreeEnvironment(ENV));
+              putDecrementEndPoints(() -> putFreeEnvironment(ENV));
             } else {
               entryCall = false;
             }
@@ -1017,9 +1017,7 @@ public class CGenerator extends IRInstructionVisitor {
                       arg.getSourceTypePolarity()));
             }
 
-            putIf(
-                decrementAtomic(environmentEndPoints(ENV)) + " == 0",
-                () -> putFreeEnvironment(ENV));
+            putDecrementEndPoints(() -> putFreeEnvironment(ENV));
             putAssign(ENV, TMP_ENV);
           }
         };
@@ -1140,34 +1138,31 @@ public class CGenerator extends IRInstructionVisitor {
 
     // Decrement the end points and free the environment if necessary.
     if (i.shouldReturn()) {
-      putIfElse(
-          decrementAtomic(environmentEndPoints()) + " == 0",
-          () -> putFreeEnvironment(ENV),
-          () -> {
-            // If the environment was not freed, and if the records won't be used in this
-            // environment
-            // anymore, we need to remove their bindings. This is necessary to prevent them from
-            // being
-            // cloned or freed again later on.
+      putDecrementEndPoints(() -> putFreeEnvironment(ENV), () -> {
+        // If the environment was not freed, and if the records won't be used in this
+        // environment
+        // anymore, we need to remove their bindings. This is necessary to prevent them from
+        // being
+        // cloned or freed again later on.
 
-            // The negative record will be deleted, but it's binding may now point to the positive
-            // record. If it doesn't, then we set it to null.
-            putIf(
-                TMP_RECORD + " == " + record(i.getNegRecord()),
-                () -> {
-                  putAssign(record(i.getNegRecord()), "NULL");
-                });
+        // The negative record will be deleted, but it's binding may now point to the positive
+        // record. If it doesn't, then we set it to null.
+        putIf(
+            TMP_RECORD + " == " + record(i.getNegRecord()),
+            () -> {
+              putAssign(record(i.getNegRecord()), "NULL");
+            });
 
-            // The positive record will only be needed if either the environment we're going to jump
-            // to or its continuation environment are the current environment. If not, we also need
-            // to
-            // remove its binding from the current environment.
-            putIf(
-                ENV + " != " + recordContEnv(i.getPosRecord()) + " && " + ENV + " != " + TMP_ENV,
-                () -> {
-                  putAssign(record(i.getPosRecord()), "NULL");
-                });
-          });
+        // The positive record will only be needed if either the environment we're going to jump
+        // to or its continuation environment are the current environment. If not, we also need
+        // to
+        // remove its binding from the current environment.
+        putIf(
+            ENV + " != " + recordContEnv(i.getPosRecord()) + " && " + ENV + " != " + TMP_ENV,
+            () -> {
+              putAssign(record(i.getPosRecord()), "NULL");
+            });
+      });
     } else {
       // The negative record will be deleted, but it's binding may now point to the positive
       // record. If it doesn't, then we set it to null.
@@ -1241,31 +1236,28 @@ public class CGenerator extends IRInstructionVisitor {
         });
 
     // Decrement the end points and free the environment if necessary.
-    putIfElse(
-        decrementAtomic(environmentEndPoints()) + " == 0",
-        () -> putFreeEnvironment(ENV),
-        () -> {
-          // If the environment was not freed, and if the records won't be used in this environment
-          // anymore, we need to remove their bindings. This is necessary to prevent them from being
-          // cloned or freed again later on.
+    putDecrementEndPoints(() -> putFreeEnvironment(ENV), () -> {
+      // If the environment was not freed, and if the records won't be used in this environment
+      // anymore, we need to remove their bindings. This is necessary to prevent them from being
+      // cloned or freed again later on.
 
-          // The positive record will be deleted, but it's binding may now point to the negative
-          // record. If it doesn't, then we set it to null.
-          putIf(
-              TMP_RECORD + " == " + record(i.getPosRecord()),
-              () -> {
-                putAssign(record(i.getPosRecord()), "NULL");
-              });
+      // The positive record will be deleted, but it's binding may now point to the negative
+      // record. If it doesn't, then we set it to null.
+      putIf(
+          TMP_RECORD + " == " + record(i.getPosRecord()),
+          () -> {
+            putAssign(record(i.getPosRecord()), "NULL");
+          });
 
-          // The negative record will only be needed if either the environment we're going to jump
-          // to or its continuation environment are the current environment. If not, we also need to
-          // remove its binding from the current environment.
-          putIf(
-              ENV + " != " + recordContEnv(i.getNegRecord()) + " && " + ENV + " != " + TMP_ENV,
-              () -> {
-                putAssign(record(i.getNegRecord()), "NULL");
-              });
-        });
+      // The negative record will only be needed if either the environment we're going to jump
+      // to or its continuation environment are the current environment. If not, we also need to
+      // remove its binding from the current environment.
+      putIf(
+          ENV + " != " + recordContEnv(i.getNegRecord()) + " && " + ENV + " != " + TMP_ENV,
+          () -> {
+            putAssign(record(i.getNegRecord()), "NULL");
+          });
+    });
 
     // Finally, free the positive record and jump to the continuation.
     putFreeRecord(TMP_RECORD);
@@ -1306,7 +1298,7 @@ public class CGenerator extends IRInstructionVisitor {
           putAssign(record(ENV, i.getRecord()), "NULL");
         });
 
-    putIf(decrementAtomic(environmentEndPoints()) + " == 0", () -> putFreeEnvironment(ENV));
+    putDecrementEndPoints(() -> putFreeEnvironment(ENV));
 
     putAssign(ENV, TMP_ENV);
     putComputedGoto(TMP_CONT);
@@ -1423,7 +1415,7 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRNextTask instruction) {
-    putIf(decrementAtomic(environmentEndPoints()) + " == 0", () -> putFreeEnvironment(ENV));
+    putDecrementEndPoints(() -> putFreeEnvironment(ENV));
     putAssign(TMP_TASK, TASK);
     putAssign(TASK, taskNext(TASK));
     putAssign(TMP_CONT, taskCont(TMP_TASK));
@@ -2278,6 +2270,23 @@ public class CGenerator extends IRInstructionVisitor {
       return "--" + var;
     } else {
       return "atomic_fetch_sub(&" + var + ", 1) - 1";
+    }
+  }
+
+  private void putDecrementEndPoints(Runnable free) {
+    if (optimizeSingleEndpoint && ir.getProcesses().get(procName).getEndPoints() == 1) {
+      free.run();
+    } else {
+      putIf(decrementAtomic(environmentEndPoints()) + " == 0", free);
+    }
+  }
+
+  private void putDecrementEndPoints(Runnable free, Runnable otherwise) {
+    if (optimizeSingleEndpoint && ir.getProcesses().get(procName).getEndPoints() == 1) {
+      free.run();
+    } else {
+      putIfElse(
+          decrementAtomic(environmentEndPoints()) + " == 0", free, otherwise);
     }
   }
 

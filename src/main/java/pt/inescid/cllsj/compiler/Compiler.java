@@ -35,6 +35,7 @@ public class Compiler {
   public boolean optimizeFlipForward = true;
   public boolean optimizeSendValue = true;
   public boolean optimizeKnownJumps = true;
+  public boolean optimizeSingleEndpoint = true;
 
   public int compile(String path) {
     ASTProgram ast;
@@ -137,6 +138,7 @@ public class Compiler {
       gen.optimizePrimitiveExponentials = optimizePrimitiveExponentials;
       gen.optimizeTailCalls = optimizeTailCalls;
       gen.optimizeSendValue = optimizeSendValue;
+      gen.optimizeSingleEndpoint = optimizeSingleEndpoint;
       output = gen.generate(ir);
     } catch (Exception e) {
       System.err.println("C Generation error: " + e.getMessage());
