@@ -13,6 +13,10 @@ public class IRPop extends IRInstruction {
     return record;
   }
 
+  public void setRecord(int record) {
+    this.record = record;
+  }
+
   @Override
   public void accept(IRInstructionVisitor visitor) {
     visitor.visit(this);

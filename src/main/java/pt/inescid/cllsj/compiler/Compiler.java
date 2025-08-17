@@ -103,6 +103,7 @@ public class Compiler {
 
         if (optimizeSendValue) {
           optimizer.removeUnnecessaryValuePushes(ir);
+          optimizer.removeUnnecessaryValuePops(ir);
         }
 
         optimizer.removeUnreachableBlocks(ir);

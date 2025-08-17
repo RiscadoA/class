@@ -1,9 +1,7 @@
 package pt.inescid.cllsj.compiler.ir.flow;
 
 import java.util.Optional;
-import java.util.function.Consumer;
 import java.util.function.Function;
-
 import pt.inescid.cllsj.compiler.ir.instructions.IRInstruction;
 
 public class IRFlowLocation {
@@ -74,6 +72,19 @@ public class IRFlowLocation {
     }
   }
 
+  // Returns the successor location in the flow, if there is one and only one.
+  public Optional<IRFlowLocation> getSuccessor() {
+    if (getIndex() < getFlow().getBlock().getInstructions().size() - 1) {
+      return Optional.of(getFlow().getLocation(getIndex() + 1));
+    } else if (getFlow().getBranches().size() == 1 && getFlow().getDetached().isEmpty()) {
+      return getFlow().getBranches().stream().findFirst().map(f -> f.getLocations().getFirst());
+    } else if (getFlow().getBranches().isEmpty() && getFlow().getDetached().size() == 1) {
+      return getFlow().getDetached().stream().findFirst().map(f -> f.getLocations().getFirst());
+    } else {
+      return Optional.empty();
+    }
+  }
+
   public void replaceInstruction(IRInstruction newInstruction) {
     getFlow().getBlock().getInstructions().set(getIndex(), newInstruction);
   }
@@ -90,6 +101,12 @@ public class IRFlowLocation {
     IRInstruction instruction = getInstruction();
     removeInstruction();
     beforeLocation.getFlow().addInstruction(beforeLocation.getIndex(), instruction, this);
+  }
+
+  public void moveInstructionAfter(IRFlowLocation afterLocation) {
+    IRInstruction instruction = getInstruction();
+    removeInstruction();
+    afterLocation.getFlow().addInstruction(afterLocation.getIndex() + 1, instruction, this);
   }
 
   public void removeInstruction() {
@@ -110,6 +127,15 @@ public class IRFlowLocation {
     forEachBefore(consumer, true);
   }
 
+  // Calls the function for each instruction occurring after this location,
+  // starting from the instruction just after this one.
+  //
+  // If at a given point the flow has two possible successors, the function stops.
+  // If the function returns false, the iteration stops.
+  public void forEachAfter(Function<IRFlowLocation, Boolean> consumer) {
+    forEachAfter(consumer, true);
+  }
+
   public void forEachBefore(Function<IRFlowLocation, Boolean> consumer, boolean first) {
     Optional<IRFlowLocation> predecessor = getPredecessor();
     if (!first && !consumer.apply(this)) {
@@ -117,6 +143,16 @@ public class IRFlowLocation {
     }
     if (predecessor.isPresent()) {
       predecessor.get().forEachBefore(consumer, false);
+    }
+  }
+
+  public void forEachAfter(Function<IRFlowLocation, Boolean> consumer, boolean first) {
+    Optional<IRFlowLocation> successor = getSuccessor();
+    if (!first && !consumer.apply(this)) {
+      return;
+    }
+    if (successor.isPresent()) {
+      successor.get().forEachAfter(consumer, false);
     }
   }
 }

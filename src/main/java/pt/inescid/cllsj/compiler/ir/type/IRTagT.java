@@ -1,10 +1,6 @@
 package pt.inescid.cllsj.compiler.ir.type;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
-import java.util.function.Function;
-
 import pt.inescid.cllsj.compiler.ir.IRTypeVisitor;
 
 public class IRTagT extends IRType {
@@ -30,22 +26,5 @@ public class IRTagT extends IRType {
       result += " { " + i + ": " + choices.get(i) + " }";
     }
     return result;
-  }
-
-  @Override
-  public IRType removeLastSlot() {
-    boolean allClose = true;
-    List<IRType> newChoices = new ArrayList<>();
-    for (int i = 0; i < choices.size(); ++i) {
-      if (!(choices.get(i) instanceof IRCloseT)) {
-        allClose = false;
-      }
-      newChoices.add(choices.get(i).removeLastSlot());
-    }
-    if (allClose) {
-      return new IRCloseT();
-    } else {
-      return new IRTagT(newChoices);
-    }
   }
 }

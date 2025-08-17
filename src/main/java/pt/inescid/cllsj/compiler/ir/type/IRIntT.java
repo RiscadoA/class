@@ -12,9 +12,4 @@ public class IRIntT extends IRType {
   public String toString() {
     return "int";
   }
-
-  @Override
-  public IRType removeLastSlot() {
-    return new IRCloseT();
-  }
 }

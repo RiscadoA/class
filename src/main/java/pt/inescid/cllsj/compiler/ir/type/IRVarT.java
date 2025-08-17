@@ -1,8 +1,6 @@
 package pt.inescid.cllsj.compiler.ir.type;
 
 import java.util.Optional;
-import java.util.function.Function;
-
 import pt.inescid.cllsj.compiler.ir.IRTypeVisitor;
 
 public class IRVarT extends IRType {
@@ -41,10 +39,5 @@ public class IRVarT extends IRType {
   public String toString() {
     String fs = flipPolarity.map(p -> p ? "+" : "-").orElse("");
     return "var" + fs + " " + type;
-  }
-
-  @Override
-  public IRType removeLastSlot() {
-      throw new UnsupportedOperationException("Type is only known at runtime");
   }
 }

@@ -160,13 +160,15 @@ public class IRFlowSlot {
         merged.tag = this.tag.equals(other.tag) ? this.tag : Optional.empty();
         break;
       case RECORD:
-        this.recordIntroductionLocation = this.recordIntroductionLocation.equals(other.recordIntroductionLocation)
-            ? this.recordIntroductionLocation
-            : Optional.empty();
+        this.recordIntroductionLocation =
+            this.recordIntroductionLocation.equals(other.recordIntroductionLocation)
+                ? this.recordIntroductionLocation
+                : Optional.empty();
       case EXPONENTIAL:
-        merged.exponentialHeapLocation = this.exponentialHeapLocation.equals(other.exponentialHeapLocation)
-            ? this.exponentialHeapLocation
-            : Optional.empty();
+        merged.exponentialHeapLocation =
+            this.exponentialHeapLocation.equals(other.exponentialHeapLocation)
+                ? this.exponentialHeapLocation
+                : Optional.empty();
         break;
       case TYPE:
         merged.type = this.type.equals(other.type) ? this.type : Optional.empty();

@@ -22,9 +22,4 @@ public class IRExponentialT extends IRType {
   public String toString() {
     return "exponential(" + inner.toString() + ")";
   }
-
-  @Override
-  public IRType removeLastSlot() {
-    return new IRCloseT();
-  }
 }

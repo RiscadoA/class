@@ -109,7 +109,7 @@ public class IRFlow {
     locations.add(location);
     block.getInstructions().add(instruction);
   }
-  
+
   public void addInstruction(int index, IRFlowLocation location) {
     addInstruction(index, location.getInstruction(), location);
   }

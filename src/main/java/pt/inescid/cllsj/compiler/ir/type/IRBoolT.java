@@ -12,9 +12,4 @@ public class IRBoolT extends IRType {
   public String toString() {
     return "bool";
   }
-
-  @Override
-  public IRType removeLastSlot() {
-    return new IRCloseT();
-  }
 }
