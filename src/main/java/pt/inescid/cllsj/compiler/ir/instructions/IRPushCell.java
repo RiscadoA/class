@@ -1,5 +1,7 @@
 package pt.inescid.cllsj.compiler.ir.instructions;
 
+import java.util.function.Function;
+
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 
 public class IRPushCell extends IRPush {
@@ -22,5 +24,16 @@ public class IRPushCell extends IRPush {
   @Override
   public String toString() {
     return "pushCell(" + getRecord() + ", " + argRecord + ")";
+  }
+
+  @Override
+  public boolean usesRecord(int record) {
+    return super.usesRecord(record) || argRecord == record;
+  }
+
+  @Override
+  public void renameRecords(Function<Integer, Integer> renamer) {
+    super.renameRecords(renamer);
+    argRecord = renamer.apply(argRecord);
   }
 }

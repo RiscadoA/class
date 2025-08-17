@@ -252,6 +252,48 @@ public class IROptimizer {
     }
   }
 
+  public void removeUnusedRecords(IRProgram ir) {
+    for (Map.Entry<String, IRProcess> e : ir.getProcesses().entrySet()) {
+      removeUnusedRecords(e.getValue());
+    }
+  }
+
+  private void removeUnusedRecords(IRProcess ir) {
+    // First, figure out which records are unused
+    Set<Integer> unusedRecords = new HashSet<>();
+    for (int i = ir.getRecordArgumentCount(); i < ir.getRecordCount(); ++i) {
+      unusedRecords.add(i);
+    }
+
+    for (IRBlock block : ir.getBlocksIncludingEntry()) {
+      for (IRInstruction instr : block.getInstructions()) {
+        unusedRecords.removeIf(r -> instr.usesRecord(r));
+      }
+    }
+
+    // Then, remove these records from the process
+    Map<Integer, Integer> recordRebindings = new HashMap<>();
+    for (int delta = 0, i = 0; i < ir.getRecordCount(); ++i) {
+      if (unusedRecords.contains(i)) {
+        delta += 1;
+      } else {
+        recordRebindings.put(i, i - delta);
+      }
+    }
+    for (int i = ir.getRecordCount() - 1; i >= 0; --i) {
+      if (unusedRecords.contains(i)) {
+        ir.removeRecord(i);
+      }
+    }
+
+    // Finally, rename all records in the instructions
+    for (IRBlock block : ir.getBlocksIncludingEntry()) {
+      for (IRInstruction instr : block.getInstructions()) {
+        instr.renameRecords(recordRebindings::get);
+      }
+    }
+  }
+
   public void removeUnreachableBlocks(IRProgram ir) {
     for (Map.Entry<String, IRProcess> e : ir.getProcesses().entrySet()) {
       removeUnreachableBlocks(e.getValue(), processFlows.get(e.getKey()));

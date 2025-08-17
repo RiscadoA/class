@@ -1,5 +1,7 @@
 package pt.inescid.cllsj.compiler.ir.instructions;
 
+import java.util.function.Function;
+
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 
 // Instruction used by the flip forward optimization which merges a flip and a forward instruction
@@ -34,5 +36,11 @@ public class IRFlipForward extends IRInstruction {
   @Override
   public boolean usesRecord(int record) {
     return this.negRecord == record || this.posRecord == record;
+  }
+
+  @Override
+  public void renameRecords(Function<Integer, Integer> renamer) {
+    negRecord = renamer.apply(negRecord);
+    posRecord = renamer.apply(posRecord);
   }
 }

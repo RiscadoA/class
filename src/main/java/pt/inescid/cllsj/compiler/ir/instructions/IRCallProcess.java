@@ -1,6 +1,8 @@
 package pt.inescid.cllsj.compiler.ir.instructions;
 
 import java.util.List;
+import java.util.function.Function;
+
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
 import pt.inescid.cllsj.compiler.ir.type.IRType;
@@ -142,5 +144,12 @@ public class IRCallProcess extends IRInstruction {
       }
     }
     return false;
+  }
+
+  @Override
+  public void renameRecords(Function<Integer, Integer> renamer) {
+    for (LinearArgument arg : linearArguments) {
+      arg.sourceRecord = renamer.apply(arg.sourceRecord);
+    }
   }
 }

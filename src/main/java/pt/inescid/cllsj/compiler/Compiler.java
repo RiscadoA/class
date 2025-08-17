@@ -108,6 +108,7 @@ public class Compiler {
         }
 
         optimizer.removeUnreachableBlocks(ir);
+        optimizer.removeUnusedRecords(ir);
 
         if (onlyAnalyze) {
           optimizer.printProcessFlows(ir);

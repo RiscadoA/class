@@ -1,5 +1,7 @@
 package pt.inescid.cllsj.compiler.ir.instructions;
 
+import java.util.function.Function;
+
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
 
@@ -33,6 +35,12 @@ public class IRPopSession extends IRPop {
 
   @Override
   public boolean usesRecord(int record) {
-    return this.getRecord() == record || this.getArgRecord() == record;
+    return super.usesRecord(record) || this.getArgRecord() == record;
+  }
+
+  @Override
+  public void renameRecords(Function<Integer, Integer> renamer) {
+    super.renameRecords(renamer);
+    argRecord = renamer.apply(argRecord);
   }
 }

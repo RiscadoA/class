@@ -23,9 +23,9 @@ public class IRProcess {
       int endPoints) {
     this.recordArgumentCount = recordArgumentCount;
     this.exponentialArgumentCount = exponentialArgumentCount;
-    this.recordTypes = recordTypes;
-    this.exponentialTypes = exponentialTypes;
-    this.typeVariablePolarities = typeVariablePolarites;
+    this.recordTypes = new ArrayList<>(recordTypes);
+    this.exponentialTypes = new ArrayList<>(exponentialTypes);
+    this.typeVariablePolarities = new ArrayList<>(typeVariablePolarites);
     this.endPoints = endPoints;
     this.entry = new IRBlock(null);
     this.blocks = new ArrayList<>();
@@ -45,6 +45,10 @@ public class IRProcess {
 
   public int getRecordCount() {
     return recordTypes.size();
+  }
+
+  public void removeRecord(int index) {
+    recordTypes.remove(index);
   }
 
   public IRType getRecordType(int index) {

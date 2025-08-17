@@ -1,5 +1,7 @@
 package pt.inescid.cllsj.compiler.ir.expressions;
 
+import java.util.function.Function;
+
 import pt.inescid.cllsj.compiler.ir.IRExpressionVisitor;
 import pt.inescid.cllsj.compiler.ir.type.IRIntT;
 import pt.inescid.cllsj.compiler.ir.type.IRStringT;
@@ -47,5 +49,10 @@ public class IRAdd extends IRExpression {
   @Override
   public boolean usesRecord(int record) {
     return lhs.usesRecord(record) || rhs.usesRecord(record);
+  }
+
+  public void renameRecords(Function<Integer,Integer> renamer) {
+    lhs.renameRecords(renamer);
+    rhs.renameRecords(renamer);
   }
 }

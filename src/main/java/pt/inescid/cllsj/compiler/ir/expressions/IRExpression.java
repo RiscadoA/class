@@ -1,5 +1,7 @@
 package pt.inescid.cllsj.compiler.ir.expressions;
 
+import java.util.function.Function;
+
 import pt.inescid.cllsj.compiler.ir.IRExpressionVisitor;
 import pt.inescid.cllsj.compiler.ir.type.IRType;
 
@@ -11,4 +13,6 @@ public abstract class IRExpression {
   public abstract IRType getType();
 
   public abstract boolean usesRecord(int record);
+
+  public abstract void renameRecords(Function<Integer, Integer> renamer);
 }

@@ -1,6 +1,8 @@
 package pt.inescid.cllsj.compiler.ir.instructions;
 
 import java.util.Optional;
+import java.util.function.Function;
+
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 
 public class IRNewSession extends IRInstruction {
@@ -43,5 +45,10 @@ public class IRNewSession extends IRInstruction {
   @Override
   public boolean usesRecord(int record) {
     return this.record == record;
+  }
+
+  @Override
+  public void renameRecords(Function<Integer, Integer> renamer) {
+    record = renamer.apply(record);
   }
 }

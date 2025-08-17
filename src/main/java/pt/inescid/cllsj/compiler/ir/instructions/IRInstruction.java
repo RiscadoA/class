@@ -1,5 +1,7 @@
 package pt.inescid.cllsj.compiler.ir.instructions;
 
+import java.util.function.Function;
+
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 
 public abstract class IRInstruction {
@@ -8,4 +10,6 @@ public abstract class IRInstruction {
   }
 
   public abstract boolean usesRecord(int record);
+
+  public abstract void renameRecords(Function<Integer, Integer> renamer);
 }

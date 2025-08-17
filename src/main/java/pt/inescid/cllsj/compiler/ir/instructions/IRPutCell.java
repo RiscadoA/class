@@ -1,5 +1,7 @@
 package pt.inescid.cllsj.compiler.ir.instructions;
 
+import java.util.function.Function;
+
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 
 public class IRPutCell extends IRInstruction {
@@ -32,5 +34,11 @@ public class IRPutCell extends IRInstruction {
   @Override
   public boolean usesRecord(int record) {
     return this.record == record || this.argRecord == record;
+  }
+
+  @Override
+  public void renameRecords(Function<Integer, Integer> renamer) {
+    record = renamer.apply(record);
+    argRecord = renamer.apply(argRecord);
   }
 }

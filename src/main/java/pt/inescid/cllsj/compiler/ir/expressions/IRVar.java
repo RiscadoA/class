@@ -1,10 +1,12 @@
 package pt.inescid.cllsj.compiler.ir.expressions;
 
+import java.util.function.Function;
+
 import pt.inescid.cllsj.compiler.ir.IRExpressionVisitor;
 import pt.inescid.cllsj.compiler.ir.type.IRType;
 
 public class IRVar extends IRExpression {
-  private final int record;
+  private int record;
   private final IRType type;
 
   public IRVar(int record, IRType type) {
@@ -34,5 +36,9 @@ public class IRVar extends IRExpression {
   @Override
   public boolean usesRecord(int record) {
     return this.record == record;
+  }
+
+  public void renameRecords(Function<Integer,Integer> renamer) {
+    record = renamer.apply(record);
   }
 }

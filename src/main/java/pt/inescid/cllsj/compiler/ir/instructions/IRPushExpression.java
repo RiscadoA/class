@@ -1,5 +1,7 @@
 package pt.inescid.cllsj.compiler.ir.instructions;
 
+import java.util.function.Function;
+
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 import pt.inescid.cllsj.compiler.ir.expressions.IRExpression;
 
@@ -39,6 +41,12 @@ public class IRPushExpression extends IRPush {
 
   @Override
   public boolean usesRecord(int record) {
-    return getRecord() == record || expression.usesRecord(record);
+    return super.usesRecord(record) || expression.usesRecord(record);
+  }
+
+  @Override
+  public void renameRecords(Function<Integer, Integer> renamer) {
+    super.renameRecords(renamer);
+    expression.renameRecords(renamer);
   }
 }
