@@ -493,6 +493,48 @@ public class IROptimizer {
     }
   }
 
+  public void removeUnusedExponentials(IRProgram ir) {
+    for (Map.Entry<String, IRProcess> e : ir.getProcesses().entrySet()) {
+      removeUnusedExponentials(e.getValue());
+    }
+  }
+
+  private void removeUnusedExponentials(IRProcess ir) {
+    // First, figure out which exponentials are unused
+    Set<Integer> unusedExponentials = new HashSet<>();
+    for (int i = ir.getExponentialArgumentCount(); i < ir.getExponentialCount(); ++i) {
+      unusedExponentials.add(i);
+    }
+
+    for (IRBlock block : ir.getBlocksIncludingEntry()) {
+      for (IRInstruction instr : block.getInstructions()) {
+        unusedExponentials.removeIf(r -> instr.usesExponential(r));
+      }
+    }
+
+    // Then, remove these exponentials from the process
+    Map<Integer, Integer> exponentialRebindings = new HashMap<>();
+    for (int delta = 0, i = 0; i < ir.getExponentialCount(); ++i) {
+      if (unusedExponentials.contains(i)) {
+        delta += 1;
+      } else {
+        exponentialRebindings.put(i, i - delta);
+      }
+    }
+    for (int i = ir.getExponentialCount() - 1; i >= 0; --i) {
+      if (unusedExponentials.contains(i)) {
+        ir.removeExponential(i);
+      }
+    }
+
+    // Finally, rename all records in the instructions
+    for (IRBlock block : ir.getBlocksIncludingEntry()) {
+      for (IRInstruction instr : block.getInstructions()) {
+        instr.renameExponentials(exponentialRebindings::get);
+      }
+    }
+  }
+
   public void removeUnreachableBlocks(IRProgram ir) {
     for (Map.Entry<String, IRProcess> e : ir.getProcesses().entrySet()) {
       removeUnreachableBlocks(e.getValue(), processFlows.get(e.getKey()));

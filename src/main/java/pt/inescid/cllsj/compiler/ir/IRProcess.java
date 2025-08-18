@@ -67,6 +67,10 @@ public class IRProcess {
     return exponentialTypes.get(index);
   }
 
+  public void removeExponential(int index) {
+    exponentialTypes.remove(index);
+  }
+
   public int getTypeVariableCount() {
     return typeVariablePolarities.size();
   }
