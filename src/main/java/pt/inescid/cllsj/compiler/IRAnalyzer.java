@@ -277,13 +277,15 @@ public class IRAnalyzer extends IRInstructionVisitor {
   @Override
   public void visit(IRPopTag instruction) {
     IRFlowSlot slot = state.getBoundRecord(instruction.getRecord()).doPop(location);
-    if (slot.isKnownTag()) {
-      int tag = slot.getTag();
-      visit(instruction.getCases().get(tag).getLabel(), false);
-    } else {
-      // We don't know the tag, we must visit all branches
-      for (IRPopTag.Case c : instruction.getCases().values()) {
-        visit(c.getLabel(), false);
+    if (!instruction.getCases().isEmpty()) {
+      if (slot.isKnownTag()) {
+        int tag = slot.getTag();
+        visit(instruction.getCases().get(tag).getLabel(), false);
+      } else {
+        // We don't know the tag, we must visit all branches
+        for (IRPopTag.Case c : instruction.getCases().values()) {
+          visit(c.getLabel(), false);
+        }
       }
     }
   }

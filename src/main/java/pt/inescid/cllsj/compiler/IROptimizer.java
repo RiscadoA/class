@@ -937,6 +937,24 @@ public class IROptimizer {
     }
 
     @Override
+    public void visit(IRTagT type) {
+      List<IRType> choices = new ArrayList<>();
+      boolean allClose = true;
+      for (IRType choice : type.getChoices()) {
+        if (!(choice instanceof IRCloseT)) {
+          allClose = false;
+        }
+        choices.add(recurse(choice, 1));
+      }
+
+      if (allClose) {
+        result = new IRCloseT();
+      } else {
+        result = new IRTagT(choices);
+      }
+    }
+
+    @Override
     public void visit(IRFlipT type) {
       type.getCont().accept(this);
     }
