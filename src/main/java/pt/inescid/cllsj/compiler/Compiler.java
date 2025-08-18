@@ -36,6 +36,7 @@ public class Compiler {
   public boolean optimizeSendValue = true;
   public boolean optimizeKnownJumps = true;
   public boolean optimizeKnownSlots = true;
+  public boolean optimizeKnownEndPoints = true;
   public boolean optimizeSingleEndpoint = true;
 
   public int compile(String path) {
@@ -111,6 +112,10 @@ public class Compiler {
 
         if (optimizeFlipForward) {
           optimizer.optimizeFlipForward(ir);
+        }
+
+        if (optimizeKnownEndPoints) {
+          optimizer.optimizeKnownEndPoints(ir);
         }
 
         optimizer.removeUnreachableBlocks(ir);

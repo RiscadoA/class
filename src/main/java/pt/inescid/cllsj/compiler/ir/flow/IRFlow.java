@@ -19,11 +19,16 @@ public class IRFlow {
   // Blocks which can lead to this flow
   private Set<IRFlow> sources = new HashSet<>();
 
-  // Blocks which can execute any time after this one
+  // Blocks introduced here which can execute any time after this one
   private Set<IRFlow> detached = new HashSet<>();
 
-  // Blocks into which this one must diverge
+  // Blocks into which this one must immediately diverge
   private Set<IRFlow> branches = new HashSet<>();
+
+  // Blocks which were executed after this one
+  // These don't necessarily match with any valid trace, but they are guaranteed to
+  // represent one possible trace
+  private Set<IRFlow> targets = new HashSet<>();
 
   public IRFlow(IRBlock block) {
     this.block = block;
@@ -50,6 +55,10 @@ public class IRFlow {
 
   public Set<IRFlow> getBranches() {
     return branches;
+  }
+
+  public Set<IRFlow> getTargets() {
+    return targets;
   }
 
   public List<IRFlowLocation> getLocations() {
@@ -94,13 +103,19 @@ public class IRFlow {
     branches.remove(branch);
   }
 
-  public void addBranch(IRFlow branch) {
-    branches.add(branch);
+  public void removeTarget(IRFlow target) {
+    removeDetached(target);
+    removeBranch(target);
+    targets.remove(target);
   }
 
-  public void removeOutgoing(IRFlow flow) {
-    removeDetached(flow);
-    removeBranch(flow);
+  public void addBranch(IRFlow branch) {
+    branches.add(branch);
+    targets.add(branch);
+  }
+
+  public void addTarget(IRFlow target) {
+    targets.add(target);
   }
 
   public void addInstruction(IRFlowLocation location) {
@@ -190,13 +205,14 @@ public class IRFlow {
       printLabels(sb, branches);
       sb.append("]\n");
     }
-
-    for (IRFlow branch : this.branches) {
-      sb.append(branch.toString(shown));
+    if (!targets.isEmpty()) {
+      sb.append("    [targets: ");
+      printLabels(sb, targets);
+      sb.append("]\n");
     }
 
-    for (IRFlow detached : this.detached) {
-      sb.append(detached.toString(shown));
+    for (IRFlow target : this.targets) {
+      sb.append(target.toString(shown));
     }
 
     return sb.toString();

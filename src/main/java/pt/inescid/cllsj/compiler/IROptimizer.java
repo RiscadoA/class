@@ -89,6 +89,46 @@ public class IROptimizer {
     }
   }
 
+  public void optimizeKnownEndPoints(IRProgram ir) {
+    ir.forEachProcess((n, p) -> optimizeKnownEndPoints(p, processFlows.get(n)));
+  }
+
+  private void optimizeKnownEndPoints(IRProcess ir, Map<IRBlock, IRFlow> flows) {
+    for (IRFlow flow : flows.values()) {
+      // We want to find the blocks which have at least one outgoing flow.
+      // Those blocks should never be end points.
+      // Thus, we skip any which do not have an outgoing flow - these are real endpoints.
+      if (flow.getBranches().isEmpty() && flow.getDetached().isEmpty()) {
+        continue;
+      }
+
+      IRInstruction instruction = flow.getBlock().getInstructions().getLast();
+      boolean wasEndPoint;
+      if (instruction instanceof IRCallProcess) {
+        wasEndPoint = ((IRCallProcess) instruction).isEndPoint();
+        ((IRCallProcess) instruction).removeEndPoint();
+      } else if (instruction instanceof IRForward) {
+        wasEndPoint = ((IRForward) instruction).isEndPoint();
+        ((IRForward) instruction).removeEndPoint();
+      } else if (instruction instanceof IRFlipForward) {
+        wasEndPoint = ((IRFlipForward) instruction).isEndPoint();
+        ((IRFlipForward) instruction).removeEndPoint();
+      } else if (instruction instanceof IRReturn) {
+        wasEndPoint = ((IRReturn) instruction).isEndPoint();
+        ((IRReturn) instruction).removeEndPoint();
+      } else if (instruction instanceof IRNextTask) {
+        wasEndPoint = ((IRNextTask) instruction).isEndPoint();
+        ((IRNextTask) instruction).removeEndPoint();
+      } else {
+        continue;
+      }
+
+      if (wasEndPoint) {
+        subtractEndPoints(ir, flow, 1);
+      }
+    }
+  }
+
   private void concatFlows(IRProcess ir, IRFlow prev, IRFlow next) {
     // Get the last instruction on the current block
     IRInstruction last = prev.getBlock().getInstructions().getLast();
@@ -206,9 +246,12 @@ public class IROptimizer {
       prev.addBranch(branch);
     }
     for (IRFlow detached : next.getDetached()) {
-      detached.removeSource(next);
-      detached.addSource(prev);
       prev.addDetached(detached);
+    }
+    for (IRFlow target : next.getTargets()) {
+      target.removeSource(next);
+      target.addSource(prev);
+      prev.addTarget(target);
     }
   }
 
@@ -559,11 +602,8 @@ public class IROptimizer {
       ir.getBlocks().remove(toRemove.get());
       IRFlow flow = flows.remove(toRemove.get());
       if (flow != null) {
-        for (IRFlow branch : flow.getBranches()) {
-          branch.getSources().remove(flow);
-        }
-        for (IRFlow detached : flow.getDetached()) {
-          detached.getSources().remove(flow);
+        for (IRFlow target : flow.getTargets()) {
+          target.getSources().remove(flow);
         }
       }
     }
@@ -611,7 +651,7 @@ public class IROptimizer {
         flipBlock.getInstructions().add(new IRFlipForward(x, y));
         flipFlow.getStates().removeLast();
         flipFlow.getStates().add(forwardFlow.getStates().get(1));
-        flipFlow.removeOutgoing(forwardFlow);
+        flipFlow.removeTarget(forwardFlow);
         forwardFlow.removeSource(flipFlow);
       }
     }

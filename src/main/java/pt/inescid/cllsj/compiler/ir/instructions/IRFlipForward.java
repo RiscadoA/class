@@ -8,6 +8,7 @@ import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 public class IRFlipForward extends IRInstruction {
   private int negRecord; // Index of the record whose session is of a reading type.
   private int posRecord; // Index of the record whose session is of a writing type.
+  private boolean isEndPoint = true;
 
   public IRFlipForward(int negRecord, int posRecord) {
     this.negRecord = negRecord;
@@ -22,6 +23,14 @@ public class IRFlipForward extends IRInstruction {
     return posRecord;
   }
 
+  public boolean isEndPoint() {
+    return isEndPoint;
+  }
+
+  public void removeEndPoint() {
+    isEndPoint = false;
+  }
+
   @Override
   public void accept(IRInstructionVisitor visitor) {
     visitor.visit(this);
@@ -29,7 +38,16 @@ public class IRFlipForward extends IRInstruction {
 
   @Override
   public String toString() {
-    return "flipForward(-" + negRecord + ", +" + posRecord + ")";
+    StringBuilder sb = new StringBuilder("flipForward(");
+    if (isEndPoint()) {
+      sb.append("end point, ");
+    }
+    sb.append("-");
+    sb.append(negRecord);
+    sb.append(", +");
+    sb.append(posRecord);
+    sb.append(")");
+    return sb.toString();
   }
 
   @Override

@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
+import pt.inescid.cllsj.compiler.IRAnalyzer;
 
 public class IRFlowRecord {
   private IRFlowLocation introductionLocation;
@@ -43,9 +44,9 @@ public class IRFlowRecord {
   }
 
   // Performs a write on the record.
-  public void doPush(IRFlowState state, IRFlowSlot slot) {
+  public void doPush(IRAnalyzer analyzer, IRFlowState state, IRFlowSlot slot) {
     if (!slotsKnown) {
-      slot.markLost(state);
+      slot.markLost(analyzer, state);
       return;
     }
 
@@ -88,26 +89,26 @@ public class IRFlowRecord {
   }
 
   // Mark the record's continuation as unknown.
-  public void markContinuationUnknown(IRFlowState state) {
+  public void markContinuationUnknown(IRAnalyzer analyzer, IRFlowState state) {
     if (this.continuation.isPresent()) {
-      state.pushPendingContinuation(this.continuation.get());
+      state.pushPendingContinuation(analyzer, this.continuation.get());
     }
     this.continuation = Optional.empty();
   }
 
   // Mark the record's slots as completely unknown.
-  public void markSlotsUnknown(IRFlowState state) {
+  public void markSlotsUnknown(IRAnalyzer analyzer, IRFlowState state) {
     this.slotsKnown = false;
     for (IRFlowSlot slot : slots) {
-      slot.markLost(state);
+      slot.markLost(analyzer, state);
     }
     this.slots.clear();
     this.nextSlotIndex = Optional.empty();
   }
 
-  public void markTotallyUnknown(IRFlowState state) {
-    markContinuationUnknown(state);
-    markSlotsUnknown(state);
+  public void markTotallyUnknown(IRAnalyzer analyzer, IRFlowState state) {
+    markContinuationUnknown(analyzer, state);
+    markSlotsUnknown(analyzer, state);
   }
 
   public void doPopAll(Consumer<IRFlowSlot> consumer) {

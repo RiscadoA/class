@@ -988,7 +988,7 @@ public class CGenerator extends IRInstructionVisitor {
               && instruction.getExponentialArguments().isEmpty()
               && instruction.getTypeArguments().isEmpty()) {
             if (!entryCall) {
-              putDecrementEndPoints(() -> putFreeEnvironment(ENV));
+              putDecrementEndPoints(instruction.isEndPoint(), () -> putFreeEnvironment(ENV));
             } else {
               entryCall = false;
             }
@@ -1018,7 +1018,7 @@ public class CGenerator extends IRInstructionVisitor {
                       arg.getSourceTypePolarity()));
             }
 
-            putDecrementEndPoints(() -> putFreeEnvironment(ENV));
+            putDecrementEndPoints(instruction.isEndPoint(), () -> putFreeEnvironment(ENV));
             putAssign(ENV, TMP_ENV);
           }
         };
@@ -1040,7 +1040,10 @@ public class CGenerator extends IRInstructionVisitor {
     }
 
     // If we're recursively calling the same process, we might be able to do tail call optimization.
-    if (optimizeTailCalls && instruction.getProcessName().equals(procName) && sameTypes) {
+    if (optimizeTailCalls
+        && instruction.getProcessName().equals(procName)
+        && sameTypes
+        && instruction.isEndPoint()) {
       // We must increment the end points as we might decrement them twice, if this ends up not
       // being a tail call.
       putStatement(incrementAtomic(environmentEndPoints()));
@@ -1137,29 +1140,31 @@ public class CGenerator extends IRInstructionVisitor {
               record(i.getPosRecord()));
         });
 
+    Runnable cleanNegRecord =
+        () -> {
+          // The negative record will be deleted, but it's binding may now point to the positive
+          // record. If it doesn't, then we set it to null.
+          putIf(
+              TMP_RECORD + " == " + record(i.getNegRecord()),
+              () -> {
+                putAssign(record(i.getNegRecord()), "NULL");
+              });
+        };
+
     // Decrement the end points and free the environment if necessary.
     if (i.shouldReturn()) {
       putDecrementEndPoints(
+          i.isEndPoint(),
           () -> putFreeEnvironment(ENV),
           () -> {
             // If the environment was not freed, and if the records won't be used in this
-            // environment
-            // anymore, we need to remove their bindings. This is necessary to prevent them from
-            // being
-            // cloned or freed again later on.
-
-            // The negative record will be deleted, but it's binding may now point to the positive
-            // record. If it doesn't, then we set it to null.
-            putIf(
-                TMP_RECORD + " == " + record(i.getNegRecord()),
-                () -> {
-                  putAssign(record(i.getNegRecord()), "NULL");
-                });
+            // environment anymore, we need to remove their bindings. This is necessary to
+            // prevent them from being cloned or freed again later on.
+            cleanNegRecord.run();
 
             // The positive record will only be needed if either the environment we're going to jump
             // to or its continuation environment are the current environment. If not, we also need
-            // to
-            // remove its binding from the current environment.
+            // to remove its binding from the current environment.
             putIf(
                 ENV + " != " + recordContEnv(i.getPosRecord()) + " && " + ENV + " != " + TMP_ENV,
                 () -> {
@@ -1167,13 +1172,7 @@ public class CGenerator extends IRInstructionVisitor {
                 });
           });
     } else {
-      // The negative record will be deleted, but it's binding may now point to the positive
-      // record. If it doesn't, then we set it to null.
-      putIf(
-          TMP_RECORD + " == " + record(i.getNegRecord()),
-          () -> {
-            putAssign(record(i.getNegRecord()), "NULL");
-          });
+      cleanNegRecord.run();
     }
 
     // Finally, free the negative record and jump to the continuation.
@@ -1240,6 +1239,7 @@ public class CGenerator extends IRInstructionVisitor {
 
     // Decrement the end points and free the environment if necessary.
     putDecrementEndPoints(
+        i.isEndPoint(),
         () -> putFreeEnvironment(ENV),
         () -> {
           // If the environment was not freed, and if the records won't be used in this environment
@@ -1303,7 +1303,7 @@ public class CGenerator extends IRInstructionVisitor {
           putAssign(record(ENV, i.getRecord()), "NULL");
         });
 
-    putDecrementEndPoints(() -> putFreeEnvironment(ENV));
+    putDecrementEndPoints(i.isEndPoint(), () -> putFreeEnvironment(ENV));
 
     putAssign(ENV, TMP_ENV);
     putComputedGoto(TMP_CONT);
@@ -1420,7 +1420,7 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRNextTask instruction) {
-    putDecrementEndPoints(() -> putFreeEnvironment(ENV));
+    putDecrementEndPoints(instruction.isEndPoint(), () -> putFreeEnvironment(ENV));
     putAssign(TMP_TASK, TASK);
     putAssign(TASK, taskNext(TASK));
     putAssign(TMP_CONT, taskCont(TMP_TASK));
@@ -2298,16 +2298,19 @@ public class CGenerator extends IRInstructionVisitor {
 
   // ================================= Statement building helpers =================================
 
-  private void putDecrementEndPoints(Runnable free) {
-    if (optimizeSingleEndpoint && ir.getProcesses().get(procName).getEndPoints() == 1) {
-      free.run();
-    } else {
-      putIf(decrementAtomic(environmentEndPoints()) + " == 0", free);
+  private void putDecrementEndPoints(boolean isEndPoint, Runnable free) {
+    if (isEndPoint) {
+      if (optimizeSingleEndpoint && ir.getProcesses().get(procName).getEndPoints() == 1) {
+        free.run();
+      } else {
+        putIf(decrementAtomic(environmentEndPoints()) + " == 0", free);
+      }
     }
   }
 
-  private void putDecrementEndPoints(Runnable free, Runnable otherwise) {
-    if (optimizeSingleEndpoint && ir.getProcesses().get(procName).getEndPoints() == 1) {
+  private void putDecrementEndPoints(boolean isEndPoint, Runnable free, Runnable otherwise) {
+    if (!isEndPoint
+        || (optimizeSingleEndpoint && ir.getProcesses().get(procName).getEndPoints() == 1)) {
       free.run();
     } else {
       putIfElse(decrementAtomic(environmentEndPoints()) + " == 0", free, otherwise);

@@ -4,6 +4,16 @@ import java.util.function.Function;
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 
 public class IRNextTask extends IRInstruction {
+  private boolean isEndPoint = true;
+
+  public boolean isEndPoint() {
+    return isEndPoint;
+  }
+
+  public void removeEndPoint() {
+    isEndPoint = false;
+  }
+
   @Override
   public void accept(IRInstructionVisitor visitor) {
     visitor.visit(this);
@@ -11,7 +21,12 @@ public class IRNextTask extends IRInstruction {
 
   @Override
   public String toString() {
-    return "nextTask()";
+    StringBuilder sb = new StringBuilder("nextTask(");
+    if (isEndPoint()) {
+      sb.append("end point");
+    }
+    sb.append(")");
+    return sb.toString();
   }
 
   @Override

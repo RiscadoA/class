@@ -5,6 +5,7 @@ import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 
 public class IRReturn extends IRInstruction {
   private int record;
+  private boolean isEndPoint = true;
 
   public IRReturn(int record) {
     this.record = record;
@@ -14,6 +15,14 @@ public class IRReturn extends IRInstruction {
     return record;
   }
 
+  public boolean isEndPoint() {
+    return isEndPoint;
+  }
+
+  public void removeEndPoint() {
+    isEndPoint = false;
+  }
+
   @Override
   public void accept(IRInstructionVisitor visitor) {
     visitor.visit(this);
@@ -21,7 +30,13 @@ public class IRReturn extends IRInstruction {
 
   @Override
   public String toString() {
-    return "return(" + record + ")";
+    StringBuilder sb = new StringBuilder("return(");
+    if (isEndPoint()) {
+      sb.append("end point, ");
+    }
+    sb.append(record);
+    sb.append(")");
+    return sb.toString();
   }
 
   @Override

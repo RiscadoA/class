@@ -58,6 +58,25 @@ public class IRAnalyzer extends IRInstructionVisitor {
     this.flows.put(process.getEntry(), this.flow);
   }
 
+  public IRFlow getFlow() {
+    return flow;
+  }
+
+  public IRFlow getFlow(String label) {
+    return getFlow(process.getBlock(label));
+  }
+
+  public IRFlow getFlow(IRBlock block) {
+    IRFlow flow;
+    if (!flows.containsKey(block)) {
+      flow = new IRFlow(block);
+      flows.put(block, flow);
+    } else {
+      flow = flows.get(block);
+    }
+    return flow;
+  }
+
   private void visitNextPending() {
     Optional<IRFlowContinuation> cont = state.popPendingContinuation();
     if (cont.isPresent()) {
@@ -73,20 +92,13 @@ public class IRAnalyzer extends IRInstructionVisitor {
     // Create a new flow object (if we haven't passed through it yet).
     IRFlow previousFlow = this.flow;
     IRFlowState previousState = this.state;
-    IRFlow currentFlow;
-    if (!flows.containsKey(block)) {
-      currentFlow = new IRFlow(block);
-      flows.put(block, currentFlow);
-    } else {
-      // We've already passed through the block, we'll need to merge states
-      currentFlow = flows.get(block);
-    }
+    IRFlow currentFlow = getFlow(block);
     this.flow = currentFlow;
 
     // Link the previous block with this one.
     if (previousFlow != currentFlow) {
       if (detached) {
-        previousFlow.addDetached(currentFlow);
+        previousFlow.addTarget(currentFlow);
       } else {
         previousFlow.addBranch(currentFlow);
       }
@@ -115,7 +127,7 @@ public class IRAnalyzer extends IRInstructionVisitor {
 
   @Override
   public void visit(IRNewTask instruction) {
-    state.pushPendingContinuation(instruction.getLabel(), location);
+    state.pushPendingContinuation(this, instruction.getLabel(), location);
   }
 
   @Override
@@ -125,7 +137,7 @@ public class IRAnalyzer extends IRInstructionVisitor {
 
   @Override
   public void visit(IRNewThread instruction) {
-    state.pushPendingContinuation(instruction.getLabel(), location);
+    state.pushPendingContinuation(this, instruction.getLabel(), location);
   }
 
   @Override
@@ -158,7 +170,7 @@ public class IRAnalyzer extends IRInstructionVisitor {
     } else {
       // Unknown continuation. Slots will be left in an unknown state.
       record.doReturn(); // Pretend we've returned from the continuation
-      record.markSlotsUnknown(state);
+      record.markSlotsUnknown(this, state);
       visit(instruction.getContLabel(), true);
     }
   }
@@ -180,22 +192,22 @@ public class IRAnalyzer extends IRInstructionVisitor {
     Optional<Boolean> value = state.isValue(instruction.getValueRequisites());
 
     if (value.isEmpty()) {
-      record.markSlotsUnknown(state);
-      argRecord.markTotallyUnknown(state);
+      record.markSlotsUnknown(this, state);
+      argRecord.markTotallyUnknown(this, state);
     } else if (value.get()) {
       if (argRecord.slotsAreKnown()) {
         int slots = argRecord.getSlotCount().get();
         for (int i = 0; i < slots; ++i) {
-          record.doPush(state, argRecord.doPop(location));
+          record.doPush(this, state, argRecord.doPop(location));
         }
       } else {
-        argRecord.markTotallyUnknown(state);
-        record.markSlotsUnknown(state);
+        argRecord.markTotallyUnknown(this, state);
+        record.markSlotsUnknown(this, state);
       }
       state.unbindRecord(instruction.getArgRecord());
       state.freeRecord(argRecord);
     } else {
-      record.doPush(state, IRFlowSlot.record(location, argRecord.getIntroductionLocation()));
+      record.doPush(this, state, IRFlowSlot.record(location, argRecord.getIntroductionLocation()));
     }
   }
 
@@ -205,7 +217,7 @@ public class IRAnalyzer extends IRInstructionVisitor {
     Optional<Boolean> value = state.isValue(instruction.getValueRequisites());
 
     if (value.isEmpty()) {
-      record.markSlotsUnknown(state);
+      record.markSlotsUnknown(this, state);
       state.bindRecord(instruction.getArgRecord(), state.allocateRecord(location));
     } else if (value.get()) {
       IRFlowRecord argRecord = state.allocateRecord(location);
@@ -217,10 +229,10 @@ public class IRAnalyzer extends IRInstructionVisitor {
       if (slotCount.isPresent()) {
         argRecord.doNewSession(Optional.empty());
         for (int i = 0; i < slotCount.get(); ++i) {
-          argRecord.doPush(state, record.doPop(location));
+          argRecord.doPush(this, state, record.doPop(location));
         }
       } else {
-        record.markSlotsUnknown(state);
+        record.markSlotsUnknown(this, state);
       }
     } else {
       IRFlowSlot slot = record.doPop(location);
@@ -239,7 +251,7 @@ public class IRAnalyzer extends IRInstructionVisitor {
       IRFlowExponential exponential = state.allocateExponential(Optional.of(List.of(slot)));
       slot = IRFlowSlot.exponential(location, exponential.getHeapLocation());
     }
-    state.getBoundRecord(instruction.getRecord()).doPush(state, slot);
+    state.getBoundRecord(instruction.getRecord()).doPush(this, state, slot);
   }
 
   @Override
@@ -249,7 +261,7 @@ public class IRAnalyzer extends IRInstructionVisitor {
 
   @Override
   public void visit(IRPushClose instruction) {
-    state.getBoundRecord(instruction.getRecord()).doPush(state, IRFlowSlot.close(location));
+    state.getBoundRecord(instruction.getRecord()).doPush(this, state, IRFlowSlot.close(location));
   }
 
   @Override
@@ -271,7 +283,7 @@ public class IRAnalyzer extends IRInstructionVisitor {
   public void visit(IRPushTag instruction) {
     state
         .getBoundRecord(instruction.getRecord())
-        .doPush(state, IRFlowSlot.tag(location, instruction.getTag()));
+        .doPush(this, state, IRFlowSlot.tag(location, instruction.getTag()));
   }
 
   @Override
@@ -292,14 +304,14 @@ public class IRAnalyzer extends IRInstructionVisitor {
 
   @Override
   public void visit(IRPushCell instruction) {
-    state.getBoundRecord(instruction.getRecord()).doPush(state, IRFlowSlot.cell(location));
-    state.getBoundRecord(instruction.getArgRecord()).markTotallyUnknown(state);
+    state.getBoundRecord(instruction.getRecord()).doPush(this, state, IRFlowSlot.cell(location));
+    state.getBoundRecord(instruction.getArgRecord()).markTotallyUnknown(this, state);
   }
 
   @Override
   public void visit(IRPutCell instruction) {
-    state.getBoundRecord(instruction.getRecord()).doPush(state, IRFlowSlot.cell(location));
-    state.getBoundRecord(instruction.getArgRecord()).markTotallyUnknown(state);
+    state.getBoundRecord(instruction.getRecord()).doPush(this, state, IRFlowSlot.cell(location));
+    state.getBoundRecord(instruction.getArgRecord()).markTotallyUnknown(this, state);
   }
 
   @Override
@@ -312,7 +324,7 @@ public class IRAnalyzer extends IRInstructionVisitor {
   public void visit(IRPushExponential instruction) {
     IRFlowExponential exponential = state.getBoundExponential(instruction.getExponential());
     IRFlowSlot slot = IRFlowSlot.exponential(location, exponential.getHeapLocation());
-    state.getBoundRecord(instruction.getRecord()).doPush(state, slot);
+    state.getBoundRecord(instruction.getRecord()).doPush(this, state, slot);
   }
 
   @Override
@@ -331,7 +343,9 @@ public class IRAnalyzer extends IRInstructionVisitor {
     IRFlowType type =
         new IRFlowType(
             instruction.getType(), instruction.isPositive(), instruction.getValueRequisites());
-    state.getBoundRecord(instruction.getRecord()).doPush(state, IRFlowSlot.type(location, type));
+    state
+        .getBoundRecord(instruction.getRecord())
+        .doPush(this, state, IRFlowSlot.type(location, type));
   }
 
   @Override
@@ -369,7 +383,7 @@ public class IRAnalyzer extends IRInstructionVisitor {
     if (slot.isValue() && record.getSlotCount().get() == 0) {
       exponential = state.allocateExponential(Optional.of(List.of(slot)));
     } else {
-      slot.markLost(state);
+      slot.markLost(this, state);
       exponential = state.allocateExponential(Optional.empty());
     }
 
@@ -387,7 +401,7 @@ public class IRAnalyzer extends IRInstructionVisitor {
     if (exponential.hasKnownValue()) {
       record.doNewSession(Optional.empty());
       for (IRFlowSlot slot : exponential.getValue()) {
-        record.doPush(state, slot);
+        record.doPush(this, state, slot);
       }
     }
   }
@@ -395,7 +409,7 @@ public class IRAnalyzer extends IRInstructionVisitor {
   @Override
   public void visit(IRCallProcess instruction) {
     for (IRCallProcess.LinearArgument arg : instruction.getLinearArguments()) {
-      state.getBoundRecord(arg.getSourceRecord()).markTotallyUnknown(state);
+      state.getBoundRecord(arg.getSourceRecord()).markTotallyUnknown(this, state);
     }
     visitNextPending();
   }
@@ -408,10 +422,10 @@ public class IRAnalyzer extends IRInstructionVisitor {
     if (negRecord.slotsAreKnown()) {
       int slotCount = negRecord.getSlotCount().get();
       for (int i = 0; i < slotCount; ++i) {
-        posRecord.doPush(state, negRecord.doPop(location));
+        posRecord.doPush(this, state, negRecord.doPop(location));
       }
     } else {
-      posRecord.markSlotsUnknown(state);
+      posRecord.markSlotsUnknown(this, state);
     }
 
     Optional<IRFlowContinuation> posRecordCont = posRecord.doFlip(negRecord.doReturn());
@@ -480,7 +494,7 @@ public class IRAnalyzer extends IRInstructionVisitor {
       slot = IRFlowSlot.exponential(location, exponential.getHeapLocation());
     }
 
-    record.doPush(state, slot);
+    record.doPush(this, state, slot);
   }
 
   @Override

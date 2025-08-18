@@ -88,10 +88,8 @@ public class IRFlowLocation {
   public Optional<IRFlowLocation> getSuccessor() {
     if (getIndex() < getFlow().getBlock().getInstructions().size() - 1) {
       return Optional.of(getFlow().getLocation(getIndex() + 1));
-    } else if (getFlow().getBranches().size() == 1 && getFlow().getDetached().isEmpty()) {
-      return getFlow().getBranches().stream().findFirst().map(f -> f.getLocations().getFirst());
-    } else if (getFlow().getBranches().isEmpty() && getFlow().getDetached().size() == 1) {
-      return getFlow().getDetached().stream().findFirst().map(f -> f.getLocations().getFirst());
+    } else if (getFlow().getTargets().size() == 1) {
+      return getFlow().getTargets().stream().findFirst().map(f -> f.getLocations().getFirst());
     } else {
       return Optional.empty();
     }

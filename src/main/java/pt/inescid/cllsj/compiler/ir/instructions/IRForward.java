@@ -12,6 +12,8 @@ public class IRForward extends IRInstruction {
   // In that case we just modify the posRecord accordingly and delete the negRecord
   private boolean shouldReturn = true;
 
+  private boolean isEndPoint = true;
+
   public IRForward(int negRecord, int posRecord) {
     this.negRecord = negRecord;
     this.posRecord = posRecord;
@@ -33,6 +35,14 @@ public class IRForward extends IRInstruction {
     this.shouldReturn = false;
   }
 
+  public boolean isEndPoint() {
+    return shouldReturn && isEndPoint;
+  }
+
+  public void removeEndPoint() {
+    isEndPoint = false;
+  }
+
   @Override
   public void accept(IRInstructionVisitor visitor) {
     visitor.visit(this);
@@ -45,6 +55,8 @@ public class IRForward extends IRInstruction {
     sb.append(", +").append(posRecord);
     if (!shouldReturn) {
       sb.append(", no return");
+    } else if (isEndPoint()) {
+      sb.append(", end point");
     }
     sb.append(")");
     return sb.toString();

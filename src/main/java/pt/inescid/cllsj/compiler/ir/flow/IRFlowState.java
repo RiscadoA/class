@@ -5,6 +5,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Stack;
+import pt.inescid.cllsj.compiler.IRAnalyzer;
 import pt.inescid.cllsj.compiler.ir.IRTypeVisitor;
 import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
 import pt.inescid.cllsj.compiler.ir.type.IRBoolT;
@@ -97,12 +98,13 @@ public class IRFlowState {
     boundRecords.remove(id);
   }
 
-  public void pushPendingContinuation(IRFlowContinuation cont) {
+  public void pushPendingContinuation(IRAnalyzer analyzer, IRFlowContinuation cont) {
+    analyzer.getFlow().addDetached(analyzer.getFlow(cont.getLabel()));
     pendingContinuations.get().push(cont);
   }
 
-  public void pushPendingContinuation(String label, IRFlowLocation location) {
-    pushPendingContinuation(new IRFlowContinuation(label, location));
+  public void pushPendingContinuation(IRAnalyzer analyzer, String label, IRFlowLocation location) {
+    pushPendingContinuation(analyzer, new IRFlowContinuation(label, location));
   }
 
   public Optional<IRFlowContinuation> popPendingContinuation() {

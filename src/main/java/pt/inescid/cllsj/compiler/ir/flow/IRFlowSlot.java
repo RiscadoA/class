@@ -1,6 +1,7 @@
 package pt.inescid.cllsj.compiler.ir.flow;
 
 import java.util.Optional;
+import pt.inescid.cllsj.compiler.IRAnalyzer;
 
 public class IRFlowSlot {
   private static enum Type {
@@ -140,9 +141,9 @@ public class IRFlowSlot {
     return type.orElseThrow(() -> new IllegalStateException("Slot does not hold a known type"));
   }
 
-  public void markLost(IRFlowState state) {
+  public void markLost(IRAnalyzer analyzer, IRFlowState state) {
     if (recordIntroductionLocation.isPresent()) {
-      state.getHeapRecord(recordIntroductionLocation.get()).markTotallyUnknown(state);
+      state.getHeapRecord(recordIntroductionLocation.get()).markTotallyUnknown(analyzer, state);
     }
   }
 

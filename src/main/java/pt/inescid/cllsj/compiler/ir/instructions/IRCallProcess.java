@@ -81,6 +81,7 @@ public class IRCallProcess extends IRInstruction {
   private List<LinearArgument> linearArguments;
   private List<ExponentialArgument> exponentialArguments;
   private List<TypeArgument> typeArguments;
+  private boolean isEndPoint = true;
 
   public IRCallProcess(
       String processName,
@@ -109,6 +110,14 @@ public class IRCallProcess extends IRInstruction {
     return typeArguments;
   }
 
+  public boolean isEndPoint() {
+    return isEndPoint;
+  }
+
+  public void removeEndPoint() {
+    isEndPoint = false;
+  }
+
   @Override
   public void accept(IRInstructionVisitor visitor) {
     visitor.visit(this);
@@ -117,6 +126,9 @@ public class IRCallProcess extends IRInstruction {
   @Override
   public String toString() {
     String str = "callProcess(" + processName;
+    if (isEndPoint()) {
+      str += ", end point";
+    }
     for (TypeArgument arg : this.typeArguments) {
       str +=
           ", T"
