@@ -1516,6 +1516,7 @@ public class CGenerator extends IRInstructionVisitor {
         && (!optimizePrimitiveExponentials
             || instruction.getExpression().getType() instanceof IRStringT)) {
       putNewExponentialFromExpression(TMP_EXPONENTIAL, instruction.getExpression());
+      putPushExponential(instruction.getRecord(), TMP_EXPONENTIAL);
     } else {
       putPush(
           instruction.getRecord(),
