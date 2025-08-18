@@ -406,6 +406,8 @@ public class IROptimizer {
               newLoc.set(Optional.of(loc));
               return false;
             }
+          } else if (loc.getInstruction().usesRecord(push.getRecord())) {
+            return false;
           }
           return true;
         });
@@ -416,8 +418,19 @@ public class IROptimizer {
               freeLoc.set(Optional.of(loc));
               return false;
             }
+          } else if (loc.getInstruction().usesRecord(push.getRecord())) {
+            return false;
           }
           return true;
+        });
+
+        // If the record is still used between the push and the pop, we can't delete it
+        pushLoc.forEachAfter(loc -> {
+          if (loc != popLoc && loc.getInstruction().usesRecord(push.getRecord())) {
+            freeLoc.set(Optional.empty());
+            newLoc.set(Optional.empty());
+          }
+          return loc != popLoc;
         });
 
         if (newLoc.get().isPresent() && freeLoc.get().isPresent()) {
