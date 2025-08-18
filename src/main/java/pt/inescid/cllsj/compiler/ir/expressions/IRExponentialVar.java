@@ -1,12 +1,11 @@
 package pt.inescid.cllsj.compiler.ir.expressions;
 
 import java.util.function.Function;
-
 import pt.inescid.cllsj.compiler.ir.IRExpressionVisitor;
 import pt.inescid.cllsj.compiler.ir.type.IRType;
 
 public class IRExponentialVar extends IRExpression {
-  private final int exponential;
+  private int exponential;
   private final IRType type;
 
   public IRExponentialVar(int exponential, IRType type) {
@@ -38,5 +37,10 @@ public class IRExponentialVar extends IRExpression {
     return false;
   }
 
-  public void renameRecords(Function<Integer,Integer> renamer) {}
+  public void renameRecords(Function<Integer, Integer> renamer) {}
+
+  @Override
+  public void renameExponentials(Function<Integer, Integer> renamer) {
+    exponential = renamer.apply(exponential);
+  }
 }

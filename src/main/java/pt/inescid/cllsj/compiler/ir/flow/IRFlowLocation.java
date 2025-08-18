@@ -32,6 +32,18 @@ public class IRFlowLocation {
     return index;
   }
 
+  public IRFlowState getPreviousState() {
+    IRFlow flow = getFlow();
+    int index = getIndex();
+    return flow.getStates().get(index);
+  }
+
+  public IRFlowState getNextState() {
+    IRFlow flow = getFlow();
+    int index = getIndex();
+    return flow.getStates().get(index + 1);
+  }
+
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
@@ -115,7 +127,21 @@ public class IRFlowLocation {
     }
     getFlow().getBlock().getInstructions().remove(index);
     getFlow().getLocations().remove(index);
+    getFlow().getStates().remove(index);
     markRemoved();
+  }
+
+  // Checks if there's a single path from this location to the given location.
+  public boolean hasSinglePathUntil(IRFlowLocation loc) {
+    if (this == loc) {
+      return true;
+    }
+
+    Optional<IRFlowLocation> successor = getSuccessor();
+    if (successor.isEmpty()) {
+      return false;
+    }
+    return successor.get().hasSinglePathUntil(loc);
   }
 
   // Calls the function for each instruction occurring before this location,

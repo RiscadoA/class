@@ -1,7 +1,6 @@
 package pt.inescid.cllsj.compiler.ir.instructions;
 
 import java.util.function.Function;
-
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 import pt.inescid.cllsj.compiler.ir.expressions.IRExpression;
 
@@ -44,5 +43,10 @@ public class IRPrint extends IRInstruction {
   @Override
   public void renameRecords(Function<Integer, Integer> renamer) {
     expression.renameRecords(renamer);
+  }
+
+  @Override
+  public void renameExponentials(Function<Integer, Integer> renamer) {
+    expression.renameExponentials(renamer);
   }
 }

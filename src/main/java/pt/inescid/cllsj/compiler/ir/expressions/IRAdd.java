@@ -1,7 +1,6 @@
 package pt.inescid.cllsj.compiler.ir.expressions;
 
 import java.util.function.Function;
-
 import pt.inescid.cllsj.compiler.ir.IRExpressionVisitor;
 import pt.inescid.cllsj.compiler.ir.type.IRIntT;
 import pt.inescid.cllsj.compiler.ir.type.IRStringT;
@@ -51,8 +50,13 @@ public class IRAdd extends IRExpression {
     return lhs.usesRecord(record) || rhs.usesRecord(record);
   }
 
-  public void renameRecords(Function<Integer,Integer> renamer) {
+  public void renameRecords(Function<Integer, Integer> renamer) {
     lhs.renameRecords(renamer);
     rhs.renameRecords(renamer);
+  }
+
+  public void renameExponentials(Function<Integer, Integer> renamer) {
+    lhs.renameExponentials(renamer);
+    rhs.renameExponentials(renamer);
   }
 }

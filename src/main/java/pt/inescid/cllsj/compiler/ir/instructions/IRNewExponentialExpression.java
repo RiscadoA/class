@@ -2,22 +2,23 @@ package pt.inescid.cllsj.compiler.ir.instructions;
 
 import java.util.function.Function;
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
+import pt.inescid.cllsj.compiler.ir.expressions.IRExpression;
 
-public class IRNewExponential extends IRInstruction {
+public class IRNewExponentialExpression extends IRInstruction {
   private int exponential;
-  private int record;
+  private IRExpression expression;
 
-  public IRNewExponential(int exponential, int record) {
+  public IRNewExponentialExpression(int exponential, IRExpression expression) {
     this.exponential = exponential;
-    this.record = record;
+    this.expression = expression;
   }
 
   public int getExponential() {
     return exponential;
   }
 
-  public int getRecord() {
-    return record;
+  public IRExpression getExpression() {
+    return expression;
   }
 
   @Override
@@ -27,18 +28,16 @@ public class IRNewExponential extends IRInstruction {
 
   @Override
   public String toString() {
-    return "newExponential(" + exponential + ", " + record + ")";
+    return "newExponentialExpression(" + exponential + ", " + expression + ")";
   }
 
   @Override
   public boolean usesRecord(int record) {
-    return this.record == record;
+    return false;
   }
 
   @Override
-  public void renameRecords(Function<Integer, Integer> renamer) {
-    record = renamer.apply(record);
-  }
+  public void renameRecords(Function<Integer, Integer> renamer) {}
 
   @Override
   public void renameExponentials(Function<Integer, Integer> renamer) {

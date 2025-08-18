@@ -8,6 +8,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
+
 import pt.inescid.cllsj.compiler.ir.IRBlock;
 import pt.inescid.cllsj.compiler.ir.IRProcess;
 import pt.inescid.cllsj.compiler.ir.IRProgram;
@@ -15,13 +17,17 @@ import pt.inescid.cllsj.compiler.ir.IRTypeVisitor;
 import pt.inescid.cllsj.compiler.ir.flow.IRFlow;
 import pt.inescid.cllsj.compiler.ir.flow.IRFlowContinuation;
 import pt.inescid.cllsj.compiler.ir.flow.IRFlowLocation;
+import pt.inescid.cllsj.compiler.ir.flow.IRFlowRecord;
 import pt.inescid.cllsj.compiler.ir.instructions.*;
 import pt.inescid.cllsj.compiler.ir.type.IRBoolT;
+import pt.inescid.cllsj.compiler.ir.type.IRCellT;
 import pt.inescid.cllsj.compiler.ir.type.IRCloseT;
 import pt.inescid.cllsj.compiler.ir.type.IRExponentialT;
+import pt.inescid.cllsj.compiler.ir.type.IRFlipT;
 import pt.inescid.cllsj.compiler.ir.type.IRIntT;
 import pt.inescid.cllsj.compiler.ir.type.IRSessionT;
 import pt.inescid.cllsj.compiler.ir.type.IRStringT;
+import pt.inescid.cllsj.compiler.ir.type.IRTagT;
 import pt.inescid.cllsj.compiler.ir.type.IRType;
 import pt.inescid.cllsj.compiler.ir.type.IRTypeT;
 
@@ -249,6 +255,183 @@ public class IROptimizer {
       }
 
       subtractEndPoints(ir, source, endPoints, visited);
+    }
+  }
+
+  public void optimizeKnownSlots(IRProgram ir) {
+    for (Map.Entry<String, IRProcess> e : ir.getProcesses().entrySet()) {
+      if (!processFlows.containsKey(e.getKey())) {
+        throw new IllegalStateException(
+            "Analysis must be enabled to perform known slots optimization");
+      }
+      optimizeKnownSlots(e.getValue(), processFlows.get(e.getKey()));
+    }
+  }
+
+  private void optimizeKnownSlots(IRProcess ir, Map<IRBlock, IRFlow> flows) {
+    // Until no changes are made, repeat:
+    //
+    // - For linear records:
+    //    1. Search for IRPopSession which popped a known slot
+    //    2. Find respective IRPushSession
+    //       - The analyzer can extract this information easily
+    //    3. Rename popped record to the pushed record
+    //    4. Remove the respective part of the type
+    //       - Unsure on how to do this
+    //       - Maybe a 'remove nth slot from type' operation
+    //    5. Remove both instructions
+    //
+    // - For exponential records:
+    //    1. Search for IRPopExponential which popped a known slot
+    //    2. Find respective IRPushExponential or IRPushExpression
+    //    3. Rename popped exponential to the pushed exponential
+    //    4. Remove the respective part of the type
+    //    5. Remove both instructions
+
+    // Will store, for a given push instruction, the instructions which pop their data
+    Map<IRFlowLocation, IRFlowLocation> candidatePops = new HashMap<>();
+
+    // We search for any pop instruction which popped a slot with a known pusher
+    for (IRBlock block : ir.getBlocksIncludingEntry()) {
+      if (!flows.containsKey(block)) {
+        continue; // No flow information for this block
+      }
+      IRFlow flow = flows.get(block);
+
+      for (int i = 0; i < block.getInstructions().size(); ++i) {
+        IRInstruction instruction = block.getInstructions().get(i);
+        if (!(instruction instanceof IRPop)) {
+          continue; // Not what we're looking for
+        }
+        IRPop pop = (IRPop) instruction;
+        if (pop instanceof IRPopSession && ((IRPopSession) pop).getValueRequisites().canBeValue()) {
+          continue; // This code currently doesn't handle value session pushes and pops.
+        }
+        if (pop instanceof IRPopUnfold) {
+          continue; // We're not really popping data with these instructions
+        }
+
+        IRFlowRecord recordState = flow.getStates().get(i).getBoundRecord(pop.getRecord());
+        if (recordState.peek().isEmpty() || recordState.peek().get().getPusher().isEmpty()) {
+          continue; // Unknown slot, we can't do anything
+        }
+        IRFlowLocation pushLoc = recordState.peek().get().getPusher().get();
+
+        candidatePops.put(pushLoc, flow.getLocation(i));
+      }
+    }
+
+    for (IRFlowLocation pushLoc : candidatePops.keySet()) {
+      IRFlowLocation popLoc = candidatePops.get(pushLoc);
+      IRPush push = (IRPush) pushLoc.getInstruction();
+      IRPop pop = (IRPop) popLoc.getInstruction();
+
+      IRFlowRecord record = pushLoc.getNextState().getBoundRecord(push.getRecord());
+      if (record.getNextSlotIndex().isEmpty()) {
+        continue; // We need to know which part of the type we're removing
+      }
+      int slotIndex = record.getNextSlotIndex().get();
+
+      // We must go through each location and ensure that there's a single execution
+      // path from the push to the pop.
+      if (!pushLoc.hasSinglePathUntil(popLoc)) {
+        continue; // We could optimize this across many branches but it is currently unimplemented
+      }
+
+      // Depending on the type of pop instruction, we'll try merging their argument data,
+      // so that the push/pop pair becomes unnecessary
+      boolean removePush = true;
+      if (pop instanceof IRPopExponential) {
+        int popped = ((IRPopExponential) pop).getArgExponential();
+
+        if (push instanceof IRPushExponential) {
+          int pushed = ((IRPushExponential) push).getExponential();
+
+          // We need to remove any IRDetachExponential instructions found for the pushed exponential
+          pushLoc.forEachAfter(loc -> {
+            if (loc.getInstruction() instanceof IRDetachExponential) {
+              IRDetachExponential detach = (IRDetachExponential)loc.getInstruction();
+              if (detach.getExponential() == pushed) {
+                loc.removeInstruction();
+                return false;
+              }
+            }
+            return true;
+          });
+
+          for (IRBlock block : ir.getBlocksIncludingEntry()) {
+            for (IRInstruction instr : block.getInstructions()) {
+              instr.renameExponentials(r -> r == popped ? pushed : r);
+            }
+          }
+        } else if (push instanceof IRPushExpression) {
+          removePush = false;
+          IRPushExpression pushExpr = (IRPushExpression) push;
+          pushLoc.replaceInstruction(
+              new IRNewExponentialExpression(popped, pushExpr.getExpression()));
+        } else if (push instanceof IRScan) {
+          removePush = false;
+          IRScan scan = (IRScan) push;
+          pushLoc.replaceInstruction(new IRNewExponentialScan(popped, scan.getType()));
+        } else {
+          continue; // Unsupported exponential push
+        }
+      } else if (pop instanceof IRPopSession) {
+        int pushed = ((IRPushSession) push).getArgRecord();
+        int popped = ((IRPopSession) pop).getArgRecord();
+        for (IRBlock block : ir.getBlocksIncludingEntry()) {
+          for (IRInstruction instr : block.getInstructions()) {
+            instr.renameRecords(r -> r == popped ? pushed : r);
+          }
+        }
+      } else if (pop instanceof IRPopTag || pop instanceof IRPopClose) {
+        // We don't really need to do anything other than removing the instructions
+        // For the tags, the jump has already been optimized away by the known jump optimization
+      } else {
+        continue; // Unimplemented pop type
+      }
+
+      // Now, we simply remove both instructions and modify the type accordingly
+      IRType oldType = ir.getRecordType(push.getRecord());
+      IRType newType = TypeModifier.removeNth(oldType, slotIndex);
+
+      if (newType instanceof IRCloseT) {
+        // We might be able to remove the session entirely
+        AtomicReference<Optional<IRFlowLocation>> newLoc = new AtomicReference<>(Optional.empty());
+        AtomicReference<Optional<IRFlowLocation>> freeLoc = new AtomicReference<>(Optional.empty());
+
+        pushLoc.forEachBefore(loc -> {
+          if (loc.getInstruction() instanceof IRNewSession) {
+            if (((IRNewSession)loc.getInstruction()).getRecord() == push.getRecord()) {
+              newLoc.set(Optional.of(loc));
+              return false;
+            }
+          }
+          return true;
+        });
+
+        popLoc.forEachAfter(loc -> {
+          if (loc.getInstruction() instanceof IRFreeSession) {
+            if (((IRFreeSession)loc.getInstruction()).getRecord() == push.getRecord()) {
+              freeLoc.set(Optional.of(loc));
+              return false;
+            }
+          }
+          return true;
+        });
+
+        if (newLoc.get().isPresent() && freeLoc.get().isPresent()) {
+          newLoc.get().get().removeInstruction();
+          freeLoc.get().get().removeInstruction();
+        }
+      }
+
+      if (removePush) {
+        pushLoc.removeInstruction();
+      }
+      popLoc.removeInstruction();
+
+      ir.setRecordType(push.getRecord(), newType);
     }
   }
 
@@ -600,7 +783,7 @@ public class IROptimizer {
               }
 
               if (instr instanceof IRFreeSession) {
-                IRFreeSession freeSession = (IRFreeSession)instr;
+                IRFreeSession freeSession = (IRFreeSession) instr;
                 if (freeSession.getRecord() == argRecord) {
                   loc.removeInstruction();
                   popSessionLoc.removeInstruction();
@@ -620,29 +803,35 @@ public class IROptimizer {
 
   public static class TypeModifier extends IRTypeVisitor {
     private static enum Modification {
-      REMOVE_FIRST,
+      REMOVE_NTH,
       REMOVE_LAST,
     }
 
     private IRType result;
     private Modification modification;
+    private int index;
 
     public static IRType removeFirst(IRType type) {
-      TypeModifier modifier = new TypeModifier(Modification.REMOVE_FIRST);
-      return modifier.recurse(type);
+      return removeNth(type, 0);
+    }
+
+    public static IRType removeNth(IRType type, int index) {
+      TypeModifier modifier = new TypeModifier(Modification.REMOVE_NTH, index);
+      return modifier.recurse(type, 0);
     }
 
     public static IRType removeLast(IRType type) {
-      TypeModifier modifier = new TypeModifier(Modification.REMOVE_LAST);
-      return modifier.recurse(type);
+      TypeModifier modifier = new TypeModifier(Modification.REMOVE_LAST, 0);
+      return modifier.recurse(type, 0);
     }
 
-    public TypeModifier(Modification modification) {
+    public TypeModifier(Modification modification, int index) {
       this.modification = modification;
+      this.index = index;
     }
 
-    private IRType recurse(IRType type) {
-      TypeModifier m = new TypeModifier(modification);
+    private IRType recurse(IRType type, int offset) {
+      TypeModifier m = new TypeModifier(modification, index - offset);
       type.accept(m);
       return m.result;
     }
@@ -656,7 +845,11 @@ public class IROptimizer {
 
     @Override
     public void visit(IRTypeT type) {
-      result = new IRCloseT();
+      if (index == 0) {
+        result = new IRCloseT();
+      } else {
+        result = type;
+      }
     }
 
     @Override
@@ -685,17 +878,34 @@ public class IROptimizer {
     }
 
     @Override
+    public void visit(IRCellT type) {
+      result = new IRCloseT();
+    }
+
+    @Override
     public void visit(IRSessionT type) {
       if (type.getValueRequisites().mustBeValue()) {
-        if (modification == Modification.REMOVE_FIRST) {
-          IRType arg = recurse(type.getArg());
-          if (arg instanceof IRCloseT) {
-            result = type.getCont();
+        if (modification == Modification.REMOVE_NTH) {
+          int argCount = TypeSlotCounter.count(type.getArg());
+          if (index < argCount) {
+            // Remove from the argument side
+            IRType arg = recurse(type.getArg(), 0);
+            if (arg instanceof IRCloseT) {
+              result = type.getCont();
+            } else {
+              result = new IRSessionT(arg, type.getCont(), type.getValueRequisites());
+            }
           } else {
-            result = new IRSessionT(arg, type.getCont(), type.getValueRequisites());
+            // Remove from the continuation side
+            IRType cont = recurse(type.getCont(), argCount);
+            if (cont instanceof IRCloseT) {
+              result = type.getArg();
+            } else {
+              result = new IRSessionT(type.getArg(), cont, type.getValueRequisites());
+            }
           }
         } else if (modification == Modification.REMOVE_LAST) {
-          IRType cont = recurse(type.getCont());
+          IRType cont = recurse(type.getCont(), 0);
           if (cont instanceof IRCloseT) {
             result = type.getArg();
           } else {
@@ -703,20 +913,73 @@ public class IROptimizer {
           }
         }
       } else if (!type.getValueRequisites().canBeValue()) {
-        if (modification == Modification.REMOVE_FIRST) {
-          result = type.getCont();
+        if (modification == Modification.REMOVE_NTH) {
+          if (index == 0) {
+            result = type.getCont();
+          } else {
+            result =
+                new IRSessionT(
+                    type.getArg(), recurse(type.getCont(), 1), type.getValueRequisites());
+          }
         } else if (modification == Modification.REMOVE_LAST) {
           if (type.getCont() instanceof IRCloseT) {
             result = new IRCloseT();
           } else {
             result =
-                new IRSessionT(type.getArg(), recurse(type.getCont()), type.getValueRequisites());
+                new IRSessionT(
+                    type.getArg(), recurse(type.getCont(), 0), type.getValueRequisites());
           }
         }
       } else {
         throw new UnsupportedOperationException(
             "Sessions with uncertain value requisites are not supported yet");
       }
+    }
+
+    @Override
+    public void visit(IRFlipT type) {
+      type.getCont().accept(this);
+    }
+  }
+
+  public static class TypeSlotCounter extends IRTypeVisitor {
+    private int result;
+
+    public static int count(IRType type) {
+      TypeSlotCounter counter = new TypeSlotCounter();
+      type.accept(counter);
+      return counter.result;
+    }
+
+    @Override
+    public void visit(IRType type) {
+      result = 1;
+    }
+
+    @Override
+    public void visit(IRSessionT type) {
+      if (type.getValueRequisites().mustBeValue()) {
+        result = count(type.getArg());
+      } else if (!type.getValueRequisites().canBeValue()) {
+        result = 1;
+      } else {
+        throw new UnsupportedOperationException(
+            "Sessions with uncertain value requisites are not supported yet");
+      }
+      result += count(type.getCont());
+    }
+
+    @Override
+    public void visit(IRTagT type) {
+      result = 1;
+      for (IRType choice : type.getChoices()) {
+        result = Integer.max(result, 1 + count(choice));
+      }
+    }
+
+    @Override
+    public void visit(IRFlipT type) {
+      type.getCont().accept(this);
     }
   }
 }

@@ -35,6 +35,7 @@ public class Compiler {
   public boolean optimizeFlipForward = true;
   public boolean optimizeSendValue = true;
   public boolean optimizeKnownJumps = true;
+  public boolean optimizeKnownSlots = true;
   public boolean optimizeSingleEndpoint = true;
 
   public int compile(String path) {
@@ -98,13 +99,18 @@ public class Compiler {
           optimizer.optimizeKnownJumps(ir);
         }
 
-        if (optimizeFlipForward) {
-          optimizer.optimizeFlipForward(ir);
-        }
-
         if (optimizeSendValue) {
           optimizer.removeUnnecessaryValuePushes(ir);
           optimizer.removeUnnecessaryValuePops(ir);
+        }
+
+        if (optimizeKnownSlots) {
+          optimizer.analyze(ir);
+          optimizer.optimizeKnownSlots(ir);
+        }
+
+        if (optimizeFlipForward) {
+          optimizer.optimizeFlipForward(ir);
         }
 
         optimizer.removeUnreachableBlocks(ir);

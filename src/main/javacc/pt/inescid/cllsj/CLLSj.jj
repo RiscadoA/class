@@ -152,6 +152,8 @@ public static void main(String args[]) {
           compiler.optimizeSendValue = false;
         } else if (args[i].equals("--no-optimize-known-jumps")) {
           compiler.optimizeKnownJumps = false;
+        } else if (args[i].equals("--no-optimize-known-slots")) {
+          compiler.optimizeKnownSlots = false;
         } else if (args[i].equals("--no-optimize-single-endpoint")) {
           compiler.optimizeSingleEndpoint = false;
         } else if (args[i].equals("-p")) {

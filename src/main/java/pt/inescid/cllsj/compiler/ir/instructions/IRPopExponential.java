@@ -1,5 +1,6 @@
 package pt.inescid.cllsj.compiler.ir.instructions;
 
+import java.util.function.Function;
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 
 public class IRPopExponential extends IRPop {
@@ -22,5 +23,10 @@ public class IRPopExponential extends IRPop {
   @Override
   public String toString() {
     return "popExponential(" + getRecord() + ", " + argExponential + ")";
+  }
+
+  @Override
+  public void renameExponentials(Function<Integer, Integer> renamer) {
+    argExponential = renamer.apply(argExponential);
   }
 }

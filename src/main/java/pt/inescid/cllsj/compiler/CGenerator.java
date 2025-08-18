@@ -63,6 +63,7 @@ public class CGenerator extends IRInstructionVisitor {
     putLine("#include <stdio.h>");
     putLine("#include <stdlib.h>");
     putLine("#include <string.h>");
+    putLine("#include <stdint.h>");
     if (!disableConcurrency) {
       putLine("#include <pthread.h>");
       putLine("#include <stdatomic.h>");
@@ -1138,31 +1139,33 @@ public class CGenerator extends IRInstructionVisitor {
 
     // Decrement the end points and free the environment if necessary.
     if (i.shouldReturn()) {
-      putDecrementEndPoints(() -> putFreeEnvironment(ENV), () -> {
-        // If the environment was not freed, and if the records won't be used in this
-        // environment
-        // anymore, we need to remove their bindings. This is necessary to prevent them from
-        // being
-        // cloned or freed again later on.
+      putDecrementEndPoints(
+          () -> putFreeEnvironment(ENV),
+          () -> {
+            // If the environment was not freed, and if the records won't be used in this
+            // environment
+            // anymore, we need to remove their bindings. This is necessary to prevent them from
+            // being
+            // cloned or freed again later on.
 
-        // The negative record will be deleted, but it's binding may now point to the positive
-        // record. If it doesn't, then we set it to null.
-        putIf(
-            TMP_RECORD + " == " + record(i.getNegRecord()),
-            () -> {
-              putAssign(record(i.getNegRecord()), "NULL");
-            });
+            // The negative record will be deleted, but it's binding may now point to the positive
+            // record. If it doesn't, then we set it to null.
+            putIf(
+                TMP_RECORD + " == " + record(i.getNegRecord()),
+                () -> {
+                  putAssign(record(i.getNegRecord()), "NULL");
+                });
 
-        // The positive record will only be needed if either the environment we're going to jump
-        // to or its continuation environment are the current environment. If not, we also need
-        // to
-        // remove its binding from the current environment.
-        putIf(
-            ENV + " != " + recordContEnv(i.getPosRecord()) + " && " + ENV + " != " + TMP_ENV,
-            () -> {
-              putAssign(record(i.getPosRecord()), "NULL");
-            });
-      });
+            // The positive record will only be needed if either the environment we're going to jump
+            // to or its continuation environment are the current environment. If not, we also need
+            // to
+            // remove its binding from the current environment.
+            putIf(
+                ENV + " != " + recordContEnv(i.getPosRecord()) + " && " + ENV + " != " + TMP_ENV,
+                () -> {
+                  putAssign(record(i.getPosRecord()), "NULL");
+                });
+          });
     } else {
       // The negative record will be deleted, but it's binding may now point to the positive
       // record. If it doesn't, then we set it to null.
@@ -1236,28 +1239,30 @@ public class CGenerator extends IRInstructionVisitor {
         });
 
     // Decrement the end points and free the environment if necessary.
-    putDecrementEndPoints(() -> putFreeEnvironment(ENV), () -> {
-      // If the environment was not freed, and if the records won't be used in this environment
-      // anymore, we need to remove their bindings. This is necessary to prevent them from being
-      // cloned or freed again later on.
+    putDecrementEndPoints(
+        () -> putFreeEnvironment(ENV),
+        () -> {
+          // If the environment was not freed, and if the records won't be used in this environment
+          // anymore, we need to remove their bindings. This is necessary to prevent them from being
+          // cloned or freed again later on.
 
-      // The positive record will be deleted, but it's binding may now point to the negative
-      // record. If it doesn't, then we set it to null.
-      putIf(
-          TMP_RECORD + " == " + record(i.getPosRecord()),
-          () -> {
-            putAssign(record(i.getPosRecord()), "NULL");
-          });
+          // The positive record will be deleted, but it's binding may now point to the negative
+          // record. If it doesn't, then we set it to null.
+          putIf(
+              TMP_RECORD + " == " + record(i.getPosRecord()),
+              () -> {
+                putAssign(record(i.getPosRecord()), "NULL");
+              });
 
-      // The negative record will only be needed if either the environment we're going to jump
-      // to or its continuation environment are the current environment. If not, we also need to
-      // remove its binding from the current environment.
-      putIf(
-          ENV + " != " + recordContEnv(i.getNegRecord()) + " && " + ENV + " != " + TMP_ENV,
-          () -> {
-            putAssign(record(i.getNegRecord()), "NULL");
-          });
-    });
+          // The negative record will only be needed if either the environment we're going to jump
+          // to or its continuation environment are the current environment. If not, we also need to
+          // remove its binding from the current environment.
+          putIf(
+              ENV + " != " + recordContEnv(i.getNegRecord()) + " && " + ENV + " != " + TMP_ENV,
+              () -> {
+                putAssign(record(i.getNegRecord()), "NULL");
+              });
+        });
 
     // Finally, free the positive record and jump to the continuation.
     putFreeRecord(TMP_RECORD);
@@ -1498,18 +1503,7 @@ public class CGenerator extends IRInstructionVisitor {
     }
 
     if (promote && (!optimizePrimitiveExponentials || irType instanceof IRStringT)) {
-      putAllocExponential(TMP_EXPONENTIAL);
-      putAssign(exponentialRefCount(TMP_EXPONENTIAL), 1);
-      putAllocRecord(exponentialRecord(TMP_EXPONENTIAL), irType);
-      putAssign(read(exponentialRecord(TMP_EXPONENTIAL)), 0);
-      putAssign(written(exponentialRecord(TMP_EXPONENTIAL)), 0);
-      putAssign(recordContEnv(exponentialRecord(TMP_EXPONENTIAL)), "NULL");
-      String recordBufferManagerName = recordBufferManagerName(irType);
-      putAssign(
-          exponentialManager(TMP_EXPONENTIAL),
-          recordBufferManagerName.isEmpty() ? "NULL" : ("&" + recordBufferManagerName));
-
-      putPush(exponentialRecord(TMP_EXPONENTIAL), cType, cValue);
+      putNewExponentialFromValue(TMP_EXPONENTIAL, irType, cValue);
       putPushExponential(instruction.getRecord(), TMP_EXPONENTIAL);
     } else {
       putPush(instruction.getRecord(), cType, cValue);
@@ -1521,23 +1515,7 @@ public class CGenerator extends IRInstructionVisitor {
     if (instruction.isExponential()
         && (!optimizePrimitiveExponentials
             || instruction.getExpression().getType() instanceof IRStringT)) {
-      putAllocExponential(TMP_EXPONENTIAL);
-      putAssign(exponentialRefCount(TMP_EXPONENTIAL), 1);
-      putAllocRecord(exponentialRecord(TMP_EXPONENTIAL), instruction.getExpression().getType());
-      putAssign(read(exponentialRecord(TMP_EXPONENTIAL)), 0);
-      putAssign(written(exponentialRecord(TMP_EXPONENTIAL)), 0);
-      putAssign(recordContEnv(exponentialRecord(TMP_EXPONENTIAL)), "NULL");
-      String recordBufferManagerName =
-          recordBufferManagerName(instruction.getExpression().getType());
-      putAssign(
-          exponentialManager(TMP_EXPONENTIAL),
-          recordBufferManagerName.isEmpty() ? "NULL" : ("&" + recordBufferManagerName));
-
-      putPush(
-          exponentialRecord(TMP_EXPONENTIAL),
-          cType(instruction.getExpression().getType()),
-          expression(instruction.getExpression()));
-      putPushExponential(instruction.getRecord(), TMP_EXPONENTIAL);
+      putNewExponentialFromExpression(TMP_EXPONENTIAL, instruction.getExpression());
     } else {
       putPush(
           instruction.getRecord(),
@@ -1594,7 +1572,7 @@ public class CGenerator extends IRInstructionVisitor {
     Runnable forInt =
         () -> {
           putAssign(
-              exponentialInteger(instruction.getExponential()),
+              readExponentialInteger(instruction.getExponential()),
               pop(instruction.getRecord(), "int"));
           putFreeRecord(record(instruction.getRecord()));
         };
@@ -1602,7 +1580,7 @@ public class CGenerator extends IRInstructionVisitor {
     Runnable forBool =
         () -> {
           putAssign(
-              exponentialBool(instruction.getExponential()),
+              readExponentialBool(instruction.getExponential()),
               pop(instruction.getRecord(), "unsigned char"));
           putFreeRecord(record(instruction.getRecord()));
         };
@@ -1626,10 +1604,42 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   @Override
+  public void visit(IRNewExponentialExpression instruction) {
+    putNewExponentialFromExpression(
+        exponential(instruction.getExponential()), instruction.getExpression());
+  }
+
+  @Override
+  public void visit(IRNewExponentialScan instruction) {
+    IRType irType = instruction.getType();
+    if (irType instanceof IRExponentialT) {
+      irType = ((IRExponentialT) irType).getInner();
+    } else {
+      throw new UnsupportedOperationException(
+          "IRNewExponentialScan should have an exponential type");
+    }
+
+    String cValue;
+    if (irType instanceof IRIntT) {
+      cValue = "int_scan()";
+    } else if (irType instanceof IRBoolT) {
+      cValue = "bool_scan()";
+    } else if (irType instanceof IRStringT) {
+      cValue = "string_scan()";
+    } else {
+      throw new UnsupportedOperationException(
+          "Unsupported type for IRNewExponentialScan: "
+              + instruction.getType().getClass().getName());
+    }
+
+    putNewExponentialFromValue(exponential(instruction.getExponential()), irType, cValue);
+  }
+
+  @Override
   public void visit(IRPushExponential instruction) {
     Runnable forInt =
         () -> {
-          putPush(instruction.getRecord(), "int", exponentialInteger(instruction.getExponential()));
+          putPush(instruction.getRecord(), "int", readExponentialInteger(instruction.getExponential()));
         };
 
     Runnable forBool =
@@ -1637,7 +1647,7 @@ public class CGenerator extends IRInstructionVisitor {
           putPush(
               instruction.getRecord(),
               "unsigned char",
-              exponentialBool(instruction.getExponential()));
+              readExponentialBool(instruction.getExponential()));
         };
 
     Runnable forOther =
@@ -1653,14 +1663,14 @@ public class CGenerator extends IRInstructionVisitor {
     Runnable forInt =
         () -> {
           putAssign(
-              exponentialInteger(instruction.getArgExponential()),
+              readExponentialInteger(instruction.getArgExponential()),
               pop(instruction.getRecord(), "int"));
         };
 
     Runnable forBool =
         () -> {
           putAssign(
-              exponentialBool(instruction.getArgExponential()),
+              readExponentialBool(instruction.getArgExponential()),
               pop(instruction.getRecord(), "unsigned char"));
         };
 
@@ -1690,7 +1700,7 @@ public class CGenerator extends IRInstructionVisitor {
         () -> {
           forIntAndBool.run();
           putPush(
-              instruction.getArgRecord(), "int", exponentialInteger(instruction.getExponential()));
+              instruction.getArgRecord(), "int", readExponentialInteger(instruction.getExponential()));
         };
 
     Runnable forBool =
@@ -1699,7 +1709,7 @@ public class CGenerator extends IRInstructionVisitor {
           putPush(
               instruction.getArgRecord(),
               "unsigned char",
-              exponentialBool(instruction.getExponential()));
+              readExponentialBool(instruction.getExponential()));
         };
 
     Runnable forOther =
@@ -2161,17 +2171,28 @@ public class CGenerator extends IRInstructionVisitor {
     return exponential + "->record";
   }
 
-  private String exponentialInteger(int exponential) {
+  private String readExponentialInteger(int exponential) {
     // Hacky, but works as long as sizeof(int) < sizeof(struct exponential*)
     // We're just casting the address of the exponential to an int
     return "*(int*)(&" + exponential(exponential) + ")";
   }
 
-  private String exponentialBool(int exponential) {
+  private String readExponentialBool(int exponential) {
     // Hacky, but works as long as sizeof(unsigned char) < sizeof(struct exponential*)
     // We're just casting the address of the exponential to an unsigned char
     return "*(unsigned char*)(&" + exponential(exponential) + ")";
   }
+
+  private String writeExponentialInteger(String cValue) {
+    // Same as above but the cast is in the opposite direction
+    return "(struct exponential*)(uintptr_t)((unsigned int)(" + cValue + "))";
+  }
+
+  private String writeExponentialBool(String cValue) {
+    // Same as above but the cast is in the opposite direction
+    return "(struct exponential*)(uintptr_t)(" + cValue + ")";
+  }
+
 
   private String exponentialRecord(int exponential) {
     return exponentialRecord(exponential(exponential));
@@ -2273,6 +2294,8 @@ public class CGenerator extends IRInstructionVisitor {
     }
   }
 
+  // ================================= Statement building helpers =================================
+
   private void putDecrementEndPoints(Runnable free) {
     if (optimizeSingleEndpoint && ir.getProcesses().get(procName).getEndPoints() == 1) {
       free.run();
@@ -2285,12 +2308,34 @@ public class CGenerator extends IRInstructionVisitor {
     if (optimizeSingleEndpoint && ir.getProcesses().get(procName).getEndPoints() == 1) {
       free.run();
     } else {
-      putIfElse(
-          decrementAtomic(environmentEndPoints()) + " == 0", free, otherwise);
+      putIfElse(decrementAtomic(environmentEndPoints()) + " == 0", free, otherwise);
     }
   }
 
-  // ================================= Statement building helpers =================================
+  private void putNewExponentialFromExpression(String var, IRExpression expression) {
+    putNewExponentialFromValue(var, expression.getType(), expression(expression));
+  }
+
+  private void putNewExponentialFromValue(String var, IRType type, String cValue) {
+    if (optimizePrimitiveExponentials && type instanceof IRIntT) {
+      putAssign(var, writeExponentialInteger(cValue));
+    } else if (optimizePrimitiveExponentials && type instanceof IRBoolT) {
+      putAssign(var, writeExponentialBool(cValue));
+    } else {
+      putAllocExponential(var);
+      putAssign(exponentialRefCount(var), 1);
+      putAllocRecord(exponentialRecord(var), type);
+      putAssign(read(exponentialRecord(var)), 0);
+      putAssign(written(exponentialRecord(var)), 0);
+      putAssign(recordContEnv(exponentialRecord(var)), "NULL");
+      String recordBufferManagerName = recordBufferManagerName(type);
+      putAssign(
+          exponentialManager(var),
+          recordBufferManagerName.isEmpty() ? "NULL" : ("&" + recordBufferManagerName));
+
+      putPush(exponentialRecord(var), cType(type), cValue);
+    }
+  }
 
   private void putAllocEnvironment(
       String var, String manager, String recordCount, String exponentialCount, String typeCount) {
@@ -2966,9 +3011,9 @@ public class CGenerator extends IRInstructionVisitor {
       String dataRef;
 
       if (optimizePrimitiveExponentials && (expr.getType() instanceof IRIntT)) {
-        dataRef = exponentialInteger(expr.getExponential());
+        dataRef = readExponentialInteger(expr.getExponential());
       } else if (optimizePrimitiveExponentials && (expr.getType() instanceof IRBoolT)) {
-        dataRef = exponentialBool(expr.getExponential());
+        dataRef = readExponentialBool(expr.getExponential());
       } else {
         // We simply access the exponential data buffer directly.
         final String record = exponentialRecord(expr.getExponential());

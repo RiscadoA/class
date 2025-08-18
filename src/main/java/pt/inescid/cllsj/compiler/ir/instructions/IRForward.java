@@ -1,7 +1,6 @@
 package pt.inescid.cllsj.compiler.ir.instructions;
 
 import java.util.function.Function;
-
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 
 public class IRForward extends IRInstruction {
@@ -61,4 +60,7 @@ public class IRForward extends IRInstruction {
     negRecord = renamer.apply(negRecord);
     posRecord = renamer.apply(posRecord);
   }
+
+  @Override
+  public void renameExponentials(Function<Integer, Integer> renamer) {}
 }

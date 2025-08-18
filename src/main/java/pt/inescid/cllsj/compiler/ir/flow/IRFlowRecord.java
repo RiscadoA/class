@@ -10,6 +10,7 @@ public class IRFlowRecord {
   private Optional<IRFlowContinuation> continuation = Optional.empty();
 
   private List<IRFlowSlot> slots = new ArrayList<>();
+  private Optional<Integer> nextSlotIndex = Optional.empty();
   private boolean slotsKnown = false;
 
   public IRFlowRecord(IRFlowLocation introductionLocation) {
@@ -19,7 +20,16 @@ public class IRFlowRecord {
   public void doNewSession(Optional<IRFlowContinuation> continuation) {
     this.slots.clear();
     this.slotsKnown = true;
+    this.nextSlotIndex = Optional.of(0);
     this.continuation = continuation;
+  }
+
+  // Gets the next slot that will be popped, if it is known.
+  public Optional<IRFlowSlot> peek() {
+    if (!slotsKnown) {
+      return Optional.empty();
+    }
+    return Optional.of(slots.getFirst());
   }
 
   // Performs a read on the record.
@@ -40,16 +50,19 @@ public class IRFlowRecord {
     }
 
     slots.add(slot);
+    nextSlotIndex = nextSlotIndex.map(i -> i + 1);
   }
 
   public void doPushUnfold() {
     slots.clear();
     slotsKnown = true;
+    nextSlotIndex = Optional.empty();
   }
 
   public void doPopUnfold() {
     if (slotsKnown) {
       slots.clear();
+      nextSlotIndex = Optional.empty();
     }
   }
 
@@ -89,6 +102,7 @@ public class IRFlowRecord {
       slot.markLost(state);
     }
     this.slots.clear();
+    this.nextSlotIndex = Optional.empty();
   }
 
   public void markTotallyUnknown(IRFlowState state) {
@@ -108,6 +122,13 @@ public class IRFlowRecord {
 
   public boolean slotsAreKnown() {
     return slotsKnown;
+  }
+
+  public Optional<Integer> getNextSlotIndex() {
+    if (!slotsKnown) {
+      return Optional.empty();
+    }
+    return nextSlotIndex;
   }
 
   public Optional<Integer> getSlotCount() {
@@ -146,6 +167,9 @@ public class IRFlowRecord {
       merged.slots.clear();
       merged.slotsKnown = false;
     }
+    if (!merged.nextSlotIndex.equals(other.nextSlotIndex)) {
+      merged.nextSlotIndex = Optional.empty();
+    }
     for (int i = 0; i < merged.slots.size(); ++i) {
       merged.slots.set(i, merged.slots.get(i).merge(other.slots.get(i)));
     }
@@ -157,6 +181,7 @@ public class IRFlowRecord {
     clone.continuation = this.continuation;
     clone.slots.addAll(this.slots);
     clone.slotsKnown = this.slotsKnown;
+    clone.nextSlotIndex = this.nextSlotIndex;
     return clone;
   }
 

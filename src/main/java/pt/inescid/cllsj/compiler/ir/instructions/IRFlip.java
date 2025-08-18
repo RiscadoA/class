@@ -1,7 +1,6 @@
 package pt.inescid.cllsj.compiler.ir.instructions;
 
 import java.util.function.Function;
-
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 
 public class IRFlip extends IRInstruction {
@@ -44,4 +43,7 @@ public class IRFlip extends IRInstruction {
   public void renameRecords(Function<Integer, Integer> renamer) {
     record = renamer.apply(record);
   }
+
+  @Override
+  public void renameExponentials(Function<Integer, Integer> renamer) {}
 }

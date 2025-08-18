@@ -117,6 +117,7 @@ public class IRFlow {
   public void addInstruction(int index, IRInstruction instruction, IRFlowLocation location) {
     location.move(this, index);
     locations.add(index, location);
+    states.add(index, states.get(index));
     block.getInstructions().add(index, instruction);
     for (int i = index + 1; i < block.getInstructions().size(); ++i) {
       locations.get(i).move(this, i);

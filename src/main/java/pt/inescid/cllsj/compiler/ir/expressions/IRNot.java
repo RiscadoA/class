@@ -1,7 +1,6 @@
 package pt.inescid.cllsj.compiler.ir.expressions;
 
 import java.util.function.Function;
-
 import pt.inescid.cllsj.compiler.ir.IRExpressionVisitor;
 import pt.inescid.cllsj.compiler.ir.type.IRBoolT;
 import pt.inescid.cllsj.compiler.ir.type.IRType;
@@ -37,7 +36,11 @@ public class IRNot extends IRExpression {
     return inner.usesRecord(record);
   }
 
-  public void renameRecords(Function<Integer,Integer> renamer) {
+  public void renameRecords(Function<Integer, Integer> renamer) {
     inner.renameRecords(renamer);
+  }
+
+  public void renameExponentials(Function<Integer, Integer> renamer) {
+    inner.renameExponentials(renamer);
   }
 }
