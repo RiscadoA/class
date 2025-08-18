@@ -47,7 +47,7 @@ public class IRAnalyzer extends IRInstructionVisitor {
     for (int i = 0; i < process.getExponentialArgumentCount(); ++i) {
       analyzer.state.bindExponential(i, analyzer.state.allocateExponential(Optional.empty()));
     }
-    analyzer.visit(process.getEntry(), true);
+    analyzer.visit(process.getEntry(), VisitType.DETACHED);
     return analyzer.flows;
   }
 
@@ -77,18 +77,24 @@ public class IRAnalyzer extends IRInstructionVisitor {
     return flow;
   }
 
+  private static enum VisitType {
+    DETACHED,
+    BRANCH,
+    PENDING,
+  }
+
   private void visitNextPending() {
     Optional<IRFlowContinuation> cont = state.popPendingContinuation();
     if (cont.isPresent()) {
-      visit(cont.get().getLabel(), true);
+      visit(cont.get().getLabel(), VisitType.PENDING);
     }
   }
 
-  private void visit(String label, boolean detached) {
-    visit(process.getBlock(label), detached);
+  private void visit(String label, VisitType type) {
+    visit(process.getBlock(label), type);
   }
 
-  private void visit(IRBlock block, boolean detached) {
+  private void visit(IRBlock block, VisitType type) {
     // Create a new flow object (if we haven't passed through it yet).
     IRFlow previousFlow = this.flow;
     IRFlowState previousState = this.state;
@@ -97,9 +103,12 @@ public class IRAnalyzer extends IRInstructionVisitor {
 
     // Link the previous block with this one.
     if (previousFlow != currentFlow) {
-      if (detached) {
+      if (type == VisitType.PENDING) {
         previousFlow.addTarget(currentFlow);
-      } else {
+      } else if (type == VisitType.DETACHED) {
+        previousFlow.addDetached(currentFlow);
+        previousFlow.addTarget(currentFlow);
+      } else if (type == VisitType.BRANCH) {
         previousFlow.addBranch(currentFlow);
       }
       currentFlow.addSource(previousFlow);
@@ -166,12 +175,12 @@ public class IRAnalyzer extends IRInstructionVisitor {
         record.doFlip(new IRFlowContinuation(instruction.getContLabel(), location));
     if (cont.isPresent()) {
       // The continuation is known, we should flip to the next state.
-      visit(cont.get().getLabel(), false);
+      visit(cont.get().getLabel(), VisitType.BRANCH);
     } else {
       // Unknown continuation. Slots will be left in an unknown state.
       record.doReturn(); // Pretend we've returned from the continuation
       record.markSlotsUnknown(this, state);
-      visit(instruction.getContLabel(), true);
+      visit(instruction.getContLabel(), VisitType.DETACHED);
     }
   }
 
@@ -179,7 +188,7 @@ public class IRAnalyzer extends IRInstructionVisitor {
   public void visit(IRReturn instruction) {
     Optional<IRFlowContinuation> cont = state.getBoundRecord(instruction.getRecord()).doReturn();
     if (cont.isPresent()) {
-      visit(cont.get().getLabel(), false);
+      visit(cont.get().getLabel(), VisitType.BRANCH);
     } else {
       visitNextPending();
     }
@@ -292,11 +301,11 @@ public class IRAnalyzer extends IRInstructionVisitor {
     if (!instruction.getCases().isEmpty()) {
       if (slot.isKnownTag()) {
         int tag = slot.getTag();
-        visit(instruction.getCases().get(tag).getLabel(), false);
+        visit(instruction.getCases().get(tag).getLabel(), VisitType.BRANCH);
       } else {
         // We don't know the tag, we must visit all branches
         for (IRPopTag.Case c : instruction.getCases().values()) {
-          visit(c.getLabel(), false);
+          visit(c.getLabel(), VisitType.BRANCH);
         }
       }
     }
@@ -357,19 +366,19 @@ public class IRAnalyzer extends IRInstructionVisitor {
     if (slot.isKnownType() && slot.getType().isPositive().isPresent()) {
       if (slot.getType().isPositive().get()) {
         if (instruction.getPositive().isPresent()) {
-          visit(instruction.getPositive().get().getLabel(), false);
+          visit(instruction.getPositive().get().getLabel(), VisitType.BRANCH);
         }
       } else {
         if (instruction.getNegative().isPresent()) {
-          visit(instruction.getNegative().get().getLabel(), false);
+          visit(instruction.getNegative().get().getLabel(), VisitType.BRANCH);
         }
       }
     } else {
       if (instruction.getNegative().isPresent()) {
-        visit(instruction.getNegative().get().getLabel(), false);
+        visit(instruction.getNegative().get().getLabel(), VisitType.BRANCH);
       }
       if (instruction.getPositive().isPresent()) {
-        visit(instruction.getPositive().get().getLabel(), false);
+        visit(instruction.getPositive().get().getLabel(), VisitType.BRANCH);
       }
     }
   }
@@ -435,7 +444,7 @@ public class IRAnalyzer extends IRInstructionVisitor {
 
     if (instruction.shouldReturn()) {
       if (posRecordCont.isPresent()) {
-        visit(posRecordCont.get().getLabel(), false);
+        visit(posRecordCont.get().getLabel(), VisitType.BRANCH);
       } else {
         visitNextPending();
       }
@@ -500,13 +509,13 @@ public class IRAnalyzer extends IRInstructionVisitor {
   @Override
   public void visit(IRBranch instruction) {
     visit(instruction.getExpression());
-    visit(instruction.getThen().getLabel(), false);
-    visit(instruction.getOtherwise().getLabel(), false);
+    visit(instruction.getThen().getLabel(), VisitType.BRANCH);
+    visit(instruction.getOtherwise().getLabel(), VisitType.BRANCH);
   }
 
   @Override
   public void visit(IRJump instruction) {
-    visit(instruction.getLabel(), false);
+    visit(instruction.getLabel(), VisitType.BRANCH);
   }
 
   private IRFlowSlot visit(IRExpression expression) {

@@ -118,7 +118,9 @@ public class Compiler {
           optimizer.optimizeKnownEndPoints(ir);
         }
 
-        optimizer.removeUnreachableBlocks(ir);
+        if (optimizeKnownJumps) {
+          optimizer.removeUnreachableBlocks(ir);
+        }
         optimizer.removeUnusedRecords(ir);
         optimizer.removeUnusedExponentials(ir);
 

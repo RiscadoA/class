@@ -2309,11 +2309,14 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   private void putDecrementEndPoints(boolean isEndPoint, Runnable free, Runnable otherwise) {
-    if (!isEndPoint
-        || (optimizeSingleEndpoint && ir.getProcesses().get(procName).getEndPoints() == 1)) {
-      free.run();
+    if (isEndPoint) {
+      if ((optimizeSingleEndpoint && ir.getProcesses().get(procName).getEndPoints() == 1)) {
+        free.run();
+      } else {
+        putIfElse(decrementAtomic(environmentEndPoints()) + " == 0", free, otherwise);
+      }
     } else {
-      putIfElse(decrementAtomic(environmentEndPoints()) + " == 0", free, otherwise);
+      otherwise.run();
     }
   }
 

@@ -239,7 +239,7 @@ public class IROptimizer {
     // }
 
     // Link with the outgoing edges of the next flow
-    prev.removeBranch(next);
+    prev.removeTarget(next);
     for (IRFlow branch : next.getBranches()) {
       branch.removeSource(next);
       branch.addSource(prev);
@@ -427,9 +427,13 @@ public class IROptimizer {
             instr.renameRecords(r -> r == popped ? pushed : r);
           }
         }
-      } else if (pop instanceof IRPopTag || pop instanceof IRPopClose) {
+      } else if (pop instanceof IRPopClose) {
         // We don't really need to do anything other than removing the instructions
+      } else if (pop instanceof IRPopTag) {
         // For the tags, the jump has already been optimized away by the known jump optimization
+        if (!((IRPopTag) pop).getCases().isEmpty()) {
+          continue; // Known jump optimization didn't run?
+        }
       } else {
         continue; // Unimplemented pop type
       }
