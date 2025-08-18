@@ -36,11 +36,6 @@ public class IRPrint extends IRInstruction {
   }
 
   @Override
-  public boolean usesRecord(int record) {
-    return expression.usesRecord(record);
-  }
-
-  @Override
   public void renameRecords(Function<Integer, Integer> renamer) {
     expression.renameRecords(renamer);
   }

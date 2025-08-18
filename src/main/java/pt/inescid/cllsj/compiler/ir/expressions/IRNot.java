@@ -31,11 +31,6 @@ public class IRNot extends IRExpression {
     return "not(" + inner + ")";
   }
 
-  @Override
-  public boolean usesRecord(int record) {
-    return inner.usesRecord(record);
-  }
-
   public void renameRecords(Function<Integer, Integer> renamer) {
     inner.renameRecords(renamer);
   }

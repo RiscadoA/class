@@ -1639,7 +1639,8 @@ public class CGenerator extends IRInstructionVisitor {
   public void visit(IRPushExponential instruction) {
     Runnable forInt =
         () -> {
-          putPush(instruction.getRecord(), "int", readExponentialInteger(instruction.getExponential()));
+          putPush(
+              instruction.getRecord(), "int", readExponentialInteger(instruction.getExponential()));
         };
 
     Runnable forBool =
@@ -1700,7 +1701,9 @@ public class CGenerator extends IRInstructionVisitor {
         () -> {
           forIntAndBool.run();
           putPush(
-              instruction.getArgRecord(), "int", readExponentialInteger(instruction.getExponential()));
+              instruction.getArgRecord(),
+              "int",
+              readExponentialInteger(instruction.getExponential()));
         };
 
     Runnable forBool =
@@ -2192,7 +2195,6 @@ public class CGenerator extends IRInstructionVisitor {
     // Same as above but the cast is in the opposite direction
     return "(struct exponential*)(uintptr_t)(" + cValue + ")";
   }
-
 
   private String exponentialRecord(int exponential) {
     return exponentialRecord(exponential(exponential));

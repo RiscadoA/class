@@ -33,11 +33,6 @@ public class IRFlipForward extends IRInstruction {
   }
 
   @Override
-  public boolean usesRecord(int record) {
-    return this.negRecord == record || this.posRecord == record;
-  }
-
-  @Override
   public void renameRecords(Function<Integer, Integer> renamer) {
     negRecord = renamer.apply(negRecord);
     posRecord = renamer.apply(posRecord);

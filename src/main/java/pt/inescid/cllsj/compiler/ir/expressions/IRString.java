@@ -39,11 +39,6 @@ public class IRString extends IRExpression {
     return "\"" + getEscapedValue() + "\"";
   }
 
-  @Override
-  public boolean usesRecord(int record) {
-    return false;
-  }
-
   public void renameRecords(Function<Integer, Integer> renamer) {}
 
   public void renameExponentials(Function<Integer, Integer> renamer) {}

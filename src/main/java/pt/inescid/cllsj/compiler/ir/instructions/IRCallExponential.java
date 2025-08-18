@@ -46,11 +46,6 @@ public class IRCallExponential extends IRInstruction {
   }
 
   @Override
-  public boolean usesRecord(int record) {
-    return this.argRecord == record;
-  }
-
-  @Override
   public void renameRecords(Function<Integer, Integer> renamer) {
     argRecord = renamer.apply(argRecord);
   }

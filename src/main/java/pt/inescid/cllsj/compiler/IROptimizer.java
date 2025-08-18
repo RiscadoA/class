@@ -9,7 +9,6 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
-
 import pt.inescid.cllsj.compiler.ir.IRBlock;
 import pt.inescid.cllsj.compiler.ir.IRProcess;
 import pt.inescid.cllsj.compiler.ir.IRProgram;
@@ -348,16 +347,17 @@ public class IROptimizer {
           int pushed = ((IRPushExponential) push).getExponential();
 
           // We need to remove any IRDetachExponential instructions found for the pushed exponential
-          pushLoc.forEachAfter(loc -> {
-            if (loc.getInstruction() instanceof IRDetachExponential) {
-              IRDetachExponential detach = (IRDetachExponential)loc.getInstruction();
-              if (detach.getExponential() == pushed) {
-                loc.removeInstruction();
-                return false;
-              }
-            }
-            return true;
-          });
+          pushLoc.forEachAfter(
+              loc -> {
+                if (loc.getInstruction() instanceof IRDetachExponential) {
+                  IRDetachExponential detach = (IRDetachExponential) loc.getInstruction();
+                  if (detach.getExponential() == pushed) {
+                    loc.removeInstruction();
+                    return false;
+                  }
+                }
+                return true;
+              });
 
           for (IRBlock block : ir.getBlocksIncludingEntry()) {
             for (IRInstruction instr : block.getInstructions()) {
@@ -400,38 +400,41 @@ public class IROptimizer {
         AtomicReference<Optional<IRFlowLocation>> newLoc = new AtomicReference<>(Optional.empty());
         AtomicReference<Optional<IRFlowLocation>> freeLoc = new AtomicReference<>(Optional.empty());
 
-        pushLoc.forEachBefore(loc -> {
-          if (loc.getInstruction() instanceof IRNewSession) {
-            if (((IRNewSession)loc.getInstruction()).getRecord() == push.getRecord()) {
-              newLoc.set(Optional.of(loc));
-              return false;
-            }
-          } else if (loc.getInstruction().usesRecord(push.getRecord())) {
-            return false;
-          }
-          return true;
-        });
+        pushLoc.forEachBefore(
+            loc -> {
+              if (loc.getInstruction() instanceof IRNewSession) {
+                if (((IRNewSession) loc.getInstruction()).getRecord() == push.getRecord()) {
+                  newLoc.set(Optional.of(loc));
+                  return false;
+                }
+              } else if (loc.getInstruction().usesRecord(push.getRecord())) {
+                return false;
+              }
+              return true;
+            });
 
-        popLoc.forEachAfter(loc -> {
-          if (loc.getInstruction() instanceof IRFreeSession) {
-            if (((IRFreeSession)loc.getInstruction()).getRecord() == push.getRecord()) {
-              freeLoc.set(Optional.of(loc));
-              return false;
-            }
-          } else if (loc.getInstruction().usesRecord(push.getRecord())) {
-            return false;
-          }
-          return true;
-        });
+        popLoc.forEachAfter(
+            loc -> {
+              if (loc.getInstruction() instanceof IRFreeSession) {
+                if (((IRFreeSession) loc.getInstruction()).getRecord() == push.getRecord()) {
+                  freeLoc.set(Optional.of(loc));
+                  return false;
+                }
+              } else if (loc.getInstruction().usesRecord(push.getRecord())) {
+                return false;
+              }
+              return true;
+            });
 
         // If the record is still used between the push and the pop, we can't delete it
-        pushLoc.forEachAfter(loc -> {
-          if (loc != popLoc && loc.getInstruction().usesRecord(push.getRecord())) {
-            freeLoc.set(Optional.empty());
-            newLoc.set(Optional.empty());
-          }
-          return loc != popLoc;
-        });
+        pushLoc.forEachAfter(
+            loc -> {
+              if (loc != popLoc && loc.getInstruction().usesRecord(push.getRecord())) {
+                freeLoc.set(Optional.empty());
+                newLoc.set(Optional.empty());
+              }
+              return loc != popLoc;
+            });
 
         if (newLoc.get().isPresent() && freeLoc.get().isPresent()) {
           newLoc.get().get().removeInstruction();

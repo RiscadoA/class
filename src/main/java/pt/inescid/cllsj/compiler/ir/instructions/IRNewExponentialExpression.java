@@ -32,11 +32,6 @@ public class IRNewExponentialExpression extends IRInstruction {
   }
 
   @Override
-  public boolean usesRecord(int record) {
-    return false;
-  }
-
-  @Override
   public void renameRecords(Function<Integer, Integer> renamer) {}
 
   @Override

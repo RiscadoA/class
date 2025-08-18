@@ -39,11 +39,6 @@ public class IRPushExpression extends IRPush {
   }
 
   @Override
-  public boolean usesRecord(int record) {
-    return super.usesRecord(record) || expression.usesRecord(record);
-  }
-
-  @Override
   public void renameRecords(Function<Integer, Integer> renamer) {
     super.renameRecords(renamer);
     expression.renameRecords(renamer);

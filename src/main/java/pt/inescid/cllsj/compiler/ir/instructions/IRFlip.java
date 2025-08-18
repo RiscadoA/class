@@ -35,11 +35,6 @@ public class IRFlip extends IRInstruction {
   }
 
   @Override
-  public boolean usesRecord(int record) {
-    return this.record == record;
-  }
-
-  @Override
   public void renameRecords(Function<Integer, Integer> renamer) {
     record = renamer.apply(record);
   }

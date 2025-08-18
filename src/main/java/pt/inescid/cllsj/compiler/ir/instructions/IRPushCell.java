@@ -26,11 +26,6 @@ public class IRPushCell extends IRPush {
   }
 
   @Override
-  public boolean usesRecord(int record) {
-    return super.usesRecord(record) || argRecord == record;
-  }
-
-  @Override
   public void renameRecords(Function<Integer, Integer> renamer) {
     super.renameRecords(renamer);
     argRecord = renamer.apply(argRecord);

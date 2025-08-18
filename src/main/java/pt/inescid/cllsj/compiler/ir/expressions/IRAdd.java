@@ -45,11 +45,6 @@ public class IRAdd extends IRExpression {
     return "(" + lhs + " + " + rhs + ")";
   }
 
-  @Override
-  public boolean usesRecord(int record) {
-    return lhs.usesRecord(record) || rhs.usesRecord(record);
-  }
-
   public void renameRecords(Function<Integer, Integer> renamer) {
     lhs.renameRecords(renamer);
     rhs.renameRecords(renamer);

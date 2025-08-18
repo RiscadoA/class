@@ -31,11 +31,6 @@ public class IRPutCell extends IRInstruction {
   }
 
   @Override
-  public boolean usesRecord(int record) {
-    return this.record == record || this.argRecord == record;
-  }
-
-  @Override
   public void renameRecords(Function<Integer, Integer> renamer) {
     record = renamer.apply(record);
     argRecord = renamer.apply(argRecord);

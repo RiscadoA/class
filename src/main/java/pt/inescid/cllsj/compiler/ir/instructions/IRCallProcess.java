@@ -136,16 +136,6 @@ public class IRCallProcess extends IRInstruction {
   }
 
   @Override
-  public boolean usesRecord(int record) {
-    for (LinearArgument arg : linearArguments) {
-      if (arg.getSourceRecord() == record) {
-        return true;
-      }
-    }
-    return false;
-  }
-
-  @Override
   public void renameRecords(Function<Integer, Integer> renamer) {
     for (LinearArgument arg : linearArguments) {
       arg.sourceRecord = renamer.apply(arg.sourceRecord);

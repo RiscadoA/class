@@ -32,11 +32,6 @@ public class IRVar extends IRExpression {
     return "record " + record;
   }
 
-  @Override
-  public boolean usesRecord(int record) {
-    return this.record == record;
-  }
-
   public void renameRecords(Function<Integer, Integer> renamer) {
     record = renamer.apply(record);
   }
