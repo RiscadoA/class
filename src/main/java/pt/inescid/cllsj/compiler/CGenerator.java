@@ -50,8 +50,8 @@ public class CGenerator extends IRInstructionVisitor {
   public boolean optimizeSendValue = true;
   public boolean optimizeSingleEndpoint = true;
 
-  public int customAllocatorSizeDivisor = 32;
-  public int customAllocatorLevels = 8;
+  public int customAllocatorSizeDivisor = 64;
+  public int customAllocatorLevels = 4;
 
   private Set<IRType> usedRecordManagers = new HashSet<>();
 
@@ -797,11 +797,15 @@ public class CGenerator extends IRInstructionVisitor {
 
     putLine("int main() {");
     incIndent();
-    for (int i = 0; i < customAllocatorLevels; ++i) {
-      putAssign("allocator_list[" + i + "]", "NULL");
+    if (customAllocatorLevels > 0) {
+      putLine("for (int i = 0; i < " + customAllocatorLevels + "; ++i) {");
+      incIndent();
+      putAssign("allocator_list[i]", "NULL");
       if (!disableConcurrency) {
-        putStatement("pthread_mutex_init(&allocator_mutex[" + i + "], NULL)");
+        putStatement("pthread_mutex_init(&allocator_mutex[i], NULL)");
       }
+      decIndent();
+      putLine("}");
     }
     if (!disableConcurrency) {
       putStatement("pthread_cond_init(&thread_stops_cond_var, NULL)");
