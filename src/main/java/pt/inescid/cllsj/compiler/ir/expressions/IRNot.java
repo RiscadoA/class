@@ -31,6 +31,11 @@ public class IRNot extends IRExpression {
     return "not(" + inner + ")";
   }
 
+  @Override
+  public IRExpression clone() {
+    return new IRNot(inner.clone());
+  }
+
   public void renameRecords(Function<Integer, Integer> renamer) {
     inner.renameRecords(renamer);
   }

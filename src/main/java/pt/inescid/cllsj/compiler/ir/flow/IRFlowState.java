@@ -34,6 +34,10 @@ public class IRFlowState {
   private Optional<Stack<IRFlowContinuation>> pendingContinuations = Optional.of(new Stack<>());
 
   public IRFlowRecord allocateRecord(IRFlowLocation location) {
+    if (recordHeap.containsKey(location)) {
+      throw new UnsupportedOperationException("Record has been already allocated");
+    }
+
     IRFlowRecord record = new IRFlowRecord(location);
     recordHeap.put(location, record);
     return record;
@@ -118,7 +122,7 @@ public class IRFlowState {
     return pendingContinuations;
   }
 
-  public IRFlowState merge(IRFlowState other) {
+  public IRFlowState merge(IRAnalyzer analyzer, IRFlowLocation location, IRFlowState other) {
     if (this == other) {
       return this;
     }
@@ -126,22 +130,37 @@ public class IRFlowState {
     IRFlowState merged = this.clone();
     for (Map.Entry<IRFlowLocation, IRFlowRecord> entry : other.recordHeap.entrySet()) {
       if (merged.recordHeap.containsKey(entry.getKey())) {
-        merged.recordHeap.get(entry.getKey()).merge(entry.getValue());
+        IRFlowRecord result = merged.recordHeap.get(entry.getKey()).merge(entry.getValue());
+        merged.recordHeap.put(entry.getKey(), result);
       } else {
         merged.recordHeap.put(entry.getKey(), entry.getValue().clone());
       }
     }
     for (Map.Entry<Integer, IRFlowLocation> entry : other.boundRecords.entrySet()) {
       if (merged.boundRecords.containsKey(entry.getKey())) {
-        if (merged.boundRecords.get(entry.getKey()) != entry.getValue()) {
-          throw new IllegalArgumentException(
-              "Cannot merge states which bind different records ("
-                  + merged.boundRecords.get(entry.getKey())
-                  + " != "
-                  + entry.getValue()
-                  + ") to the same binding ("
-                  + entry.getKey()
-                  + ")");
+        IRFlowLocation mergedLoc = merged.boundRecords.get(entry.getKey());
+        IRFlowLocation otherLoc = entry.getValue();
+        if (mergedLoc != otherLoc) {
+          if (mergedLoc.isKnown() || otherLoc.isKnown()) {
+            throw new IllegalArgumentException(
+                "Cannot merge states which bind different records ("
+                    + mergedLoc
+                    + " != "
+                    + otherLoc
+                    + ") to the same binding ("
+                    + entry.getKey()
+                    + ")");
+          }
+
+          // If two different records are bound to the same binding,
+          // we get rid of both of them and create a new record
+          IRFlowRecord thisRecord = merged.recordHeap.get(mergedLoc);
+          IRFlowRecord otherRecord = merged.recordHeap.get(otherLoc);
+          IRFlowRecord newRecord = thisRecord.merge(otherRecord);
+          merged.recordHeap.remove(mergedLoc);
+          merged.recordHeap.remove(otherLoc);
+          merged.recordHeap.put(newRecord.getIntroductionLocation(), newRecord);
+          merged.boundRecords.put(entry.getKey(), newRecord.getIntroductionLocation());
         }
       } else {
         merged.boundRecords.put(entry.getKey(), entry.getValue());

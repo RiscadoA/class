@@ -1,5 +1,7 @@
 package pt.inescid.cllsj.compiler.ir;
 
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -64,5 +66,15 @@ public class IRValueRequisites {
     } else {
       return "notValue";
     }
+  }
+
+  public IRValueRequisites clone() {
+    IRValueRequisites clone = new IRValueRequisites();
+    clone.canBeValue = this.canBeValue;
+    if (canBeValue) {
+      clone.requiredTypePolarities = new HashMap<>(this.requiredTypePolarities);
+      clone.typesWhichMustBeValues = new ArrayList<>(this.typesWhichMustBeValues);
+    }
+    return clone;
   }
 }

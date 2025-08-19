@@ -30,4 +30,9 @@ public class IRPushCell extends IRPush {
     super.renameRecords(renamer);
     argRecord = renamer.apply(argRecord);
   }
+
+  @Override
+  public IRInstruction clone() {
+    return new IRPushCell(getRecord(), argRecord);
+  }
 }

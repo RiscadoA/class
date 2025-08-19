@@ -47,6 +47,7 @@ public class IRProgram {
             "exponential " + i + ": " + process.getValue().getExponentialType(i).toString() + "\n";
       }
       result += "    endPoints: " + process.getValue().getEndPoints() + "\n";
+      result += "    inlineable: " + process.getValue().isInlineable() + "\n";
       result += process.getKey() + ":\n";
       result += process.getValue().toString() + "\n";
     }

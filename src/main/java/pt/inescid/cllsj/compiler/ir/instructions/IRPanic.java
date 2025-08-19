@@ -25,6 +25,11 @@ public class IRPanic extends IRInstruction {
   }
 
   @Override
+  public IRInstruction clone() {
+    return new IRPanic(msg);
+  }
+
+  @Override
   public void renameRecords(Function<Integer, Integer> renamer) {}
 
   @Override

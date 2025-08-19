@@ -63,6 +63,14 @@ public class IRForward extends IRInstruction {
   }
 
   @Override
+  public IRInstruction clone() {
+    IRForward clone = new IRForward(negRecord, posRecord);
+    clone.shouldReturn = shouldReturn;
+    clone.isEndPoint = isEndPoint;
+    return clone;
+  }
+
+  @Override
   public void renameRecords(Function<Integer, Integer> renamer) {
     negRecord = renamer.apply(negRecord);
     posRecord = renamer.apply(posRecord);

@@ -27,6 +27,7 @@ public class Compiler {
   public boolean disableConcurrency = false;
   public int customAllocatorSizeDivisor = 32;
   public int customAllocatorLevels = 8;
+  public int inliningComplexity = 10;
   public boolean optimizeIRWithAnalysis = true;
   public boolean optimizePrimitiveExponentials = true;
   public boolean optimizeExponentialExpressionToForward = true;
@@ -93,6 +94,12 @@ public class Compiler {
 
     try {
       IROptimizer optimizer = new IROptimizer();
+
+      if (inliningComplexity >= 0) {
+        optimizer.inlineProcesses(ir, inliningComplexity);
+        optimizer.removeUnusedProcesses(ir, entryProcess);
+      }
+
       if (optimizeIRWithAnalysis) {
         optimizer.analyze(ir);
 
@@ -128,7 +135,13 @@ public class Compiler {
           optimizer.printProcessFlows(ir);
           return 0;
         }
+      } else if (onlyAnalyze) {
+        optimizer.analyze(ir);
+        optimizer.printProcessFlows(ir);
+        return 0;
       }
+
+      optimizer.removeUnusedProcesses(ir, entryProcess);
     } catch (Exception e) {
       System.err.println("IR optimization error: " + e.getMessage());
       e.printStackTrace();

@@ -13,6 +13,7 @@ public class IRProcess {
   private IRBlock entry;
   private List<IRBlock> blocks;
   private List<Boolean> typeVariablePolarities;
+  private boolean inlineable;
 
   public IRProcess(
       int recordArgumentCount,
@@ -20,7 +21,8 @@ public class IRProcess {
       List<IRType> recordTypes,
       List<IRType> exponentialTypes,
       List<Boolean> typeVariablePolarites,
-      int endPoints) {
+      int endPoints,
+      boolean inlineable) {
     this.recordArgumentCount = recordArgumentCount;
     this.exponentialArgumentCount = exponentialArgumentCount;
     this.recordTypes = new ArrayList<>(recordTypes);
@@ -29,6 +31,7 @@ public class IRProcess {
     this.endPoints = endPoints;
     this.entry = new IRBlock(null);
     this.blocks = new ArrayList<>();
+    this.inlineable = inlineable;
   }
 
   public boolean hasArguments() {
@@ -45,6 +48,12 @@ public class IRProcess {
 
   public int getRecordCount() {
     return recordTypes.size();
+  }
+
+  public int addRecord(IRType type) {
+    int index = recordTypes.size();
+    recordTypes.add(type);
+    return index;
   }
 
   public void removeRecord(int index) {
@@ -67,8 +76,20 @@ public class IRProcess {
     return exponentialTypes.get(index);
   }
 
+  public int addExponential(IRType type) {
+    int index = exponentialTypes.size();
+    exponentialTypes.add(type);
+    return index;
+  }
+
   public void removeExponential(int index) {
     exponentialTypes.remove(index);
+  }
+
+  public int addType(boolean polarity) {
+    int index = typeVariablePolarities.size();
+    typeVariablePolarities.add(polarity);
+    return index;
   }
 
   public int getTypeVariableCount() {
@@ -123,6 +144,10 @@ public class IRProcess {
       }
     }
     return false;
+  }
+
+  public boolean isInlineable() {
+    return inlineable;
   }
 
   @Override

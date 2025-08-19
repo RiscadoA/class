@@ -1,0 +1,39 @@
+type Choice {
+    choice of {
+        |#left: close
+        |#right: close
+    }
+};;
+
+proc scan_choice(x: Choice) {
+    cut {
+        scan(b)
+        |b: ~lbool|
+        if b {
+            #left x; close x
+        } else {
+            #right x; close x
+        }
+    }
+};;
+
+proc foo(x: ~Choice) {
+    case x of {
+        |#left: wait x; println("left foo"); ()
+        |#right:
+            wait x;
+            par {
+                println("right foo 1"); ()
+                ||
+                println("right foo 2"); ()
+            }
+    }
+};;
+
+proc main() {
+    cut {
+        scan_choice(x)
+        |x: ~Choice|
+        foo(x)
+    }
+};;

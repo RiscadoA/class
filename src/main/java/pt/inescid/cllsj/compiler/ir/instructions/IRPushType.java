@@ -1,5 +1,6 @@
 package pt.inescid.cllsj.compiler.ir.instructions;
 
+import java.util.function.Function;
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
 import pt.inescid.cllsj.compiler.ir.type.IRType;
@@ -45,5 +46,17 @@ public class IRPushType extends IRPush {
         + ", "
         + valueRequisites
         + ")";
+  }
+
+  @Override
+  public void substituteTypes(
+      Function<IRType, IRType> types, Function<IRValueRequisites, IRValueRequisites> requisites) {
+    this.type = types.apply(this.type);
+    this.valueRequisites = requisites.apply(this.valueRequisites);
+  }
+
+  @Override
+  public IRInstruction clone() {
+    return new IRPushType(getRecord(), type, isPositive, valueRequisites.clone());
   }
 }

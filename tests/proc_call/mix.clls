@@ -1,0 +1,15 @@
+proc foo() {
+    par {
+        println("lhs"); ()
+        ||
+        println("rhs"); ()
+    }
+};;
+
+proc main() {
+    par {
+        foo()
+        ||
+        foo()
+    }
+};;

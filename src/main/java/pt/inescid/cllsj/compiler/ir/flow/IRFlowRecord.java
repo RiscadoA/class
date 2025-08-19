@@ -152,17 +152,13 @@ public class IRFlowRecord {
 
   public IRFlowRecord merge(IRFlowRecord other) {
     IRFlowRecord merged = this.clone();
-    if (merged.continuation.isEmpty()
-        || other.continuation.isEmpty()
-        || !merged.continuation.get().equals(other.continuation.get())) {
+    if (merged.continuation.isPresent() && other.continuation.isPresent()) {
+      merged.continuation = merged.continuation.get().merge(other.continuation.get());
+    } else {
       merged.continuation = Optional.empty();
     }
     if (merged.introductionLocation != other.introductionLocation) {
-      throw new IllegalArgumentException(
-          "Cannot merge records with different introduction locations: "
-              + merged.introductionLocation
-              + " != "
-              + other.introductionLocation);
+      merged.introductionLocation = IRFlowLocation.unknown();
     }
     if (!merged.slotsKnown || !other.slotsKnown || merged.slots.size() != other.slots.size()) {
       merged.slots.clear();

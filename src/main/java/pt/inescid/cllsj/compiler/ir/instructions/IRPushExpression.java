@@ -49,4 +49,9 @@ public class IRPushExpression extends IRPush {
     super.renameExponentials(renamer);
     expression.renameExponentials(renamer);
   }
+
+  @Override
+  public IRInstruction clone() {
+    return new IRPushExpression(getRecord(), expression.clone(), isExponential);
+  }
 }

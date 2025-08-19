@@ -20,6 +20,13 @@ public class IRNextTask extends IRInstruction {
   }
 
   @Override
+  public IRInstruction clone() {
+    IRNextTask clone = new IRNextTask();
+    clone.isEndPoint = this.isEndPoint;
+    return clone;
+  }
+
+  @Override
   public String toString() {
     StringBuilder sb = new StringBuilder("nextTask(");
     if (isEndPoint()) {

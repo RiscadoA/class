@@ -25,8 +25,18 @@ public class IRNewThread extends IRInstruction {
   }
 
   @Override
+  public IRInstruction clone() {
+    return new IRNewThread(label);
+  }
+
+  @Override
   public void renameRecords(Function<Integer, Integer> renamer) {}
 
   @Override
   public void renameExponentials(Function<Integer, Integer> renamer) {}
+
+  @Override
+  public void renameLabels(Function<String, String> renamer) {
+    label = renamer.apply(label);
+  }
 }

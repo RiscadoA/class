@@ -32,6 +32,11 @@ public class IRNewExponentialScan extends IRInstruction {
   }
 
   @Override
+  public IRInstruction clone() {
+    return new IRNewExponentialScan(exponential, type);
+  }
+
+  @Override
   public void renameRecords(Function<Integer, Integer> renamer) {}
 
   @Override

@@ -3,7 +3,7 @@ package pt.inescid.cllsj.compiler.ir.instructions;
 import java.util.function.Function;
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 
-public class IRPop extends IRInstruction {
+public abstract class IRPop extends IRInstruction {
   private int record;
 
   public IRPop(int record) {

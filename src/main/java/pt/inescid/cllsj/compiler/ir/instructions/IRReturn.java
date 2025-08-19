@@ -46,4 +46,11 @@ public class IRReturn extends IRInstruction {
 
   @Override
   public void renameExponentials(Function<Integer, Integer> renamer) {}
+
+  @Override
+  public IRInstruction clone() {
+    IRReturn clone = new IRReturn(record);
+    clone.isEndPoint = isEndPoint;
+    return clone;
+  }
 }

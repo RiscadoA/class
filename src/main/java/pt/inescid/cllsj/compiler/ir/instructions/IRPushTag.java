@@ -23,4 +23,9 @@ public class IRPushTag extends IRPush {
   public String toString() {
     return "pushTag(" + getRecord() + ", " + tag + ")";
   }
+
+  @Override
+  public IRInstruction clone() {
+    return new IRPushTag(getRecord(), tag);
+  }
 }

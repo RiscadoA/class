@@ -25,6 +25,11 @@ public class IRDetachExponential extends IRInstruction {
   }
 
   @Override
+  public IRInstruction clone() {
+    return new IRDetachExponential(exponential);
+  }
+
+  @Override
   public void renameRecords(Function<Integer, Integer> renamer) {}
 
   @Override

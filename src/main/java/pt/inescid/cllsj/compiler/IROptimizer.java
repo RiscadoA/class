@@ -3,16 +3,21 @@ package pt.inescid.cllsj.compiler;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 import pt.inescid.cllsj.compiler.ir.IRBlock;
 import pt.inescid.cllsj.compiler.ir.IRProcess;
 import pt.inescid.cllsj.compiler.ir.IRProgram;
 import pt.inescid.cllsj.compiler.ir.IRTypeVisitor;
+import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
 import pt.inescid.cllsj.compiler.ir.flow.IRFlow;
 import pt.inescid.cllsj.compiler.ir.flow.IRFlowContinuation;
 import pt.inescid.cllsj.compiler.ir.flow.IRFlowLocation;
@@ -29,12 +34,18 @@ import pt.inescid.cllsj.compiler.ir.type.IRStringT;
 import pt.inescid.cllsj.compiler.ir.type.IRTagT;
 import pt.inescid.cllsj.compiler.ir.type.IRType;
 import pt.inescid.cllsj.compiler.ir.type.IRTypeT;
+import pt.inescid.cllsj.compiler.ir.type.IRVarT;
 
 public class IROptimizer {
   private Map<String, Map<IRBlock, IRFlow>> processFlows = new HashMap<>();
 
   public void analyze(IRProgram program) {
+    processFlows.clear();
+    int processCount = program.getProcesses().size();
+    int done = 0;
     for (Map.Entry<String, IRProcess> e : program.getProcesses().entrySet()) {
+      System.err.println(
+          "Analyzing process: " + e.getKey() + " (" + ++done + "/" + processCount + ")");
       processFlows.put(e.getKey(), IRAnalyzer.analyze(e.getValue()));
     }
   }
@@ -61,7 +72,7 @@ public class IROptimizer {
   private void optimizeKnownJumps(IRProcess ir, Map<IRBlock, IRFlow> flows) {
     while (true) {
       Optional<IRFlow> prev = Optional.empty();
-      Optional<IRFlow> next1 = Optional.empty();
+      Optional<IRFlow> next = Optional.empty();
 
       for (IRFlow flow : flows.values()) {
         if (flow.getBranches().size() != 1) {
@@ -74,14 +85,13 @@ public class IROptimizer {
 
         // We can concatenate the two blocks
         prev = Optional.of(flow);
-        next1 = Optional.of(branch);
+        next = Optional.of(branch);
         break;
       }
 
-      if (prev.isEmpty() || next1.isEmpty()) {
+      if (prev.isEmpty() || next.isEmpty()) {
         break;
       }
-      final Optional<IRFlow> next = next1;
 
       concatFlows(ir, prev.get(), next.get());
       ir.getBlocks().remove(next.get().getBlock());
@@ -124,7 +134,7 @@ public class IROptimizer {
       }
 
       if (wasEndPoint) {
-        subtractEndPoints(ir, flow, 1);
+        subtractEndPoints(ir, flow.getBlock(), 1);
       }
     }
   }
@@ -160,9 +170,9 @@ public class IROptimizer {
     } else if (last instanceof IRBranch) {
       IRBranch i = (IRBranch) last;
       if (i.getThen().getLabel().equals(next.getBlock().getLabel())) {
-        subtractEndPoints(ir, prev, i.getOtherwise().getEndPoints());
+        subtractEndPoints(ir, prev.getBlock(), i.getOtherwise().getEndPoints());
       } else {
-        subtractEndPoints(ir, prev, i.getThen().getEndPoints());
+        subtractEndPoints(ir, prev.getBlock(), i.getThen().getEndPoints());
       }
       removeLast.run();
     } else if (last instanceof IRPopTag) {
@@ -173,7 +183,7 @@ public class IROptimizer {
           endPoints += c.getEndPoints();
         }
       }
-      subtractEndPoints(ir, prev, endPoints);
+      subtractEndPoints(ir, prev.getBlock(), endPoints);
 
       // This is a troublesome instruction.
       // If remove the tag pop, we would need to remove the push too, and, additionally, modify the
@@ -185,9 +195,9 @@ public class IROptimizer {
       // Similarly to IRPopTag, we can remove the branch but not the instruction itself.
       IRPopType i = (IRPopType) last;
       if (i.getPositive().get().getLabel().equals(next.getBlock().getLabel())) {
-        subtractEndPoints(ir, prev, i.getNegative().get().getEndPoints());
+        subtractEndPoints(ir, prev.getBlock(), i.getNegative().get().getEndPoints());
       } else {
-        subtractEndPoints(ir, prev, i.getPositive().get().getEndPoints());
+        subtractEndPoints(ir, prev.getBlock(), i.getPositive().get().getEndPoints());
       }
       i.removeNegative();
       i.removePositive();
@@ -205,7 +215,7 @@ public class IROptimizer {
       // We're removing a single end point of the process, if we didn't end up creating a new return
       // instruction
       if (!(contBeforeForward.getWriter().getInstruction() instanceof IRReturn)) {
-        subtractEndPoints(ir, prev, 1);
+        subtractEndPoints(ir, prev.getBlock(), 1);
       }
     } else if (last instanceof IRReturn) {
       // We're removing a single end point of the process.
@@ -217,7 +227,7 @@ public class IROptimizer {
       // We're removing a single end point of the process, if we didn't end up creating a new return
       // instruction.
       if (!(contBeforeReturn.getWriter().getInstruction() instanceof IRReturn)) {
-        subtractEndPoints(ir, prev, 1);
+        subtractEndPoints(ir, prev.getBlock(), 1);
       }
       removeLast.run();
     } else {
@@ -230,13 +240,6 @@ public class IROptimizer {
       prev.addInstruction(next.getLocation(i));
     }
     prev.getStates().addAll(next.getStates());
-
-    // System.err.println(prev.getStates().get(0));
-    // for (int i = 0; i < prev.getBlock().getInstructions().size(); ++i) {
-    //   System.err.println(prev.getLocation(i));
-    //   System.err.println("  " + prev.getBlock().getInstructions().get(i));
-    //   System.err.println(prev.getStates().get(i + 1));
-    // }
 
     // Link with the outgoing edges of the next flow
     prev.removeTarget(next);
@@ -255,48 +258,64 @@ public class IROptimizer {
     }
   }
 
-  private void subtractEndPoints(IRProcess ir, IRFlow flow, int endPoints) {
-    subtractEndPoints(ir, flow, endPoints, new HashSet<>());
+  private void subtractEndPoints(IRProcess ir, IRBlock block, int endPoints) {
+    subtractEndPoints(ir, block, endPoints, new HashSet<>());
   }
 
-  // Decrements the end points of all branch instructions leading to the given flow
-  private void subtractEndPoints(IRProcess ir, IRFlow flow, int endPoints, Set<IRFlow> visited) {
-    if (!visited.add(flow)) {
+  // Modifies the end points of all branch instructions leading to block.
+  private void subtractEndPoints(IRProcess ir, IRBlock block, int endPoints, Set<IRBlock> visited) {
+    if (!visited.add(block)) {
       return;
     }
 
-    if (flow.getSources().isEmpty()) {
+    // Entry block
+    if (block.getLabel() == null) {
       ir.subtractEndPoints(endPoints);
+      return;
     }
 
-    for (IRFlow source : flow.getSources()) {
-      IRInstruction last = source.getBlock().getInstructions().getLast();
+    // Find blocks which reference this block
+    for (IRBlock introducer : ir.getBlocksIncludingEntry()) {
+      boolean referenced = false;
+      for (IRInstruction instr : introducer.getInstructions()) {
+        if (instr.usesLabel(block.getLabel())) {
+          referenced = true;
+          break;
+        }
+      }
+      if (!referenced) {
+        continue;
+      }
+
+      // We found one! Now we check if the last instruction of the block is a branch referring to us
+      IRInstruction last = introducer.getInstructions().getLast();
       if (last instanceof IRBranch) {
         IRBranch i = (IRBranch) last;
-        if (i.getThen().getLabel().equals(flow.getBlock().getLabel())) {
+        if (i.getThen().getLabel().equals(block.getLabel())) {
           i.getThen().subtractEndPoints(endPoints);
-        } else {
+        } else if (i.getOtherwise().getLabel().equals(block.getLabel())) {
           i.getOtherwise().subtractEndPoints(endPoints);
         }
       } else if (last instanceof IRPopType) {
         IRPopType i = (IRPopType) last;
         if (i.getPositive().isPresent()
-            && i.getPositive().get().getLabel().equals(flow.getBlock().getLabel())) {
+            && i.getPositive().get().getLabel().equals(block.getLabel())) {
           i.getPositive().get().subtractEndPoints(endPoints);
         } else if (i.getNegative().isPresent()
-            && i.getNegative().get().getLabel().equals(flow.getBlock().getLabel())) {
+            && i.getNegative().get().getLabel().equals(block.getLabel())) {
           i.getNegative().get().subtractEndPoints(endPoints);
         }
       } else if (last instanceof IRPopTag) {
         IRPopTag i = (IRPopTag) last;
         for (IRPopTag.Case c : i.getCases().values()) {
-          if (c.getLabel().equals(flow.getBlock().getLabel())) {
+          if (c.getLabel().equals(block.getLabel())) {
             c.subtractEndPoints(endPoints);
           }
         }
       }
 
-      subtractEndPoints(ir, source, endPoints, visited);
+      // We continue going up the chain of blocks
+      subtractEndPoints(ir, introducer, endPoints, visited);
     }
   }
 
@@ -903,6 +922,238 @@ public class IROptimizer {
     }
   }
 
+  public void inlineProcesses(IRProgram ir, int maxComplexity) {
+    Map<String, Integer> evaluated = new HashMap<>();
+    Set<String> visited = new HashSet<>();
+    ir.forEachProcess((name, proc) -> inlineProcesses(ir, maxComplexity, name, evaluated, visited));
+  }
+
+  private void inlineProcesses(
+      IRProgram ir,
+      int maxComplexity,
+      String name,
+      Map<String, Integer> evaluated,
+      Set<String> visited) {
+    if (!visited.add(name)) {
+      return;
+    }
+    IRProcess proc = ir.getProcesses().get(name);
+
+    // Search for process calls which we can inline
+    for (int i = 0; i < proc.getBlocksIncludingEntry().size(); ++i) {
+      IRBlock block = proc.getBlocksIncludingEntry().get(i);
+      IRInstruction instr = block.getInstructions().getLast();
+      if (!(instr instanceof IRCallProcess)) {
+        continue; // Not a process call
+      }
+
+      // First visit the process we'll inline
+      IRCallProcess call = (IRCallProcess) instr;
+      String callName = call.getProcessName();
+      inlineProcesses(ir, maxComplexity, callName, evaluated, visited);
+      IRProcess callProc = ir.getProcesses().get(callName);
+      if (!callProc.isInlineable()) {
+        continue;
+      }
+
+      int complexity = evaluated.computeIfAbsent(callName, k -> complexity(callProc));
+      if (complexity > maxComplexity) {
+        continue; // Skip too complex
+      }
+
+      // Remove the call instruction
+      block.getInstructions().removeLast();
+
+      // Add new type variables to the current process
+      Map<Integer, Integer> typeMap = new HashMap<>();
+      for (int j = call.getTypeArguments().size(); j < callProc.getTypeVariableCount(); ++j) {
+        typeMap.put(j, proc.addType(callProc.isTypeVariablePositive(j)));
+      }
+
+      // Functions which perform variable substitution on the types of the called process.
+      BiFunction<Integer, IRValueRequisites, IRValueRequisites> substituteValueReqs =
+          (offset, reqs) -> {
+            if (reqs.mustBeValue() || !reqs.canBeValue()) {
+              return reqs;
+            }
+
+            Map<Integer, Boolean> reqPolarities = new HashMap<>();
+            List<Integer> reqValues = new ArrayList<>();
+
+            for (int t : reqs.getRequiredTypePolarities().keySet()) {
+              boolean p = reqs.getRequiredTypePolarities().get(t);
+              if (t < offset) {
+                reqPolarities.put(t, p);
+                continue;
+              }
+              t -= offset;
+
+              boolean found = false;
+              for (IRCallProcess.TypeArgument arg : call.getTypeArguments()) {
+                if (arg.getTargetType() == t) {
+                  if (arg.getSourceTypePolarity() == p) {
+                    found = true;
+                    break;
+                  } else {
+                    return IRValueRequisites.notValue();
+                  }
+                }
+              }
+              if (!found) {
+                if (!typeMap.containsKey(t)) {
+                  throw new IllegalStateException(
+                      "Type " + t + " not found in type map for process call " + callName);
+                }
+                reqPolarities.put(typeMap.get(t) + offset, p);
+              }
+            }
+
+            for (int t : reqs.getTypesWhichMustBeValues()) {
+              if (t < offset) {
+                reqValues.add(t);
+                continue;
+              }
+              t -= offset;
+
+              boolean found = false;
+              for (IRCallProcess.TypeArgument arg : call.getTypeArguments()) {
+                if (arg.getTargetType() == t) {
+                  found = true;
+                  if (arg.getSourceTypeValueRequisites().mustBeValue()) {
+                    break;
+                  } else if (!arg.getSourceTypeValueRequisites().canBeValue()) {
+                    return IRValueRequisites.notValue();
+                  } else {
+                    for (Map.Entry<Integer, Boolean> e :
+                        arg.getSourceTypeValueRequisites().getRequiredTypePolarities().entrySet()) {
+                      reqPolarities.put(e.getKey() + offset, e.getValue());
+                    }
+                    for (int t2 : arg.getSourceTypeValueRequisites().getTypesWhichMustBeValues()) {
+                      reqValues.add(t2 + offset);
+                    }
+                    break;
+                  }
+                }
+              }
+              if (!found) {
+                reqValues.add(typeMap.get(t) + offset);
+              }
+            }
+
+            return IRValueRequisites.value(reqPolarities, reqValues);
+          };
+      Function<IRType, IRType> substituteTypeVars =
+          type -> {
+            IRType result = type.substituteReqs(0, substituteValueReqs);
+            for (IRCallProcess.TypeArgument arg : call.getTypeArguments()) {
+              result =
+                  result.substituteVar(
+                      arg.getTargetType(),
+                      0,
+                      (offset, var) -> {
+                        if (var.hasPrecedingFlip(arg.getSourceTypePolarity())) {
+                          return new IRFlipT(arg.getSourceType());
+                        } else {
+                          return arg.getSourceType();
+                        }
+                      });
+            }
+            for (int original : typeMap.keySet()) {
+              result =
+                  result.substituteVar(
+                      original,
+                      0,
+                      (offset, var) -> {
+                        return new IRVarT(typeMap.get(original) + offset, var.getFlipPolarity());
+                      });
+            }
+            return result;
+          };
+
+      // Start by adding new records, exponentials and types to the current process
+      Map<Integer, Integer> recordMap = new HashMap<>();
+      for (IRCallProcess.LinearArgument arg : call.getLinearArguments()) {
+        recordMap.put(arg.getTargetRecord(), arg.getSourceRecord());
+      }
+      for (int j = callProc.getRecordArgumentCount(); j < callProc.getRecordCount(); ++j) {
+        recordMap.put(j, proc.addRecord(substituteTypeVars.apply(callProc.getRecordType(j))));
+      }
+      Map<Integer, Integer> exponentialMap = new HashMap<>();
+      for (IRCallProcess.ExponentialArgument arg : call.getExponentialArguments()) {
+        exponentialMap.put(arg.getTargetExponential(), arg.getSourceExponential());
+      }
+      for (int j = callProc.getExponentialArgumentCount();
+          j < callProc.getExponentialCount();
+          ++j) {
+        exponentialMap.put(
+            j, proc.addExponential(substituteTypeVars.apply(callProc.getExponentialType(j))));
+      }
+
+      // Create a mapping from labels in the inlined process to labels in the current process
+      Map<String, String> labelMap = new HashMap<>();
+      for (IRBlock callBlock : callProc.getBlocks()) {
+        labelMap.put(
+            callBlock.getLabel(),
+            proc.addBlock(call.getProcessName() + "_" + callBlock.getLabel()).getLabel());
+      }
+
+      // Add instructions from the entry block into this block
+      for (IRInstruction callInstr : callProc.getEntry().getInstructions()) {
+        IRInstruction newInstr = callInstr.clone();
+        newInstr.renameRecords(recordMap::get);
+        newInstr.renameExponentials(exponentialMap::get);
+        newInstr.renameLabels(labelMap::get);
+        newInstr.substituteTypes(substituteTypeVars, reqs -> substituteValueReqs.apply(0, reqs));
+        block.add(newInstr);
+      }
+
+      // Add all blocks of the process to the current process
+      for (IRBlock callBlock : callProc.getBlocks()) {
+        IRBlock newBlock = proc.getBlock(labelMap.get(callBlock.getLabel()));
+        for (IRInstruction callInstr : callBlock.getInstructions()) {
+          IRInstruction newInstr = callInstr.clone();
+          newInstr.renameRecords(recordMap::get);
+          newInstr.renameExponentials(exponentialMap::get);
+          newInstr.renameLabels(labelMap::get);
+          newInstr.substituteTypes(substituteTypeVars, reqs -> substituteValueReqs.apply(0, reqs));
+          newBlock.add(newInstr);
+        }
+      }
+
+      // Modify the end point count of the current process
+      // We may actually end up adding end points here
+      subtractEndPoints(proc, block, 1 - callProc.getEndPoints());
+    }
+  }
+
+  public void removeUnusedProcesses(IRProgram ir, String entryProcess) {
+    // BFS to find all processes which are used by the entry process
+    Set<String> used = new HashSet<>();
+    Queue<String> queue = new LinkedList<>();
+    used.add(entryProcess);
+    queue.add(entryProcess);
+
+    while (!queue.isEmpty()) {
+      String procName = queue.poll();
+      IRProcess proc = ir.getProcesses().get(procName);
+
+      for (IRBlock block : proc.getBlocksIncludingEntry()) {
+        for (IRInstruction instr : block.getInstructions()) {
+          if (instr instanceof IRCallProcess) {
+            IRCallProcess call = (IRCallProcess) instr;
+            if (!used.contains(call.getProcessName())) {
+              used.add(call.getProcessName());
+              queue.add(call.getProcessName());
+            }
+          }
+        }
+      }
+    }
+
+    // Now, we remove all processes which are not used
+    ir.getProcesses().entrySet().removeIf(e -> !used.contains(e.getKey()));
+  }
+
   public static class TypeModifier extends IRTypeVisitor {
     private static enum Modification {
       REMOVE_NTH,
@@ -940,7 +1191,6 @@ public class IROptimizer {
 
     @Override
     public void visit(IRType type) {
-      System.err.println("found " + type);
       throw new UnsupportedOperationException(
           "TypeModifier does not yet support type: " + type.getClass().getSimpleName());
     }
@@ -1101,5 +1351,10 @@ public class IROptimizer {
     public void visit(IRFlipT type) {
       type.getCont().accept(this);
     }
+  }
+
+  // Heuristic for how complex a process is
+  private int complexity(IRProcess process) {
+    return process.getBlocks().size();
   }
 }

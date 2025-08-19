@@ -38,4 +38,9 @@ public class IRTakeCell extends IRInstruction {
 
   @Override
   public void renameExponentials(Function<Integer, Integer> renamer) {}
+
+  @Override
+  public IRInstruction clone() {
+    return new IRTakeCell(record, argRecord);
+  }
 }

@@ -25,6 +25,11 @@ public class IRCleanRecord extends IRInstruction {
   }
 
   @Override
+  public IRInstruction clone() {
+    return new IRCleanRecord(record);
+  }
+
+  @Override
   public void renameRecords(Function<Integer, Integer> renamer) {
     record = renamer.apply(record);
   }

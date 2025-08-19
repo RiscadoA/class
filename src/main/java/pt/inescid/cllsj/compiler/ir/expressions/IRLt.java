@@ -37,6 +37,11 @@ public class IRLt extends IRExpression {
     return "(" + lhs + " < " + rhs + ")";
   }
 
+  @Override
+  public IRExpression clone() {
+    return new IRLt(lhs.clone(), rhs.clone());
+  }
+
   public void renameRecords(Function<Integer, Integer> renamer) {
     lhs.renameRecords(renamer);
     rhs.renameRecords(renamer);

@@ -16,4 +16,9 @@ public class IRPushClose extends IRPush {
   public String toString() {
     return "pushClose(" + getRecord() + ")";
   }
+
+  @Override
+  public IRInstruction clone() {
+    return new IRPushClose(getRecord());
+  }
 }

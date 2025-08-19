@@ -10,7 +10,7 @@ public class IRNewSession extends IRInstruction {
 
   public IRNewSession(int record, String label) {
     this.record = record;
-    this.label = Optional.of(label);
+    this.label = Optional.ofNullable(label);
   }
 
   public int getRecord() {
@@ -42,10 +42,26 @@ public class IRNewSession extends IRInstruction {
   }
 
   @Override
+  public IRInstruction clone() {
+    IRNewSession clone = new IRNewSession(record, null);
+    clone.setLabel(label);
+    return clone;
+  }
+
+  @Override
   public void renameRecords(Function<Integer, Integer> renamer) {
     record = renamer.apply(record);
   }
 
   @Override
   public void renameExponentials(Function<Integer, Integer> renamer) {}
+
+  @Override
+  public void renameLabels(Function<String, String> renamer) {
+    if (label.isPresent()) {
+      label = Optional.of(renamer.apply(label.get()));
+    } else {
+      label = Optional.empty();
+    }
+  }
 }

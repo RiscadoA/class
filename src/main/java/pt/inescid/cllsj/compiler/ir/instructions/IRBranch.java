@@ -65,6 +65,14 @@ public class IRBranch extends IRInstruction {
   }
 
   @Override
+  public IRInstruction clone() {
+    return new IRBranch(
+        expression.clone(),
+        new Case(then.getLabel(), then.getEndPoints()),
+        new Case(otherwise.getLabel(), otherwise.getEndPoints()));
+  }
+
+  @Override
   public void renameRecords(Function<Integer, Integer> renamer) {
     expression.renameRecords(renamer);
   }
@@ -72,5 +80,11 @@ public class IRBranch extends IRInstruction {
   @Override
   public void renameExponentials(Function<Integer, Integer> renamer) {
     expression.renameExponentials(renamer);
+  }
+
+  @Override
+  public void renameLabels(Function<String, String> renamer) {
+    then.label = renamer.apply(then.label);
+    otherwise.label = renamer.apply(otherwise.label);
   }
 }

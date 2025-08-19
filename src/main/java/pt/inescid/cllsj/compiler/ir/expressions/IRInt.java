@@ -31,6 +31,11 @@ public class IRInt extends IRExpression {
     return Integer.toString(value);
   }
 
+  @Override
+  public IRExpression clone() {
+    return new IRInt(value);
+  }
+
   public void renameRecords(Function<Integer, Integer> renamer) {}
 
   public void renameExponentials(Function<Integer, Integer> renamer) {}

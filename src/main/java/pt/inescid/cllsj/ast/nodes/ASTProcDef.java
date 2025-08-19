@@ -52,6 +52,10 @@ public class ASTProcDef extends ASTNode {
     return id;
   }
 
+  public boolean isRecursive() {
+    return rec || unsafe_rec;
+  }
+
   public List<String> getTArgs() {
     return targs;
   }

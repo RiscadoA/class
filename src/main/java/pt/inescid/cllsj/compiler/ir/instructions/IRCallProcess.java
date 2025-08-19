@@ -148,6 +148,30 @@ public class IRCallProcess extends IRInstruction {
   }
 
   @Override
+  public IRInstruction clone() {
+    IRCallProcess clone =
+        new IRCallProcess(
+            processName,
+            linearArguments.stream()
+                .map(arg -> new LinearArgument(arg.sourceRecord, arg.targetRecord))
+                .toList(),
+            exponentialArguments.stream()
+                .map(arg -> new ExponentialArgument(arg.sourceExponential, arg.targetExponential))
+                .toList(),
+            typeArguments.stream()
+                .map(
+                    arg ->
+                        new TypeArgument(
+                            arg.sourceType,
+                            arg.sourceTypeValueRequisites,
+                            arg.sourceTypePolarity,
+                            arg.targetType))
+                .toList());
+    clone.isEndPoint = isEndPoint;
+    return clone;
+  }
+
+  @Override
   public void renameRecords(Function<Integer, Integer> renamer) {
     for (LinearArgument arg : linearArguments) {
       arg.sourceRecord = renamer.apply(arg.sourceRecord);
@@ -158,6 +182,15 @@ public class IRCallProcess extends IRInstruction {
   public void renameExponentials(Function<Integer, Integer> renamer) {
     for (ExponentialArgument arg : exponentialArguments) {
       arg.sourceExponential = renamer.apply(arg.sourceExponential);
+    }
+  }
+
+  @Override
+  public void substituteTypes(
+      Function<IRType, IRType> types, Function<IRValueRequisites, IRValueRequisites> requisites) {
+    for (TypeArgument arg : typeArguments) {
+      arg.sourceType = types.apply(arg.sourceType);
+      arg.sourceTypeValueRequisites = requisites.apply(arg.sourceTypeValueRequisites);
     }
   }
 }

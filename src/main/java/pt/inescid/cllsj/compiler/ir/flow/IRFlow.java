@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import pt.inescid.cllsj.compiler.IRAnalyzer;
 import pt.inescid.cllsj.compiler.ir.IRBlock;
 import pt.inescid.cllsj.compiler.ir.instructions.IRInstruction;
 
@@ -73,11 +74,11 @@ public class IRFlow {
     return block.getInstructions().get(index);
   }
 
-  public void addState(int index, IRFlowState state) {
+  public void addState(int index, IRAnalyzer analyzer, IRFlowLocation location, IRFlowState state) {
     if (states.size() == index) {
       states.add(state);
     } else if (states.size() > index) {
-      states.set(index, states.get(index).merge(state));
+      states.set(index, states.get(index).merge(analyzer, location, state));
     } else {
       throw new UnsupportedOperationException("States added in the wrong order");
     }

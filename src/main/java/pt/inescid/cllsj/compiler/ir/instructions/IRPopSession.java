@@ -3,6 +3,7 @@ package pt.inescid.cllsj.compiler.ir.instructions;
 import java.util.function.Function;
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
+import pt.inescid.cllsj.compiler.ir.type.IRType;
 
 public class IRPopSession extends IRPop {
   private int argRecord; // Index where the new record will be stored.
@@ -33,8 +34,19 @@ public class IRPopSession extends IRPop {
   }
 
   @Override
+  public IRInstruction clone() {
+    return new IRPopSession(getRecord(), argRecord, valueRequisites);
+  }
+
+  @Override
   public void renameRecords(Function<Integer, Integer> renamer) {
     super.renameRecords(renamer);
     argRecord = renamer.apply(argRecord);
+  }
+
+  @Override
+  public void substituteTypes(
+      Function<IRType, IRType> types, Function<IRValueRequisites, IRValueRequisites> requisites) {
+    valueRequisites = requisites.apply(valueRequisites);
   }
 }

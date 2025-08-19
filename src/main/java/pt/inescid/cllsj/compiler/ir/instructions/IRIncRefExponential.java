@@ -25,6 +25,11 @@ public class IRIncRefExponential extends IRInstruction {
   }
 
   @Override
+  public IRInstruction clone() {
+    return new IRIncRefExponential(exponential);
+  }
+
+  @Override
   public void renameRecords(Function<Integer, Integer> renamer) {}
 
   @Override

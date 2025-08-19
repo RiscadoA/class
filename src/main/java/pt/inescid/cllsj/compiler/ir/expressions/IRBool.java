@@ -31,6 +31,11 @@ public class IRBool extends IRExpression {
     return Boolean.toString(value);
   }
 
+  @Override
+  public IRExpression clone() {
+    return new IRBool(value);
+  }
+
   public void renameRecords(Function<Integer, Integer> renamer) {}
 
   public void renameExponentials(Function<Integer, Integer> renamer) {}

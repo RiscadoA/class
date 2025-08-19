@@ -45,6 +45,11 @@ public class IRAdd extends IRExpression {
     return "(" + lhs + " + " + rhs + ")";
   }
 
+  @Override
+  public IRExpression clone() {
+    return new IRAdd(lhs.clone(), rhs.clone());
+  }
+
   public void renameRecords(Function<Integer, Integer> renamer) {
     lhs.renameRecords(renamer);
     rhs.renameRecords(renamer);

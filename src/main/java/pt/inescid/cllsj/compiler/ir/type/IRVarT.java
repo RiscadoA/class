@@ -1,7 +1,9 @@
 package pt.inescid.cllsj.compiler.ir.type;
 
 import java.util.Optional;
+import java.util.function.BiFunction;
 import pt.inescid.cllsj.compiler.ir.IRTypeVisitor;
+import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
 
 public class IRVarT extends IRType {
   // Index of the type variable, counting from the end.
@@ -31,6 +33,10 @@ public class IRVarT extends IRType {
     return flipPolarity.isPresent() && flipPolarity.get() == varPolarity;
   }
 
+  public Optional<Boolean> getFlipPolarity() {
+    return flipPolarity;
+  }
+
   public void accept(IRTypeVisitor visitor) {
     visitor.visit(this);
   }
@@ -39,5 +45,20 @@ public class IRVarT extends IRType {
   public String toString() {
     String fs = flipPolarity.map(p -> p ? "+" : "-").orElse("");
     return "var" + fs + " " + type;
+  }
+
+  @Override
+  public IRType substituteVar(int index, int offset, BiFunction<Integer, IRVarT, IRType> types) {
+    if (index == this.type) {
+      return types.apply(offset, this);
+    } else {
+      return this;
+    }
+  }
+
+  @Override
+  public IRType substituteReqs(
+      int offset, BiFunction<Integer, IRValueRequisites, IRValueRequisites> reqs) {
+    return this;
   }
 }

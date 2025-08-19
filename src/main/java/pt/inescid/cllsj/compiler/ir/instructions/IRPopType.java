@@ -1,6 +1,7 @@
 package pt.inescid.cllsj.compiler.ir.instructions;
 
 import java.util.Optional;
+import java.util.function.Function;
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 
 public class IRPopType extends IRPop {
@@ -33,8 +34,8 @@ public class IRPopType extends IRPop {
   public IRPopType(int record, int argType, Case positive, Case negative) {
     super(record);
     this.argType = argType;
-    this.positive = Optional.of(positive);
-    this.negative = Optional.of(negative);
+    this.positive = Optional.ofNullable(positive);
+    this.negative = Optional.ofNullable(negative);
   }
 
   public int getArgType() {
@@ -75,5 +76,26 @@ public class IRPopType extends IRPop {
     }
     sb.append(")");
     return sb.toString();
+  }
+
+  @Override
+  public IRInstruction clone() {
+    Case pos =
+        positive.isPresent() ? new Case(positive.get().label, positive.get().endPoints) : null;
+    Case neg =
+        negative.isPresent() ? new Case(negative.get().label, negative.get().endPoints) : null;
+    return new IRPopType(getRecord(), argType, pos, neg);
+  }
+
+  @Override
+  public void renameLabels(Function<String, String> renamer) {
+    if (positive.isPresent()) {
+      positive =
+          Optional.of(new Case(renamer.apply(positive.get().label), positive.get().endPoints));
+    }
+    if (negative.isPresent()) {
+      negative =
+          Optional.of(new Case(renamer.apply(negative.get().label), negative.get().endPoints));
+    }
   }
 }

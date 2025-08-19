@@ -46,6 +46,11 @@ public class IRCallExponential extends IRInstruction {
   }
 
   @Override
+  public IRInstruction clone() {
+    return new IRCallExponential(exponential, argRecord, decRefCount);
+  }
+
+  @Override
   public void renameRecords(Function<Integer, Integer> renamer) {
     argRecord = renamer.apply(argRecord);
   }

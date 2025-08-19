@@ -29,4 +29,9 @@ public class IRPushExponential extends IRPush {
   public void renameExponentials(Function<Integer, Integer> renamer) {
     exponential = renamer.apply(exponential);
   }
+
+  @Override
+  public IRInstruction clone() {
+    return new IRPushExponential(getRecord(), exponential);
+  }
 }

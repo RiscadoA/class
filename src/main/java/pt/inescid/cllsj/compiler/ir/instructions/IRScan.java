@@ -24,4 +24,9 @@ public class IRScan extends IRPush {
   public String toString() {
     return "scan(" + getRecord() + ", " + type + ")";
   }
+
+  @Override
+  public IRInstruction clone() {
+    return new IRScan(getRecord(), type);
+  }
 }

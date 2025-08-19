@@ -16,6 +16,11 @@ public class IRPopExponential extends IRPop {
   }
 
   @Override
+  public IRInstruction clone() {
+    return new IRPopExponential(getRecord(), argExponential);
+  }
+
+  @Override
   public void accept(IRInstructionVisitor visitor) {
     visitor.visit(this);
   }

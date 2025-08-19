@@ -31,6 +31,11 @@ public class IRNewExponential extends IRInstruction {
   }
 
   @Override
+  public IRInstruction clone() {
+    return new IRNewExponential(exponential, record);
+  }
+
+  @Override
   public void renameRecords(Function<Integer, Integer> renamer) {
     record = renamer.apply(record);
   }

@@ -1,6 +1,8 @@
 package pt.inescid.cllsj.compiler.ir.instructions;
 
 import java.util.Map;
+import java.util.function.Function;
+import java.util.stream.Collectors;
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 
 public class IRPopTag extends IRPop {
@@ -56,5 +58,25 @@ public class IRPopTag extends IRPop {
               + ")";
     }
     return str + ")";
+  }
+
+  @Override
+  public IRInstruction clone() {
+    return new IRPopTag(
+        getRecord(),
+        cases.entrySet().stream()
+            .collect(
+                Collectors.toMap(
+                    Map.Entry::getKey, e -> new Case(e.getValue().label, e.getValue().endPoints))));
+  }
+
+  @Override
+  public void renameLabels(Function<String, String> renamer) {
+    cases =
+        cases.entrySet().stream()
+            .collect(
+                Collectors.toMap(
+                    Map.Entry::getKey,
+                    e -> new Case(renamer.apply(e.getValue().label), e.getValue().endPoints)));
   }
 }

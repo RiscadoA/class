@@ -25,6 +25,11 @@ public class IRIncRefCell extends IRInstruction {
   }
 
   @Override
+  public IRInstruction clone() {
+    return new IRIncRefCell(record);
+  }
+
+  @Override
   public void renameRecords(Function<Integer, Integer> renamer) {
     record = renamer.apply(record);
   }

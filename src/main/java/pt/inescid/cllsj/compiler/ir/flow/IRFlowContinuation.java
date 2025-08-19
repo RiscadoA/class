@@ -60,17 +60,22 @@ public class IRFlowContinuation {
     return getLabel() + "@" + getWriter();
   }
 
-  @Override
-  public boolean equals(Object obj) {
-    if (this == obj) return true;
-    if (!(obj instanceof IRFlowContinuation)) return false;
-    if (this.override.isPresent()) {
-      return override.get().equals(obj);
+  public Optional<IRFlowContinuation> merge(IRFlowContinuation other) {
+    if (override.isPresent()) {
+      return override.get().merge(other);
     }
-    IRFlowContinuation other = (IRFlowContinuation) obj;
     while (!other.override.isEmpty()) {
       other = other.override.get();
     }
-    return this == other;
+    if (this == other) {
+      return Optional.of(this);
+    }
+
+    if (label.equals(other.label) && writer.equals(other.writer)) {
+      this.override = Optional.of(other);
+      return Optional.of(this);
+    } else {
+      return Optional.empty();
+    }
   }
 }

@@ -37,6 +37,11 @@ public class IRAnd extends IRExpression {
     return "(" + lhs + " and " + rhs + ")";
   }
 
+  @Override
+  public IRExpression clone() {
+    return new IRAnd(lhs.clone(), rhs.clone());
+  }
+
   public void renameRecords(Function<Integer, Integer> renamer) {
     lhs.renameRecords(renamer);
     rhs.renameRecords(renamer);

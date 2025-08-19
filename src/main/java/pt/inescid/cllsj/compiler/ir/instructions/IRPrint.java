@@ -44,4 +44,9 @@ public class IRPrint extends IRInstruction {
   public void renameExponentials(Function<Integer, Integer> renamer) {
     expression.renameExponentials(renamer);
   }
+
+  @Override
+  public IRInstruction clone() {
+    return new IRPrint(expression.clone(), newLine);
+  }
 }

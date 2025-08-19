@@ -42,7 +42,7 @@ public class IRAnalyzer extends IRInstructionVisitor {
       analyzer.state.bindType(i, new IRFlowType(process.isTypeVariablePositive(i)));
     }
     for (int i = 0; i < process.getRecordArgumentCount(); ++i) {
-      analyzer.state.bindRecord(i, analyzer.state.allocateRecord(IRFlowLocation.initial(i)));
+      analyzer.state.bindRecord(i, analyzer.state.allocateRecord(IRFlowLocation.unknown()));
     }
     for (int i = 0; i < process.getExponentialArgumentCount(); ++i) {
       analyzer.state.bindExponential(i, analyzer.state.allocateExponential(Optional.empty()));
@@ -116,12 +116,12 @@ public class IRAnalyzer extends IRInstructionVisitor {
 
     // Visit each instruction in the block, one by one.
     int index = 0;
-    currentFlow.addState(index, state);
+    currentFlow.addState(index, this, location, state);
     for (IRInstruction instruction : block.getInstructions()) {
       state = state.clone();
       location = currentFlow.getLocation(index);
       instruction.accept(this);
-      currentFlow.addState(++index, state);
+      currentFlow.addState(++index, this, location, state);
     }
 
     this.flow = previousFlow;
@@ -227,7 +227,7 @@ public class IRAnalyzer extends IRInstructionVisitor {
 
     if (value.isEmpty()) {
       record.markSlotsUnknown(this, state);
-      state.bindRecord(instruction.getArgRecord(), state.allocateRecord(location));
+      state.bindRecord(instruction.getArgRecord(), state.allocateRecord(IRFlowLocation.unknown()));
     } else if (value.get()) {
       IRFlowRecord argRecord = state.allocateRecord(location);
       state.bindRecord(instruction.getArgRecord(), argRecord);
@@ -248,7 +248,8 @@ public class IRAnalyzer extends IRInstructionVisitor {
       if (slot.isKnownRecord()) {
         state.bindRecord(instruction.getArgRecord(), slot.getRecordIntroductionLocation());
       } else {
-        state.bindRecord(instruction.getArgRecord(), state.allocateRecord(location));
+        state.bindRecord(
+            instruction.getArgRecord(), state.allocateRecord(IRFlowLocation.unknown()));
       }
     }
   }

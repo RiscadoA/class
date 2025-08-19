@@ -13,6 +13,11 @@ public class IRPopClose extends IRPop {
   }
 
   @Override
+  public IRInstruction clone() {
+    return new IRPopClose(getRecord());
+  }
+
+  @Override
   public String toString() {
     return "popClose(" + getRecord() + ")";
   }

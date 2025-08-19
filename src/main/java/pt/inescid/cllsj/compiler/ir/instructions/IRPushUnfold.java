@@ -16,4 +16,9 @@ public class IRPushUnfold extends IRPush {
   public String toString() {
     return "pushUnfold(" + getRecord() + ")";
   }
+
+  @Override
+  public IRInstruction clone() {
+    return new IRPushUnfold(getRecord());
+  }
 }

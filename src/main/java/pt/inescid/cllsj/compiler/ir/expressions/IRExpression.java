@@ -11,6 +11,8 @@ public abstract class IRExpression {
 
   public abstract IRType getType();
 
+  public abstract IRExpression clone();
+
   public abstract void renameRecords(Function<Integer, Integer> renamer);
 
   public abstract void renameExponentials(Function<Integer, Integer> renamer);

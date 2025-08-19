@@ -32,6 +32,11 @@ public class IRVar extends IRExpression {
     return "record " + record;
   }
 
+  @Override
+  public IRExpression clone() {
+    return new IRVar(record, type);
+  }
+
   public void renameRecords(Function<Integer, Integer> renamer) {
     record = renamer.apply(record);
   }

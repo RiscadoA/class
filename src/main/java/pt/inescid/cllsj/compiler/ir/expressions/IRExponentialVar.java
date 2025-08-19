@@ -32,6 +32,11 @@ public class IRExponentialVar extends IRExpression {
     return "exponential " + exponential;
   }
 
+  @Override
+  public IRExpression clone() {
+    return new IRExponentialVar(exponential, type);
+  }
+
   public void renameRecords(Function<Integer, Integer> renamer) {}
 
   @Override

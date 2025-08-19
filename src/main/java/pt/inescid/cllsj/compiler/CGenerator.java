@@ -35,6 +35,7 @@ public class CGenerator extends IRInstructionVisitor {
   private String code = "";
   private int indentLevel = 0;
   private String procName;
+  private int typeCount;
   private int recordCount;
   private int exponentialCount;
   private boolean entryCall = true;
@@ -455,6 +456,54 @@ public class CGenerator extends IRInstructionVisitor {
     putLineEnd();
     putBlankLine();
 
+    // Functions used for printing debug info
+    if (debug) {
+      putLine("void debug_type(int i, struct type* type) {");
+      incIndent();
+      putDebug("    <type %d:", "i");
+      if (optimizePrimitiveExponentials) {
+        putDebug(" id(%d)", typeId("(*type)"));
+      }
+      if (optimizeSendValue) {
+        putDebug(" flags(%d)", typeFlags("(*type)"));
+      }
+      putDebugLn(" size(%d)>", typeSize("(*type)"));
+      decIndent();
+      putLine("}");
+      putBlankLine();
+
+      putLine("void debug_record(int i, struct record* record) {");
+      incIndent();
+      putDebug("    <record %d: %p>", "i", "record");
+      putIfElse(
+          "record != NULL",
+          () ->
+              putDebugLn(
+                  " <written: %d> <read: %d> <cont_env: %p> <cont_record: %d>",
+                  written("record"),
+                  read("record"),
+                  recordContEnv("record"),
+                  recordContRecord("record")),
+          () -> putDebugLn(""));
+      decIndent();
+      putLine("}");
+      putBlankLine();
+
+      putLine("void debug_exponential(int i, struct exponential* exponential) {");
+      incIndent();
+      putDebug("    <exponential %d: %p>", "i", "exponential");
+      putIfElse(
+          "exponential != NULL",
+          () ->
+              putDebugLn(
+                  " <ref_count: %d> <record: %p>",
+                  exponentialRefCount("exponential"), exponentialRecord("exponential")),
+          () -> putDebugLn(""));
+      decIndent();
+      putLine("}");
+      putBlankLine();
+    }
+
     // Functions used for operations on string expressions.
     putLine("char* string_create(const char* str) {");
     incIndent();
@@ -759,6 +808,7 @@ public class CGenerator extends IRInstructionVisitor {
 
     // Generate code for each process.
     for (Map.Entry<String, IRProcess> procEntry : ir.getProcesses().entrySet()) {
+      typeCount = procEntry.getValue().getTypeVariableCount();
       recordCount = procEntry.getValue().getRecordCount();
       exponentialCount = procEntry.getValue().getExponentialCount();
 
@@ -945,27 +995,22 @@ public class CGenerator extends IRInstructionVisitor {
   private void visitInstruction(IRInstruction instruction) {
     if (debug) {
       putDebugLn("    <proc: " + procName + "> <env: %p>", ENV);
+      for (int i = 0; i < typeCount; ++i) {
+        putStatement("debug_type(" + i + ", &" + type(i) + ")");
+      }
       for (int i = 0; i < recordCount; ++i) {
-        final int iFinal = i;
-        putDebug("    <record " + i + ": %p>", record(i));
-        putIfElse(
-            record(i) + " != NULL",
-            () ->
-                putDebugLn(
-                    " <written: %d> <read: %d> <cont_env: %p> <cont_record: %d>",
-                    written(iFinal), read(iFinal), recordContEnv(iFinal), recordContRecord(iFinal)),
-            () -> putDebugLn(""));
+        putStatement("debug_record(" + i + ", " + record(i) + ")");
       }
       for (int i = 0; i < exponentialCount; ++i) {
-        final int iFinal = i;
-        putDebug("    <exponential " + i + ": %p>", exponential(i));
-        putIfElse(
-            exponential(i) + " != NULL",
-            () ->
-                putDebugLn(
-                    " <ref_count: %d> <record: %p>",
-                    exponentialRefCount(iFinal), exponentialRecord(iFinal)),
-            () -> putDebugLn(""));
+        if (optimizePrimitiveExponentials && exponentialType(i) instanceof IRIntT) {
+          putDebugLn("    <exponential " + i + ": int(%d)>", "(int)(uintptr_t)" + exponential(i));
+        } else if (optimizePrimitiveExponentials && exponentialType(i) instanceof IRBoolT) {
+          putDebugLn(
+              "    <exponential " + i + ": bool(%d)>",
+              "(unsigned char)(uintptr_t)" + exponential(i));
+        } else {
+          putStatement("debug_exponential(" + i + ", " + exponential(i) + ")");
+        }
       }
     }
     if (trace) {

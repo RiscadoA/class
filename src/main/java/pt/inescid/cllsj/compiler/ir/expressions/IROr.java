@@ -37,6 +37,11 @@ public class IROr extends IRExpression {
     return "(" + lhs + " or " + rhs + ")";
   }
 
+  @Override
+  public IRExpression clone() {
+    return new IROr(lhs.clone(), rhs.clone());
+  }
+
   public void renameRecords(Function<Integer, Integer> renamer) {
     lhs.renameRecords(renamer);
     rhs.renameRecords(renamer);

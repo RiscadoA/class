@@ -51,6 +51,13 @@ public class IRFlipForward extends IRInstruction {
   }
 
   @Override
+  public IRInstruction clone() {
+    IRFlipForward clone = new IRFlipForward(negRecord, posRecord);
+    clone.isEndPoint = isEndPoint;
+    return clone;
+  }
+
+  @Override
   public void renameRecords(Function<Integer, Integer> renamer) {
     negRecord = renamer.apply(negRecord);
     posRecord = renamer.apply(posRecord);

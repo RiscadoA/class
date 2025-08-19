@@ -39,6 +39,11 @@ public class IRString extends IRExpression {
     return "\"" + getEscapedValue() + "\"";
   }
 
+  @Override
+  public IRExpression clone() {
+    return new IRString(value);
+  }
+
   public void renameRecords(Function<Integer, Integer> renamer) {}
 
   public void renameExponentials(Function<Integer, Integer> renamer) {}

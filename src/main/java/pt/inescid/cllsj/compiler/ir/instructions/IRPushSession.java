@@ -3,6 +3,7 @@ package pt.inescid.cllsj.compiler.ir.instructions;
 import java.util.function.Function;
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
+import pt.inescid.cllsj.compiler.ir.type.IRType;
 
 public class IRPushSession extends IRPush {
   private int argRecord;
@@ -36,5 +37,16 @@ public class IRPushSession extends IRPush {
   public void renameRecords(Function<Integer, Integer> renamer) {
     super.renameRecords(renamer);
     argRecord = renamer.apply(argRecord);
+  }
+
+  @Override
+  public void substituteTypes(
+      Function<IRType, IRType> types, Function<IRValueRequisites, IRValueRequisites> requisites) {
+    this.valueRequisites = requisites.apply(this.valueRequisites);
+  }
+
+  @Override
+  public IRInstruction clone() {
+    return new IRPushSession(getRecord(), argRecord, valueRequisites.clone());
   }
 }

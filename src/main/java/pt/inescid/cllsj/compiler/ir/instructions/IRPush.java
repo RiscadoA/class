@@ -3,7 +3,7 @@ package pt.inescid.cllsj.compiler.ir.instructions;
 import java.util.function.Function;
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 
-public class IRPush extends IRInstruction {
+public abstract class IRPush extends IRInstruction {
   private int record;
 
   public IRPush(int record) {

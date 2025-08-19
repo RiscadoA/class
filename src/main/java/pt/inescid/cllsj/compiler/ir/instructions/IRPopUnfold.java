@@ -16,4 +16,9 @@ public class IRPopUnfold extends IRPop {
   public String toString() {
     return "popUnfold(" + getRecord() + ")";
   }
+
+  @Override
+  public IRInstruction clone() {
+    return new IRPopUnfold(getRecord());
+  }
 }

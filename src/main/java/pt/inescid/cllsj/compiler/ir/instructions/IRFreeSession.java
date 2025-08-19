@@ -25,6 +25,11 @@ public class IRFreeSession extends IRInstruction {
   }
 
   @Override
+  public IRInstruction clone() {
+    return new IRFreeSession(record);
+  }
+
+  @Override
   public void renameRecords(Function<Integer, Integer> renamer) {
     record = renamer.apply(record);
   }

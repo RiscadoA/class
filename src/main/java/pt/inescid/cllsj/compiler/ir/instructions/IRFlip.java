@@ -35,10 +35,20 @@ public class IRFlip extends IRInstruction {
   }
 
   @Override
+  public IRInstruction clone() {
+    return new IRFlip(record, contLabel);
+  }
+
+  @Override
   public void renameRecords(Function<Integer, Integer> renamer) {
     record = renamer.apply(record);
   }
 
   @Override
   public void renameExponentials(Function<Integer, Integer> renamer) {}
+
+  @Override
+  public void renameLabels(Function<String, String> renamer) {
+    contLabel = renamer.apply(contLabel);
+  }
 }

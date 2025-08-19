@@ -8,14 +8,15 @@ public class IRFlowLocation {
   private IRFlow flow;
   private int index;
   private boolean removed = false;
+  private static int nextUnknown = 0;
 
   public IRFlowLocation(IRFlow flow, int index) {
     this.flow = flow;
     this.index = index;
   }
 
-  public static IRFlowLocation initial(int index) {
-    return new IRFlowLocation(null, -1 - index);
+  public static IRFlowLocation unknown() {
+    return new IRFlowLocation(null, -1 - nextUnknown++);
   }
 
   public IRFlow getFlow() {
@@ -30,6 +31,10 @@ public class IRFlowLocation {
       throw new IllegalStateException("This flow location (" + this + ") has been removed");
     }
     return index;
+  }
+
+  public boolean isKnown() {
+    return index >= 0;
   }
 
   public IRFlowState getPreviousState() {
@@ -51,7 +56,7 @@ public class IRFlowLocation {
       sb.append("removed ");
     }
     if (index < 0) {
-      sb.append("initial");
+      sb.append("unknown");
     } else {
       sb.append(Optional.ofNullable(flow.getBlock().getLabel()).orElse("entry"));
       sb.append(":").append(index);
