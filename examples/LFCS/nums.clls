@@ -1,0 +1,9 @@
+proc pp(a:lint; b:~lint)
+{
+if (b==0) { let a 1+b } { let a 2+b}
+};;
+
+proc main() {
+   letc a:lint { pp(a; 99) }; 
+   println(a); ()
+};;

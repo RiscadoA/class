@@ -1,0 +1,64 @@
+
+proc pp(a:~int,b:int)
+{
+let b a+a
+};;
+
+proc main() {
+   letc x:int { pp(3,x) }; // pass be here?
+   println(x); ()
+};;
+
+proc main() { 
+   letc b:int { let b 10 };
+   println(b); ()
+};;
+
+proc main() { 
+   letc b:int { let b 10 };
+   println((b*b)+b+3+(b-3)); ()
+};;
+
+proc main() { 
+   letc b:int { let b 10 };
+   println(b); ()
+};;
+
+proc main() { 
+   letc b:int { let b 10 };
+   letc y:int { let y b };
+   println(y); ()
+};;
+
+proc main() { 
+   letc b:int { let b 10 };
+   letc y:lint { let y (b*b)+b+3+(b-3) };
+   println(y); ()
+};;
+
+proc main() { 
+   letc b:int { let b 10 };
+   letc y:int { let y (b*b)+b+3+(b-3) };
+   println(y); ()
+};;
+
+
+/* fail 
+proc main() { 
+   letc b:int { let b 10 };
+   letc y:lint { let y (b*b)+b+3+(b-3) };
+   ()
+};;
+
+proc main() {
+   letc y:lint { let y 10 };
+    ()
+};;
+
+*/
+
+proc main() {
+   letc y:int { let y 10 };
+    ()
+};;
+

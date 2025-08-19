@@ -55,7 +55,7 @@ proc primesN(primes:IntStream) {
 proc unsafe_rec printfirstN(il:~IntStream;k:~lint)
 {
    if(k==0) {
-	  #stop il; wait il; println(" STOP.");()
+	  #stop il; wait il; ()
 	 }
    {
 	 #next il; recv il(n);
