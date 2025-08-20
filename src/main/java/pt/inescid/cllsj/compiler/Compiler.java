@@ -39,6 +39,7 @@ public class Compiler {
   public boolean optimizeKnownSlots = true;
   public boolean optimizeKnownEndPoints = true;
   public boolean optimizeSingleEndpoint = true;
+  public boolean inlineRecursiveProcesses = true;
 
   public int compile(String path) {
     ASTProgram ast;
@@ -96,7 +97,7 @@ public class Compiler {
       IROptimizer optimizer = new IROptimizer();
 
       if (inliningComplexity >= 0) {
-        optimizer.inlineProcesses(ir, inliningComplexity);
+        optimizer.inlineProcesses(ir, inliningComplexity, false);
         optimizer.removeUnusedProcesses(ir, entryProcess);
       }
 
@@ -139,6 +140,10 @@ public class Compiler {
         optimizer.analyze(ir);
         optimizer.printProcessFlows(ir);
         return 0;
+      }
+
+      if (inliningComplexity >= 0 && inlineRecursiveProcesses) {
+        optimizer.inlineProcesses(ir, inliningComplexity, true);
       }
 
       optimizer.removeUnusedProcesses(ir, entryProcess);

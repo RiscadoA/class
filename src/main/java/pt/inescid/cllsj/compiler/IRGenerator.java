@@ -58,7 +58,8 @@ public class IRGenerator extends ASTNodeVisitor {
                 procDef.getGArgs().size(),
                 env,
                 procDef.getRhs(),
-                !procDef.isRecursive());
+                true,
+                procDef.isRecursive());
           },
           this.ep);
     }
@@ -74,7 +75,8 @@ public class IRGenerator extends ASTNodeVisitor {
       Environment env,
       ASTNode node,
       Consumer<IRBlock> entryConsumer,
-      boolean inlineable) {
+      boolean inlineable,
+      boolean recursive) {
     IRProcess oldProcess = process;
     process =
         new IRProcess(
@@ -84,7 +86,8 @@ public class IRGenerator extends ASTNodeVisitor {
             env.exponentialTypes(),
             env.typeVariablePolarities(),
             countEndPoints(node),
-            inlineable);
+            inlineable,
+            recursive);
     program.addProcess(env.getName(), process);
     environments.push(env);
     visitBlock(
@@ -102,8 +105,16 @@ public class IRGenerator extends ASTNodeVisitor {
       int exponentialArgumentCount,
       Environment env,
       ASTNode node,
-      boolean inlineable) {
-    addProcess(linearArgumentCount, exponentialArgumentCount, env, node, block -> {}, inlineable);
+      boolean inlineable,
+      boolean recursive) {
+    addProcess(
+        linearArgumentCount,
+        exponentialArgumentCount,
+        env,
+        node,
+        block -> {},
+        inlineable,
+        recursive);
   }
 
   private void visitBlock(IRBlock block, ASTNode node) {
@@ -467,6 +478,7 @@ public class IRGenerator extends ASTNodeVisitor {
           // Thus, after we enter into the process, we just flip back.
           flipIfNegative(env.record(node.getChi()), node.getType());
         },
+        false,
         false);
 
     // Call the process we generated above.
@@ -549,6 +561,7 @@ public class IRGenerator extends ASTNodeVisitor {
           // Thus, after we enter into the process, we just flip back.
           flipIfNegative(env.record(node.getCh()), node.getContType());
         },
+        false,
         false);
 
     // Call the process we generated above.

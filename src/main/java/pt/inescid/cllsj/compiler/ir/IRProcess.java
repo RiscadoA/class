@@ -2,6 +2,8 @@ package pt.inescid.cllsj.compiler.ir;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Stream;
+import pt.inescid.cllsj.compiler.ir.instructions.IRInstruction;
 import pt.inescid.cllsj.compiler.ir.type.IRType;
 
 public class IRProcess {
@@ -14,6 +16,7 @@ public class IRProcess {
   private List<IRBlock> blocks;
   private List<Boolean> typeVariablePolarities;
   private boolean inlineable;
+  private boolean recursive;
 
   public IRProcess(
       int recordArgumentCount,
@@ -22,7 +25,8 @@ public class IRProcess {
       List<IRType> exponentialTypes,
       List<Boolean> typeVariablePolarites,
       int endPoints,
-      boolean inlineable) {
+      boolean inlineable,
+      boolean recursive) {
     this.recordArgumentCount = recordArgumentCount;
     this.exponentialArgumentCount = exponentialArgumentCount;
     this.recordTypes = new ArrayList<>(recordTypes);
@@ -32,6 +36,7 @@ public class IRProcess {
     this.entry = new IRBlock(null);
     this.blocks = new ArrayList<>();
     this.inlineable = inlineable;
+    this.recursive = recursive;
   }
 
   public boolean hasArguments() {
@@ -123,9 +128,11 @@ public class IRProcess {
   }
 
   public List<IRBlock> getBlocksIncludingEntry() {
-    List<IRBlock> allBlocks = new ArrayList<>(blocks);
-    allBlocks.add(0, entry); // Add entry block at the beginning
-    return allBlocks;
+    return Stream.concat(Stream.of(entry), blocks.stream()).toList();
+  }
+
+  public List<IRInstruction> getInstructions() {
+    return getBlocksIncludingEntry().stream().flatMap(b -> b.getInstructions().stream()).toList();
   }
 
   public IRBlock getBlock(String label) {
@@ -148,6 +155,10 @@ public class IRProcess {
 
   public boolean isInlineable() {
     return inlineable;
+  }
+
+  public boolean isRecursive() {
+    return recursive;
   }
 
   @Override

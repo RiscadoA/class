@@ -679,7 +679,7 @@ public class IROptimizer {
     for (Map.Entry<String, IRProcess> e : ir.getProcesses().entrySet()) {
       Map<IRBlock, IRFlow> flows = processFlows.get(e.getKey());
       Set<IRBlock> blocksToRemove = new HashSet<>();
-      
+
       for (IRBlock flipBlock : e.getValue().getBlocksIncludingEntry()) {
         if (!flows.containsKey(flipBlock)) {
           continue;
@@ -857,7 +857,9 @@ public class IROptimizer {
                     push.setRecord(pushSession.getRecord());
                     loc.moveInstructionAfter(pushSessionLoc);
                     ir.setRecordType(
-                        argRecord, TypeModifier.removeLast(loc.getPreviousState(), ir.getRecordType(argRecord)));
+                        argRecord,
+                        TypeModifier.removeLast(
+                            loc.getPreviousState(), ir.getRecordType(argRecord)));
                   }
                   return true;
                 }
@@ -955,7 +957,9 @@ public class IROptimizer {
                   pop.setRecord(popSession.getRecord());
                   loc.moveInstructionBefore(popSessionLoc);
                   ir.setRecordType(
-                      argRecord, TypeModifier.removeFirst(loc.getPreviousState(), ir.getRecordType(argRecord)));
+                      argRecord,
+                      TypeModifier.removeFirst(
+                          loc.getPreviousState(), ir.getRecordType(argRecord)));
                   return true;
                 }
               }
@@ -979,16 +983,18 @@ public class IROptimizer {
     }
   }
 
-  public void inlineProcesses(IRProgram ir, int maxComplexity) {
+  public void inlineProcesses(IRProgram ir, int maxComplexity, boolean allowLoops) {
     Map<String, Integer> evaluated = new HashMap<>();
     Set<String> visited = new HashSet<>();
-    ir.forEachProcess((name, proc) -> inlineProcesses(ir, maxComplexity, name, evaluated, visited));
+    ir.forEachProcess(
+        (name, proc) -> inlineProcesses(ir, maxComplexity, name, allowLoops, evaluated, visited));
   }
 
   private void inlineProcesses(
       IRProgram ir,
       int maxComplexity,
       String name,
+      boolean allowLoops,
       Map<String, Integer> evaluated,
       Set<String> visited) {
     if (!visited.add(name)) {
@@ -997,7 +1003,7 @@ public class IROptimizer {
     IRProcess proc = ir.getProcesses().get(name);
 
     // Search for process calls which we can inline
-    for (int i = 0; i < proc.getBlocksIncludingEntry().size(); ++i) {
+    for (int i = 0, end = proc.getBlocksIncludingEntry().size(); i < end; ++i) {
       IRBlock block = proc.getBlocksIncludingEntry().get(i);
       IRInstruction instr = block.getInstructions().getLast();
       if (!(instr instanceof IRCallProcess)) {
@@ -1007,10 +1013,43 @@ public class IROptimizer {
       // First visit the process we'll inline
       IRCallProcess call = (IRCallProcess) instr;
       String callName = call.getProcessName();
-      inlineProcesses(ir, maxComplexity, callName, evaluated, visited);
+      inlineProcesses(ir, maxComplexity, callName, allowLoops, evaluated, visited);
       IRProcess callProc = ir.getProcesses().get(callName);
-      if (!callProc.isInlineable()) {
+      if (!callProc.isInlineable() || (!allowLoops && callProc.isRecursive())) {
         continue;
+      }
+
+      if (callName.equals(name)) {
+        continue; // We can't inline a process into itself
+      }
+
+      // If the process is recursive, we need to check if we can turn it into a loop
+      if (callProc.isRecursive()) {
+        // It must have a single end point - otherwise, tail calls are not guaranteed
+        if (callProc.getEndPoints() != 1) {
+          continue;
+        }
+
+        // All recursive calls must be end points, and thus, be tail calls
+        boolean valid = true;
+        for (IRInstruction innerInstr : callProc.getInstructions()) {
+          if (innerInstr instanceof IRCallProcess) {
+            IRCallProcess innerCall = (IRCallProcess) innerInstr;
+            if (innerCall.getProcessName().equals(callName) && !innerCall.isEndPoint()) {
+              valid = false;
+              break;
+            }
+
+            // We must also be able to turn the call into a loop
+            if (!IRCallLoop.canGetFromCallProcess(innerCall)) {
+              valid = false;
+              break;
+            }
+          }
+        }
+        if (!valid) {
+          continue;
+        }
       }
 
       int complexity = evaluated.computeIfAbsent(callName, k -> complexity(callProc));
@@ -1130,20 +1169,51 @@ public class IROptimizer {
       // Start by adding new records, exponentials and types to the current process
       Map<Integer, Integer> recordMap = new HashMap<>();
       for (IRCallProcess.LinearArgument arg : call.getLinearArguments()) {
-        recordMap.put(arg.getTargetRecord(), arg.getSourceRecord());
+        if (callProc.isRecursive()) {
+          // If the process is recursive, we need to keep arguments separate, as
+          // the process will call itself on those same arguments which would overwrite ours
+          recordMap.put(
+              arg.getTargetRecord(),
+              proc.addRecord(
+                  substituteTypeVars.apply(callProc.getRecordType(arg.getTargetRecord()))));
+        } else {
+          recordMap.put(arg.getTargetRecord(), arg.getSourceRecord());
+        }
       }
       for (int j = callProc.getRecordArgumentCount(); j < callProc.getRecordCount(); ++j) {
         recordMap.put(j, proc.addRecord(substituteTypeVars.apply(callProc.getRecordType(j))));
       }
       Map<Integer, Integer> exponentialMap = new HashMap<>();
       for (IRCallProcess.ExponentialArgument arg : call.getExponentialArguments()) {
-        exponentialMap.put(arg.getTargetExponential(), arg.getSourceExponential());
+        if (callProc.isRecursive()) {
+          // Same thing as above
+          exponentialMap.put(
+              arg.getTargetExponential(),
+              proc.addExponential(
+                  substituteTypeVars.apply(
+                      callProc.getExponentialType(arg.getTargetExponential()))));
+        } else {
+          exponentialMap.put(arg.getTargetExponential(), arg.getSourceExponential());
+        }
       }
       for (int j = callProc.getExponentialArgumentCount();
           j < callProc.getExponentialCount();
           ++j) {
         exponentialMap.put(
             j, proc.addExponential(substituteTypeVars.apply(callProc.getExponentialType(j))));
+      }
+
+      // Identify the block we'll be adding the inlined process' entry instructions
+      // If the process is recursive (and thus, a loop), we need to create a new block
+      IRBlock entryBlock;
+      if (callProc.isRecursive()) {
+        entryBlock = proc.addBlock(call.getProcessName());
+        block.add(
+            IRCallLoop.fromCallProcess(
+                    entryBlock.getLabel(), call, recordMap::get, exponentialMap::get)
+                .get());
+      } else {
+        entryBlock = block;
       }
 
       // Create a mapping from labels in the inlined process to labels in the current process
@@ -1154,31 +1224,45 @@ public class IROptimizer {
             proc.addBlock(call.getProcessName() + "_" + callBlock.getLabel()).getLabel());
       }
 
-      // Add instructions from the entry block into this block
+      // Function for converting an instruction from the inlined process to the current process
+      Function<IRInstruction, IRInstruction> convertInstruction =
+          callInstr -> {
+            IRInstruction newInstr = callInstr.clone();
+            newInstr.renameRecords(recordMap::get);
+            newInstr.renameExponentials(exponentialMap::get);
+            newInstr.renameLabels(labelMap::get);
+            newInstr.substituteTypes(
+                substituteTypeVars, reqs -> substituteValueReqs.apply(0, reqs));
+
+            // If it is a recursive call, turn into a IRCallLoop instruction
+            if (callProc.isRecursive() && newInstr instanceof IRCallProcess) {
+              IRCallProcess newCall = (IRCallProcess) newInstr;
+              if (newCall.getProcessName().equals(callName)) {
+                newInstr =
+                    IRCallLoop.fromCallProcess(
+                            entryBlock.getLabel(), newCall, recordMap::get, exponentialMap::get)
+                        .get();
+              }
+            }
+
+            return newInstr;
+          };
+
+      // Add instructions from the entry block into the entryBlock
       for (IRInstruction callInstr : callProc.getEntry().getInstructions()) {
-        IRInstruction newInstr = callInstr.clone();
-        newInstr.renameRecords(recordMap::get);
-        newInstr.renameExponentials(exponentialMap::get);
-        newInstr.renameLabels(labelMap::get);
-        newInstr.substituteTypes(substituteTypeVars, reqs -> substituteValueReqs.apply(0, reqs));
-        block.add(newInstr);
+        entryBlock.add(convertInstruction.apply(callInstr));
       }
 
       // Add all blocks of the process to the current process
       for (IRBlock callBlock : callProc.getBlocks()) {
         IRBlock newBlock = proc.getBlock(labelMap.get(callBlock.getLabel()));
         for (IRInstruction callInstr : callBlock.getInstructions()) {
-          IRInstruction newInstr = callInstr.clone();
-          newInstr.renameRecords(recordMap::get);
-          newInstr.renameExponentials(exponentialMap::get);
-          newInstr.renameLabels(labelMap::get);
-          newInstr.substituteTypes(substituteTypeVars, reqs -> substituteValueReqs.apply(0, reqs));
-          newBlock.add(newInstr);
+          newBlock.add(convertInstruction.apply(callInstr));
         }
       }
 
       // Modify the end point count of the current block
-      modifyEndPoints(proc, block, callProc.getEndPoints() - 1);
+      modifyEndPoints(proc, block, callProc.getEndPoints() - (call.isEndPoint() ? 1 : 0));
     }
   }
 

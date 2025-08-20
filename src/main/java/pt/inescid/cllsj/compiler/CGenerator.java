@@ -1146,6 +1146,61 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   @Override
+  public void visit(IRCallLoop instruction) {
+    Set<Integer> sourceRecords = new HashSet<>();
+    Set<Integer> sourceExponentials = new HashSet<>();
+    for (IRCallLoop.LinearArgument arg : instruction.getLinearArguments()) {
+      sourceRecords.add(arg.getSourceRecord());
+    }
+    for (IRCallLoop.ExponentialArgument arg : instruction.getExponentialArguments()) {
+      sourceExponentials.add(arg.getSourceExponential());
+    }
+
+    // We need this map to store the record and exponential swaps that we need to do.
+    Map<Integer, Integer> recordMap = new HashMap<>();
+    Map<Integer, Integer> exponentialMap = new HashMap<>();
+
+    for (IRCallLoop.LinearArgument arg : instruction.getLinearArguments()) {
+      sourceRecords.remove(arg.getSourceRecord());
+
+      // If the binding is the same, we don't need to do anything.
+      int sourceRecord = recordMap.getOrDefault(arg.getSourceRecord(), arg.getSourceRecord());
+      if (sourceRecord != arg.getTargetRecord()) {
+        if (sourceRecords.contains(arg.getTargetRecord())) {
+          // If the target record will also be passed as an argument, we use a swap instead of a
+          // direct assignment
+          putAssign(TMP_RECORD, record(arg.getTargetRecord()));
+          putAssign(record(arg.getTargetRecord()), record(sourceRecord));
+          putAssign(record(sourceRecord), TMP_RECORD);
+          recordMap.put(arg.getTargetRecord(), sourceRecord);
+        } else {
+          putAssign(record(arg.getTargetRecord()), record(sourceRecord));
+        }
+      }
+    }
+    for (IRCallLoop.ExponentialArgument arg : instruction.getExponentialArguments()) {
+      sourceExponentials.remove(arg.getSourceExponential());
+
+      // If the binding is the same, we don't need to do anything.
+      int sourceExponential =
+          exponentialMap.getOrDefault(arg.getSourceExponential(), arg.getSourceExponential());
+      if (sourceExponential != arg.getTargetExponential()) {
+        if (sourceExponentials.contains(arg.getTargetExponential())) {
+          // Swap the exponentials.
+          putAssign(TMP_EXPONENTIAL, exponential(arg.getTargetExponential()));
+          putAssign(exponential(arg.getTargetExponential()), exponential(sourceExponential));
+          putAssign(exponential(sourceExponential), TMP_EXPONENTIAL);
+          exponentialMap.put(arg.getTargetExponential(), sourceExponential);
+        } else {
+          putAssign(exponential(arg.getTargetExponential()), exponential(sourceExponential));
+        }
+      }
+    }
+
+    putConstantGoto(blockLabel(instruction.getEntryLabel()));
+  }
+
+  @Override
   public void visit(IRForward i) {
     // Copy the buffer from the negative record to the positive record.
     putStatement(
@@ -1511,11 +1566,19 @@ public class CGenerator extends IRInstructionVisitor {
     putIfElse(
         expression(instruction.getExpression()),
         () -> {
-          putAssign(environmentEndPoints(), environmentEndPoints() + " - " + (maxEndPoints - instruction.getThen().getEndPoints()));
+          putAssign(
+              environmentEndPoints(),
+              environmentEndPoints()
+                  + " - "
+                  + (maxEndPoints - instruction.getThen().getEndPoints()));
           putConstantGoto(blockLabel(instruction.getThen().getLabel()));
         },
         () -> {
-          putAssign(environmentEndPoints(), environmentEndPoints() + " - " + (maxEndPoints - instruction.getOtherwise().getEndPoints()));
+          putAssign(
+              environmentEndPoints(),
+              environmentEndPoints()
+                  + " - "
+                  + (maxEndPoints - instruction.getOtherwise().getEndPoints()));
           putConstantGoto(blockLabel(instruction.getOtherwise().getLabel()));
         });
   }
@@ -1591,13 +1654,20 @@ public class CGenerator extends IRInstructionVisitor {
           () -> {
             if (instruction.getPositive().isPresent()) {
               putAssign(
-                  environmentEndPoints(), environmentEndPoints() + " - " + (maxEndPoints - instruction.getPositive().get().getEndPoints()));
+                  environmentEndPoints(),
+                  environmentEndPoints()
+                      + " - "
+                      + (maxEndPoints - instruction.getPositive().get().getEndPoints()));
               putConstantGoto(blockLabel(instruction.getPositive().get().getLabel()));
             }
           },
           () -> {
             if (instruction.getNegative().isPresent()) {
-              putAssign(environmentEndPoints(), environmentEndPoints() + " - " + (maxEndPoints - instruction.getNegative().get().getEndPoints()));
+              putAssign(
+                  environmentEndPoints(),
+                  environmentEndPoints()
+                      + " - "
+                      + (maxEndPoints - instruction.getNegative().get().getEndPoints()));
               putConstantGoto(blockLabel(instruction.getNegative().get().getLabel()));
             }
           });
@@ -1609,16 +1679,16 @@ public class CGenerator extends IRInstructionVisitor {
     Runnable forInt =
         () -> {
           putAssign(
-              readExponentialInteger(instruction.getExponential()),
-              pop(instruction.getRecord(), "int"));
+              exponential(instruction.getExponential()),
+              writeExponentialInteger(pop(instruction.getRecord(), "int")));
           putFreeRecord(record(instruction.getRecord()));
         };
 
     Runnable forBool =
         () -> {
           putAssign(
-              readExponentialBool(instruction.getExponential()),
-              pop(instruction.getRecord(), "unsigned char"));
+              exponential(instruction.getExponential()),
+              writeExponentialBool(pop(instruction.getRecord(), "unsigned char")));
           putFreeRecord(record(instruction.getRecord()));
         };
 
@@ -1701,15 +1771,15 @@ public class CGenerator extends IRInstructionVisitor {
     Runnable forInt =
         () -> {
           putAssign(
-              readExponentialInteger(instruction.getArgExponential()),
-              pop(instruction.getRecord(), "int"));
+              exponential(instruction.getArgExponential()),
+              writeExponentialInteger(pop(instruction.getRecord(), "int")));
         };
 
     Runnable forBool =
         () -> {
           putAssign(
-              readExponentialBool(instruction.getArgExponential()),
-              pop(instruction.getRecord(), "unsigned char"));
+              exponential(instruction.getArgExponential()),
+              writeExponentialBool(pop(instruction.getRecord(), "unsigned char")));
         };
 
     Runnable forOther =
@@ -2214,13 +2284,13 @@ public class CGenerator extends IRInstructionVisitor {
   private String readExponentialInteger(int exponential) {
     // Hacky, but works as long as sizeof(int) < sizeof(struct exponential*)
     // We're just casting the address of the exponential to an int
-    return "*(int*)(&" + exponential(exponential) + ")";
+    return "(int)(unsigned int)(uintptr_t)(" + exponential(exponential) + ")";
   }
 
   private String readExponentialBool(int exponential) {
     // Hacky, but works as long as sizeof(unsigned char) < sizeof(struct exponential*)
     // We're just casting the address of the exponential to an unsigned char
-    return "*(unsigned char*)(&" + exponential(exponential) + ")";
+    return "(unsigned char)(uintptr_t)(" + exponential(exponential) + ")";
   }
 
   private String writeExponentialInteger(String cValue) {

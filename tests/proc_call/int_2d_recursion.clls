@@ -1,0 +1,34 @@
+proc unsafe_rec line_recursion(done: close; x: colint) {
+    print(x);
+    if x == 0 {
+        println();
+        close done
+    } else {
+        print(" ");
+        line_recursion(done; x - 1)
+    }
+};;
+
+proc unsafe_rec table_recursion(done: close; x: colint, y: colint) {
+    cut {
+        line_recursion(inner; x)
+        |inner: wait|
+        wait inner;
+        if y == 0 {
+            close done
+        } else {
+            table_recursion(done; x, y - 1)
+        }
+    }
+    
+};;
+
+proc main() {
+    cut {
+        scan(i)
+        |i: ?colint|
+        table_recursion(done; i, i)
+        |done: wait|
+        wait done; ()
+    }
+};;

@@ -37,10 +37,13 @@ public class IRNewExponentialExpression extends IRInstruction {
   }
 
   @Override
-  public void renameRecords(Function<Integer, Integer> renamer) {}
+  public void renameRecords(Function<Integer, Integer> renamer) {
+    expression.renameRecords(renamer);
+  }
 
   @Override
   public void renameExponentials(Function<Integer, Integer> renamer) {
     exponential = renamer.apply(exponential);
+    expression.renameExponentials(renamer);
   }
 }

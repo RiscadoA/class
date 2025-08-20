@@ -181,4 +181,8 @@ public abstract class IRInstructionVisitor {
   public void visit(IRPanic instruction) {
     visit((IRInstruction) instruction);
   }
+
+  public void visit(IRCallLoop instruction) {
+    visit((IRCallLoop) instruction);
+  }
 }

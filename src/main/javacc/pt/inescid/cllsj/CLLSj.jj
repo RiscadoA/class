@@ -146,6 +146,8 @@ public static void main(String args[]) {
 
           compiler.inliningComplexity = Integer.parseInt(args[i + 1]);
           i += 1;
+        } else if (args[i].equals("--no-inlining-recursive-processes")) {
+          compiler.inlineRecursiveProcesses = false;
         } else if (args[i].equals("--no-optimize-ir-with-analysis")) {
           compiler.optimizeIRWithAnalysis = false;
         } else if (args[i].equals("--no-optimize-primitive-exponentials")) {
@@ -198,6 +200,7 @@ public static void main(String args[]) {
         System.err.println("    --no-custom-allocator: Uses malloc/free directly instead of the custom allocator");
         System.err.println("    --no-inlining: Disables inlining of processes");
         System.err.println("    --inlining-complexity <complexity>: Sets the maximum complexity allowed for a process to be inlined");
+        System.err.println("    --no-inlining-recursive-processes: Disables inlining of recursive processes");
         System.err.println("    --no-optimize-ir-with-analysis: Disables IR optimization through flow analysis");
         System.err.println("    --no-optimize-primitive-exponentials: Disables primitive exponential optimization");
         System.err.println("    --no-optimize-exponential-expression-to-forward: Disables exponential expression variable optimization to forward");

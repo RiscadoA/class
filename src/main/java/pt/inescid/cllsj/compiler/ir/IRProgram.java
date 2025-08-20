@@ -48,6 +48,7 @@ public class IRProgram {
       }
       result += "    endPoints: " + process.getValue().getEndPoints() + "\n";
       result += "    inlineable: " + process.getValue().isInlineable() + "\n";
+      result += "    recursive: " + process.getValue().isRecursive() + "\n";
       result += process.getKey() + ":\n";
       result += process.getValue().toString() + "\n";
     }
