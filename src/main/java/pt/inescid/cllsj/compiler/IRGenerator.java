@@ -291,15 +291,13 @@ public class IRGenerator extends ASTNodeVisitor {
     ep = ep.assoc(node.getTyidGen(), entry);
     ep = ep.assoc(node.getTyidPar(), entry);
 
-    int endPoints = countEndPoints(node.getRhs()) - 1;
-
     block.add(new IRPopSession(previousRecord, nextRecord, IRValueRequisites.notValue()));
     block.add(
         new IRPopType(
             previousRecord,
             type(node.getTyidGen()),
-            new IRPopType.Case(positiveBlock.getLabel(), endPoints),
-            new IRPopType.Case(negativeBlock.getLabel(), endPoints)));
+            new IRPopType.Case(positiveBlock.getLabel(), 0),
+            new IRPopType.Case(negativeBlock.getLabel(), 0)));
     positiveBlock.add(new IRFreeSession(previousRecord));
     negativeBlock.add(new IRFreeSession(previousRecord));
 
@@ -331,11 +329,9 @@ public class IRGenerator extends ASTNodeVisitor {
     for (int i = 0; i < node.getCaseCount(); ++i) {
       String caseLabel = node.getCaseLabelFromIndex(i);
       ASTNode caseNode = node.getCase(caseLabel);
-      // We don't count the root path, as that's already accounted for in the process
-      int endPointCount = countEndPoints(caseNode) - 1;
 
       IRBlock caseBlock = process.addBlock("case_" + caseLabel.substring(1));
-      cases.put(i, new IRPopTag.Case(caseBlock.getLabel(), endPointCount));
+      cases.put(i, new IRPopTag.Case(caseBlock.getLabel(), countEndPoints(caseNode)));
 
       // Decrement the reference count of any unused exponentials in this case.
       for (String name : exponentials) {
@@ -434,10 +430,9 @@ public class IRGenerator extends ASTNodeVisitor {
     IRBlock thenBlock = process.addBlock("if_then");
     IRBlock elseBlock = process.addBlock("if_else");
 
-    IRBranch.Case then =
-        new IRBranch.Case(thenBlock.getLabel(), countEndPoints(node.getThen()) - 1);
+    IRBranch.Case then = new IRBranch.Case(thenBlock.getLabel(), countEndPoints(node.getThen()));
     IRBranch.Case otherwise =
-        new IRBranch.Case(elseBlock.getLabel(), countEndPoints(node.getElse()) - 1);
+        new IRBranch.Case(elseBlock.getLabel(), countEndPoints(node.getElse()));
     block.add(new IRBranch(expr.getExpr(), then, otherwise));
 
     expr.cleanUp(thenBlock, Optional.of(node.getThen()), false);
@@ -829,7 +824,7 @@ public class IRGenerator extends ASTNodeVisitor {
   }
 
   private class EndPointCounter extends ASTNodeVisitor {
-    private int count = 1;
+    private int count = 0;
 
     @Override
     public void visit(ASTNode node) {
@@ -839,45 +834,56 @@ public class IRGenerator extends ASTNodeVisitor {
 
     @Override
     public void visit(ASTCut node) {
-      count += 1;
       node.getLhs().accept(this);
       node.getRhs().accept(this);
     }
 
     @Override
     public void visit(ASTMix node) {
-      count += 1;
       node.getLhs().accept(this);
       node.getRhs().accept(this);
     }
 
     @Override
     public void visit(ASTShare node) {
-      count += 1;
       node.getLhs().accept(this);
       node.getRhs().accept(this);
     }
 
     @Override
-    public void visit(ASTEmpty node) {}
+    public void visit(ASTEmpty node) {
+      count += 1;
+    }
 
     @Override
-    public void visit(ASTClose node) {}
+    public void visit(ASTClose node) {
+      count += 1;
+    }
 
     @Override
-    public void visit(ASTId node) {}
+    public void visit(ASTId node) {
+      count += 1;
+    }
 
     @Override
-    public void visit(ASTFwd node) {}
+    public void visit(ASTFwd node) {
+      count += 1;
+    }
 
     @Override
-    public void visit(ASTFwdB node) {}
+    public void visit(ASTFwdB node) {
+      count += 1;
+    }
 
     @Override
-    public void visit(ASTCoExpr node) {}
+    public void visit(ASTCoExpr node) {
+      count += 1;
+    }
 
     @Override
-    public void visit(ASTPromoCoExpr node) {}
+    public void visit(ASTPromoCoExpr node) {
+      count += 1;
+    }
 
     @Override
     public void visit(ASTCoClose node) {
@@ -891,15 +897,19 @@ public class IRGenerator extends ASTNodeVisitor {
 
     @Override
     public void visit(ASTCase node) {
+      int oldCount = count;
+      int maxCount = 0;
       for (int i = 0; i < node.getCaseCount(); ++i) {
+        count = 0;
         node.getCase(node.getCaseLabelFromIndex(i)).accept(this);
+        maxCount = Math.max(maxCount, count);
       }
+      count = oldCount + maxCount;
     }
 
     @Override
     public void visit(ASTSend node) {
       if (!optimizeSendForward || !(node.getLhs() instanceof ASTFwd)) {
-        count += 1;
         node.getLhs().accept(this);
       }
       node.getRhs().accept(this);
@@ -916,7 +926,9 @@ public class IRGenerator extends ASTNodeVisitor {
     }
 
     @Override
-    public void visit(ASTScan node) {}
+    public void visit(ASTScan node) {
+      count += 1;
+    }
 
     @Override
     public void visit(ASTUnfold node) {
@@ -931,7 +943,7 @@ public class IRGenerator extends ASTNodeVisitor {
     @Override
     public void visit(ASTBang node) {
       // An extra end point is needed since IRCallProcess is used to call the exponential process.
-      count += 1;
+      count += 2;
     }
 
     @Override
@@ -941,8 +953,14 @@ public class IRGenerator extends ASTNodeVisitor {
 
     @Override
     public void visit(ASTIf node) {
+      int oldCount = count;
+      count = 0;
       node.getThen().accept(this);
+      int maxCount = count;
+      count = 0;
       node.getElse().accept(this);
+      maxCount = Math.max(maxCount, count);
+      count = oldCount + maxCount;
     }
 
     @Override
@@ -954,11 +972,12 @@ public class IRGenerator extends ASTNodeVisitor {
     @Override
     public void visit(ASTRecvTy node) {
       node.getRhs().accept(this);
-      node.getRhs().accept(this);
     }
 
     @Override
-    public void visit(ASTAffine node) {}
+    public void visit(ASTAffine node) {
+      count += 1;
+    }
 
     @Override
     public void visit(ASTUse node) {
@@ -966,11 +985,13 @@ public class IRGenerator extends ASTNodeVisitor {
     }
 
     @Override
-    public void visit(ASTDiscard node) {}
+    public void visit(ASTDiscard node) {
+      count += 1;
+    }
 
     @Override
     public void visit(ASTCell node) {
-      count += 1;
+      count += 2;
     }
 
     @Override
@@ -987,7 +1008,9 @@ public class IRGenerator extends ASTNodeVisitor {
     }
 
     @Override
-    public void visit(ASTRelease node) {}
+    public void visit(ASTRelease node) {
+      count += 1;
+    }
 
     @Override
     public void visit(ASTSleep node) {
@@ -995,7 +1018,9 @@ public class IRGenerator extends ASTNodeVisitor {
     }
 
     @Override
-    public void visit(ASTUnreachable node) {}
+    public void visit(ASTUnreachable node) {
+      count += 1;
+    }
   }
 
   private class GeneratedExpression {

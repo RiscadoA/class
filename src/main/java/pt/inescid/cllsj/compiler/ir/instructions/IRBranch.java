@@ -22,8 +22,8 @@ public class IRBranch extends IRInstruction {
       return endPoints;
     }
 
-    public void subtractEndPoints(int n) {
-      this.endPoints -= n;
+    public void modifyEndPoints(int n) {
+      this.endPoints += n;
     }
 
     @Override
@@ -62,6 +62,10 @@ public class IRBranch extends IRInstruction {
   @Override
   public String toString() {
     return "branch(" + expression + ", " + then + ", " + otherwise + ")";
+  }
+
+  public int getEndPoints() {
+    return Math.max(then.getEndPoints(), otherwise.getEndPoints());
   }
 
   @Override

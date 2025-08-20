@@ -22,8 +22,8 @@ public class IRPopType extends IRPop {
       return endPoints;
     }
 
-    public void subtractEndPoints(int n) {
-      this.endPoints -= n;
+    public void modifyEndPoints(int n) {
+      this.endPoints += n;
     }
   }
 
@@ -56,6 +56,11 @@ public class IRPopType extends IRPop {
 
   public void removeNegative() {
     this.negative = Optional.empty();
+  }
+
+  public int getEndPoints() {
+    return Math.max(
+        positive.map(Case::getEndPoints).orElse(0), negative.map(Case::getEndPoints).orElse(0));
   }
 
   @Override

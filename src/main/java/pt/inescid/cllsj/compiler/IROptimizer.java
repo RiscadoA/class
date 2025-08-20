@@ -134,7 +134,7 @@ public class IROptimizer {
       }
 
       if (wasEndPoint) {
-        subtractEndPoints(ir, flow.getBlock(), 1);
+        modifyEndPoints(ir, flow.getBlock(), -1);
       }
     }
   }
@@ -169,36 +169,40 @@ public class IROptimizer {
       removeLast.run();
     } else if (last instanceof IRBranch) {
       IRBranch i = (IRBranch) last;
+      int unusedEndPoints = i.getEndPoints();
       if (i.getThen().getLabel().equals(next.getBlock().getLabel())) {
-        subtractEndPoints(ir, prev.getBlock(), i.getOtherwise().getEndPoints());
+        unusedEndPoints -= i.getThen().getEndPoints();
       } else {
-        subtractEndPoints(ir, prev.getBlock(), i.getThen().getEndPoints());
+        unusedEndPoints -= i.getOtherwise().getEndPoints();
       }
+      modifyEndPoints(ir, prev.getBlock(), -unusedEndPoints);
       removeLast.run();
     } else if (last instanceof IRPopTag) {
       IRPopTag i = (IRPopTag) last;
-      int endPoints = 0;
+      int unusedEndPoints = i.getEndPoints();
       for (IRPopTag.Case c : i.getCases().values()) {
-        if (!c.getLabel().equals(next.getBlock().getLabel())) {
-          endPoints += c.getEndPoints();
+        if (c.getLabel().equals(next.getBlock().getLabel())) {
+          unusedEndPoints -= c.getEndPoints();
+          break;
         }
       }
-      subtractEndPoints(ir, prev.getBlock(), endPoints);
+      modifyEndPoints(ir, prev.getBlock(), -unusedEndPoints);
 
       // This is a troublesome instruction.
       // If remove the tag pop, we would need to remove the push too, and, additionally, modify the
       // type of the record That is complicated and, in most cases, this optimization probably
-      // almost
-      // never happens anyway. So, we keep the instruction, and just omit the branching.
+      // almost never happens anyway. So, we keep the instruction, and just omit the branching.
       i.getCases().clear();
     } else if (last instanceof IRPopType) {
       // Similarly to IRPopTag, we can remove the branch but not the instruction itself.
       IRPopType i = (IRPopType) last;
+      int unusedEndPoints = i.getEndPoints();
       if (i.getPositive().get().getLabel().equals(next.getBlock().getLabel())) {
-        subtractEndPoints(ir, prev.getBlock(), i.getNegative().get().getEndPoints());
+        unusedEndPoints -= i.getPositive().get().getEndPoints();
       } else {
-        subtractEndPoints(ir, prev.getBlock(), i.getPositive().get().getEndPoints());
+        unusedEndPoints -= i.getNegative().get().getEndPoints();
       }
+      modifyEndPoints(ir, prev.getBlock(), -unusedEndPoints);
       i.removeNegative();
       i.removePositive();
     } else if (last instanceof IRForward) {
@@ -215,7 +219,7 @@ public class IROptimizer {
       // We're removing a single end point of the process, if we didn't end up creating a new return
       // instruction
       if (!(contBeforeForward.getWriter().getInstruction() instanceof IRReturn)) {
-        subtractEndPoints(ir, prev.getBlock(), 1);
+        modifyEndPoints(ir, prev.getBlock(), -1);
       }
     } else if (last instanceof IRReturn) {
       // We're removing a single end point of the process.
@@ -224,10 +228,13 @@ public class IROptimizer {
           prev.getStates().getLast().getBoundRecord(i.getRecord()).getContinuation().get();
       contBeforeReturn.replaceWritten(Optional.empty());
 
-      // We're removing a single end point of the process, if we didn't end up creating a new return
-      // instruction.
-      if (!(contBeforeReturn.getWriter().getInstruction() instanceof IRReturn)) {
-        subtractEndPoints(ir, prev.getBlock(), 1);
+      // We're removing a single end point of the process
+      modifyEndPoints(ir, prev.getBlock(), -1);
+
+      // We might have also just created a new return instruction,
+      // in which case we'll need to add an end point there
+      if (contBeforeReturn.getWriter().getInstruction() instanceof IRReturn) {
+        modifyEndPoints(ir, contBeforeReturn.getWriter().getFlow().getBlock(), 1);
       }
       removeLast.run();
     } else {
@@ -258,19 +265,24 @@ public class IROptimizer {
     }
   }
 
-  private void subtractEndPoints(IRProcess ir, IRBlock block, int endPoints) {
-    subtractEndPoints(ir, block, endPoints, new HashSet<>());
+  // Modifies the end points of all branch instructions leading to block.
+  // If positive, increases the end point count, otherwise, decreases it.
+  private void modifyEndPoints(IRProcess ir, IRBlock block, int endPoints) {
+    modifyEndPoints(ir, block, endPoints, new HashSet<>());
   }
 
-  // Modifies the end points of all branch instructions leading to block.
-  private void subtractEndPoints(IRProcess ir, IRBlock block, int endPoints, Set<IRBlock> visited) {
+  private void modifyEndPoints(IRProcess ir, IRBlock block, int endPoints, Set<IRBlock> visited) {
+    if (endPoints == 0) {
+      return;
+    }
+
     if (!visited.add(block)) {
       return;
     }
 
     // Entry block
     if (block.getLabel() == null) {
-      ir.subtractEndPoints(endPoints);
+      ir.setEndPoints(ir.getEndPoints() + endPoints);
       return;
     }
 
@@ -291,31 +303,47 @@ public class IROptimizer {
       IRInstruction last = introducer.getInstructions().getLast();
       if (last instanceof IRBranch) {
         IRBranch i = (IRBranch) last;
+        int originalEndPoints = i.getEndPoints();
+
         if (i.getThen().getLabel().equals(block.getLabel())) {
-          i.getThen().subtractEndPoints(endPoints);
+          i.getThen().modifyEndPoints(endPoints);
         } else if (i.getOtherwise().getLabel().equals(block.getLabel())) {
-          i.getOtherwise().subtractEndPoints(endPoints);
+          i.getOtherwise().modifyEndPoints(endPoints);
         }
+
+        // If the end points were modified, we need to propagate the change
+        endPoints = i.getEndPoints() - originalEndPoints;
       } else if (last instanceof IRPopType) {
         IRPopType i = (IRPopType) last;
+        int originalEndPoints = i.getEndPoints();
+
         if (i.getPositive().isPresent()
             && i.getPositive().get().getLabel().equals(block.getLabel())) {
-          i.getPositive().get().subtractEndPoints(endPoints);
+          i.getPositive().get().modifyEndPoints(endPoints);
         } else if (i.getNegative().isPresent()
             && i.getNegative().get().getLabel().equals(block.getLabel())) {
-          i.getNegative().get().subtractEndPoints(endPoints);
+          i.getNegative().get().modifyEndPoints(endPoints);
         }
+
+        // If the end points were modified, we need to propagate the change
+        endPoints = i.getEndPoints() - originalEndPoints;
       } else if (last instanceof IRPopTag) {
         IRPopTag i = (IRPopTag) last;
-        for (IRPopTag.Case c : i.getCases().values()) {
-          if (c.getLabel().equals(block.getLabel())) {
-            c.subtractEndPoints(endPoints);
+        int originalEndPoints = i.getEndPoints();
+
+        for (IRPopTag.Case thisCase : i.getCases().values()) {
+          if (thisCase.getLabel().equals(block.getLabel())) {
+            thisCase.modifyEndPoints(endPoints);
+            break;
           }
         }
+
+        // If the end points were modified, we need to propagate the change
+        endPoints = i.getEndPoints() - originalEndPoints;
       }
 
       // We continue going up the chain of blocks
-      subtractEndPoints(ir, introducer, endPoints, visited);
+      modifyEndPoints(ir, introducer, endPoints, visited);
     }
   }
 
@@ -1120,9 +1148,8 @@ public class IROptimizer {
         }
       }
 
-      // Modify the end point count of the current process
-      // We may actually end up adding end points here
-      subtractEndPoints(proc, block, 1 - callProc.getEndPoints());
+      // Modify the end point count of the current block
+      modifyEndPoints(proc, block, callProc.getEndPoints() - 1);
     }
   }
 

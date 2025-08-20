@@ -23,8 +23,8 @@ public class IRPopTag extends IRPop {
       return endPoints;
     }
 
-    public void subtractEndPoints(int n) {
-      this.endPoints -= n;
+    public void modifyEndPoints(int n) {
+      this.endPoints += n;
     }
   }
 
@@ -37,6 +37,14 @@ public class IRPopTag extends IRPop {
 
   public Map<Integer, Case> getCases() {
     return cases;
+  }
+
+  public int getEndPoints() {
+    int max = 0;
+    for (Case c : cases.values()) {
+      max = Math.max(max, c.getEndPoints());
+    }
+    return max;
   }
 
   @Override

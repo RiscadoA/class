@@ -1411,9 +1411,9 @@ public class CGenerator extends IRInstructionVisitor {
     incIndent();
 
     // We'll take the end points of all other cases for each case, since these paths won't be taken
-    Integer totalEndPoints = 0;
+    Integer maxEndPoints = 0;
     for (Map.Entry<Integer, IRPopTag.Case> entry : instruction.getCases().entrySet()) {
-      totalEndPoints += entry.getValue().getEndPoints();
+      maxEndPoints = Math.max(maxEndPoints, entry.getValue().getEndPoints());
     }
 
     for (Map.Entry<Integer, IRPopTag.Case> entry : instruction.getCases().entrySet()) {
@@ -1421,7 +1421,7 @@ public class CGenerator extends IRInstructionVisitor {
       incIndent();
       putAssign(
           environmentEndPoints(),
-          environmentEndPoints() + " - " + (totalEndPoints - entry.getValue().getEndPoints()));
+          environmentEndPoints() + " - " + (maxEndPoints - entry.getValue().getEndPoints()));
       putConstantGoto(blockLabel(entry.getValue().getLabel()));
       decIndent();
     }
@@ -1507,18 +1507,15 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRBranch instruction) {
+    int maxEndPoints = instruction.getEndPoints();
     putIfElse(
         expression(instruction.getExpression()),
         () -> {
-          putAssign(
-              environmentEndPoints(),
-              environmentEndPoints() + " - " + instruction.getOtherwise().getEndPoints());
+          putAssign(environmentEndPoints(), environmentEndPoints() + " - " + (maxEndPoints - instruction.getThen().getEndPoints()));
           putConstantGoto(blockLabel(instruction.getThen().getLabel()));
         },
         () -> {
-          putAssign(
-              environmentEndPoints(),
-              environmentEndPoints() + " - " + instruction.getThen().getEndPoints());
+          putAssign(environmentEndPoints(), environmentEndPoints() + " - " + (maxEndPoints - instruction.getOtherwise().getEndPoints()));
           putConstantGoto(blockLabel(instruction.getOtherwise().getLabel()));
         });
   }
@@ -1588,29 +1585,19 @@ public class CGenerator extends IRInstructionVisitor {
   public void visit(IRPopType instruction) {
     putAssign(type(instruction.getArgType()), popType(instruction.getRecord()));
     if (instruction.getPositive().isPresent() || instruction.getNegative().isPresent()) {
+      int maxEndPoints = instruction.getEndPoints();
       putIfElse(
           popPolarity(instruction.getRecord()),
           () -> {
             if (instruction.getPositive().isPresent()) {
-              if (instruction.getNegative().isPresent()) {
-                putAssign(
-                    environmentEndPoints(),
-                    environmentEndPoints()
-                        + " - "
-                        + instruction.getNegative().get().getEndPoints());
-              }
+              putAssign(
+                  environmentEndPoints(), environmentEndPoints() + " - " + (maxEndPoints - instruction.getPositive().get().getEndPoints()));
               putConstantGoto(blockLabel(instruction.getPositive().get().getLabel()));
             }
           },
           () -> {
             if (instruction.getNegative().isPresent()) {
-              if (instruction.getPositive().isPresent()) {
-                putAssign(
-                    environmentEndPoints(),
-                    environmentEndPoints()
-                        + " - "
-                        + instruction.getPositive().get().getEndPoints());
-              }
+              putAssign(environmentEndPoints(), environmentEndPoints() + " - " + (maxEndPoints - instruction.getNegative().get().getEndPoints()));
               putConstantGoto(blockLabel(instruction.getNegative().get().getLabel()));
             }
           });

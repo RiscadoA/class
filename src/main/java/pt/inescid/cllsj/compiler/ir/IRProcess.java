@@ -104,8 +104,8 @@ public class IRProcess {
     return endPoints;
   }
 
-  public void subtractEndPoints(int endPoints) {
-    this.endPoints -= endPoints;
+  public void setEndPoints(int endPoints) {
+    this.endPoints = endPoints;
   }
 
   public IRBlock getEntry() {
