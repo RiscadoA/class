@@ -669,7 +669,7 @@ public class IROptimizer {
       IRFlow flow = flows.remove(toRemove.get());
       if (flow != null) {
         for (IRFlow target : flow.getTargets()) {
-          target.getSources().remove(flow);
+          target.removeSource(flow);
         }
       }
     }
@@ -678,6 +678,8 @@ public class IROptimizer {
   public void optimizeFlipForward(IRProgram ir) {
     for (Map.Entry<String, IRProcess> e : ir.getProcesses().entrySet()) {
       Map<IRBlock, IRFlow> flows = processFlows.get(e.getKey());
+      Set<IRBlock> blocksToRemove = new HashSet<>();
+      
       for (IRBlock flipBlock : e.getValue().getBlocksIncludingEntry()) {
         if (!flows.containsKey(flipBlock)) {
           continue;
@@ -714,11 +716,23 @@ public class IROptimizer {
 
         IRFlow forwardFlow = flows.get(forwardBlock);
         flipBlock.getInstructions().removeLast();
-        flipBlock.getInstructions().add(new IRFlipForward(x, y));
+        IRFlipForward flipForward = new IRFlipForward(x, y);
+        if (!forward.isEndPoint()) {
+          flipForward.removeEndPoint();
+        }
+        flipBlock.getInstructions().add(flipForward);
         flipFlow.getStates().removeLast();
         flipFlow.getStates().add(forwardFlow.getStates().get(1));
         flipFlow.removeTarget(forwardFlow);
-        forwardFlow.removeSource(flipFlow);
+        blocksToRemove.add(forwardBlock);
+      }
+
+      for (IRBlock block : blocksToRemove) {
+        IRFlow flow = flows.remove(block);
+        for (IRFlow source : flow.getSources()) {
+          source.removeTarget(flow);
+        }
+        e.getValue().getBlocks().remove(block);
       }
     }
   }
