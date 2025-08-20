@@ -22,6 +22,7 @@ import pt.inescid.cllsj.compiler.ir.flow.IRFlow;
 import pt.inescid.cllsj.compiler.ir.flow.IRFlowContinuation;
 import pt.inescid.cllsj.compiler.ir.flow.IRFlowLocation;
 import pt.inescid.cllsj.compiler.ir.flow.IRFlowRecord;
+import pt.inescid.cllsj.compiler.ir.flow.IRFlowState;
 import pt.inescid.cllsj.compiler.ir.instructions.*;
 import pt.inescid.cllsj.compiler.ir.type.IRBoolT;
 import pt.inescid.cllsj.compiler.ir.type.IRCellT;
@@ -501,7 +502,7 @@ public class IROptimizer {
 
       // Now, we simply remove both instructions and modify the type accordingly
       IRType oldType = ir.getRecordType(push.getRecord());
-      IRType newType = TypeModifier.removeNth(oldType, slotIndex);
+      IRType newType = TypeModifier.removeNth(pushLoc.getPreviousState(), oldType, slotIndex);
 
       if (newType instanceof IRCloseT) {
         // We might be able to remove the session entirely
@@ -842,7 +843,7 @@ public class IROptimizer {
                     push.setRecord(pushSession.getRecord());
                     loc.moveInstructionAfter(pushSessionLoc);
                     ir.setRecordType(
-                        argRecord, TypeModifier.removeLast(ir.getRecordType(argRecord)));
+                        argRecord, TypeModifier.removeLast(loc.getPreviousState(), ir.getRecordType(argRecord)));
                   }
                   return true;
                 }
@@ -940,7 +941,7 @@ public class IROptimizer {
                   pop.setRecord(popSession.getRecord());
                   loc.moveInstructionBefore(popSessionLoc);
                   ir.setRecordType(
-                      argRecord, TypeModifier.removeFirst(ir.getRecordType(argRecord)));
+                      argRecord, TypeModifier.removeFirst(loc.getPreviousState(), ir.getRecordType(argRecord)));
                   return true;
                 }
               }
@@ -1201,31 +1202,33 @@ public class IROptimizer {
       REMOVE_LAST,
     }
 
+    private IRFlowState state;
     private IRType result;
     private Modification modification;
     private int index;
 
-    public static IRType removeFirst(IRType type) {
-      return removeNth(type, 0);
+    public static IRType removeFirst(IRFlowState state, IRType type) {
+      return removeNth(state, type, 0);
     }
 
-    public static IRType removeNth(IRType type, int index) {
-      TypeModifier modifier = new TypeModifier(Modification.REMOVE_NTH, index);
+    public static IRType removeNth(IRFlowState state, IRType type, int index) {
+      TypeModifier modifier = new TypeModifier(state, Modification.REMOVE_NTH, index);
       return modifier.recurse(type, 0);
     }
 
-    public static IRType removeLast(IRType type) {
-      TypeModifier modifier = new TypeModifier(Modification.REMOVE_LAST, 0);
+    public static IRType removeLast(IRFlowState state, IRType type) {
+      TypeModifier modifier = new TypeModifier(state, Modification.REMOVE_LAST, 0);
       return modifier.recurse(type, 0);
     }
 
-    public TypeModifier(Modification modification, int index) {
+    public TypeModifier(IRFlowState state, Modification modification, int index) {
+      this.state = state;
       this.modification = modification;
       this.index = index;
     }
 
     private IRType recurse(IRType type, int offset) {
-      TypeModifier m = new TypeModifier(modification, index - offset);
+      TypeModifier m = new TypeModifier(state, modification, index - offset);
       type.accept(m);
       return m.result;
     }
@@ -1277,7 +1280,9 @@ public class IROptimizer {
 
     @Override
     public void visit(IRSessionT type) {
-      if (type.getValueRequisites().mustBeValue()) {
+      Optional<Boolean> isValue = state.isValue(type.getValueRequisites());
+
+      if (isValue.isPresent() && isValue.get() == true) {
         if (modification == Modification.REMOVE_NTH) {
           int argCount = TypeSlotCounter.count(type.getArg());
           if (index < argCount) {
@@ -1305,7 +1310,7 @@ public class IROptimizer {
             result = new IRSessionT(type.getArg(), cont, type.getValueRequisites());
           }
         }
-      } else if (!type.getValueRequisites().canBeValue()) {
+      } else if (isValue.isPresent() && isValue.get() == false) {
         if (modification == Modification.REMOVE_NTH) {
           if (index == 0) {
             result = type.getCont();
