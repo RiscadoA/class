@@ -304,42 +304,56 @@ public class IROptimizer {
       if (last instanceof IRBranch) {
         IRBranch i = (IRBranch) last;
         int originalEndPoints = i.getEndPoints();
+        boolean modified = false;
 
         if (i.getThen().getLabel().equals(block.getLabel())) {
           i.getThen().modifyEndPoints(endPoints);
+          modified = true;
         } else if (i.getOtherwise().getLabel().equals(block.getLabel())) {
           i.getOtherwise().modifyEndPoints(endPoints);
+          modified = true;
         }
 
-        // If the end points were modified, we need to propagate the change
-        endPoints = i.getEndPoints() - originalEndPoints;
+        if (modified) {
+          // If the end points were modified, we need to propagate the change
+          endPoints = i.getEndPoints() - originalEndPoints;
+        }
       } else if (last instanceof IRPopType) {
         IRPopType i = (IRPopType) last;
         int originalEndPoints = i.getEndPoints();
+        boolean modified = false;
 
         if (i.getPositive().isPresent()
             && i.getPositive().get().getLabel().equals(block.getLabel())) {
           i.getPositive().get().modifyEndPoints(endPoints);
+          modified = true;
         } else if (i.getNegative().isPresent()
             && i.getNegative().get().getLabel().equals(block.getLabel())) {
           i.getNegative().get().modifyEndPoints(endPoints);
+          modified = true;
         }
 
-        // If the end points were modified, we need to propagate the change
-        endPoints = i.getEndPoints() - originalEndPoints;
+        if (modified) {
+          // If the end points were modified, we need to propagate the change
+          endPoints = i.getEndPoints() - originalEndPoints;
+        }
       } else if (last instanceof IRPopTag) {
         IRPopTag i = (IRPopTag) last;
         int originalEndPoints = i.getEndPoints();
+        boolean modified = false;
 
         for (IRPopTag.Case thisCase : i.getCases().values()) {
           if (thisCase.getLabel().equals(block.getLabel())) {
             thisCase.modifyEndPoints(endPoints);
+            modified = true;
             break;
           }
         }
 
-        // If the end points were modified, we need to propagate the change
-        endPoints = i.getEndPoints() - originalEndPoints;
+        if (modified) {
+          // If the end points were modified, we need to propagate the change
+          endPoints = i.getEndPoints() - originalEndPoints;
+        }
       }
 
       // We continue going up the chain of blocks
