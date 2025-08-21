@@ -373,6 +373,9 @@ public class IROptimizer {
   }
 
   private void optimizeKnownSlots(IRProcess ir, Map<IRBlock, IRFlow> flows) {
+    // Slost which have already been removed of types.
+    Map<Integer, Set<Integer>> removedSlots = new HashMap<>();
+
     // Will store, for a given push instruction, the instructions which pop their data
     Map<IRFlowLocation, IRFlowLocation> candidatePops = new HashMap<>();
 
@@ -415,7 +418,12 @@ public class IROptimizer {
       if (record.getNextSlotIndex().isEmpty()) {
         continue; // We need to know which part of the type we're removing
       }
-      int slotIndex = record.getNextSlotIndex().get();
+      int slotIndex = record.getNextSlotIndex().get() - 1;
+      if (removedSlots.containsKey(push.getRecord())) {
+        // We might need to decrement the slot index if previous slots have already been removed
+        Set<Integer> slots = removedSlots.get(push.getRecord());
+        slotIndex -= slots.stream().filter(i -> i < record.getNextSlotIndex().get()).count();
+      }
 
       // We must go through each location and ensure that there's a single execution
       // path from the push to the pop.
@@ -538,6 +546,7 @@ public class IROptimizer {
       popLoc.removeInstruction();
 
       ir.setRecordType(push.getRecord(), newType);
+      removedSlots.computeIfAbsent(push.getRecord(), k -> new HashSet<>()).add(slotIndex);
     }
   }
 
