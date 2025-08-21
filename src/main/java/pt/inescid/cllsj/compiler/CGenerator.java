@@ -764,11 +764,11 @@ public class CGenerator extends IRInstructionVisitor {
     // Define registers.
     putStatement("struct task* " + TASK);
     putStatement("struct task* " + TMP_TASK);
-    putStatement("struct environment* " + ENV);
-    putStatement("struct environment* " + TMP_ENV);
-    putStatement("void* " + TMP_CONT);
-    putStatement("struct record* " + TMP_RECORD);
-    putStatement("struct exponential* " + TMP_EXPONENTIAL);
+    putStatement("register struct environment* " + ENV);
+    putStatement("register struct environment* " + TMP_ENV);
+    putStatement("register void* " + TMP_CONT);
+    putStatement("register struct record* " + TMP_RECORD);
+    putStatement("register struct exponential* " + TMP_EXPONENTIAL);
     if (!disableConcurrency) {
       putStatement("pthread_t " + TMP_THREAD);
     }
