@@ -12,11 +12,11 @@ ofile=""
 while getopts ":dOtPiraAsep:o:" opt; do
     case $opt in
         d)
-            Cflags="$Cflags -g -O2"
+            Cflags="$Cflags -g -O1"
             debug=true
             ;;
         O)
-            Cflags="$Cflags -O1"
+            Cflags="$Cflags -O2"
             ;;
         t)
             CLLSflags="$CLLSflags -t"
