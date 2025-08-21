@@ -1,0 +1,75 @@
+type corec IntStream {
+       offer of   {
+     	   | #next: send int; IntStream
+	       | #stop: close
+ 	   }	   	   
+ };;
+ 
+proc rec integersfrom(n: IntStream, k:~int)
+{
+    case n of {
+      	|	#next: send n(k); integersfrom(n,k+1)
+	 	|	#stop: close n
+ 	}	   	   
+ };;
+ 
+proc unsafe_rec filter(fouts:IntStream, fins:~IntStream, n:~int)
+ {
+    #next fins;
+    recv fins (v);  
+    if  ((v / n)*n == v) then
+	 	{ filter(fouts,fins,n) }
+    else
+		{  
+	    	case fouts of { // unbalanced here
+	    		| #next:  send fouts (v); filter(fouts, fins,n) 
+	    		| #stop:  #stop fins; wait fins; close fouts
+	 		}
+	 	}
+ };;
+ 
+proc unsafe_rec sieve(souts:IntStream, sins:~IntStream)
+ {
+      case souts of { 
+  	  	|#next:  
+			#next sins;
+      		recv sins (p);
+  	  	    send souts(p);
+		    cut  {
+		       	sieve(souts,outp)
+		      		|outp:IntStream|
+		      	filter(outp,sins,p)
+		    }
+		|#stop:
+			#stop sins; wait sins; close souts
+	}
+ };;
+
+proc primesN(primes:IntStream) { 
+	letc n:IntStream {
+      integersfrom(n,2)
+	};
+    sieve(primes,n)
+};;
+
+proc unsafe_rec printfirstN(il:~IntStream,k:~int)
+{
+   if(k==0) {
+	  #stop il; wait il; println(" STOP.");()
+	 }
+   {
+	 #next il; 
+	 recv il(n); 
+	 print(n); 
+	 print(" ");
+	 printfirstN(il,k-1) // pass basic parameter values directly in env
+   }
+};;
+
+proc main_ss(np:coint)
+{
+    letc primes:IntStream {
+		primesN(primes)
+	};
+    printfirstN(primes,np)
+ };;
