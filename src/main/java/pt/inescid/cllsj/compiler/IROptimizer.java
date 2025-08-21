@@ -373,25 +373,6 @@ public class IROptimizer {
   }
 
   private void optimizeKnownSlots(IRProcess ir, Map<IRBlock, IRFlow> flows) {
-    // Until no changes are made, repeat:
-    //
-    // - For linear records:
-    //    1. Search for IRPopSession which popped a known slot
-    //    2. Find respective IRPushSession
-    //       - The analyzer can extract this information easily
-    //    3. Rename popped record to the pushed record
-    //    4. Remove the respective part of the type
-    //       - Unsure on how to do this
-    //       - Maybe a 'remove nth slot from type' operation
-    //    5. Remove both instructions
-    //
-    // - For exponential records:
-    //    1. Search for IRPopExponential which popped a known slot
-    //    2. Find respective IRPushExponential or IRPushExpression
-    //    3. Rename popped exponential to the pushed exponential
-    //    4. Remove the respective part of the type
-    //    5. Remove both instructions
-
     // Will store, for a given push instruction, the instructions which pop their data
     Map<IRFlowLocation, IRFlowLocation> candidatePops = new HashMap<>();
 
