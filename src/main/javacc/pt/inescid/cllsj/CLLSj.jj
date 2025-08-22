@@ -166,9 +166,9 @@ public static void main(String args[]) {
           compiler.optimizeKnownJumps = false;
         } else if (args[i].equals("--no-optimize-known-slots")) {
           compiler.optimizeKnownSlots = false;
-        } else if (args[i].equals("--no-optimize-known-endpoints")) {
+        } else if (args[i].equals("--no-optimize-known-end-points")) {
           compiler.optimizeKnownEndPoints = false;
-        } else if (args[i].equals("--no-optimize-single-endpoint")) {
+        } else if (args[i].equals("--no-optimize-single-end-point")) {
           compiler.optimizeSingleEndpoint = false;
         } else if (args[i].equals("-p")) {
           if (i + 1 >= args.length) {
@@ -209,8 +209,9 @@ public static void main(String args[]) {
         System.err.println("    --no-optimize-flip-forward: Disables flip forward optimization");
         System.err.println("    --no-optimize-send-value: Disables send value optimization");
         System.err.println("    --no-optimize-known-jumps: Disables optimization of known jumps");
-        System.err.println("    --no-optimize-known-endpoints: Disables optimization of known endpoints");
-        System.err.println("    --no-optimize-single-endpoint: Disables optimization of single endpoint processes");
+        System.err.println("    --no-optimize-known-slots: Disables optimization of known slots");
+        System.err.println("    --no-optimize-known-end-points: Disables optimization of known endpoints");
+        System.err.println("    --no-optimize-single-end-point: Disables optimization of single endpoint processes");
 
         System.exit(1);
       }
