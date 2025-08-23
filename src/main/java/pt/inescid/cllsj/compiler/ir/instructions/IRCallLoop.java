@@ -150,4 +150,9 @@ public class IRCallLoop extends IRInstruction {
       arg.targetExponential = renamer.apply(arg.targetExponential);
     }
   }
+
+  @Override
+  public void renameLabels(Function<String, String> renamer) {
+    this.entryLabel = renamer.apply(this.entryLabel);
+  }
 }
