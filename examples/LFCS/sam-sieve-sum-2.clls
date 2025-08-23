@@ -1,7 +1,7 @@
 type corec IntStream {
        offer of   {
      	   | #next: send !lint; IntStream
-	   | #stop: close
+	   | #stop: wait
  	   }	   	   
  };;
  
@@ -9,7 +9,7 @@ proc rec integersfrom(n: IntStream; k:~lint)
 {
     case n of {
       	|	#next: send n(k); integersfrom(n;k+1)
-	 	|	#stop: close n
+	 	|	#stop: wait n;()
  	}	   	   
  };;
  
@@ -23,7 +23,7 @@ proc unsafe_rec filter(fouts:IntStream, fins:~IntStream; n:~lint)
 		{  
 	    		case fouts of { 
 	    		|#next:  send fouts (v); filter(fouts, fins;n) 
-	    		|#stop:  #stop fins; wait fins; close fouts
+	    		|#stop:  wait fouts; #stop fins; close fins
 	 		}
 	 	}
  };;
@@ -41,7 +41,7 @@ proc unsafe_rec sieve(souts:IntStream, sins:~IntStream)
 		      	filter(outp,sins;p)
 		    }
 		|#stop:
-			#stop sins; close souts; wait sins; ()
+			wait souts; #stop sins; close sins
 	}
  };;
 
@@ -56,7 +56,7 @@ proc unsafe_rec printfirstN(il:~IntStream;k:~lint)
 {
    if(k==0) {
 	  println("DONE!");
-	  #stop il; wait il; ()
+	  #stop il; close il
 	 }
    {
 	 #next il; recv il(n);
