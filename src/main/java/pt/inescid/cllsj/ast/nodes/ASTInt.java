@@ -3,13 +3,13 @@ package pt.inescid.cllsj.ast.nodes;
 import java.util.*;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
-import pt.inescid.cllsj.LinSession;
 import pt.inescid.cllsj.Server;
+import pt.inescid.cllsj.Session;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.VInt;
 import pt.inescid.cllsj.Value;
 import pt.inescid.cllsj.ast.ASTExprVisitor;
-import pt.inescid.cllsj.ast.types.ASTLCointT;
+import pt.inescid.cllsj.ast.types.ASTCointT;
 import pt.inescid.cllsj.ast.types.ASTType;
 
 public class ASTInt extends ASTExpr {
@@ -59,10 +59,10 @@ public class ASTInt extends ASTExpr {
 
   public ASTType etypecheck(Env<ASTType> ed, Env<ASTType> eg, Env<EnvEntry> ep, boolean lin)
       throws Exception {
-    return new ASTLCointT();
+    return new ASTCointT(); // NON-LIN-INT
   }
 
-  public Value eval(Env<LinSession> ed, Env<Server> eg) throws Exception {
+  public Value eval(Env<Session> ed, Env<Server> eg) throws Exception {
     return new VInt(v);
   }
 

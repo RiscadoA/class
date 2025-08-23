@@ -16,6 +16,7 @@ import pt.inescid.cllsj.SAM;
 import pt.inescid.cllsj.SAMCont;
 import pt.inescid.cllsj.SAMError;
 import pt.inescid.cllsj.Server;
+import pt.inescid.cllsj.Session;
 import pt.inescid.cllsj.SessionClosure;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.SessionFieldAffine;
@@ -31,9 +32,11 @@ import pt.inescid.cllsj.ast.types.ASTCellBT;
 import pt.inescid.cllsj.ast.types.ASTCellLT;
 import pt.inescid.cllsj.ast.types.ASTCellT;
 import pt.inescid.cllsj.ast.types.ASTCoRecT;
+import pt.inescid.cllsj.ast.types.ASTCointT;
 import pt.inescid.cllsj.ast.types.ASTOneT;
 import pt.inescid.cllsj.ast.types.ASTRecT;
 import pt.inescid.cllsj.ast.types.ASTType;
+import pt.inescid.cllsj.ast.types.ASTintT;
 
 public class ASTFwd extends ASTNode {
 
@@ -261,7 +264,7 @@ public class ASTFwd extends ASTNode {
     ch2 = x;
   }
 
-  public void runproc(Env<EnvEntry> ep, Env<LinSession> ed, Env<Server> eg, Logger logger)
+  public void runproc(Env<EnvEntry> ep, Env<Session> ed, Env<Server> eg, Logger logger)
       throws Exception {
 
     // when forwarding a cell, make sure the cell is on channel ch1
@@ -288,13 +291,24 @@ public class ASTFwd extends ASTNode {
     // System.out.println("FWD "+ch1i+" : "+ch2i+" : "+typeCh2i);
 
     try {
+
+      // System.out.println("Type fwd ch2 "+ typeCh2i);
+      if (typeCh2i instanceof ASTintT) {
+        LinSession session2 = (LinSession) ed.find(ch2i);
+        session2.send(ed.find(ch1i));
+        return;
+      } else {
+        if (typeCh2i instanceof ASTCointT) {
+          LinSession session1 = (LinSession) ed.find(ch1i);
+          session1.send(ed.find(ch2i));
+          return;
+        }
+      }
       LinSession session1 = (LinSession) ed.find(ch1i);
       LinSession session2 = (LinSession) ed.find(ch2i);
 
       // System.out.println("Set fwd -"+ session1 + " -> " + session2);
-
       session1.setFwdSession(session2);
-
       // System.out.println("Set fwd +"+ session1 + " -> " + session2);
 
       logger.info("Set fwd -" + session1 + " -> " + session2);

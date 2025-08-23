@@ -35,7 +35,7 @@ public class LinSession extends Session implements Cell, Channel {
 
   private Env<EnvEntry> ep;
 
-  private Env<LinSession> ed;
+  private Env<Session> ed;
 
   private Env<Server> eg;
 
@@ -287,7 +287,7 @@ public class LinSession extends Session implements Cell, Channel {
       String _chi,
       ASTNode _rhs,
       Env<EnvEntry> _ep,
-      Env<LinSession> _ed,
+      Env<Session> _ed,
       Env<Server> _eg,
       Logger _logger,
       boolean _linear,
@@ -347,7 +347,7 @@ public class LinSession extends Session implements Cell, Channel {
       LinSession session = new LinSession(_chi);
       ASTNode rhs_r = rhs;
       Env<EnvEntry> ep_r = ep;
-      Env<LinSession> ed_r = ed;
+      Env<Session> ed_r = ed;
       String chi_r = chi;
       Env<Server> eg_r = eg;
       // System.out.println("Take: contents = " +_chi+" "+rhs_r);
@@ -374,8 +374,7 @@ public class LinSession extends Session implements Cell, Channel {
     }
   }
 
-  public void put(
-      String _chi, ASTNode _rhs, Env<EnvEntry> _ep, Env<LinSession> _ed, Env<Server> _eg)
+  public void put(String _chi, ASTNode _rhs, Env<EnvEntry> _ep, Env<Session> _ed, Env<Server> _eg)
       throws Exception {
     lock.lock();
     // Thread.sleep(3);
@@ -418,7 +417,7 @@ public class LinSession extends Session implements Cell, Channel {
         // System.out.println(usages + " FREE CELL "+this);
 
         LinSession session = new LinSession(chi);
-        Env<LinSession> edCut = ed.assoc(chi, session);
+        Env<Session> edCut = ed.assoc(chi, session);
 
         if (statecell) {
           // System.out.println("STATE CELL RELEASE payload");
@@ -477,7 +476,7 @@ public class LinSession extends Session implements Cell, Channel {
           new Runnable() {
             public void run() {
               try {
-                rhs_r.runproc(ep_r, new Env<LinSession>(chi_r, session, null), eg_r, logger);
+                rhs_r.runproc(ep_r, new Env<Session>(chi_r, session, null), eg_r, logger);
               } catch (Exception e) {
                 e.printStackTrace(System.out);
               }

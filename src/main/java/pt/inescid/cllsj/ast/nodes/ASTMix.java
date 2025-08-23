@@ -6,10 +6,10 @@ import java.util.logging.*;
 import pt.inescid.cllsj.CLLSj;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
-import pt.inescid.cllsj.LinSession;
 import pt.inescid.cllsj.SAM;
 import pt.inescid.cllsj.SAMCont;
 import pt.inescid.cllsj.Server;
+import pt.inescid.cllsj.Session;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.types.ASTBotT;
@@ -128,7 +128,7 @@ public class ASTMix extends ASTNode {
   /*
     Calls runproc on lhs and rhs in parallel
   */
-  public void runproc(Env<EnvEntry> ep, Env<LinSession> ed, Env<Server> eg, Logger logger)
+  public void runproc(Env<EnvEntry> ep, Env<Session> ed, Env<Server> eg, Logger logger)
       throws Exception {
     CLLSj.threadPool.submit(
         new Runnable() {
@@ -140,14 +140,6 @@ public class ASTMix extends ASTNode {
             }
           }
         });
-    /* CLLSj.threadPool.submit(
-       new Runnable(){
-       public void run(){ try {
-       rhs.runproc(ep, ed, eg, logger);
-       } catch (Exception e) {e.printStackTrace(System.out);} }
-       });
-    */
-
     rhs.runproc(ep, ed, eg, logger);
   }
 

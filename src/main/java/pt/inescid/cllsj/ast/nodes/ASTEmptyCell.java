@@ -6,8 +6,8 @@ import java.util.logging.*;
 import pt.inescid.cllsj.Cell;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
-import pt.inescid.cllsj.LinSession;
 import pt.inescid.cllsj.Server;
+import pt.inescid.cllsj.Session;
 import pt.inescid.cllsj.TypeError;
 import pt.inescid.cllsj.ast.types.ASTCellLT;
 import pt.inescid.cllsj.ast.types.ASTType;
@@ -76,7 +76,7 @@ public class ASTEmptyCell extends ASTNode {
     if (y == ch) ch = x;
   }
 
-  public void runproc(Env<EnvEntry> ep, Env<LinSession> ed, Env<Server> eg, Logger logger)
+  public void runproc(Env<EnvEntry> ep, Env<Session> ed, Env<Server> eg, Logger logger)
       throws Exception {
     Cell cell = (Cell) ed.find(ch);
     cell.setEmptyCell(logger);

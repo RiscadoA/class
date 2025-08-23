@@ -4,8 +4,8 @@ import java.util.*;
 import java.util.function.*;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
-import pt.inescid.cllsj.LinSession;
 import pt.inescid.cllsj.Server;
+import pt.inescid.cllsj.Session;
 import pt.inescid.cllsj.ast.types.ASTType;
 
 public class ASTInclude extends ASTNode {
@@ -50,7 +50,7 @@ public class ASTInclude extends ASTNode {
     return s;
   }
 
-  public void runproc(Env<EnvEntry> ep, Env<LinSession> ed, Env<Server> eg) throws Exception {}
+  public void runproc(Env<EnvEntry> ep, Env<Session> ed, Env<Server> eg) throws Exception {}
 
   public ASTNode subst(Env<ASTType> e) {
     return this;

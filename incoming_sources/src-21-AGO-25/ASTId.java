@@ -374,7 +374,6 @@ public class ASTId extends ASTNode {
 	    
 	EnvEntry tc = ep.find(id);
 
-
 	if (tc instanceof ProcEntry) {
 
 	    ASTProcDef pe = (ASTProcDef) ((ProcEntry) tc).getProc();

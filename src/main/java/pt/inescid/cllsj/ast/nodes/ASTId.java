@@ -7,12 +7,12 @@ import pt.inescid.cllsj.CLLSj;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.IndexedSessionRef;
-import pt.inescid.cllsj.LinSession;
 import pt.inescid.cllsj.ProcEntry;
 import pt.inescid.cllsj.RVarEntry;
 import pt.inescid.cllsj.SAMCont;
 import pt.inescid.cllsj.SAMError;
 import pt.inescid.cllsj.Server;
+import pt.inescid.cllsj.Session;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.SessionRecord;
 import pt.inescid.cllsj.Trail;
@@ -391,7 +391,6 @@ public class ASTId extends ASTNode {
                 + actual.toStr(ep));
       }
     }
-
     exprs.clear();
     gexprs.clear();
   }
@@ -458,25 +457,29 @@ public class ASTId extends ASTNode {
     }
   }
 
-  public void runproc(Env<EnvEntry> ep, Env<LinSession> ed, Env<Server> eg, Logger logger)
+  public void runproc(Env<EnvEntry> ep, Env<Session> ed, Env<Server> eg, Logger logger)
       throws Exception {
 
     EnvEntry tc = ep.find(id);
 
     if (tc instanceof ProcEntry) {
-      ASTProcDef pe = (ASTProcDef) ((ProcEntry) tc).getProc();
-      Env<EnvEntry> epDef = pe.getEnv();
 
+      ASTProcDef pe = (ASTProcDef) ((ProcEntry) tc).getProc();
+
+      Env<EnvEntry> epDef = pe.getEnv();
       Iterator<String> its = pars.iterator();
-      Env<LinSession> ned = ed;
+
+      // Env<Session> ned = ed;
+      Env<Session> ned = new Env<Session>();
+      Env<Server> neg = eg;
+
       for (String arg : pe.args) {
         String par = its.next();
-        LinSession session = ed.find(par);
+        Session session = ed.find(par);
         ned = ned.assoc(arg, session);
       }
 
       Iterator<String> gits = gpars.iterator();
-      Env<Server> neg = eg;
       for (String garg : pe.gargs) {
         String gpar = gits.next();
         Server server = eg.find(gpar);

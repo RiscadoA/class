@@ -49,7 +49,7 @@ public class Server extends Session {
         new Runnable() {
           public void run() {
             try {
-              rhs.runproc(ep, new Env<LinSession>(chi, session, null), ge, logger);
+              rhs.runproc(ep, new Env<Session>(chi, session, null), ge, logger);
             } catch (Exception e) {
               e.printStackTrace(System.out);
             }

@@ -363,7 +363,7 @@ public static void processFile(String path, CLLSj parser, boolean inc)
 		clear_statistics();
 
                 while(n.repeat	> 0){
-	  	     parent.getRhs().runproc(ep, new Env<LinSession>(), new Env<Server>(), logger);
+	  	     parent.getRhs().runproc(ep, new Env<Session>(), new Env<Server>(), logger);
                 n.repeat--;
 		}
 		
@@ -581,14 +581,6 @@ TOKEN :
   |
   < CELL: "cell" >
   |
-  < RD: "rd" >
-  |
-  < WRT: "wrt" >
-  |
-  < LOCK: "lock" >
-  |
-  < UNLK: "unlk" >
-  |
   < CELLB: "cell!" >
   |
   < EMPTY: "empty" >
@@ -643,7 +635,7 @@ TOKEN :
   |
   < SAMR: "samr" >
   | 
-  < MOD : "mod">
+  < MOD : "%">
   | 
   < lab: "#"( ["A"-"Z", "a"-"z","_","0"-"9"] )+ >
   |
@@ -816,6 +808,14 @@ ASTType SType() throws Exception:
 {
 (   s=<Id>  { t = new ASTIdT(s.image); }
     ( <LPAR> ArgListT((ASTIdT)t) <RPAR> )? 
+    |
+    <INT> {
+    t = new ASTintT();
+    } 
+    |
+    <COINT> {
+    t = new ASTCointT();
+    }
     |
     <LINT> {
     t = new ASTLintT();
@@ -1479,18 +1479,6 @@ boolean b;
           {p = new ASTTake(c1.image,c2.image,t,p1);	    
       p.lineno = c3.beginLine; p1.setanc(p);
       }
-    |
-    c3 = <LOCK> c1=<Id> <SEMIC> p1=Proc()
-    { p = new ASTLock(c1.image,p1); p.lineno = c3.beginLine;  p1.setanc(p);}
-    |
-    c3 = <UNLK> c1=<Id> <SEMIC> p1=Proc()
-    { p = new ASTUnlock(c1.image,p1); p.lineno = c3.beginLine; p1.setanc(p); }
-    |
-    c3 = <WRT> c1=<Id> <LPAR> c2=<Id> <COL> t=Type() <DOT> p1=Proc() <RPAR> <SEMIC> p2=Proc()
-    { p = new ASTWrt(c1.image,c2.image,t,p1,p2); p.lineno = c3.beginLine; p1.setanc(p);  p2.setanc(p);}
-    |
-    c3 = <RD> c1=<Id> <LPAR> c2=<Id> <COL> t=Type() <RPAR> <SEMIC> p1=Proc()
-    { p = new ASTRead(c1.image,c2.image,t,p1); p.lineno = c3.beginLine;  p1.setanc(p);}
     |
     c3 = <FWD> c1=<Id> c2=<Id> { p = new ASTFwd(c1.image, c2.image); p.lineno = c3.beginLine; }
     |

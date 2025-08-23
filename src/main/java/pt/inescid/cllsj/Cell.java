@@ -9,7 +9,7 @@ public interface Cell {
 
   LinSession take(String _chi) throws Exception;
 
-  void put(String _chi, ASTNode _rhs, Env<EnvEntry> _ep, Env<LinSession> _ed, Env<Server> _eg)
+  void put(String _chi, ASTNode _rhs, Env<EnvEntry> _ep, Env<Session> _ed, Env<Server> _eg)
       throws Exception;
 
   void free() throws Exception;
@@ -18,7 +18,7 @@ public interface Cell {
       String _chi,
       ASTNode _rhs,
       Env<EnvEntry> _ep,
-      Env<LinSession> _ed,
+      Env<Session> _ed,
       Env<Server> _eg,
       Logger logger,
       boolean _linear,

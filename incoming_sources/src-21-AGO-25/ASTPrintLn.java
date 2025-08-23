@@ -57,7 +57,6 @@ public class ASTPrintLn extends ASTNode {
 
     public void typecheck(Env<ASTType> ed, Env<ASTType> eg, Env<EnvEntry> ep) throws Exception {
  	ASTType et;
-	System.out.println("println-tc:");eg.crawl();
 	try {
 	    et =expr.etypecheck(ed,eg,ep,false);
 	} catch (Exception ee) {

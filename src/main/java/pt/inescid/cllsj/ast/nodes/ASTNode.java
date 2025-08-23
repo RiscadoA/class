@@ -5,7 +5,6 @@ import java.util.function.*;
 import java.util.logging.*;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
-import pt.inescid.cllsj.LinSession;
 import pt.inescid.cllsj.RVarEntry;
 import pt.inescid.cllsj.SAMCont;
 import pt.inescid.cllsj.Server;
@@ -20,6 +19,7 @@ import pt.inescid.cllsj.ast.types.ASTBangT;
 import pt.inescid.cllsj.ast.types.ASTBasicType;
 import pt.inescid.cllsj.ast.types.ASTBotT;
 import pt.inescid.cllsj.ast.types.ASTCoAffineT;
+import pt.inescid.cllsj.ast.types.ASTCointT;
 import pt.inescid.cllsj.ast.types.ASTNotT;
 import pt.inescid.cllsj.ast.types.ASTRecvT;
 import pt.inescid.cllsj.ast.types.ASTSendT;
@@ -107,10 +107,12 @@ public abstract class ASTNode {
       }
       if (def) {
         ASTType te = ed.find(id);
+        if (!(te instanceof ASTCointT)) // NON-LIN-INT
         throw new TypeError(
-            "Line " + lineno + " :" + "for " + id + " type pending = " + te.toStr(ep));
+              "Line " + lineno + " :" + "for " + id + " type pending = " + te.toStr(ep));
       }
     }
+    ;
   }
 
   public void linclose(String id, Env<ASTType> ed, Env<EnvEntry> ep) throws Exception {
@@ -122,8 +124,10 @@ public abstract class ASTNode {
 
     if (def) {
       ASTType te = ed.find(id);
+      // System.out.println("lin-close " + id + " " + te);
+      if (!(te instanceof ASTCointT)) // NON-LIN-INT
       throw new TypeError(
-          "Line " + lineno + " :" + "for " + id + " type pending = " + te.toStr(ep));
+            "Line " + lineno + " :" + "for " + id + " type pending = " + te.toStr(ep));
     }
   }
 
@@ -142,8 +146,10 @@ public abstract class ASTNode {
     return session_dir_out;
   }
 
-  public void runproc(Env<EnvEntry> ep, Env<LinSession> ed, Env<Server> eg, Logger logger)
-      throws Exception {}
+  public void runproc(Env<EnvEntry> ep, Env<Session> ed, Env<Server> eg, Logger logger)
+      throws Exception {
+    throw new RuntimeException("Unreachable");
+  }
 
   public static Env<EnvEntry> propagateRVar(Env<EnvEntry> ep, String parent, String child) {
     try {

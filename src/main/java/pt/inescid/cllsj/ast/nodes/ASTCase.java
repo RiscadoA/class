@@ -9,11 +9,11 @@ import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.IndexedSessionRef;
 import pt.inescid.cllsj.LabelSet;
-import pt.inescid.cllsj.LinSession;
 import pt.inescid.cllsj.LinSessionValue;
 import pt.inescid.cllsj.SAMCont;
 import pt.inescid.cllsj.SAMError;
 import pt.inescid.cllsj.Server;
+import pt.inescid.cllsj.Session;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.SessionRecord;
 import pt.inescid.cllsj.SyntaxError;
@@ -235,7 +235,7 @@ public class ASTCase extends ASTNode {
         // System.out.println("GO TO LINCLOSE "+lab);
         this.linclose(ed, ep);
 
-        if (last != null && !last.eq(ed))
+        if (last != null && !last.eqlin(ed))
           throw new TypeError(
               "Line " + lineno + " :" + "OFFER " + ch + ": unbalanced linear contexts");
         last = ed;
@@ -300,7 +300,7 @@ public class ASTCase extends ASTNode {
     }
   }
 
-  public void runproc(Env<EnvEntry> ep, Env<LinSession> ed, Env<Server> eg, Logger logger)
+  public void runproc(Env<EnvEntry> ep, Env<Session> ed, Env<Server> eg, Logger logger)
       throws Exception {
     Channel channel = (Channel) ed.find(ch);
     // System.out.println("[RUNSTATUS] Start CASE on session "+ session.id);

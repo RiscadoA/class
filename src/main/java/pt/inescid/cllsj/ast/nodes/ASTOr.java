@@ -3,8 +3,8 @@ package pt.inescid.cllsj.ast.nodes;
 import java.util.*;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
-import pt.inescid.cllsj.LinSession;
 import pt.inescid.cllsj.Server;
+import pt.inescid.cllsj.Session;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.TypeError;
 import pt.inescid.cllsj.VBool;
@@ -74,7 +74,7 @@ public class ASTOr extends ASTExpr {
     return new ASTCoLboolT();
   }
 
-  public Value eval(Env<LinSession> ed, Env<Server> eg) throws Exception {
+  public Value eval(Env<Session> ed, Env<Server> eg) throws Exception {
     VBool vleft = (VBool) lhs.eval(ed, eg);
     VBool vright = (VBool) rhs.eval(ed, eg);
     return new VBool(vleft.get() || vright.get());

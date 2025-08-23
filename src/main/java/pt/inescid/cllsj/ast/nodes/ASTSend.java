@@ -13,6 +13,7 @@ import pt.inescid.cllsj.LinSessionValue;
 import pt.inescid.cllsj.SAMCont;
 import pt.inescid.cllsj.SAMError;
 import pt.inescid.cllsj.Server;
+import pt.inescid.cllsj.Session;
 import pt.inescid.cllsj.SessionClosure;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.SessionRecord;
@@ -294,7 +295,7 @@ public class ASTSend extends ASTNode {
     } else rhs.subs(x, y);
   }
 
-  public void runproc(Env<EnvEntry> ep, Env<LinSession> ed, Env<Server> eg, Logger logger)
+  public void runproc(Env<EnvEntry> ep, Env<Session> ed, Env<Server> eg, Logger logger)
       throws Exception {
     Channel channel = (Channel) ed.find(chs);
     LinSession sessionOut = new LinSession(cho);
@@ -313,16 +314,6 @@ public class ASTSend extends ASTNode {
             }
           }
         });
-
-    /*	CLLSj.threadPool.submit(
-    	new Runnable(){public void run(){
-    	try{
-    	rhs.runproc(ep, ed, eg, logger);
-    	}catch (Exception e){ e.printStackTrace(System.out); }
-    	}});
-
-    	logger);
-    */
 
     rhs.runproc(ep, ed, eg, logger);
   }

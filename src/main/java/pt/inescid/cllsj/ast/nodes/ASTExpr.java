@@ -5,8 +5,8 @@ import java.util.function.*;
 import java.util.logging.*;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
-import pt.inescid.cllsj.LinSession;
 import pt.inescid.cllsj.Server;
+import pt.inescid.cllsj.Session;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.Value;
 import pt.inescid.cllsj.ast.ASTExprVisitor;
@@ -18,7 +18,7 @@ public abstract class ASTExpr extends ASTNode {
   public abstract ASTType etypecheck(Env<ASTType> e, Env<ASTType> eg, Env<EnvEntry> ep, boolean lin)
       throws Exception;
 
-  public abstract Value eval(Env<LinSession> ed, Env<Server> eg) throws Exception;
+  public abstract Value eval(Env<Session> ed, Env<Server> eg) throws Exception;
 
   public void ASTInsertUse(String ch, ASTType t, ASTNode here, Boolean disCont) throws Exception {
     anc.ASTInsertUse(ch, t, this, disCont); // insert above up
