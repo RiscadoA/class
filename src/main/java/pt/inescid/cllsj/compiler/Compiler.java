@@ -27,7 +27,7 @@ public class Compiler {
   public boolean disableConcurrency = false;
   public int customAllocatorSizeDivisor = 32;
   public int customAllocatorLevels = 8;
-  public int inliningComplexity = 10;
+  public int inliningComplexity = 20;
   public boolean optimizeIRWithAnalysis = true;
   public boolean optimizePrimitiveExponentials = true;
   public boolean optimizeExponentialExpressionToForward = true;
