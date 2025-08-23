@@ -1,10 +1,14 @@
 
 type corec IntStream {
-       offer of   {
-     	   |#next: send !lint; IntStream
-	       |#stop: close
- 	   }	   	   
- };;
+	offer of   {
+		|#next: send !lint; IntStream
+		|#stop: close
+	}
+};;
+
+type NextIntStream {
+	send !lint; IntStream
+};;
  
 proc rec integersfrom(n: IntStream; k:~lint)
 {
@@ -14,32 +18,24 @@ proc rec integersfrom(n: IntStream; k:~lint)
  	   }	   	   
  };;
 
-proc unsafe_rec filter_next(fins: ~IntStream, out: send IntStream; !lint; n:~lint) {
+proc unsafe_rec filter_next(fouts:NextIntStream, fins:~IntStream; n:~lint) {
 	#next fins;
 	recv fins(v);
 	if ((v / n)*n == v) {
-		filter_next(fins, out; n)
+		filter_next(fouts, fins; n)
 	} else {
-		send out(fins);
-		let! out v
+		send fouts(v);
+		filter(fouts, fins; n)
 	}
-};;
-
-proc rec filter(fouts:IntStream, fins:~IntStream; n:~lint) {
+} and filter(fouts:IntStream, fins:~IntStream; n:~lint) {
 	case fouts of {
 		|#next:
-			cut {
-				filter_next(fins, res; n)
-				|res: recv ~IntStream; ?colint|
-				recv res(fins2);
-				send fouts(res);
-				filter(fouts, fins2; n)
-			}
+			filter_next(fouts, fins; n)
 		|#stop:
 			#stop fins; fwd fins fouts
 	}
 };;
- 
+
 proc rec sieve(souts:IntStream, sins:~IntStream)
  {
 	case souts of { 
