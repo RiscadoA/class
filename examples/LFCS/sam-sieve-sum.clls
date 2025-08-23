@@ -27,7 +27,7 @@ proc unsafe_rec filter(fouts:IntStream, fins:~IntStream; n:~lint)
 	 		}
 	 	}
  };;
- 
+
 proc unsafe_rec sieve(souts:IntStream, sins:~IntStream)
  {
       case souts of { 

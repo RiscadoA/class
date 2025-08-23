@@ -95,16 +95,6 @@ proc primesNC(primes:IntStream)
 }
  };;
 
-proc mainc_ss(;np:colint)
-{
- ccut  {
-      primesNC(primes)
-      |primes:~IntStream|
-      printfirstN(primes;np)
-      }
- };;
-
-
 proc main() {
-	  	mainc_ss(;10000)
+	  	main_ss(;10000)
 };;
