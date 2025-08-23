@@ -27,4 +27,9 @@ public class ASTCointT extends ASTCoBasicType {
   public ASTType subst(Env<ASTType> e) {
     return this;
   }
+
+  public int SetOffsets(int base, Env<EnvEntry> e) throws Exception {
+    // offset = base;
+    return base;
+  }
 }

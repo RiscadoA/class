@@ -13,12 +13,15 @@ import pt.inescid.cllsj.LinSessionValue;
 import pt.inescid.cllsj.SAMCont;
 import pt.inescid.cllsj.SAMError;
 import pt.inescid.cllsj.Server;
+import pt.inescid.cllsj.Session;
 import pt.inescid.cllsj.SessionClosure;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.SessionRecord;
 import pt.inescid.cllsj.Trail;
 import pt.inescid.cllsj.TypeError;
+import pt.inescid.cllsj.Value;
 import pt.inescid.cllsj.ast.ASTNodeVisitor;
+import pt.inescid.cllsj.ast.types.ASTCointT;
 import pt.inescid.cllsj.ast.types.ASTRecvT;
 import pt.inescid.cllsj.ast.types.ASTType;
 
@@ -209,17 +212,27 @@ public class ASTRecv extends ASTNode {
     } else if (y != chi) rhs.subs(x, y);
   }
 
-  public void runproc(Env<EnvEntry> ep, Env<LinSession> ed, Env<Server> eg, Logger logger)
+  public void runproc(Env<EnvEntry> ep, Env<Session> ed, Env<Server> eg, Logger logger)
       throws Exception {
     Channel channel = (Channel) ed.find(chr);
     // System.out.println("[RunStatus] RECV on "+session.id+" start.");
 
-    CLLSj.inc_recvs(+1);
+    // CLLSj.inc_recvs(+1);
     LinSession session_in = (LinSession) channel.receive();
-    CLLSj.inc_recvs(-1);
+    // CLLSj.inc_recvs(-1);
+    // System.out.println("RECV on "+session_in.id+":"+session_in);
+
+    if (type instanceof ASTCointT) {
+      // read int and promote id->v to exponential environment
+      // no !: use linear environment to store id -> v
+      Value v = (Value) session_in.receive();
+      ed = ed.assoc(chi, v);
+    } else {
+      ed = ed.assoc(chi, session_in);
+    }
 
     // System.out.println("[RunStatus] RECV on "+session.id+" end.");
-    rhs.runproc(ep, ed.assoc(chi, session_in), eg, logger);
+    rhs.runproc(ep, ed, eg, logger);
   }
 
   public void samLRecv(

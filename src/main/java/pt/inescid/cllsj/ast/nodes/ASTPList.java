@@ -5,9 +5,9 @@ import java.util.function.*;
 import java.util.logging.*;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
-import pt.inescid.cllsj.LinSession;
 import pt.inescid.cllsj.ProcEntry;
 import pt.inescid.cllsj.Server;
+import pt.inescid.cllsj.Session;
 import pt.inescid.cllsj.ast.types.ASTType;
 
 public class ASTPList extends ASTNode {
@@ -96,6 +96,8 @@ public class ASTPList extends ASTNode {
     return s;
   }
 
-  public void runproc(Env<EnvEntry> ep, Env<LinSession> ed, Env<Server> eg, Logger logger)
-      throws Exception {}
+  public void runproc(Env<EnvEntry> ep, Env<Session> ed, Env<Server> eg, Logger logger)
+      throws Exception {
+    throw new Exception("Unreachable");
+  }
 }

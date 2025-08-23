@@ -1,0 +1,38 @@
+type corec IntStream {
+       offer of   {
+     	   | #next: send !lint; IntStream
+	   | #stop: close
+ 	   }	   	   
+ };;
+ 
+proc rec integersfrom(n: IntStream; k:~lint)
+{
+    case n of {
+      	|	#next: send n(k); integersfrom(n;k+1)
+	 	|	#stop: close n
+ 	}	   	   
+ };;
+
+ proc unsafe_rec printfirstN(il:~IntStream;k:~lint)
+{
+   if(k==0) {
+	  #stop il; wait il; ()
+	 }
+   {
+	 #next il; recv il(n);
+	 println(n);
+	 printfirstN(il;k-1)
+   }
+};;
+
+proc main_ss(;np:colint)
+{
+    letc nats:IntStream {
+		integersfrom(nats;2)
+	};
+    printfirstN(nats;np)
+ };;
+
+proc main() {
+   main_ss(;1000)
+};;

@@ -3,8 +3,8 @@ package pt.inescid.cllsj.ast.nodes;
 import java.util.*;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
-import pt.inescid.cllsj.LinSession;
 import pt.inescid.cllsj.Server;
+import pt.inescid.cllsj.Session;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.TypeError;
 import pt.inescid.cllsj.VInt;
@@ -13,6 +13,7 @@ import pt.inescid.cllsj.Value;
 import pt.inescid.cllsj.ast.ASTExprVisitor;
 import pt.inescid.cllsj.ast.types.ASTBotT;
 import pt.inescid.cllsj.ast.types.ASTCoLstringT;
+import pt.inescid.cllsj.ast.types.ASTCointT;
 import pt.inescid.cllsj.ast.types.ASTLCointT;
 import pt.inescid.cllsj.ast.types.ASTType;
 
@@ -68,7 +69,10 @@ public class ASTAdd extends ASTExpr {
     Env<ASTType> egrhs = eg.assoc("$DUMMY", new ASTBotT());
     ASTType rhst = rhs.etypecheck(ed, egrhs, ep, lin);
 
-    if (lhst instanceof ASTLCointT && rhst instanceof ASTLCointT) return new ASTLCointT();
+    boolean lhsti = lhst instanceof ASTLCointT || lhst instanceof ASTCointT;
+    boolean rhsti = rhst instanceof ASTLCointT || rhst instanceof ASTCointT;
+
+    if (lhsti && rhsti) return new ASTCointT(); // NON-LIN-INT
 
     if (lhst instanceof ASTCoLstringT || rhst instanceof ASTCoLstringT) return new ASTCoLstringT();
 
@@ -91,7 +95,7 @@ public class ASTAdd extends ASTExpr {
     return null; // unreachable
   }
 
-  public Value eval(Env<LinSession> ed, Env<Server> eg) throws Exception {
+  public Value eval(Env<Session> ed, Env<Server> eg) throws Exception {
     Value vleftx = lhs.eval(ed, eg);
     Value vrightx = rhs.eval(ed, eg);
     return val(vleftx, vrightx);

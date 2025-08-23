@@ -6,10 +6,10 @@ import pt.inescid.cllsj.Channel;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.IndexedSessionRef;
-import pt.inescid.cllsj.LinSession;
 import pt.inescid.cllsj.LinSessionValue;
 import pt.inescid.cllsj.SAM;
 import pt.inescid.cllsj.Server;
+import pt.inescid.cllsj.Session;
 import pt.inescid.cllsj.SessionClosure;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.SessionRecord;
@@ -180,12 +180,20 @@ public class ASTVId extends ASTExpr {
     } else return ty;
   }
 
-  public Value eval(Env<LinSession> ed, Env<Server> eg) throws Exception {
+  public Value eval(Env<Session> ed, Env<Server> eg) throws Exception {
     Value v;
-    if (linId) {
-      Channel channel = (Channel) ed.find(ch);
-      v = (Value) channel.receive();
-      return v;
+    // System.out.println("VID-eval "+ch+" lin="+linId);
+    if (linId) { // in linear context
+      Session session = (Session) ed.find(ch);
+      try { // session
+        Channel sessionc = (Channel) session;
+        // System.out.println("VID-recv "+ch+"="+sessionc);
+        v = (Value) sessionc.receive();
+        return v;
+      } catch (Exception _) { // copyable value (int)
+        // System.out.println("VID-val "+ch+"="+session);
+        return (Value) session;
+      }
     } else {
       Server server = eg.find(ch);
       if (server instanceof Value) {

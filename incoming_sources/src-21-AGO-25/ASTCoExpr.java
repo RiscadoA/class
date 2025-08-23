@@ -47,11 +47,6 @@ public class ASTCoExpr extends ASTNode {
 	} catch (Exception ee) {
 	    bt = expr.etypecheck(ed,eg,ep,true);
 	};
-/* 
-	this.inferUses(ch,ed,ep);
-
-    ASTType bt = expr.etypecheck(ed,eg,ep,true);
-*/
 	ASTType idt = ed.find(ch);
 	if (idt instanceof ASTBasicType) {
 	    ASTBasicType idtt = ((ASTBasicType)idt);
