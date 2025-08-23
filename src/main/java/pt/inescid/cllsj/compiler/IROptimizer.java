@@ -1235,6 +1235,21 @@ public class IROptimizer {
               }
             }
 
+            // We might need to remove the end point from the instruction
+            if (!call.isEndPoint()) {
+              if (newInstr instanceof IRCallProcess) {
+                ((IRCallProcess) newInstr).removeEndPoint();
+              } else if (newInstr instanceof IRForward) {
+                ((IRForward) newInstr).removeEndPoint();
+              } else if (newInstr instanceof IRFlipForward) {
+                ((IRFlipForward) newInstr).removeEndPoint();
+              } else if (newInstr instanceof IRReturn) {
+                ((IRReturn) newInstr).removeEndPoint();
+              } else if (newInstr instanceof IRNextTask) {
+                ((IRNextTask) newInstr).removeEndPoint();
+              }
+            }
+
             return newInstr;
           };
 
@@ -1252,7 +1267,9 @@ public class IROptimizer {
       }
 
       // Modify the end point count of the current block
-      modifyEndPoints(proc, block, callProc.getEndPoints() - (call.isEndPoint() ? 1 : 0));
+      if (call.isEndPoint()) {
+        modifyEndPoints(proc, block, callProc.getEndPoints() - 1);
+      }
     }
   }
 
