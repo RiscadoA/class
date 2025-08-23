@@ -13,34 +13,48 @@ proc rec integersfrom(n: IntStream; k:~lint)
 	   	    |#stop: close n
  	   }	   	   
  };;
- 
-proc rec filter(fouts:IntStream, fins:~IntStream;n:~lint)
- {
-    #next fins;
-     recv fins (v);  
-     if  ((v / n)*n == v)
-     	 { filter(fouts,fins;n) }
-     	 {  
-	    case fouts of { 
-	    |#next:  send fouts (v); filter(fouts, fins;n) 
-	    |#stop:  #stop fins; fwd fins fouts
-	 }
-	 }
- };;
+
+proc unsafe_rec filter_next(fins: ~IntStream, out: send IntStream; !lint; n:~lint) {
+	#next fins;
+	recv fins(v);
+	if ((v / n)*n == v) {
+		filter_next(fins, out; n)
+	} else {
+		send out(fins);
+		let! out v
+	}
+};;
+
+proc rec filter(fouts:IntStream, fins:~IntStream; n:~lint) {
+	case fouts of {
+		|#next:
+			cut {
+				filter_next(fins, res; n)
+				|res: recv ~IntStream; ?colint|
+				recv res(fins2);
+				send fouts(res);
+				filter(fouts, fins2; n)
+			}
+		|#stop:
+			#stop fins; fwd fins fouts
+	}
+};;
  
 proc rec sieve(souts:IntStream, sins:~IntStream)
  {
-      case souts of { 
-  	  |#next:     #next sins;
-      		      recv sins (p);
-		      ?p;
-  	  	      send souts(p);
-		      cut  {
-		      	   sieve(souts,outp)
-		      	   |outp:IntStream|
-		      	   filter(outp,sins;p)
-		      }
-	|#stop: #stop sins; wait sins; close souts
+	case souts of { 
+		|#next:
+			#next sins;
+			recv sins(p);
+			?p;
+			send souts(p);
+			cut {
+				sieve(souts, outp)
+				|outp:IntStream|
+				filter(outp,sins;p)
+			}
+		|#stop:
+			#stop sins; wait sins; close souts
 	}
  };;
 
