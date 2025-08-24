@@ -325,14 +325,34 @@ public class ASTRecv extends ASTNode {
       srec.writeSlot(null, doffset); // reset linear value
       sref.incOffset();
 
-      srec.setPol(tyrhs.isPos(ep)); // set polarity endpoint for continuation!!!
-      SessionRecord sreco = SessionRecord.newSessionRecord(arg.getSize());
+      // System.out.println("recv-type "+chr+" "+srec+" @ "+type);
 
+      srec.setPol(tyrhs.isPos(ep)); // set polarity endpoint for continuation!!!
+
+      SessionRecord sreco = SessionRecord.newSessionRecord(arg.getSize());
       IndexedSessionRef srecfw = new IndexedSessionRef(0, sreco);
       IndexedSessionRef srecfr = new IndexedSessionRef(0, sreco);
 
       if (CLLSj.trace) {
         System.out.println("recv-op new = " + sreco);
+      }
+
+      if (type instanceof ASTCointT) {
+        Env<SessionField> fwrite = frameloc.assoc(id, srecfw);
+        sreco.setPol(true);
+        sreco.setPolDual(false);
+
+        sreco.setcch(chi);
+        sreco.setCont(rhs);
+        sreco.setFrame(null);
+        sreco.setFrameP(ep);
+
+        arg.getBody().samL(fwrite, framep, SAMCont.Null);
+
+        Value v = (Value) sreco.readSlot(0);
+        Env<SessionField> fread = frame.assoc(chi, v);
+        rhs.samL(fread, ep, p_cont);
+        return;
       }
 
       if (!type.isPos(ep)) { // recv arg is writer U;T U negative

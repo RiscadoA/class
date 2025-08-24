@@ -6,7 +6,7 @@ public class SAMCont  {
     public Env<SessionField> frame;
     public Env<EnvEntry> epnm;
 
-    static SAMCont Null = new SAMCont(null, null, null);
+    public static SAMCont Null = new SAMCont(null, null, null);
     
     public SAMCont(ASTNode _code,  Env<SessionField> _frame, Env<EnvEntry> _epnm)
     {

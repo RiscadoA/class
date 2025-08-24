@@ -83,5 +83,5 @@ proc main_ss(np:coint)
  };;
 
 proc main() {
-	  	main_ss(1000)
+	  	main_ss(100000)
 };;
