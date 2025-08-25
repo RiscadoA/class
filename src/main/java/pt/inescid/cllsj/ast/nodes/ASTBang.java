@@ -119,8 +119,8 @@ public class ASTBang extends ASTNode {
 
   public void typecheck(Env<ASTType> ed, Env<ASTType> eg, Env<EnvEntry> ep) throws Exception {
 
-    System.out.println("DEBUG ! lin env: ");
-    ed.crawl();
+    // System.out.println("DEBUG ! lin env: ");
+    // ed.crawl();
     this.eg = eg;
     this.inferUses(chr, ed, ep);
     ASTType ty = ed.find(chr);
@@ -158,7 +158,7 @@ public class ASTBang extends ASTNode {
         ASTType tyId = null;
         try { // check exponentials in linear context
           tyId = ed.find(id);
-          System.out.println("DEBUG !: " + id + " linear context: " + tyId);
+          // System.out.println("DEBUG !: " + id + " linear context: " + tyId);
         } catch (Exception e) {
         }
         if (tyId != null) {

@@ -70,17 +70,17 @@ proc acker(m:~Nat, n:~Nat, r:Nat){
     }
 };;
 
-proc ackermann_main(;m:colint, n:colint){
+proc tryAcker(;m:colint, n:colint){
+    println("tryAcker");
     cut{
         lint2nat(m1;m)
         |m1:~Nat|
-        cut{
+        ccut{
             acker(m1,n1,r)
             |r:~Nat|
             nat2lint(r,r1)
             |r1:colint|
             println ( "Ackermann("  + m + ", " + n + ") = " + r1 );
-//            println (m + n + r1);
             ()
             }
         |n1:Nat|
@@ -88,10 +88,13 @@ proc ackermann_main(;m:colint, n:colint){
     }
 };;
 
-proc main(){
-        ackermann_main(;3,3)
+proc test_ackerman(){
+        tryAcker(;3,6) // 3,5
 };;
 
+proc main(){
+        tryAcker(;3,6) // 3,5
+};;
 
 
 
