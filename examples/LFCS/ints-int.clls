@@ -5,7 +5,6 @@ cut {
  println(x); ()
 }};;
 
-
 proc pp(a:~int,b:int)
 {
 let b a+a
@@ -82,6 +81,15 @@ main5();;
 main6();;
 main9();;
 
+sam main0();;
+sam main1();;
+sam main2();;
+sam main3();;
+sam main4();;
+sam main5();;
+sam main6();;
+sam main9();;
+
 proc main10() {
    letc y:send int;close { send y(2);close y};
    recv y(z);println(z);wait y;()
@@ -94,6 +102,8 @@ proc main11() {
 
 main10();;
 main11();;
+sam main10();;
+sam main11();;
 
 proc main12() {
    letc y:int { let y 10 };
@@ -101,7 +111,7 @@ proc main12() {
    println(x+x); ()
 };;
 
-proc main13() {
+proc main13() { 
    letc x:~int { println(x+x); () };
    letc y:~int { fwd y x };
    let y 10
@@ -117,6 +127,9 @@ proc main14() {
 main12();;
 main13();;
 main14();;
+sam main12();;
+sam main13();;
+sam main14();;
 
 proc main15() {
    letc y:int { let y 10 };
@@ -127,8 +140,12 @@ proc main15() {
 proc main16() {
    letc y:int { let y 10 };
    letc z:!int { let! z y };
-   println(z+z+y);()
+   println(z);()
 };;
 
 main15();;
+sam main15();;
 main16();;
+sam main16();;
+
+
