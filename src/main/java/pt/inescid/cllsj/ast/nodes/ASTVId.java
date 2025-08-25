@@ -16,7 +16,9 @@ import pt.inescid.cllsj.SessionRecord;
 import pt.inescid.cllsj.Value;
 import pt.inescid.cllsj.ast.ASTExprVisitor;
 import pt.inescid.cllsj.ast.types.ASTCoAffineT;
+import pt.inescid.cllsj.ast.types.ASTCoBasicType;
 import pt.inescid.cllsj.ast.types.ASTCoLBasicType;
+import pt.inescid.cllsj.ast.types.ASTCointT;
 import pt.inescid.cllsj.ast.types.ASTType;
 import pt.inescid.cllsj.ast.types.ASTUsageT;
 import pt.inescid.cllsj.ast.types.ASTWhyT;
@@ -81,14 +83,17 @@ public class ASTVId extends ASTExpr {
 
   public ASTType etypecheck(Env<ASTType> ed, Env<ASTType> eg, Env<EnvEntry> ep, boolean lin)
       throws Exception {
-    // System.out.println("VID typecheck "+ch+" "+lin);
+    ASTType ty = null;
 
     if (lin) {
+      // System.out.println("lin VID typecheck " + ch);
+
       try {
         ty = ed.find(ch);
         linId = true;
         ty = ty.unfoldType(ep);
         ty = ASTType.unfoldRec(ty);
+
         if (ty instanceof ASTWhyT) {
           // System.out.println("lin VID typecheck-ASTWhy "+ch);
           ASTWhyT t = (ASTWhyT) ty;
@@ -113,33 +118,29 @@ public class ASTVId extends ASTExpr {
           return this.etypecheck(ed, eg, ep, lin);
         }
         if (ty instanceof ASTCoLBasicType) {
+          // System.out.println("VID consume=" + ch + ":" + ty);
           ed.upd(ch, null);
         }
+        if (ty instanceof ASTCoBasicType) {
+          // System.out.println("VID CoBasic=" + ch + ":" + ty);
+        }
+
+        // System.out.println("VIDt=" + ty);
         return ty;
       } catch (Exception e) {
         // System.out.println("VID typecheck-try-gamma of ?T or linear "+ch);
       }
     }
 
-    /*
-    try {
-        ty = ed.find(ch);
-        if (ty instanceof ASTWhyT) {
-    		System.out.println("Should infer ?"+ch);
-    		return this.etypecheck(ed,eg,ep,true);
-    	}
-
-    } catch (Exception e) {
-        // System.out.println("VID typecheck-try-gamma "+ch);
-    }
-    */
-
     // must check exponential context!
 
     if (!lin) {
       try {
         ty = ed.find(ch);
-        // System.out.println("lin "+ch+" expected in exp context");
+        if (ty instanceof ASTCointT) {
+          // System.out.println("VID exp typecheck-ASTCointT "+ch);
+          return this.etypecheck(ed, eg, ep, true);
+        }
         if (ty instanceof ASTWhyT) {
           // System.out.println("Should infer ?"+ch);
           return this.etypecheck(ed, eg, ep, true);
@@ -157,7 +158,6 @@ public class ASTVId extends ASTExpr {
           this.getanc().ASTInsertUse(ch, tyco.getin(), this, disposableCont);
           return this.etypecheck(ed, eg, ep, lin);
         }
-
       } catch (Exception e) {
       }
     }
