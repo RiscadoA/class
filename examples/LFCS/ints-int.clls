@@ -130,3 +130,5 @@ proc main16() {
    println(z);()
 };;
 
+main15();;
+main16();;

@@ -166,15 +166,13 @@ public class ASTBang extends ASTNode {
           tyId = tyId.unfoldType(ep);
           // tyId = ASTType.unfoldRec(tyId);
           if (tyId instanceof ASTWhyT) {
-            System.out.println("DEBUG !: " + id + " is of type ?");
+            // System.out.println("DEBUG !: " + id + " is of type ?");
             ASTWhyT t = (ASTWhyT) tyId;
             tyId = t.getin();
             this.getanc().ASTInsertWhyNot(id, tyId, this);
             ed.updmove(id);
           } else if (tyId instanceof ASTCointT) {
             ned = ned.assoc(id, tyId);
-            System.out.println("DEBUG !: added ned context.");
-            ned.crawl();
           } else
             throw new TypeError(
                 "Line " + lineno + " :" + "!: " + id + " is not of ?type, found " + tyId.toStr(ep));
