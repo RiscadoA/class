@@ -96,5 +96,5 @@ proc primesNC(primes:IntStream)
  };;
 
 proc main() {
-	  	main_ss(;10000)
+	  	main_ss(;100000)
 };;

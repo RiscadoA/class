@@ -11,9 +11,6 @@ filterp (LCons n xs) p = if (rem n p == 0)
 
 sievep (LCons p xs) = LCons p (sievep (filterp xs p))
 
-sieve (p:xs) = p : sieve [x | x <- xs, rem x p > 0]
-primes = sieve [2..]
-
 primesp = sievep (intsfm 2)
 
 printAll :: Show a => [a] -> IO ()
@@ -36,4 +33,4 @@ printAllp xs k   =
 
 
 main :: IO ()
-main = printAllp (primesp) 10000
+main = printAllp (primesp) 100000
