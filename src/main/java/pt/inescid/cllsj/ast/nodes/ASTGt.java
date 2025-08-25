@@ -13,6 +13,7 @@ import pt.inescid.cllsj.Value;
 import pt.inescid.cllsj.ast.ASTExprVisitor;
 import pt.inescid.cllsj.ast.types.ASTBotT;
 import pt.inescid.cllsj.ast.types.ASTCoLboolT;
+import pt.inescid.cllsj.ast.types.ASTCoLstringT;
 import pt.inescid.cllsj.ast.types.ASTCointT;
 import pt.inescid.cllsj.ast.types.ASTLCointT;
 import pt.inescid.cllsj.ast.types.ASTType;
@@ -73,7 +74,9 @@ public class ASTGt extends ASTExpr {
     boolean lhsInt = lhst instanceof ASTLCointT || lhst instanceof ASTCointT;
     boolean rhsInt = rhst instanceof ASTLCointT || rhst instanceof ASTCointT;
 
-    if (!(lhsInt && rhsInt))
+    if (!((lhsInt && rhsInt)
+        || (lhst instanceof ASTCoLstringT && rhst instanceof ASTCoLstringT)
+        || (lhst instanceof ASTCoLboolT && rhst instanceof ASTCoLboolT)))
       throw new TypeError(
           "Line " + lineno + " :" + "== : expression arguments not of the same co-type");
     return new ASTCoLboolT();
