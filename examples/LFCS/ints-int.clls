@@ -1,64 +1,132 @@
+proc main() {
+cut {
+ let x 10
+ |x:~int|
+ println(x); ()
+}};;
+
 
 proc pp(a:~int,b:int)
 {
 let b a+a
 };;
 
-proc main() {
+proc main0() {
    letc x:int { pp(3,x) }; // pass be here?
    println(x); ()
 };;
 
-proc main() { 
+proc main1() { 
    letc b:int { let b 10 };
-   println(b); ()
+   println(b+b); ()
 };;
 
-proc main() { 
+proc main2() { 
    letc b:int { let b 10 };
    println((b*b)+b+3+(b-3)); ()
 };;
 
-proc main() { 
+proc main3() { 
    letc b:int { let b 10 };
    println(b); ()
 };;
 
-proc main() { 
+proc main4() { 
    letc b:int { let b 10 };
-   letc y:int { let y b };
+   letc y:int { let y b*2 };
    println(y); ()
 };;
 
-proc main() { 
+proc main5() { 
    letc b:int { let b 10 };
    letc y:lint { let y (b*b)+b+3+(b-3) };
    println(y); ()
 };;
 
-proc main() { 
+proc main6() { 
    letc b:int { let b 10 };
-   letc y:int { let y (b*b)+b+3+(b-3) };
-   println(y); ()
+   letc y:int { let y b*b };
+   letc y1:int { let y1 y/5 };
+   letc y2:int { let y2 y1-3 };
+   letc y3:int { let y3 y2%5 };
+   letc y4:int { let y4 -y3 };
+   println(y4); ()
 };;
 
 
 /* fail 
-proc main() { 
+proc main7() { 
    letc b:int { let b 10 };
    letc y:lint { let y (b*b)+b+3+(b-3) };
    ()
 };;
 
-proc main() {
+proc main8() {
    letc y:lint { let y 10 };
     ()
 };;
 
 */
 
-proc main() {
+proc main9() {
    letc y:int { let y 10 };
     ()
+};;
+
+main0();;
+main1();;
+main2();;
+main3();;
+main4();;
+main5();;
+main6();;
+main9();;
+
+proc main10() {
+   letc y:send int;close { send y(2);close y};
+   recv y(z);println(z);wait y;()
+};;
+
+proc main11() {
+   letc y:send int;close { send y(2);close y};
+   recv y(z);println(z+z);wait y;()
+};;
+
+main10();;
+main11();;
+
+proc main12() {
+   letc y:int { let y 10 };
+   letc x:int { fwd y x };
+   println(x+x); ()
+};;
+
+proc main13() {
+   letc x:~int { println(x+x); () };
+   letc y:~int { fwd y x };
+   let y 10
+};;
+
+proc main14() {
+   letc x:~int { println(x+x); () };
+   letc y:~int { fwd y x };
+   letc z:~int { fwd y z };
+   let z 10
+};;
+
+main12();;
+main13();;
+main14();;
+
+proc main15() {
+   letc y:int { let y 10 };
+   letc z:lint { let z y };
+   println(z);()
+};;
+
+proc main16() {
+   letc y:int { let y 10 };
+   letc z:!int { let! z y };
+   println(z);()
 };;
 

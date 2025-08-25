@@ -244,11 +244,12 @@ public class ASTVId extends ASTExpr {
       IndexedSessionRef sref = (IndexedSessionRef) sf;
       int doffset = sref.getOffset();
       SessionRecord srec = sref.getSessionRec();
-      Value sval = (Value) srec.readSlot(doffset);
       if (CLLSj.trace) {
         System.out.println("vid-op-lin " + ch + " " + srec + " @ " + doffset);
       }
+      Value sval = (Value) srec.readSlot(doffset);
       sref.incOffset();
+      // if CoInt ??
       return sval;
     } else {
       if (linId) {

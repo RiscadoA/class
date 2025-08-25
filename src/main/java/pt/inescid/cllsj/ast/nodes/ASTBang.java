@@ -20,6 +20,7 @@ import pt.inescid.cllsj.Trail;
 import pt.inescid.cllsj.TypeError;
 import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.types.ASTBangT;
+import pt.inescid.cllsj.ast.types.ASTCointT;
 import pt.inescid.cllsj.ast.types.ASTType;
 import pt.inescid.cllsj.ast.types.ASTWhyT;
 
@@ -117,12 +118,16 @@ public class ASTBang extends ASTNode {
   }
 
   public void typecheck(Env<ASTType> ed, Env<ASTType> eg, Env<EnvEntry> ep) throws Exception {
+
+    System.out.println("DEBUG ! lin env: ");
+    ed.crawl();
     this.eg = eg;
     this.inferUses(chr, ed, ep);
     ASTType ty = ed.find(chr);
     ty = ty.unfoldType(ep);
     ty = ASTType.unfoldRec(ty);
     if (type != null) type = type.unfoldType(ep);
+
     if (ty instanceof ASTBangT) {
       ASTBangT tyr = (ASTBangT) ty;
       ASTType payl = tyr.t.unfoldType(ep);
@@ -140,16 +145,20 @@ public class ASTBang extends ASTNode {
                 + type.toStr(ep));
       }
 
+      // prepare environ for exponential body
+      Env<ASTType> ned = new Env<ASTType>().assoc(chi, payl);
+
       type = payl; // SAM
       Set<String> s = rhs.fn(new HashSet<String>());
       s.remove(chi);
       Iterator<String> it = s.iterator();
       while (it.hasNext()) {
         String id = it.next();
-        // System.out.println("DEBUG !: " + id + " is a free name!");
+        // System.out.println("DEBUG !: " + id + " is a free name.");
         ASTType tyId = null;
-        try {
+        try { // check exponentials in linear context
           tyId = ed.find(id);
+          System.out.println("DEBUG !: " + id + " linear context: " + tyId);
         } catch (Exception e) {
         }
         if (tyId != null) {
@@ -157,25 +166,28 @@ public class ASTBang extends ASTNode {
           tyId = tyId.unfoldType(ep);
           // tyId = ASTType.unfoldRec(tyId);
           if (tyId instanceof ASTWhyT) {
-            // System.out.println("DEBUG !: " + id + " is of type ?");
+            System.out.println("DEBUG !: " + id + " is of type ?");
             ASTWhyT t = (ASTWhyT) tyId;
             tyId = t.getin();
             this.getanc().ASTInsertWhyNot(id, tyId, this);
             ed.updmove(id);
-            // System.out.println("DEBUG ! infer ? for " + id);
-            // eg.crawl();
-          } else throw new TypeError("Line " + lineno + " :" + "!: " + id + " is not of ?type.");
+          } else if (tyId instanceof ASTCointT) {
+            ned = ned.assoc(id, tyId);
+            System.out.println("DEBUG !: added ned context.");
+            ned.crawl();
+          } else
+            throw new TypeError(
+                "Line " + lineno + " :" + "!: " + id + " is not of ?type, found " + tyId.toStr(ep));
         }
       }
 
       ed.upd(chr, null);
 
-      ed = new Env<ASTType>().assoc(chi, payl);
-      rhs.typecheck(ed, eg, ep);
-
-      rhs.linclose(ed, ep);
-
-      rhs.linclose(chi, ed, ep);
+      // ed = new Env<ASTType>().assoc(chi, payl);
+      // propagate "linear" exponentials
+      rhs.typecheck(ned, eg, ep);
+      rhs.linclose(ned, ep);
+      rhs.linclose(chi, ned, ep);
 
     } else throw new TypeError("Line " + lineno + " :" + "!: " + chr + " is not of ! type.");
   }
