@@ -116,7 +116,10 @@ public class ASTSend extends ASTNode {
 
 	this.eg = eg;
 	// this.inferUses(chs,ed,ep);
-	
+			
+	System.out.println("SEND ed= ");
+	ed.crawl();
+
 	ASTType typee = null;
 	ASTType ty = ed.find(chs);
 	ty = ty.unfoldType(ep);

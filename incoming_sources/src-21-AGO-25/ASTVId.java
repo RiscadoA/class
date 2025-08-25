@@ -49,6 +49,7 @@ public class ASTVId extends ASTExpr {
 	
 	if (lin) {
 		System.out.println("lin VID typecheck "+ch);
+		ed.crawl();
 	    try {
 		ty = ed.find(ch);  
 		linId = true;
@@ -97,7 +98,10 @@ public class ASTVId extends ASTExpr {
 	if (!lin) {
 		try {
 			ty = ed.find(ch); 
-	    	//System.out.println("lin "+ch+" expected in exp context");
+		    if (ty instanceof ASTCointT) {
+				//System.out.println("VID exp typecheck-ASTCointT "+ch);
+				return this.etypecheck(ed,eg,ep,true);
+			}
 		    if (ty instanceof ASTWhyT) {
 				//System.out.println("Should infer ?"+ch);
 				return this.etypecheck(ed,eg,ep,true);

@@ -27,3 +27,15 @@ CLLS_FLAGS="--no-custom-allocator --no-concurrency" ./compile.sh  examples/LFCS/
 
 ../bin/sam-sieve-sum-fast-stop  95.53s user 0.57s system 99% cpu 1:36.13 total
 ./sieve  156.41s user 1.14s system 100% cpu 2:37.45 total
+
+ASTVid
+
+	if (!lin) {
+		try {
+			ty = ed.find(ch); 
+		    if (ty instanceof ASTCointT) {
+				//System.out.println("VID exp typecheck-ASTCointT "+ch);
+				return this.etypecheck(ed,eg,ep,true);
+			}
+
+
