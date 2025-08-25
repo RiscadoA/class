@@ -127,7 +127,7 @@ proc main15() {
 proc main16() {
    letc y:int { let y 10 };
    letc z:!int { let! z y };
-   println(z);()
+   println(z+z+y);()
 };;
 
 main15();;
