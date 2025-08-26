@@ -51,7 +51,9 @@ proc enq(tl:~Ptr, v:~affine lint, tlo:Ptr) {
     take tl(sn);
     share nn {
         take sn(lp);
-        put sn(c. cons<lint>(v,nn,c));
+	letc nn0: LList(lint) {
+	     unfold nn0; fwd nn0 nn }; // consider change to unfolded tail type in cons
+        put sn(c. cons<lint>(v,nn0,c));
         drop sn;
         discard lp // known to be nil
     ||
@@ -147,4 +149,8 @@ proc mainq(;n:~lint) {
     letc cl1:~EnqI { enq_user(cl1;n)};
     letc cl2:~DeqI { sleep 5;deq_user(cl2;n+2)};
     lqueue(cl1,cl2)
+};;
+
+proc main() {
+    mainq(;10)
 };;

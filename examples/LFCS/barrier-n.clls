@@ -81,5 +81,7 @@ proc mainb(;nt:~lint) {
     spawnall(c;0,nt)
 };;
 
-
+proc main() {
+    mainb(;10)
+};;
 

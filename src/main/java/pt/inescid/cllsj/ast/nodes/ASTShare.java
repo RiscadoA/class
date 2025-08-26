@@ -134,6 +134,33 @@ public class ASTShare extends ASTNode {
     } else throw new TypeError("Line " + lineno + " :" + "SHARE: " + sh + " is not of USAGE.");
   }
 
+  public void typecheckx(Env<ASTType> ed, Env<ASTType> eg, Env<EnvEntry> ep) throws Exception {
+    this.eg = eg;
+    //	this.inferUses(sh,ed,ep);
+
+    ASTType ty = ed.find(sh);
+    /*
+           ty = ty.unfoldType(ep);
+           ty = ASTType.unfoldRec(ty);
+    */
+    ty = ty.unfoldType(ep);
+    ty = ASTType.unfoldRecInfer(ty, this, sh, ep);
+
+    if (ty instanceof ASTUsageT) {
+      ASTUsageT tys = (ASTUsageT) ty;
+      if (tys.islin() && con)
+        throw new TypeError("Line " + lineno + " :" + "SHARE: " + sh + " is not of USAGE type.");
+      Env<ASTType> eglhs = eg.assoc("$DUMMY", new ASTBotT());
+      ed.upd(sh, ty);
+      lhs.typecheck(ed, eglhs, ep);
+      lhs.linclose(ed, ep);
+      ed.upd(sh, ty);
+      Env<ASTType> egrhs = eg.assoc("$DUMMY", new ASTBotT());
+      rhs.typecheck(ed, egrhs, ep);
+      rhs.linclose(ed, ep);
+    } else throw new TypeError("Line " + lineno + " :" + "SHARE: " + sh + " is not of USAGE.");
+  }
+
   public Set<String> fn(Set<String> s) {
     s = lhs.fn(s);
     s = rhs.fn(s);

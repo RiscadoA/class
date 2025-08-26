@@ -201,6 +201,86 @@ public class ASTPut extends ASTNode {
     } else throw new TypeError("Line " + lineno + " :" + "PUT: " + chs + " is not of USAGEL type.");
   }
 
+  public void typecheckx(Env<ASTType> ed, Env<ASTType> eg, Env<EnvEntry> ep) throws Exception {
+    this.eg = eg;
+    // this.inferUses(chs,ed,ep);
+
+    ASTType ty = ed.find(chs);
+    ty = ty.unfoldType(ep);
+    ty = ASTType.unfoldRecInfer(ty, this, chs, ep);
+
+    if (ty instanceof ASTUsageLT) {
+      ASTUsageLT tys = (ASTUsageLT) ty;
+      tys_payl = ASTCell.rewpaytype(tys.getin().dual(ep));
+
+      if (type != null) {
+        type = type.unfoldType(ep);
+        // type = ASTType.unfoldRec(type);
+        if (!type.equalst(tys_payl, ep, true, new Trail()))
+          throw new TypeError(
+              "Line "
+                  + lineno
+                  + " :"
+                  + "PUT "
+                  + cho
+                  + " type mismatch: found="
+                  + tys.toStr(ep)
+                  + " declared="
+                  + type.toStr(ep));
+      }
+
+      ed.upd(chs, null);
+      ed = ed.assoc(cho, tys_payl);
+
+      if (lhs instanceof ASTExpr) {
+        ASTExpr pe = (ASTExpr) lhs;
+        try {
+          // System.out.println("Compile PUT "+pe);
+          ASTNode lhsc = compileExpr(cho, pe, tys_payl, ep);
+          lhs = lhsc;
+          lhsc.setanc(this);
+        } catch (Exception ee) {
+          if (pe instanceof ASTVId) {
+            String x = ((ASTVId) pe).ch;
+            try { // check if the free put is a linear or unrestricted name
+              ASTType t2 = ed.find(x);
+              // System.out.println("VID PUT "+t2.toStr(ep));
+              lhs = compileFwd(cho, x, tys_payl, t2, ep);
+              lhs.setanc(this);
+            } catch (Exception e) { // use less
+              ASTFwdB f = new ASTFwdB(cho, x);
+              lhs = new ASTAffine(cho, f);
+              f.setanc(lhs);
+              lhs.setanc(this);
+            }
+          } else
+            throw new TypeError(
+                "Line "
+                    + lineno
+                    + " :"
+                    + "PUT "
+                    + chs
+                    + ": cannot be parsed as put of basic expression nor as free put.");
+        }
+        lhs.setanc(this);
+      }
+
+      Env<ASTType> eglhs = eg.assoc("$DUMMY", new ASTBotT());
+
+      lhs.typecheck(ed, eglhs, ep);
+
+      lhs.linclose(ed, ep);
+      lhs.linclose(cho, ed, ep);
+
+      ed.upd(chs, new ASTUsageT(tys.getin().unfoldType(ep), tys.islin()));
+
+      Env<ASTType> egrhs = eg.assoc("$DUMMY", new ASTBotT());
+
+      rhs.typecheck(ed, egrhs, ep);
+      rhs.linclose(ed, ep);
+    } else throw new TypeError("Line " + lineno + " :" + "PUT: " + chs + " is not of USAGEL type.");
+  }
+
   public Set<String> fn(Set<String> s) {
     s = lhs.fn(s);
     s.remove(cho);

@@ -126,6 +126,51 @@ public class ASTTake extends ASTNode {
       typee = type.unfoldType(ep);
       // typee = ASTType.unfoldRec(typee);
     }
+    ;
+    ty = ty.unfoldType(ep);
+    ty = ASTType.unfoldRecInfer(ty, this, chr, ep);
+
+    if (ty instanceof ASTUsageT) {
+      ASTUsageT tyr = (ASTUsageT) ty;
+      //	    ty_lhs =  new ASTCoAffineT(tyr.getin());
+
+      ty_lhs = ASTCell.rewpaytype(tyr.getin().dual(ep)).dual(ep);
+
+      if (typee != null && !typee.equalst(ty_lhs, ep, true, new Trail()))
+        throw new TypeError(
+            "Line "
+                + lineno
+                + " :"
+                + "TAKE "
+                + chi
+                + " type mismatch: found="
+                + ty_lhs.toStr(ep)
+                + " declared="
+                + typee.toStr(ep));
+
+      Env<ASTType> ext = ed.assoc(chi, ty_lhs);
+      ext.upd(chr, new ASTUsageLT(tyr.getin().unfoldType(ep), tyr.islin()));
+
+      ep = ASTNode.propagateRVar(ep, chr, chi);
+
+      rhs.typecheck(ext, eg, ep);
+      rhs.linclose(ed, ep);
+      rhs = ASTInferLinClose(rhs, chi, ext, ep);
+
+    } else throw new TypeError("Line " + lineno + " :" + "TAKE: " + chr + " is not of USAGE type.");
+  }
+
+  public void typecheckx(Env<ASTType> ed, Env<ASTType> eg, Env<EnvEntry> ep) throws Exception {
+    this.eg = eg;
+
+    // this.inferUses(chr,ed,ep);
+
+    ASTType typee = null;
+    ASTType ty = ed.find(chr);
+    if (type != null) {
+      typee = type.unfoldType(ep);
+      // typee = ASTType.unfoldRec(typee);
+    }
     ty = ty.unfoldType(ep);
     ty = ASTType.unfoldRecInfer(ty, this, chr, ep);
 
