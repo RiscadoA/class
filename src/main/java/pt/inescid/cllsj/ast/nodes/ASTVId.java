@@ -83,7 +83,7 @@ public class ASTVId extends ASTExpr {
 
   public ASTType etypecheck(Env<ASTType> ed, Env<ASTType> eg, Env<EnvEntry> ep, boolean lin)
       throws Exception {
-    ASTType ty = null;
+    ty = null;
 
     if (lin) {
       // System.out.println("lin VID typecheck " + ch);
