@@ -27,6 +27,7 @@ public class ASTSelect extends ASTNode {
   String lab;
   int labIndex = -1;
   ASTNode rhs;
+  ASTCaseT caseType;
   ASTType contType;
 
   public ASTSelect(String _ch, String _lab, ASTNode _rhs) {
@@ -62,6 +63,10 @@ public class ASTSelect extends ASTNode {
 
   public ASTType getRhsType() {
     return contType;
+  }
+
+  public ASTCaseT getCaseType() {
+    return caseType;
   }
 
   public void ASTInsertPipe(Function<ASTNode, ASTNode> f, ASTNode from) throws Exception {
@@ -124,9 +129,9 @@ public class ASTSelect extends ASTNode {
 
     if (ty instanceof ASTCaseT) {
 
-      ASTCaseT tyr = (ASTCaseT) ty;
-      ASTType tcase = tyr.getCaseType(lab);
-      labIndex = tyr.getIndex(lab);
+      caseType = (ASTCaseT) ty;
+      ASTType tcase = caseType.getCaseType(lab);
+      labIndex = caseType.getIndex(lab);
       contType = tcase;
       if (tcase == null) {
         throw new TypeError("Line " + lineno + " :" + "case: " + lab + " is not a valid label.");

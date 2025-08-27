@@ -4,11 +4,11 @@ import java.util.function.Function;
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 import pt.inescid.cllsj.compiler.ir.type.IRType;
 
-public abstract class IRPush extends IRInstruction {
+public class IRResetSession extends IRInstruction {
   private int record;
   private IRType recordType;
 
-  public IRPush(int record, IRType recordType) {
+  public IRResetSession(int record, IRType recordType) {
     this.record = record;
     this.recordType = recordType;
   }
@@ -21,17 +21,19 @@ public abstract class IRPush extends IRInstruction {
     return recordType;
   }
 
-  public void setRecord(int record) {
-    this.record = record;
-  }
-
-  public void setRecordType(IRType recordType) {
-    this.recordType = recordType;
-  }
-
   @Override
   public void accept(IRInstructionVisitor visitor) {
     visitor.visit(this);
+  }
+
+  @Override
+  public String toString() {
+    return "resetSession(" + record + "[" + recordType + "])";
+  }
+
+  @Override
+  public IRInstruction clone() {
+    return new IRResetSession(record, recordType);
   }
 
   @Override
@@ -45,13 +47,5 @@ public abstract class IRPush extends IRInstruction {
   @Override
   public void substituteTypes(Function<IRType, IRType> types) {
     recordType = types.apply(recordType);
-  }
-
-  public String toString(String pushType) {
-    return pushType + "(" + record + "[" + recordType + "])";
-  }
-
-  public String toString(String pushType, String arg) {
-    return pushType + "(" + record + "[" + recordType + "], " + arg + ")";
   }
 }

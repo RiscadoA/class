@@ -2,25 +2,24 @@ package pt.inescid.cllsj.compiler.ir.instructions;
 
 import java.util.function.Function;
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
-import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
 import pt.inescid.cllsj.compiler.ir.type.IRType;
 
 public class IRPushSession extends IRPush {
   private int argRecord;
-  private IRValueRequisites valueRequisites;
+  private IRType argRecordType;
 
-  public IRPushSession(int record, int argRecord, IRValueRequisites valueRequisites) {
-    super(record);
+  public IRPushSession(int record, IRType recordType, int argRecord, IRType argRecordType) {
+    super(record, recordType);
     this.argRecord = argRecord;
-    this.valueRequisites = valueRequisites;
+    this.argRecordType = argRecordType;
   }
 
   public int getArgRecord() {
     return argRecord;
   }
 
-  public IRValueRequisites getValueRequisites() {
-    return valueRequisites;
+  public IRType getArgRecordType() {
+    return argRecordType;
   }
 
   @Override
@@ -30,7 +29,7 @@ public class IRPushSession extends IRPush {
 
   @Override
   public String toString() {
-    return "pushSession(" + getRecord() + ", " + argRecord + ", " + valueRequisites + ")";
+    return toString("pushSession", Integer.toString(argRecord) + "[" + argRecordType + "]");
   }
 
   @Override
@@ -40,13 +39,13 @@ public class IRPushSession extends IRPush {
   }
 
   @Override
-  public void substituteTypes(
-      Function<IRType, IRType> types, Function<IRValueRequisites, IRValueRequisites> requisites) {
-    this.valueRequisites = requisites.apply(this.valueRequisites);
+  public void substituteTypes(Function<IRType, IRType> types) {
+    super.substituteTypes(types);
+    argRecordType = types.apply(argRecordType);
   }
 
   @Override
   public IRInstruction clone() {
-    return new IRPushSession(getRecord(), argRecord, valueRequisites.clone());
+    return new IRPushSession(getRecord(), getRecordType(), argRecord, argRecordType);
   }
 }

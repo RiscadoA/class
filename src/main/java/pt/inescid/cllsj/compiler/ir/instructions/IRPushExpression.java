@@ -3,13 +3,15 @@ package pt.inescid.cllsj.compiler.ir.instructions;
 import java.util.function.Function;
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 import pt.inescid.cllsj.compiler.ir.expressions.IRExpression;
+import pt.inescid.cllsj.compiler.ir.type.IRType;
 
 public class IRPushExpression extends IRPush {
   private IRExpression expression;
   private boolean isExponential;
 
-  public IRPushExpression(int record, IRExpression expression, boolean isExponential) {
-    super(record);
+  public IRPushExpression(
+      int record, IRType recordType, IRExpression expression, boolean isExponential) {
+    super(record, recordType);
     this.expression = expression;
     this.isExponential = isExponential;
   }
@@ -29,13 +31,8 @@ public class IRPushExpression extends IRPush {
 
   @Override
   public String toString() {
-    return "pushExpression("
-        + getRecord()
-        + ", "
-        + expression
-        + ", "
-        + (isExponential ? "exponential" : "linear")
-        + ")";
+    return toString(
+        "pushExpression", expression + ", " + (isExponential ? "exponential" : "linear"));
   }
 
   @Override
@@ -52,6 +49,6 @@ public class IRPushExpression extends IRPush {
 
   @Override
   public IRInstruction clone() {
-    return new IRPushExpression(getRecord(), expression.clone(), isExponential);
+    return new IRPushExpression(getRecord(), getRecordType(), expression.clone(), isExponential);
   }
 }

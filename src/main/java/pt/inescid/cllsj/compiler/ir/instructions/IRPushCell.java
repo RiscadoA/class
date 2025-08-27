@@ -2,12 +2,13 @@ package pt.inescid.cllsj.compiler.ir.instructions;
 
 import java.util.function.Function;
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
+import pt.inescid.cllsj.compiler.ir.type.IRType;
 
 public class IRPushCell extends IRPush {
   private int argRecord;
 
-  public IRPushCell(int record, int argRecord) {
-    super(record);
+  public IRPushCell(int record, IRType recordType, int argRecord) {
+    super(record, recordType);
     this.argRecord = argRecord;
   }
 
@@ -22,7 +23,7 @@ public class IRPushCell extends IRPush {
 
   @Override
   public String toString() {
-    return "pushCell(" + getRecord() + ", " + argRecord + ")";
+    return toString("pushCell", Integer.toString(argRecord));
   }
 
   @Override
@@ -33,6 +34,6 @@ public class IRPushCell extends IRPush {
 
   @Override
   public IRInstruction clone() {
-    return new IRPushCell(getRecord(), argRecord);
+    return new IRPushCell(getRecord(), getRecordType(), argRecord);
   }
 }

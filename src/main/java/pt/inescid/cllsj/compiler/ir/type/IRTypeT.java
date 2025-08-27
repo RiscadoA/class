@@ -2,7 +2,6 @@ package pt.inescid.cllsj.compiler.ir.type;
 
 import java.util.function.BiFunction;
 import pt.inescid.cllsj.compiler.ir.IRTypeVisitor;
-import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
 
 public class IRTypeT extends IRType {
   private IRType cont;
@@ -31,8 +30,7 @@ public class IRTypeT extends IRType {
   }
 
   @Override
-  public IRType substituteReqs(
-      int offset, BiFunction<Integer, IRValueRequisites, IRValueRequisites> reqs) {
-    return new IRTypeT(cont.substituteReqs(offset + 1, reqs));
+  public boolean equals(IRType other) {
+    return other instanceof IRTypeT && ((IRTypeT) other).getCont().equals(getCont());
   }
 }

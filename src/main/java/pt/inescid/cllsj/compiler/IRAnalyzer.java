@@ -198,7 +198,7 @@ public class IRAnalyzer extends IRInstructionVisitor {
   public void visit(IRPushSession instruction) {
     IRFlowRecord record = state.getBoundRecord(instruction.getRecord());
     IRFlowRecord argRecord = state.getBoundRecord(instruction.getArgRecord());
-    Optional<Boolean> value = state.isValue(instruction.getValueRequisites());
+    Optional<Boolean> value = state.isValue(instruction.getArgRecordType());
 
     if (value.isEmpty()) {
       record.markSlotsUnknown(this, state);
@@ -223,7 +223,7 @@ public class IRAnalyzer extends IRInstructionVisitor {
   @Override
   public void visit(IRPopSession instruction) {
     IRFlowRecord record = state.getBoundRecord(instruction.getRecord());
-    Optional<Boolean> value = state.isValue(instruction.getValueRequisites());
+    Optional<Boolean> value = state.isValue(instruction.getArgRecordType());
 
     if (value.isEmpty()) {
       record.markSlotsUnknown(this, state);
@@ -233,7 +233,7 @@ public class IRAnalyzer extends IRInstructionVisitor {
       state.bindRecord(instruction.getArgRecord(), argRecord);
 
       Optional<Integer> slotCount =
-          state.slotCount(process.getRecordType(instruction.getArgRecord()), record.getSlots());
+          state.slotCount(instruction.getArgRecordType(), record.getSlots());
 
       if (slotCount.isPresent()) {
         argRecord.doNewSession(Optional.empty());
@@ -350,22 +350,30 @@ public class IRAnalyzer extends IRInstructionVisitor {
 
   @Override
   public void visit(IRPushType instruction) {
-    IRFlowType type =
-        new IRFlowType(
-            instruction.getType(), instruction.isPositive(), instruction.getValueRequisites());
-    state
-        .getBoundRecord(instruction.getRecord())
-        .doPush(this, state, IRFlowSlot.type(location, type));
+    IRFlowRecord record = state.getBoundRecord(instruction.getRecord());
+    IRFlowRecord argRecord = state.getBoundRecord(instruction.getArgRecord());
+
+    IRFlowType type = new IRFlowType(instruction.getArgType(), instruction.isArgPositive());
+    record.doPush(this, state, IRFlowSlot.type(location, type));
+    record.doPush(this, state, IRFlowSlot.record(location, argRecord.getIntroductionLocation()));
   }
 
   @Override
   public void visit(IRPopType instruction) {
-    IRFlowSlot slot = state.getBoundRecord(instruction.getRecord()).doPop(location);
-    if (slot.isKnownType()) {
-      state.bindType(instruction.getArgType(), slot.getType());
+    IRFlowRecord record = state.getBoundRecord(instruction.getRecord());
+
+    IRFlowSlot typeSlot = record.doPop(location);
+    IRFlowSlot recordSlot = record.doPop(location);
+    if (typeSlot.isKnownType()) {
+      state.bindType(instruction.getArgType(), typeSlot.getType());
     }
-    if (slot.isKnownType() && slot.getType().isPositive().isPresent()) {
-      if (slot.getType().isPositive().get()) {
+    if (recordSlot.isKnownRecord()) {
+      state.bindRecord(instruction.getArgRecord(), recordSlot.getRecordIntroductionLocation());
+    } else {
+      state.bindRecord(instruction.getArgRecord(), state.allocateRecord(IRFlowLocation.unknown()));
+    }
+    if (typeSlot.isKnownType() && typeSlot.getType().isPositive().isPresent()) {
+      if (typeSlot.getType().isPositive().get()) {
         if (instruction.getPositive().isPresent()) {
           visit(instruction.getPositive().get().getLabel(), VisitType.BRANCH);
         }
@@ -478,11 +486,11 @@ public class IRAnalyzer extends IRInstructionVisitor {
   }
 
   @Override
-  public void visit(IRScan instruction) {
+  public void visit(IRPushScan instruction) {
     IRFlowRecord record = state.getBoundRecord(instruction.getRecord());
 
     boolean isExponential = false;
-    IRType type = instruction.getType();
+    IRType type = instruction.getRecordType().leftmostTail();
     if (type instanceof IRExponentialT) {
       isExponential = true;
       type = ((IRExponentialT) type).getInner();
@@ -496,7 +504,7 @@ public class IRAnalyzer extends IRInstructionVisitor {
     } else if (type instanceof IRBoolT) {
       slot = IRFlowSlot.bool(location);
     } else {
-      throw new IllegalArgumentException("Unsupported scan type: " + instruction.getType());
+      throw new IllegalArgumentException("Unsupported scan type: " + instruction.getRecordType());
     }
 
     if (isExponential) {

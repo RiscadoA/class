@@ -1,10 +1,11 @@
 package pt.inescid.cllsj.compiler.ir.instructions;
 
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
+import pt.inescid.cllsj.compiler.ir.type.IRType;
 
 public class IRPopClose extends IRPop {
-  public IRPopClose(int record) {
-    super(record);
+  public IRPopClose(int record, IRType recordType) {
+    super(record, recordType);
   }
 
   @Override
@@ -14,11 +15,11 @@ public class IRPopClose extends IRPop {
 
   @Override
   public IRInstruction clone() {
-    return new IRPopClose(getRecord());
+    return new IRPopClose(getRecord(), getRecordType());
   }
 
   @Override
   public String toString() {
-    return "popClose(" + getRecord() + ")";
+    return toString("popClose");
   }
 }

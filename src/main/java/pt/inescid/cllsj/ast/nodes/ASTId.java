@@ -34,6 +34,7 @@ public class ASTId extends ASTNode {
   List<ASTExpr> exprs;
   List<ASTExpr> gexprs;
   List<String> pars;
+  List<ASTType> parTypes;
   // List<Integer> poffsets;
   List<String> gpars;
   List<ASTType> tpars;
@@ -44,6 +45,7 @@ public class ASTId extends ASTNode {
     id = _id;
 
     pars = new ArrayList<String>();
+    parTypes = new ArrayList<>();
     gpars = new ArrayList<String>();
     tpars = new ArrayList<ASTType>();
     exprs = new ArrayList<ASTExpr>();
@@ -60,6 +62,10 @@ public class ASTId extends ASTNode {
 
   public List<String> getPars() {
     return pars;
+  }
+
+  public List<ASTType> getParTypes() {
+    return parTypes;
   }
 
   public List<String> getGPars() {
@@ -303,6 +309,8 @@ public class ASTId extends ASTNode {
         ed.upd(par, null);
         npars.add(par);
       }
+
+      parTypes.add(actual);
     }
 
     pars = npars;

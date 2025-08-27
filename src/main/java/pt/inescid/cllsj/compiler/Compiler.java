@@ -93,65 +93,65 @@ public class Compiler {
       return 1;
     }
 
-    try {
-      IROptimizer optimizer = new IROptimizer();
+    // try {
+    //   IROptimizer optimizer = new IROptimizer();
 
-      if (inliningComplexity >= 0) {
-        optimizer.inlineProcesses(ir, inliningComplexity, false);
-        optimizer.removeUnusedProcesses(ir, entryProcess);
-      }
+    //   if (inliningComplexity >= 0) {
+    //     optimizer.inlineProcesses(ir, inliningComplexity, false);
+    //     optimizer.removeUnusedProcesses(ir, entryProcess);
+    //   }
 
-      if (optimizeIRWithAnalysis) {
-        optimizer.analyze(ir);
+    //   if (optimizeIRWithAnalysis) {
+    //     optimizer.analyze(ir);
 
-        if (optimizeKnownJumps) {
-          optimizer.optimizeKnownJumps(ir);
-        }
+    //     if (optimizeKnownJumps) {
+    //       optimizer.optimizeKnownJumps(ir);
+    //     }
 
-        if (optimizeSendValue) {
-          optimizer.removeUnnecessaryValuePushes(ir);
-          optimizer.removeUnnecessaryValuePops(ir);
-        }
+    //     if (optimizeSendValue) {
+    //       optimizer.removeUnnecessaryValuePushes(ir);
+    //       optimizer.removeUnnecessaryValuePops(ir);
+    //     }
 
-        if (optimizeKnownSlots) {
-          optimizer.analyze(ir);
-          optimizer.optimizeKnownSlots(ir);
-        }
+    //     if (optimizeKnownSlots) {
+    //       optimizer.analyze(ir);
+    //       optimizer.optimizeKnownSlots(ir);
+    //     }
 
-        if (optimizeFlipForward) {
-          optimizer.optimizeFlipForward(ir);
-        }
+    //     if (optimizeFlipForward) {
+    //       optimizer.optimizeFlipForward(ir);
+    //     }
 
-        if (optimizeKnownEndPoints) {
-          optimizer.optimizeKnownEndPoints(ir);
-        }
+    //     if (optimizeKnownEndPoints) {
+    //       optimizer.optimizeKnownEndPoints(ir);
+    //     }
 
-        if (optimizeKnownJumps) {
-          optimizer.removeUnreachableBlocks(ir);
-        }
-        optimizer.removeUnusedRecords(ir);
-        optimizer.removeUnusedExponentials(ir);
+    //     if (optimizeKnownJumps) {
+    //       optimizer.removeUnreachableBlocks(ir);
+    //     }
+    //     optimizer.removeUnusedRecords(ir);
+    //     optimizer.removeUnusedExponentials(ir);
 
-        if (onlyAnalyze) {
-          optimizer.printProcessFlows(ir);
-          return 0;
-        }
-      } else if (onlyAnalyze) {
-        optimizer.analyze(ir);
-        optimizer.printProcessFlows(ir);
-        return 0;
-      }
+    //     if (onlyAnalyze) {
+    //       optimizer.printProcessFlows(ir);
+    //       return 0;
+    //     }
+    //   } else if (onlyAnalyze) {
+    //     optimizer.analyze(ir);
+    //     optimizer.printProcessFlows(ir);
+    //     return 0;
+    //   }
 
-      if (inliningComplexity >= 0 && inlineRecursiveProcesses) {
-        optimizer.inlineProcesses(ir, inliningComplexity, true);
-      }
+    //   if (inliningComplexity >= 0 && inlineRecursiveProcesses) {
+    //     optimizer.inlineProcesses(ir, inliningComplexity, true);
+    //   }
 
-      optimizer.removeUnusedProcesses(ir, entryProcess);
-    } catch (Exception e) {
-      System.err.println("IR optimization error: " + e.getMessage());
-      e.printStackTrace();
-      return 1;
-    }
+    //   optimizer.removeUnusedProcesses(ir, entryProcess);
+    // } catch (Exception e) {
+    //   System.err.println("IR optimization error: " + e.getMessage());
+    //   e.printStackTrace();
+    //   return 1;
+    // }
 
     if (onlyIR) {
       System.out.print(ir.toString());

@@ -4,9 +4,9 @@ import pt.inescid.cllsj.compiler.ir.type.IRBoolT;
 import pt.inescid.cllsj.compiler.ir.type.IRCellT;
 import pt.inescid.cllsj.compiler.ir.type.IRCloseT;
 import pt.inescid.cllsj.compiler.ir.type.IRExponentialT;
-import pt.inescid.cllsj.compiler.ir.type.IRFlipT;
 import pt.inescid.cllsj.compiler.ir.type.IRIntT;
 import pt.inescid.cllsj.compiler.ir.type.IRRecT;
+import pt.inescid.cllsj.compiler.ir.type.IRResetT;
 import pt.inescid.cllsj.compiler.ir.type.IRSessionT;
 import pt.inescid.cllsj.compiler.ir.type.IRStringT;
 import pt.inescid.cllsj.compiler.ir.type.IRTagT;
@@ -62,7 +62,7 @@ public abstract class IRTypeVisitor {
     visit((IRType) type);
   }
 
-  public void visit(IRFlipT type) {
+  public void visit(IRResetT type) {
     visit((IRType) type);
   }
 }

@@ -48,6 +48,7 @@ public class CGenerator extends IRInstructionVisitor {
   public boolean optimizeTailCalls = true;
   public boolean optimizeSendValue = true;
   public boolean optimizeSingleEndpoint = true;
+  public CArchitecture arch = new CArchitecture();
 
   public int customAllocatorSizeDivisor = 64;
   public int customAllocatorLevels = 4;
@@ -166,18 +167,6 @@ public class CGenerator extends IRInstructionVisitor {
     }
     putBlankLine();
     if (customAllocatorLevels == 0) {
-      putLine("#define managed_calloc(size) calloc(1, size)");
-    } else {
-      putLine("void* managed_calloc(size_t size) {");
-      incIndent();
-      putStatement("void* ptr = managed_alloc(size)");
-      putStatement("memset(ptr, 0, size)");
-      putStatement("return ptr");
-      decIndent();
-      putLine("}");
-    }
-    putBlankLine();
-    if (customAllocatorLevels == 0) {
       putLine("#define managed_free(ptr) free(ptr)");
     } else {
       putLine("void managed_free(void* ptr) {");
@@ -229,15 +218,12 @@ public class CGenerator extends IRInstructionVisitor {
     }
     putBlankLine();
 
-    // Define the record struct.
-    putLine("struct record {");
+    // Holds the data present at the start of a record buffer.
+    putLine("struct record_header {");
     incIndent();
     putLine("void* cont;");
     putLine("struct environment* cont_env;");
-    putLine("int cont_record;");
-    putLine("unsigned char read;");
-    putLine("unsigned char written;");
-    putLine("char buffer[];");
+    putLine("unsigned char cont_record;");
     decIndent();
     putLine("};");
     putBlankLine();
@@ -259,13 +245,18 @@ public class CGenerator extends IRInstructionVisitor {
     // Define the type struct.
     putLine("struct type {");
     incIndent();
-    if (optimizePrimitiveExponentials) {
-      putLine("int id;");
-    }
-    if (optimizeSendValue) {
-      putLine("int flags;");
-    }
+    putLine("int flags;");
     putLine("int size;");
+    putLine("int alignment;");
+    decIndent();
+    putLine("};");
+    putBlankLine();
+
+    // Define the type slot struct.
+    putLine("struct type_slot {");
+    incIndent();
+    putLine("char* record;");
+    putLine("struct type type;");
     decIndent();
     putLine("};");
     putBlankLine();
@@ -293,68 +284,52 @@ public class CGenerator extends IRInstructionVisitor {
     putBlankLine();
 
     // Define the cell struct.
-    putLine("struct cell {");
-    incIndent();
-    if (disableConcurrency) {
-      putLine("int ref_count;");
-    } else {
-      putLine("pthread_mutex_t mutex;");
-      putLine("atomic_int ref_count;");
-    }
-    putLine("struct record* record;");
-    decIndent();
-    putLine("};");
-    putBlankLine();
+    // putLine("struct cell {");
+    // incIndent();
+    // if (disableConcurrency) {
+    //   putLine("int ref_count;");
+    // } else {
+    //   putLine("pthread_mutex_t mutex;");
+    //   putLine("atomic_int ref_count;");
+    // }
+    // putLine("char* record;");
+    // decIndent();
+    // putLine("};");
+    // putBlankLine();
 
     // Utility macros for accessing records and exponentials on a given environment, and on
     // exponentials.
-    put("#define RECORD(env, rec) (*(struct record**)(");
+    put("#define RECORD(env, rec) (*(char**)(");
     put("(char*)(env) + ");
     put("sizeof(struct environment) + ");
-    put("sizeof(struct record*) * rec");
+    put("sizeof(char*) * (rec)");
     put("))");
     putLineEnd();
+    putLine("#define ACCESS(rec, offset, type) (*(type*)((rec) + (offset)))");
     put("#define EXPONENTIAL(env, rec_count, exp) (*(struct exponential**)(");
     put("(char*)(env) + ");
     put("sizeof(struct environment) + ");
-    put("sizeof(struct record*) * rec_count + ");
-    put("sizeof(struct exponential*) * exp");
+    put("sizeof(char*) * (rec_count) + ");
+    put("sizeof(struct exponential*) * (exp)");
     put("))");
     putLineEnd();
     put("#define TYPE(env, rec_count, exp_count, type_i) (*(struct type*)(");
     put("(char*)(env) + ");
     put("sizeof(struct environment) + ");
-    put("sizeof(struct record*) * rec_count + ");
-    put("sizeof(struct exponential*) * exp_count + ");
-    put("sizeof(struct type) * type_i");
+    put("sizeof(char*) * (rec_count) + ");
+    put("sizeof(struct exponential*) * (exp_count) + ");
+    put("sizeof(struct type) * (type_i)");
     put("))");
     putLineEnd();
     putBlankLine();
 
-    // Utility macro for accessing the read, written and buffer fields of a record in the active
-    // environment.
-    putLine("#define READ(rec) RECORD(" + ENV + ", rec)->read");
-    putLine("#define WRITTEN(rec) RECORD(" + ENV + ", rec)->written");
-    putLine("#define BUFFER(rec) RECORD(" + ENV + ", rec)->buffer");
+    // Utility macros to for handling alignment and padding
+    putLine("#define ALIGN(offset, alignment) ((offset) + ((alignment) - 1) & -(alignment))");
+    putLine("#define PADDING(offset, alignment) (-(offset) & ((alignment) - 1))");
     putBlankLine();
 
-    // Utility macros for pushing and popping values to/from the buffer of a record in the active
-    // environment.
-    put("#define PUSH_RAW(rec, type, ...) (*(type*)(");
-    put("&(rec->buffer)[(rec->written += sizeof(type)) - sizeof(type)]");
-    put(")) = __VA_ARGS__");
-    putLineEnd();
-    put("#define PUSH(rec, type, ...) (*(type*)(");
-    put("&BUFFER(rec)[(WRITTEN(rec) += sizeof(type)) - sizeof(type)]");
-    put(")) = __VA_ARGS__");
-    putLineEnd();
-    put("#define POP(rec, type) (*(type*)(");
-    put("&BUFFER(rec)[(READ(rec) += sizeof(type)) - sizeof(type)]");
-    put("))");
-    putLineEnd();
-    put("#define PEEK(rec, type) (*(type*)(");
-    put("&BUFFER(rec)[READ(rec)]");
-    put("))");
+    // Utility macro for getting the maximum value of two values.
+    putLine("#define MAX(a, b) ((a) > (b) ? (a) : (b))");
     putBlankLine();
 
     // Functions used for printing debug info
@@ -362,30 +337,16 @@ public class CGenerator extends IRInstructionVisitor {
       putLine("void debug_type(int i, struct type* type) {");
       incIndent();
       putDebug("    <type %d:", "i");
-      if (optimizePrimitiveExponentials) {
-        putDebug(" id(%d)", typeId("(*type)"));
-      }
-      if (optimizeSendValue) {
-        putDebug(" flags(%d)", typeFlags("(*type)"));
-      }
-      putDebugLn(" size(%d)>", typeSize("(*type)"));
+      putDebug(" flags(%d)", typeFlags("(*type)"));
+      putDebug(" size(%d)", typeSize("(*type)").toString());
+      putDebugLn(" alignment(%d)>", typeAlignment("(*type)").toString());
       decIndent();
       putLine("}");
       putBlankLine();
 
-      putLine("void debug_record(int i, struct record* record) {");
+      putLine("void debug_record(int i, char* record) {");
       incIndent();
-      putDebug("    <record %d: %p>", "i", "record");
-      putIfElse(
-          "record != NULL",
-          () ->
-              putDebugLn(
-                  " <written: %d> <read: %d> <cont_env: %p> <cont_record: %d>",
-                  written("record"),
-                  read("record"),
-                  recordContEnv("record"),
-                  recordContRecord("record")),
-          () -> putDebugLn(""));
+      putDebugLn("    <record %d: %p>", "i", "record");
       decIndent();
       putLine("}");
       putBlankLine();
@@ -562,7 +523,7 @@ public class CGenerator extends IRInstructionVisitor {
     putStatement("register struct environment* " + ENV);
     putStatement("register struct environment* " + TMP_ENV);
     putStatement("register void* " + TMP_CONT);
-    putStatement("register struct record* " + TMP_RECORD);
+    putStatement("register char* " + TMP_RECORD);
     putStatement("register struct exponential* " + TMP_EXPONENTIAL);
     if (!disableConcurrency) {
       putStatement("pthread_t " + TMP_THREAD);
@@ -636,6 +597,25 @@ public class CGenerator extends IRInstructionVisitor {
 
     putLine("int main() {");
     incIndent();
+
+    // Start by validating the architecture
+    for (CArchitecture.Test test : arch.getTests()) {
+      String actual = CSize.sizeOf(test.cType).toString();
+      putIf(
+          actual + " != " + test.expected,
+          () -> {
+            putDebugLn(
+                "Program was compiled for an architecture where "
+                    + actual
+                    + " is "
+                    + test.expected
+                    + ", but instead got %ld",
+                actual);
+            putStatement("return 1");
+          });
+    }
+    putBlankLine();
+
     if (customAllocatorLevels > 0) {
       putLine("for (int i = 0; i < " + customAllocatorLevels + "; ++i) {");
       incIndent();
@@ -754,15 +734,7 @@ public class CGenerator extends IRInstructionVisitor {
         putStatement("debug_record(" + i + ", " + record(i) + ")");
       }
       for (int i = 0; i < exponentialCount; ++i) {
-        if (optimizePrimitiveExponentials && exponentialType(i) instanceof IRIntT) {
-          putDebugLn("    <exponential " + i + ": int(%d)>", "(int)(uintptr_t)" + exponential(i));
-        } else if (optimizePrimitiveExponentials && exponentialType(i) instanceof IRBoolT) {
-          putDebugLn(
-              "    <exponential " + i + ": bool(%d)>",
-              "(unsigned char)(uintptr_t)" + exponential(i));
-        } else {
-          putStatement("debug_exponential(" + i + ", " + exponential(i) + ")");
-        }
+        putStatement("debug_exponential(" + i + ", " + exponential(i) + ")");
       }
     }
     if (trace) {
@@ -800,6 +772,7 @@ public class CGenerator extends IRInstructionVisitor {
             // Bind the arguments to the new environment
             for (LinearArgument arg : instruction.getLinearArguments()) {
               putAssign(record(TMP_ENV, arg.getTargetRecord()), record(ENV, arg.getSourceRecord()));
+              putConsumeRecord(record(ENV, arg.getSourceRecord()), arg.getRecordType());
             }
             for (ExponentialArgument arg : instruction.getExponentialArguments()) {
               putAssign(
@@ -813,10 +786,7 @@ public class CGenerator extends IRInstructionVisitor {
                       process.getRecordCount(),
                       process.getExponentialCount(),
                       arg.getTargetType()),
-                  typeInitializer(
-                      arg.getSourceType(),
-                      arg.getSourceTypeValueRequisites(),
-                      arg.getSourceTypePolarity()));
+                  typeInitializer(arg.getSourceType(), arg.getSourceTypePolarity()));
             }
 
             putDecrementEndPoints(instruction.isEndPoint(), () -> putFreeEnvironment(ENV));
@@ -955,81 +925,40 @@ public class CGenerator extends IRInstructionVisitor {
   @Override
   public void visit(IRForward i) {
     // Copy the buffer from the negative record to the positive record.
-    putStatement(
-        "memcpy("
-            + buffer(i.getPosRecord())
-            + " + "
-            + written(i.getPosRecord())
-            + ", "
-            + buffer(i.getNegRecord())
-            + " + "
-            + read(i.getNegRecord())
-            + ", "
-            + written(i.getNegRecord())
-            + " - "
-            + read(i.getNegRecord())
-            + ")");
-    putStatement(
-        written(i.getPosRecord())
-            + " += "
-            + written(i.getNegRecord())
-            + " - "
-            + read(i.getNegRecord()));
+    String offset = " - (" + lastSlotOffset(i.getType()) + ")";
+    CSize size = layout(i.getType()).size;
+    putCopy(record(i.getPosRecord()) + offset, record(i.getNegRecord()) + offset, size);
 
-    // Set the continuation of the positive record to the continuation of the negative record.
+    // Store the continuation we'll be jumping to
+    putConsumeRecord(i.getPosRecord(), i.getType());
+    String posHeader = accessRecord(i.getPosRecord(), "struct record_header");
     if (i.shouldReturn()) {
-      putAssign(TMP_CONT, recordCont(i.getPosRecord()));
-      putAssign(TMP_ENV, recordContEnv(i.getPosRecord()));
+      putAssign(TMP_CONT, recordHeaderCont(posHeader));
+      putAssign(TMP_ENV, recordHeaderContEnv(posHeader));
     }
-    putAssign(recordCont(i.getPosRecord()), recordCont(i.getNegRecord()));
-    putAssign(recordContEnv(i.getPosRecord()), recordContEnv(i.getNegRecord()));
-    putAssign(recordContRecord(i.getPosRecord()), recordContRecord(i.getNegRecord()));
 
-    // Overwrite the negative record on its continuation environment with the positive record.
-    // We only do this if the negative record has a continuation environment.
+    // Store the record we'll be freeing
     putAssign(TMP_RECORD, record(i.getNegRecord()));
-    putIf(
-        recordContEnv(i.getNegRecord()) + " != NULL",
+    putConsumeRecord(TMP_RECORD, i.getType());
+
+    // If the negative record has a continuation (i.e., type is not a value), we must handle it
+    putIfTypeIsNotValue(
+        i.getType().valueRequisites(),
         () -> {
+          // Set the continuation of the positive record to the continuation of the negative record.
+          String negHeader = accessRecord(TMP_RECORD, "0", "struct record_header");
+          putAssign(recordHeaderCont(posHeader), recordHeaderCont(negHeader));
+          putAssign(recordHeaderContEnv(posHeader), recordHeaderContEnv(negHeader));
+          putAssign(recordHeaderContRecord(posHeader), recordHeaderContRecord(negHeader));
+
+          // Overwrite the negative record on its continuation environment with the positive record.
           putAssign(
-              record(recordContEnv(i.getNegRecord()), recordContRecord(i.getNegRecord())),
+              record(recordHeaderContEnv(negHeader), recordHeaderContRecord(negHeader)),
               record(i.getPosRecord()));
         });
 
-    Runnable cleanNegRecord =
-        () -> {
-          // The negative record will be deleted, but it's binding may now point to the positive
-          // record. If it doesn't, then we set it to null.
-          putIf(
-              TMP_RECORD + " == " + record(i.getNegRecord()),
-              () -> {
-                putAssign(record(i.getNegRecord()), "NULL");
-              });
-        };
-
     // Decrement the end points and free the environment if necessary.
-    if (i.shouldReturn()) {
-      putDecrementEndPoints(
-          i.isEndPoint(),
-          () -> putFreeEnvironment(ENV),
-          () -> {
-            // If the environment was not freed, and if the records won't be used in this
-            // environment anymore, we need to remove their bindings. This is necessary to
-            // prevent them from being cloned or freed again later on.
-            cleanNegRecord.run();
-
-            // The positive record will only be needed if either the environment we're going to jump
-            // to or its continuation environment are the current environment. If not, we also need
-            // to remove its binding from the current environment.
-            putIf(
-                ENV + " != " + recordContEnv(i.getPosRecord()) + " && " + ENV + " != " + TMP_ENV,
-                () -> {
-                  putAssign(record(i.getPosRecord()), "NULL");
-                });
-          });
-    } else {
-      cleanNegRecord.run();
-    }
+    putDecrementEndPoints(i.isEndPoint(), () -> putFreeEnvironment(ENV));
 
     // Finally, free the negative record and jump to the continuation.
     putFreeRecord(TMP_RECORD);
@@ -1041,99 +970,112 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRFlipForward i) {
-    // First of all, we need to check if we need to, and if so, expand the buffer of the negative
-    // record.
-    // This is a pessimistic check, as we don't know the actual size of the buffer at runtime.
-    String currentSize = maxSize(recordType(i.getNegRecord()));
-    String desiredSize =
-        currentSize + " + " + written(i.getPosRecord()) + " - " + read(i.getPosRecord());
-    putIf(
-        currentSize + " < " + desiredSize,
-        () -> {
-          putReallocRecord(record(i.getNegRecord()), desiredSize);
-        });
+    throw new UnsupportedOperationException("Unimplemented");
 
-    // Copy the unread data on the positive buffer into the negative record's buffer.
-    putStatement(
-        "memcpy("
-            + buffer(i.getNegRecord())
-            + " + "
-            + written(i.getNegRecord())
-            + ", "
-            + buffer(i.getPosRecord())
-            + " + "
-            + read(i.getPosRecord())
-            + ", "
-            + written(i.getPosRecord())
-            + " - "
-            + read(i.getPosRecord())
-            + ")");
-    putStatement(
-        written(i.getNegRecord())
-            + " += "
-            + written(i.getPosRecord())
-            + " - "
-            + read(i.getPosRecord()));
+    // // First of all, we need to check if we need to, and if so, expand the buffer of the negative
+    // // record.
+    // // This is a pessimistic check, as we don't know the actual size of the buffer at runtime.
+    // String currentSize = maxSize(i.getType());
+    // String desiredSize =
+    //     currentSize + " + " + written(i.getPosRecord()) + " - " + read(i.getPosRecord());
+    // putIf(
+    //     currentSize + " < " + desiredSize,
+    //     () -> {
+    //       putReallocRecord(record(i.getNegRecord()), desiredSize);
+    //     });
 
-    // Set the continuation of the negative record to the continuation of the positive record.
-    putAssign(TMP_CONT, recordCont(i.getNegRecord()));
-    putAssign(TMP_ENV, recordContEnv(i.getNegRecord()));
-    putAssign(recordCont(i.getNegRecord()), recordCont(i.getPosRecord()));
-    putAssign(recordContEnv(i.getNegRecord()), recordContEnv(i.getPosRecord()));
-    putAssign(recordContRecord(i.getNegRecord()), recordContRecord(i.getPosRecord()));
+    // // Copy the unread data on the positive buffer into the negative record's buffer.
+    // putStatement(
+    //     "memcpy("
+    //         + buffer(i.getNegRecord())
+    //         + " + "
+    //         + written(i.getNegRecord())
+    //         + ", "
+    //         + buffer(i.getPosRecord())
+    //         + " + "
+    //         + read(i.getPosRecord())
+    //         + ", "
+    //         + written(i.getPosRecord())
+    //         + " - "
+    //         + read(i.getPosRecord())
+    //         + ")");
+    // putStatement(
+    //     written(i.getNegRecord())
+    //         + " += "
+    //         + written(i.getPosRecord())
+    //         + " - "
+    //         + read(i.getPosRecord()));
 
-    // Overwrite the positive record on its continuation environment with the negative record.
-    // We only do this if the positive record has a continuation environment.
-    putAssign(TMP_RECORD, record(i.getPosRecord()));
-    putIf(
-        recordContEnv(i.getPosRecord()) + " != NULL",
-        () -> {
-          putAssign(
-              record(recordContEnv(i.getPosRecord()), recordContRecord(i.getPosRecord())),
-              record(i.getNegRecord()));
-        });
+    // // Set the continuation of the negative record to the continuation of the positive record.
+    // putAssign(TMP_CONT, recordCont(i.getNegRecord()));
+    // putAssign(TMP_ENV, recordContEnv(i.getNegRecord()));
+    // putAssign(recordCont(i.getNegRecord()), recordCont(i.getPosRecord()));
+    // putAssign(recordContEnv(i.getNegRecord()), recordContEnv(i.getPosRecord()));
+    // putAssign(recordContRecord(i.getNegRecord()), recordContRecord(i.getPosRecord()));
 
-    // Decrement the end points and free the environment if necessary.
-    putDecrementEndPoints(
-        i.isEndPoint(),
-        () -> putFreeEnvironment(ENV),
-        () -> {
-          // If the environment was not freed, and if the records won't be used in this environment
-          // anymore, we need to remove their bindings. This is necessary to prevent them from being
-          // cloned or freed again later on.
+    // // Overwrite the positive record on its continuation environment with the negative record.
+    // // We only do this if the positive record has a continuation environment.
+    // putAssign(TMP_RECORD, record(i.getPosRecord()));
+    // putIf(
+    //     recordContEnv(i.getPosRecord()) + " != NULL",
+    //     () -> {
+    //       putAssign(
+    //           record(recordContEnv(i.getPosRecord()), recordContRecord(i.getPosRecord())),
+    //           record(i.getNegRecord()));
+    //     });
 
-          // The positive record will be deleted, but it's binding may now point to the negative
-          // record. If it doesn't, then we set it to null.
-          putIf(
-              TMP_RECORD + " == " + record(i.getPosRecord()),
-              () -> {
-                putAssign(record(i.getPosRecord()), "NULL");
-              });
+    // // Decrement the end points and free the environment if necessary.
+    // putDecrementEndPoints(
+    //     i.isEndPoint(),
+    //     () -> putFreeEnvironment(ENV),
+    //     () -> {
+    //       // If the environment was not freed, and if the records won't be used in this
+    // environment
+    //       // anymore, we need to remove their bindings. This is necessary to prevent them from
+    // being
+    //       // cloned or freed again later on.
 
-          // The negative record will only be needed if either the environment we're going to jump
-          // to or its continuation environment are the current environment. If not, we also need to
-          // remove its binding from the current environment.
-          putIf(
-              ENV + " != " + recordContEnv(i.getNegRecord()) + " && " + ENV + " != " + TMP_ENV,
-              () -> {
-                putAssign(record(i.getNegRecord()), "NULL");
-              });
-        });
+    //       // The positive record will be deleted, but it's binding may now point to the negative
+    //       // record. If it doesn't, then we set it to null.
+    //       putIf(
+    //           TMP_RECORD + " == " + record(i.getPosRecord()),
+    //           () -> {
+    //             putAssign(record(i.getPosRecord()), "NULL");
+    //           });
 
-    // Finally, free the positive record and jump to the continuation.
-    putFreeRecord(TMP_RECORD);
-    putAssign(ENV, TMP_ENV);
-    putComputedGoto(TMP_CONT);
+    //       // The negative record will only be needed if either the environment we're going to
+    // jump
+    //       // to or its continuation environment are the current environment. If not, we also need
+    // to
+    //       // remove its binding from the current environment.
+    //       putIf(
+    //           ENV + " != " + recordContEnv(i.getNegRecord()) + " && " + ENV + " != " + TMP_ENV,
+    //           () -> {
+    //             putAssign(record(i.getNegRecord()), "NULL");
+    //           });
+    //     });
+
+    // // Finally, free the positive record and jump to the continuation.
+    // putFreeRecord(TMP_RECORD);
+    // putAssign(ENV, TMP_ENV);
+    // putComputedGoto(TMP_CONT);
+  }
+
+  @Override
+  public void visit(IRResetSession i) {
+    putResetRecord(i.getRecord(), i.getRecordType());
   }
 
   @Override
   public void visit(IRFlip i) {
-    putAssign(TMP_CONT, recordCont(i.getRecord()));
-    putAssign(TMP_ENV, recordContEnv(i.getRecord()));
+    String header = accessRecord(i.getRecord(), "struct record_header");
 
-    putAssign(recordCont(i.getRecord()), labelAddress(blockLabel(i.getContLabel())));
-    putAssign(recordContEnv(i.getRecord()), ENV);
-    putAssign(recordContRecord(i.getRecord()), i.getRecord());
+    putAssign(TMP_CONT, recordHeaderCont(header));
+    putAssign(TMP_ENV, recordHeaderContEnv(header));
+
+    putAssign(recordHeaderCont(header), labelAddress(blockLabel(i.getContLabel())));
+    putAssign(recordHeaderContEnv(header), ENV);
+    putAssign(recordHeaderContRecord(header), i.getRecord());
 
     putAssign(ENV, TMP_ENV);
     putComputedGoto(TMP_CONT);
@@ -1141,23 +1083,10 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRReturn i) {
-    putAssign(TMP_CONT, recordCont(i.getRecord()));
-    putAssign(TMP_ENV, recordContEnv(i.getRecord()));
+    String header = accessRecord(i.getRecord(), "struct record_header");
 
-    putAssign(recordContEnv(i.getRecord()), "NULL");
-
-    // If the record won't be used anymore, we need to remove its binding from the current
-    // environment.
-    // This is necessary to prevent it from being cloned or freed again later on.
-    //
-    // The record can be unbound from the current environment if either:
-    // - its continuation environment is not the current environment;
-    // - or its continuation environment is the current environment, but its record is not the same.
-    putIf(
-        TMP_ENV + " != " + ENV + " || " + recordContRecord(i.getRecord()) + " != " + i.getRecord(),
-        () -> {
-          putAssign(record(ENV, i.getRecord()), "NULL");
-        });
+    putAssign(TMP_CONT, recordHeaderCont(header));
+    putAssign(TMP_ENV, recordHeaderContEnv(header));
 
     putDecrementEndPoints(i.isEndPoint(), () -> putFreeEnvironment(ENV));
 
@@ -1167,54 +1096,63 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRPopSession instruction) {
-    switchTypeIsValue(
-        instruction.getValueRequisites(),
+    if (instruction.getRecordType() instanceof IRSessionT == false) {
+      throw new UnsupportedOperationException("Record must be of session type");
+    }
+    IRSessionT sessionType = (IRSessionT) instruction.getRecordType();
+
+    putSwitchTypeIsValue(
+        sessionType.getArg().valueRequisites(),
         () -> {
-          String value = buffer(instruction.getRecord()) + " + " + read(instruction.getRecord());
-          String size = valueSize(recordType(instruction.getArgRecord()), value);
-          putAllocRecord(record(instruction.getArgRecord()), size);
-          putAssign(recordContEnv(instruction.getArgRecord()), "NULL");
-          putAssign(read(instruction.getArgRecord()), 0);
-          putAssign(written(instruction.getArgRecord()), size);
-          putStatement(
-              "memcpy(" + buffer(instruction.getArgRecord()) + ", " + value + ", " + size + ")");
-          putAssign(read(instruction.getRecord()), read(instruction.getRecord()) + " + " + size);
+          putAllocRecord(record(instruction.getArgRecord()), instruction.getArgRecordType());
+          putResetRecord(instruction.getArgRecord(), instruction.getArgRecordType());
+
+          putPopValue(
+              record(instruction.getRecord()),
+              sessionType,
+              record(instruction.getArgRecord()),
+              instruction.getArgRecordType());
         },
         () -> {
-          putAssign(record(instruction.getArgRecord()), popRecord(instruction.getRecord()));
+          putAssign(
+              record(instruction.getArgRecord()), accessRecord(instruction.getRecord(), "char*"));
+          putAdvanceRecord(instruction.getRecord(), instruction.getRecordType());
         });
   }
 
   @Override
   public void visit(IRPushSession instruction) {
-    switchTypeIsValue(
-        instruction.getValueRequisites(),
+    if (instruction.getRecordType() instanceof IRSessionT == false) {
+      throw new UnsupportedOperationException("Record must be of session type");
+    }
+    IRSessionT sessionType = (IRSessionT) instruction.getRecordType();
+
+    putSwitchTypeIsValue(
+        sessionType.getArg().valueRequisites(),
         () -> {
-          String value =
-              buffer(instruction.getArgRecord()) + " + " + read(instruction.getArgRecord());
-          String size =
-              written(instruction.getArgRecord()) + " - " + read(instruction.getArgRecord());
-          String dst = buffer(instruction.getRecord()) + " + " + written(instruction.getRecord());
-          putStatement("memcpy(" + dst + ", " + value + ", " + size + ")");
-          putAssign(
-              written(instruction.getRecord()), written(instruction.getRecord()) + " + " + size);
+          putPushValue(
+              record(instruction.getRecord()),
+              sessionType,
+              record(instruction.getArgRecord()),
+              instruction.getArgRecordType());
           putFreeRecord(record(instruction.getArgRecord()));
-          putAssign(record(instruction.getArgRecord()), "NULL");
         },
         () -> {
-          putPushRecord(instruction.getRecord(), record(instruction.getArgRecord()));
+          putAssign(
+              accessRecord(instruction.getRecord(), "char*"), record(instruction.getArgRecord()));
+          putAdvanceRecord(instruction.getRecord(), instruction.getRecordType());
+          putConsumeRecord(instruction.getArgRecord(), instruction.getArgRecordType());
         });
   }
 
   @Override
   public void visit(IRPopTag instruction) {
-    if (instruction.getCases().isEmpty()) {
-      // After optimizing, we might end up with pop tags which don't jump.
-      putStatement(popTag(instruction.getRecord()));
-      return;
+    if (!(instruction.getRecordType() instanceof IRTagT)) {
+      throw new UnsupportedOperationException("Record must be of tag type");
     }
+    IRTagT type = (IRTagT) instruction.getRecordType();
 
-    putLine("switch (" + popTag(instruction.getRecord()) + ") {");
+    putLine("switch (" + accessRecord(instruction.getRecord(), "unsigned char") + ") {");
     incIndent();
 
     // We'll take the end points of all other cases for each case, since these paths won't be taken
@@ -1226,9 +1164,16 @@ public class CGenerator extends IRInstructionVisitor {
     for (Map.Entry<Integer, IRPopTag.Case> entry : instruction.getCases().entrySet()) {
       putLine("case " + entry.getKey() + ":");
       incIndent();
+
+      // Decrement end points depending on the chosen branch.
       putAssign(
           environmentEndPoints(),
           environmentEndPoints() + " - " + (maxEndPoints - entry.getValue().getEndPoints()));
+
+      // Advance the record depending on the chosen branch.
+      putAdvanceRecordWithTag(instruction.getRecord(), type, entry.getKey());
+
+      // Jump to the right place.
       putConstantGoto(blockLabel(entry.getValue().getLabel()));
       decIndent();
     }
@@ -1239,39 +1184,44 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRPushTag instruction) {
-    putPushTag(instruction.getRecord(), instruction.getTag());
+    if (!(instruction.getRecordType() instanceof IRTagT)) {
+      throw new UnsupportedOperationException("Record must be of tag type");
+    }
+    IRTagT type = (IRTagT) instruction.getRecordType();
+
+    putAssign(accessRecord(instruction.getRecord(), "unsigned char"), instruction.getTag());
+    putAdvanceRecordWithTag(instruction.getRecord(), type, instruction.getTag());
   }
 
   @Override
-  public void visit(IRPopClose instruction) {
-    // Do nothing
-  }
+  public void visit(IRPopClose instruction) {}
 
   @Override
-  public void visit(IRPushClose instruction) {
-    // Do nothing
-  }
+  public void visit(IRPushClose instruction) {}
 
   @Override
   public void visit(IRNewSession instruction) {
-    putAllocRecord(record(instruction.getRecord()), recordType(instruction.getRecord()));
-    if (instruction.getLabel().isEmpty()) {
-      putAssign(recordContEnv(instruction.getRecord()), "NULL");
-    } else {
-      putAssign(
-          recordCont(instruction.getRecord()),
-          labelAddress(blockLabel(instruction.getLabel().get())));
-      putAssign(recordContEnv(instruction.getRecord()), ENV);
-      putAssign(recordContRecord(instruction.getRecord()), instruction.getRecord());
+    putAllocRecord(record(instruction.getRecord()), instruction.getType());
+
+    // If the record has a continuation, write it to the beginning of the buffer
+    if (instruction.getLabel().isPresent()) {
+      StringBuilder value = new StringBuilder("(struct record_header) {");
+      value
+          .append(".cont = ")
+          .append(labelAddress(blockLabel(instruction.getLabel().get())))
+          .append(", ");
+      value.append(".cont_env = ").append(ENV).append(", ");
+      value.append(".cont_record = ").append(instruction.getRecord());
+      value.append("}");
+      putAssign(accessRecord(instruction.getRecord(), "struct record_header"), value.toString());
     }
-    putAssign(read(instruction.getRecord()), 0);
-    putAssign(written(instruction.getRecord()), 0);
   }
 
   @Override
   public void visit(IRFreeSession instruction) {
+    // The cursor will already be on the header of the record, since all pop instructions will
+    // have been executed.
     putFreeRecord(record(instruction.getRecord()));
-    putAssign(record(instruction.getRecord()), "NULL");
   }
 
   @Override
@@ -1341,8 +1291,8 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   @Override
-  public void visit(IRScan instruction) {
-    IRType irType = instruction.getType();
+  public void visit(IRPushScan instruction) {
+    IRType irType = instruction.getRecordType().leftmostTail();
     boolean promote = false;
     if (irType instanceof IRExponentialT) {
       irType = ((IRExponentialT) irType).getInner();
@@ -1360,13 +1310,14 @@ public class CGenerator extends IRInstructionVisitor {
       cValue = "string_scan()";
     } else {
       throw new UnsupportedOperationException(
-          "Unsupported type for IRScan: " + instruction.getType().getClass().getName());
+          "Unsupported type for IRScan: " + instruction.getRecordType().getClass().getName());
     }
 
     if (promote && (!optimizePrimitiveExponentials || irType instanceof IRStringT)) {
       throw new UnsupportedOperationException("Exponentials are not supported");
     } else {
-      putPush(instruction.getRecord(), cType, cValue);
+      putAssign(accessRecord(instruction.getRecord(), cType), cValue);
+      putAdvanceRecord(instruction.getRecord(), instruction.getRecordType());
     }
   }
 
@@ -1377,30 +1328,35 @@ public class CGenerator extends IRInstructionVisitor {
             || instruction.getExpression().getType() instanceof IRStringT)) {
       throw new UnsupportedOperationException("Exponentials are not supported");
     } else {
-      putPush(
-          instruction.getRecord(),
-          cType(instruction.getExpression().getType()),
+      putAssign(
+          accessRecord(instruction.getRecord(), cType(instruction.getExpression().getType())),
           expression(instruction.getExpression()));
+      putAdvanceRecord(instruction.getRecord(), instruction.getRecordType());
     }
   }
 
   @Override
   public void visit(IRPushType instruction) {
-    putPushType(
-        instruction.getRecord(),
-        instruction.getType(),
-        instruction.getValueRequisites(),
-        instruction.isPositive());
-    putPushPolarity(instruction.getRecord(), instruction.isPositive());
+    StringBuilder value = new StringBuilder("(struct type_slot) {");
+    value.append(".record = ").append(record(instruction.getArgRecord())).append(", ");
+    value
+        .append(".type = ")
+        .append(typeInitializer(instruction.getArgType(), instruction.isArgPositive()));
+    value.append("}");
+    putAssign(accessRecord(instruction.getRecord(), "type_slot"), value.toString());
+    putAdvanceRecord(instruction.getRecord(), instruction.getRecordType());
   }
 
   @Override
   public void visit(IRPopType instruction) {
-    putAssign(type(instruction.getArgType()), popType(instruction.getRecord()));
+    String typeSlot = accessRecord(instruction.getRecord(), "struct type_slot");
+    putAssign(record(instruction.getArgRecord()), typeSlot + ".record");
+    putAssign(type(instruction.getArgType()), typeSlot + ".type");
+
     if (instruction.getPositive().isPresent() || instruction.getNegative().isPresent()) {
       int maxEndPoints = instruction.getEndPoints();
       putIfElse(
-          popPolarity(instruction.getRecord()),
+          typePolarity(type(instruction.getArgType())),
           () -> {
             if (instruction.getPositive().isPresent()) {
               putAssign(
@@ -1481,42 +1437,27 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRPushUnfold instruction) {
-    putAssign(written(instruction.getRecord()), 0);
+    // Do nothing
   }
 
   @Override
   public void visit(IRPopUnfold instruction) {
-    putAssign(read(instruction.getRecord()), 0);
+    // Do nothing
   }
 
   @Override
   public void visit(IRPushCell instruction) {
-    // Push a new cell structure and initialize its mutex.
-    putAllocCell(TMP_CELL);
-    putAssign(cellRefCount(TMP_CELL), 1);
-    putAssign(cellRecord(TMP_CELL), record(instruction.getArgRecord()));
-    putPushCell(instruction.getRecord(), TMP_CELL);
-    putAssign(record(instruction.getArgRecord()), "NULL");
+    throw new UnsupportedOperationException("Cells are still not supported");
   }
 
   @Override
   public void visit(IRTakeCell instruction) {
-    // Lock the mutex and extract the record.
-    if (!disableConcurrency) {
-      putStatement("pthread_mutex_lock(&" + cellMutex(peekCell(instruction.getRecord())) + ")");
-    }
-    putAssign(record(instruction.getArgRecord()), cellRecord(peekCell(instruction.getRecord())));
-    putAssign(cellRecord(peekCell(instruction.getRecord())), "NULL");
+    throw new UnsupportedOperationException("Cells are still not supported");
   }
 
   @Override
   public void visit(IRPutCell instruction) {
-    // Put the record into the cell and unlock the mutex.
-    putAssign(cellRecord(peekCell(instruction.getRecord())), record(instruction.getArgRecord()));
-    putAssign(record(instruction.getArgRecord()), "NULL");
-    if (!disableConcurrency) {
-      putStatement("pthread_mutex_unlock(&" + cellMutex(peekCell(instruction.getRecord())) + ")");
-    }
+    throw new UnsupportedOperationException("Cells are still not supported");
   }
 
   @Override
@@ -1572,23 +1513,30 @@ public class CGenerator extends IRInstructionVisitor {
     return type(ENV, type);
   }
 
-  private String typeInitializer(IRType type, IRValueRequisites valueRequisites, boolean polarity) {
-    String flags = "";
+  private String typeInitializer(IRType type, boolean polarity) {
+    String flags = ", .flags = 0";
+    flags += " | (" + typeIsReset(type) + ") << 2";
     if (optimizeSendValue) {
-      flags = ", .flags = ";
-      flags += "(" + typeIsValue(valueRequisites) + ") << 1";
-      flags += " | " + (polarity ? "1" : "0");
+      flags += " | (" + typeIsValue(type) + ") << 1";
     }
+    flags += " | " + (polarity ? "1" : "0");
+
+    LayoutCalculator layout = layout(type);
 
     return "(struct type){.size = "
-        + maxSize(type)
-        + (optimizePrimitiveExponentials ? ", .id = " + typeId(type) : "")
+        + layout.size
         + flags
+        + ", .alignment = "
+        + layout.alignment
         + "}";
   }
 
-  private String typeSize(String type) {
-    return type + ".size";
+  private CSize typeSize(String type) {
+    return CSize.expression(type + ".size");
+  }
+
+  private CAlignment typeAlignment(String type) {
+    return CAlignment.expression(type + ".alignment");
   }
 
   private String typeId(IRType type) {
@@ -1607,7 +1555,7 @@ public class CGenerator extends IRInstructionVisitor {
     return type + ".id";
   }
 
-  private void switchTypeId(IRType type, Runnable forInt, Runnable forBool, Runnable forOther) {
+  private void putSwitchTypeId(IRType type, Runnable forInt, Runnable forBool, Runnable forOther) {
     if (optimizePrimitiveExponentials && type instanceof IRIntT) {
       forInt.run();
     } else if (optimizePrimitiveExponentials && type instanceof IRBoolT) {
@@ -1642,6 +1590,26 @@ public class CGenerator extends IRInstructionVisitor {
     return type + ".flags";
   }
 
+  private String typeIsReset(String type, Optional<Boolean> flipPolarity) {
+    String flagCheck = "(" + typeFlags(type) + " & 4) != 0";
+    if (flipPolarity.isPresent()) {
+      return "(" + flagCheck + " && " + typePolarity(type) + " == " + flipPolarity.get() + ")";
+    } else {
+      return "(" + flagCheck + ")";
+    }
+  }
+
+  private String typeIsReset(IRType type) {
+    if (type instanceof IRCloseT || type instanceof IRResetT) {
+      return "1";
+    } else if (type instanceof IRVarT) {
+      IRVarT var = (IRVarT) type;
+      return typeIsReset(type(var.getType()), var.getFlipPolarity());
+    } else {
+      return "0";
+    }
+  }
+
   private String typeIsValue(String type) {
     return "((" + typeFlags(type) + " & 2) != 0)";
   }
@@ -1650,7 +1618,11 @@ public class CGenerator extends IRInstructionVisitor {
     return "((" + typeFlags(type) + " & 1) != 0)";
   }
 
-  private String typeIsValue(IRValueRequisites requisites) {
+  private String typeIsValue(IRType type) {
+    return typeIsValue(type.valueRequisites());
+  }
+
+  private String typeIsValue(IRType.ValueRequisites requisites) {
     if (!optimizeSendValue) {
       throw new UnsupportedOperationException(
           "Cannot check if type is value when optimizeSendValue is false");
@@ -1675,39 +1647,25 @@ public class CGenerator extends IRInstructionVisitor {
     return sb.toString();
   }
 
-  private void switchTypeIsValue(
-      IRValueRequisites requisites, Runnable ifValue, Runnable ifNotValue) {
+  private CSize ternaryTypeIsValue(
+      IRType.ValueRequisites requisites, CSize ifValue, CSize ifNotValue) {
     if (optimizeSendValue && requisites.mustBeValue()) {
-      ifValue.run();
+      return ifValue;
     } else if (optimizeSendValue && requisites.canBeValue()) {
-      putIfElse(typeIsValue(requisites), ifValue, ifNotValue);
+      return CSize.ternary(typeIsValue(requisites), ifValue, ifNotValue);
     } else {
-      ifNotValue.run();
+      return ifNotValue;
     }
   }
 
-  private String read(String record) {
-    return "(" + record + ")->read";
-  }
-
-  private String read(int record) {
-    return "READ(" + record + ")";
-  }
-
-  private String written(String record) {
-    return "(" + record + ")->written";
-  }
-
-  private String written(int record) {
-    return "WRITTEN(" + record + ")";
-  }
-
-  private String buffer(int record) {
-    return "BUFFER(" + record + ")";
-  }
-
-  private String buffer(String record) {
-    return "(" + record + ")->buffer";
+  private CSize ternaryTypeIsReset(IRType type, CSize ifReset, CSize ifNotReset) {
+    if (type instanceof IRCloseT || type instanceof IRResetT) {
+      return ifReset;
+    } else if (type instanceof IRVarT) {
+      return CSize.ternary(typeIsReset(type), ifReset, ifNotReset);
+    } else {
+      return ifNotReset;
+    }
   }
 
   private String record(String env, String record) {
@@ -1722,44 +1680,32 @@ public class CGenerator extends IRInstructionVisitor {
     return record(ENV, record);
   }
 
-  private IRType recordType(int record) {
-    return ir.getProcesses().get(procName).getRecordType(record);
+  private String accessRecord(String record, String offset, String type) {
+    return "ACCESS(" + record + ", " + offset + ", " + type + ")";
   }
 
-  private String recordCont(String record) {
-    return "(" + record + ")" + "->cont";
+  private String accessRecord(String env, String record, String offset, String type) {
+    return accessRecord(record(env, record), offset, type);
   }
 
-  private String recordCont(String env, int record) {
-    return recordCont(record(env, record));
+  private String accessRecord(String env, int record, String offset, String type) {
+    return accessRecord(env, Integer.toString(record), offset, type);
   }
 
-  private String recordCont(int record) {
-    return recordCont(ENV, record);
+  private String accessRecord(int record, String type) {
+    return accessRecord(ENV, record, "0", type);
   }
 
-  private String recordContEnv(String record) {
-    return "(" + record + ")" + "->cont_env";
+  private String recordHeaderCont(String header) {
+    return header.concat(".cont");
   }
 
-  private String recordContEnv(String env, int record) {
-    return recordContEnv(record(env, record));
+  private String recordHeaderContEnv(String header) {
+    return header.concat(".cont_env");
   }
 
-  private String recordContEnv(int record) {
-    return recordContEnv(ENV, record);
-  }
-
-  private String recordContRecord(String record) {
-    return "(" + record + ")" + "->cont_record";
-  }
-
-  private String recordContRecord(String env, int record) {
-    return recordContRecord(record(env, record));
-  }
-
-  private String recordContRecord(int record) {
-    return recordContRecord(ENV, record);
+  private String recordHeaderContRecord(String header) {
+    return header.concat(".cont_record");
   }
 
   private String exponential(String env, String recordCount, String exponential) {
@@ -1772,10 +1718,6 @@ public class CGenerator extends IRInstructionVisitor {
 
   private String exponential(int exponential) {
     return exponential(ENV, recordCount, exponential);
-  }
-
-  private IRType exponentialType(int exponential) {
-    return ir.getProcesses().get(procName).getExponentialType(exponential);
   }
 
   private String readExponentialInteger(int exponential) {
@@ -1818,46 +1760,6 @@ public class CGenerator extends IRInstructionVisitor {
 
   private String cellRecord(String cell) {
     return cell + "->record";
-  }
-
-  private String access(String buffer, String type) {
-    return "(*(" + type + "*)(" + buffer + "))";
-  }
-
-  private String pop(int index, String type) {
-    return "POP(" + index + ", " + type + ")";
-  }
-
-  private String pop(int index, IRType type) {
-    return pop(index, cType(type));
-  }
-
-  private String popTag(int index) {
-    return pop(index, "unsigned char");
-  }
-
-  private String popRecord(int index) {
-    return pop(index, "struct record*");
-  }
-
-  private String popExponential(int index) {
-    return pop(index, "struct exponential*");
-  }
-
-  private String popPolarity(int index) {
-    return pop(index, "unsigned char");
-  }
-
-  private String popType(int index) {
-    return pop(index, "struct type");
-  }
-
-  private String peek(int index, String type) {
-    return "PEEK(" + index + ", " + type + ")";
-  }
-
-  private String peekCell(int index) {
-    return peek(index, "struct cell*");
   }
 
   private String labelAddress(String label) {
@@ -1912,9 +1814,9 @@ public class CGenerator extends IRInstructionVisitor {
       String var, String recordCount, String exponentialCount, String typeCount) {
     putAssign(
         var,
-        "managed_calloc(sizeof(struct environment) + "
+        "managed_alloc(sizeof(struct environment) + "
             + recordCount
-            + " * sizeof(struct record*) + "
+            + " * sizeof(char*) + "
             + exponentialCount
             + " * sizeof(struct exponential*) + "
             + typeCount
@@ -1955,8 +1857,8 @@ public class CGenerator extends IRInstructionVisitor {
     }
   }
 
-  private void putAllocRecord(String var, String bufferSize) {
-    putAssign(var, "managed_alloc(sizeof(struct record) + " + bufferSize + ")");
+  private void putAllocRecord(String var, CSize bufferSize) {
+    putAssign(var, "managed_alloc(" + bufferSize + ")");
     if (profile) {
       putIncrementAtomic("record_allocs");
       putIncrementAtomic("record_current");
@@ -1965,11 +1867,12 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   private void putAllocRecord(String var, IRType type) {
-    putAllocRecord(var, maxSize(type));
+    putAllocRecord(var, allocationSize(type));
   }
 
   private void putReallocRecord(String var, String bufferSize) {
-    putAssign(var, "managed_realloc(" + var + ", sizeof(struct record) + " + bufferSize + ")");
+    putAssign(
+        var, "managed_realloc(" + var + ", sizeof(struct record_header) + " + bufferSize + ")");
     if (profile) {
       putIncrementAtomic("record_reallocs");
     }
@@ -2021,42 +1924,106 @@ public class CGenerator extends IRInstructionVisitor {
     }
   }
 
+  private void putPushValue(String record, IRSessionT type, String argRecord, IRType argType) {
+    if (!type.getArg().equals(argType)) {
+      if (type.getArg() instanceof IRSessionT) {
+        putPushValue(record, (IRSessionT) type.getArg(), argRecord, argType);
+      }
+
+      throw new UnsupportedOperationException("Value type does not match record argument type");
+    }
+
+    // A simple copy may not be enough as the paddings might differ
+    //
+    // E.g, the argument type 'send lint; bool':
+    // - the argument record by itself could be packed like so: BOOL:3xPADDING:LINT
+    // - the full type could be send (send lint; bool); bool: BOOL:BOOL:2xPADDING:LINT
+    //
+    // Thus, here we may have to copy each slot individually into its right place
+
+    LayoutCalculator contLayout = layout(type.getCont());
+    LayoutCalculator desiredLayout = layout(type.getArg(), contLayout.offset.add(contLayout.size));
+    LayoutCalculator currentLayout = layout(argType);
+
+    if (currentLayout.padding.equals(desiredLayout.padding) && currentLayout.size.equals(desiredLayout.size)) {
+      // Equal memory layout, we can just copy the entire data at once!
+      putCopy(
+          desiredLayout.size.subtract(desiredLayout.firstSlotOffset).retreatPointer(record),
+          currentLayout.size.subtract(currentLayout.firstSlotOffset).retreatPointer(argRecord),
+          desiredLayout.size);
+      putAssignSub(
+          record,
+          desiredLayout
+              .size
+              .subtract(desiredLayout.firstSlotSize)
+              .add(desiredLayout.padding)
+              .add(contLayout.firstSlotOffset));
+      putConsumeRecord(argRecord, argType);
+    } else {
+      // Uneven padding, we need to copy this slot manually
+      putCopy(record, argRecord, currentLayout.firstSlotSize);
+      putAssignSub(record, desiredLayout.nextSlotOffset);
+      putAssignSub(argRecord, currentLayout.nextSlotOffset);
+
+      if (argType instanceof IRSessionT) {
+        argType = ((IRSessionT) argType).getCont();
+        type = new IRSessionT(argType, type.getCont());
+        putPushValue(record, type, argRecord, argType);
+      }
+    }
+  }
+
+  private void putPopValue(String record, IRSessionT type, String argRecord, IRType argType) {
+    if (!type.getArg().equals(argType)) {
+      if (type.getArg() instanceof IRSessionT) {
+        putPushValue(record, (IRSessionT) type.getArg(), argRecord, argType);
+      }
+
+      throw new UnsupportedOperationException(
+          "Value type " + argType + " does not match record argument type " + type.getArg());
+    }
+
+    // See putPushValue for an explanation of why this is needed
+
+    LayoutCalculator contLayout = layout(type.getCont());
+    LayoutCalculator desiredLayout = layout(argType);
+    LayoutCalculator currentLayout = layout(type.getArg(), contLayout.offset.add(contLayout.size));
+
+    if (currentLayout.padding.equals(desiredLayout.padding) && currentLayout.size.equals(desiredLayout.size)) {
+      // Equal padding, we can just copy the entire data at once!
+      putCopy(
+          desiredLayout.firstSlotSize.subtract(desiredLayout.size).advancePointer(argRecord),
+          currentLayout.firstSlotSize.subtract(currentLayout.size).advancePointer(record),
+          desiredLayout.size);
+      putAssignSub(
+          record,
+          currentLayout
+              .size
+              .subtract(currentLayout.firstSlotSize)
+              .add(currentLayout.padding)
+              .add(contLayout.firstSlotOffset));
+    } else {
+      // Uneven padding, we need to copy this slot manually
+      putCopy(argRecord, record, desiredLayout.firstSlotSize);
+      putAssignSub(record, currentLayout.nextSlotOffset);
+
+      if (argType instanceof IRSessionT) {
+        argType = ((IRSessionT) argType).getCont();
+        type = new IRSessionT(argType, type.getCont());
+        putPopValue(record, type, desiredLayout.nextSlotOffset.retreatPointer(argRecord), argType);
+      }
+    }
+  }
+
   private void putLabel(String label) {
     put(label + ":");
     putLineEnd();
   }
 
-  private void putPush(int record, String type, String value) {
-    putStatement("PUSH(" + record + ", " + type + ", " + value + ")");
-  }
-
-  private void putPush(String record, String type, String value) {
-    putStatement("PUSH_RAW(" + record + ", " + type + ", " + value + ")");
-  }
-
-  private void putPushTag(int record, int value) {
-    putPush(record, "unsigned char", Integer.toString(value));
-  }
-
-  private void putPushRecord(int record, String value) {
-    putPush(record, "struct record*", value);
-  }
-
-  private void putPushExponential(int record, String value) {
-    putPush(record, "struct exponential*", value);
-  }
-
-  private void putPushPolarity(int record, boolean isPositive) {
-    putPush(record, "unsigned char", isPositive ? "1" : "0");
-  }
-
-  private void putPushType(
-      int record, IRType type, IRValueRequisites valueRequisites, boolean polarity) {
-    putPush(record, "struct type", typeInitializer(type, valueRequisites, polarity));
-  }
-
-  private void putPushCell(int record, String cell) {
-    putPush(record, "struct cell*", cell);
+  private void putCopy(String dst, String src, CSize size) {
+    if (!size.equals(CSize.zero())) {
+      putStatement("memcpy(" + dst + ", " + src + ", " + size + ")");
+    }
   }
 
   private void putAssign(String var, String value) {
@@ -2065,6 +2032,92 @@ public class CGenerator extends IRInstructionVisitor {
 
   private void putAssign(String var, int value) {
     putStatement(var + " = " + value);
+  }
+
+  private void putAssignAdd(String var, CSize value) {
+    putAssignAdd(var, value.toString());
+  }
+
+  private void putAssignAdd(String var, String value) {
+    if (!value.equals("0")) {
+      putStatement(var + " += " + value);
+    }
+  }
+
+  private void putAssignSub(String var, CSize value) {
+    putAssignSub(var, value.toString());
+  }
+
+  private void putAssignSub(String var, String value) {
+    if (!value.equals("0")) {
+      putStatement(var + " -= " + value);
+    }
+  }
+
+  // Advances the record cursor to the start of the header, assuming it currently is located at the
+  // start of the first slot
+  private void putConsumeRecord(int record, IRType currentType) {
+    putConsumeRecord(record(record), currentType);
+  }
+
+  private void putConsumeRecord(String record, IRType currentType) {
+    putAssignSub(record, headerOffset(currentType));
+  }
+
+  // Rolls back the cursor to the first slot, assuming it currently is located at the start of the
+  // header
+  private void putResetRecord(int record, IRType currentType) {
+    putResetRecord(record(record), currentType);
+  }
+
+  private void putResetRecord(String record, IRType currentType) {
+    putAssignAdd(record, headerOffset(currentType));
+  }
+
+  private void putAdvanceRecord(int record, IRType currentType) {
+    putAdvanceRecord(record(record), currentType);
+  }
+
+  private void putAdvanceRecord(String var, IRType currentType) {
+    putAssignSub(var, nextSlotOffset(currentType));
+  }
+
+  private void putAdvanceRecordWithTag(int record, IRTagT currentType, int tag) {
+    putAdvanceRecordWithTag(record(record), currentType, tag);
+  }
+
+  private void putAdvanceRecordWithTag(String var, IRTagT currentType, int tag) {
+    putAssignSub(var, nextSlotOffsetWithTag(currentType, tag));
+  }
+
+  private void putIfTypeIsNotValue(IRType.ValueRequisites requisites, Runnable ifNotValue) {
+    putSwitchTypeIsValue(requisites, Optional.empty(), Optional.of(ifNotValue));
+  }
+
+  private void putSwitchTypeIsValue(
+      IRType.ValueRequisites requisites, Runnable ifValue, Runnable ifNotValue) {
+    putSwitchTypeIsValue(requisites, Optional.of(ifValue), Optional.of(ifNotValue));
+  }
+
+  private void putSwitchTypeIsValue(
+      IRType.ValueRequisites requisites,
+      Optional<Runnable> ifValue,
+      Optional<Runnable> ifNotValue) {
+    if (optimizeSendValue && requisites.mustBeValue()) {
+      if (ifValue.isPresent()) {
+        ifValue.get().run();
+      }
+    } else if (optimizeSendValue && requisites.canBeValue()) {
+      if (ifValue.isPresent() && ifNotValue.isPresent()) {
+        putIfElse(typeIsValue(requisites), ifValue.get(), ifNotValue.get());
+      } else if (ifValue.isPresent()) {
+        putIf(typeIsValue(requisites), ifValue.get());
+      } else if (ifNotValue.isPresent()) {
+        putIf("!" + typeIsValue(requisites), ifNotValue.get());
+      }
+    } else if (ifNotValue.isPresent()) {
+      ifNotValue.get().run();
+    }
   }
 
   private void putIncrementAtomic(String var) {
@@ -2168,33 +2221,128 @@ public class CGenerator extends IRInstructionVisitor {
 
   // ========================== Type visitor used to determine type size ==========================
 
-  private String maxSize(IRType type) {
-    SizeCalculator calc = new SizeCalculator(Optional.empty());
-    type.accept(calc);
-    return calc.size;
+  // Returns the maximum size of all segments of the given type, also including the record tail.
+  // This is used to determine the size of the buffer that we'll need to allocate for the record.
+  private CSize allocationSize(IRType type) {
+    return arch.recordHeaderSize.add(totalSize(type));
   }
 
-  private String valueSize(IRType type, String buffer) {
-    SizeCalculator calc = new SizeCalculator(Optional.of(buffer));
-    type.accept(calc);
-    return calc.size;
+  // Returns the maximum size of all segments of the given type, including padding.
+  private CSize totalSize(IRType type) {
+    LayoutCalculator layout = layout(type);
+    CSize size = layout.padding.add(layout.size);
+    if (layout.nextSegment.isPresent()) {
+      return size.max(totalSize(layout.nextSegment.get()));
+    } else {
+      return size;
+    }
   }
 
-  private class SizeCalculator extends IRTypeVisitor {
-    private String size = "";
-    private String currentOffset = "";
-    private int definedTypes = 0;
-    private Optional<String> buffer;
+  // Returns the offset of the last slot of the given type in relation to the current cursor
+  private CSize lastSlotOffset(IRType type) {
+    LayoutCalculator layout = layout(type);
+    return layout.size.subtract(layout.firstSlotOffset);
+  }
 
-    public SizeCalculator(Optional<String> buffer) {
-      this.buffer = buffer;
+  // Returns the offset of the header of the given type in relation to the current cursor
+  private CSize headerOffset(IRType type) {
+    LayoutCalculator layout = layout(type);
+    return arch.recordHeaderSize
+        .add(layout.padding)
+        .add(layout.size)
+        .subtract(layout.firstSlotOffset);
+
+    // CSize ifReset = CSize.zero();
+    // CSize ifNotReset =
+    //
+    // arch.recordHeaderSize.add(layout.padding).add(layout.size).subtract(layout.firstSlotSize);
+
+    // return ternaryTypeIsReset(type, ifReset, ifNotReset);
+  }
+
+  // Given the current record type, returns how much the cursor should be moved back to access
+  // the next slot. Doesn't work for tag types, as these depend on the tag value.
+  private CSize nextSlotOffset(IRType type) {
+    return layout(type).nextSlotOffset;
+  }
+
+  // Given the a tag type, returns how much the cursor should be moved back, depending on the
+  // tag value.
+  private CSize nextSlotOffsetWithTag(IRTagT type, int tag) {
+    LayoutCalculator layout = layout(type);
+    LayoutCalculator caseLayout = layout(type.getChoices().get(tag));
+
+    // We get the offset by going back the full size, which is the maximum size of all branches,
+    // and then forward by the size of the specific chosen branch
+    return layout
+        .size
+        .subtract(layout.firstSlotOffset)
+        .subtract(caseLayout.size)
+        .add(caseLayout.firstSlotOffset);
+  }
+
+  private CAlignment alignment(IRType type) {
+    // The offset doesn't affect the alignment
+    LayoutCalculator calc = new LayoutCalculator(CSize.zero(), CSize.zero());
+    type.accept(calc);
+    return calc.alignment;
+  }
+
+  private LayoutCalculator layout(IRType type) {
+    return layout(type, arch.recordHeaderSize);
+  }
+
+  private LayoutCalculator layout(IRType type, CSize offset) {
+    CAlignment alignment = alignment(type);
+    LayoutCalculator calc = new LayoutCalculator(offset.align(alignment), offset.align(alignment));
+    calc.padding = offset.padding(alignment);
+    type.accept(calc);
+    return calc;
+  }
+
+  private class LayoutCalculator extends IRTypeVisitor {
+    private CSize resetOffset;
+    private CSize offset;
+    private int definedTypes;
+
+    // Size of the type until the next reset starting from the offset, excluding padding
+    public CSize size;
+
+    // Offset from the end of the buffer to the start of the slot
+    // Usually, this is the size of the slot, but for close/reset types, it is equal to the offset
+    // to the header.
+    public CSize firstSlotOffset;
+    public CSize firstSlotSize;
+    public CSize nextSlotOffset; // Offset to the start of the next slot
+    public CAlignment alignment; // Required alignment of the type
+    public CSize padding; // Number of padding bytes to add after the offset
+    public Optional<IRType> nextSegment = Optional.empty(); // Segment which comes after this one
+
+    public LayoutCalculator(CSize resetOffset, CSize nextSlotOffset) {
+      this(resetOffset, resetOffset, nextSlotOffset);
     }
 
-    private String recurse(IRType type) {
-      SizeCalculator calc = new SizeCalculator(buffer.map(b -> b + currentOffset));
+    public LayoutCalculator(CSize resetOffset, CSize offset, CSize nextSlotOffset) {
+      this.resetOffset = resetOffset;
+      this.offset = offset;
+      this.definedTypes = 0;
+      this.nextSlotOffset = nextSlotOffset;
+    }
+
+    private LayoutCalculator recurse(IRType type, CSize offset) {
+      return recurse(type, offset, nextSlotOffset);
+    }
+
+    private LayoutCalculator recurse(IRType type, CSize offset, CSize nextSlotOffset) {
+      return recurse(type, offset, nextSlotOffset, definedTypes);
+    }
+
+    private LayoutCalculator recurse(
+        IRType type, CSize offset, CSize nextSlotOffset, int definedTypes) {
+      LayoutCalculator calc = new LayoutCalculator(resetOffset, offset, nextSlotOffset);
       calc.definedTypes = definedTypes;
       type.accept(calc);
-      return "(" + calc.size + ")";
+      return calc;
     }
 
     @Override
@@ -2204,56 +2352,69 @@ public class CGenerator extends IRInstructionVisitor {
 
     @Override
     public void visit(IRCloseT type) {
-      size += "0";
+      size = CSize.zero();
+      firstSlotOffset = offset;
+      firstSlotSize = CSize.zero();
+      alignment = CAlignment.one();
     }
 
     @Override
     public void visit(IRSessionT type) {
-      String argSize;
+      LayoutCalculator contLayout = recurse(type.getCont(), offset);
 
-      if (optimizeSendValue && type.getValueRequisites().mustBeValue()) {
-        argSize = recurse(type.getArg());
-      } else if (optimizeSendValue && type.getValueRequisites().canBeValue()) {
-        argSize =
-            "("
-                + typeIsValue(type.getValueRequisites())
-                + " ? "
-                + recurse(type.getArg())
-                + " : sizeof(struct record*))";
-      } else {
-        argSize = "sizeof(struct record*)";
-        size += "sizeof(struct record*) + ";
-        currentOffset += " + sizeof(struct record*)";
-      }
+      CAlignment alignmentIfValue = alignment(type.getArg());
+      CAlignment alignmentIfNotValue = arch.pointerAlignment;
 
-      size += argSize + " + ";
-      String oldOffset = currentOffset;
-      currentOffset += " + " + argSize;
-      type.getCont().accept(this);
-      currentOffset = oldOffset;
+      CSize paddingIfValue = offset.add(contLayout.size).padding(alignmentIfValue);
+      CSize paddingIfNotValue = offset.add(contLayout.size).padding(alignmentIfNotValue);
+
+      LayoutCalculator argValueLayout =
+          recurse(
+              type.getArg(),
+              offset.add(contLayout.size).align(alignmentIfValue),
+              contLayout.firstSlotOffset.add(paddingIfValue));
+
+      CSize sizeIfValue = contLayout.size.add(paddingIfValue).add(argValueLayout.size);
+      CSize sizeIfNotValue = contLayout.size.add(paddingIfNotValue).add(arch.pointerSize);
+
+      CSize firstSlotOffsetIfValue = argValueLayout.firstSlotSize;
+      CSize firstSlotOffsetIfNotValue = arch.pointerSize;
+
+      CSize firstSlotSizeIfValue = argValueLayout.firstSlotSize;
+      CSize firstSlotSizeIfNotValue = arch.pointerSize;
+
+      CSize nextSlotOffsetIfValue = argValueLayout.nextSlotOffset;
+      CSize nextSlotOffsetIfNotValue = contLayout.firstSlotOffset.add(paddingIfNotValue);
+
+      size = ternaryTypeIsValue(type.getArg().valueRequisites(), sizeIfValue, sizeIfNotValue);
+      firstSlotOffset =
+          ternaryTypeIsValue(
+              type.getArg().valueRequisites(), firstSlotOffsetIfValue, firstSlotOffsetIfNotValue);
+      firstSlotSize =
+          ternaryTypeIsValue(
+              type.getArg().valueRequisites(), firstSlotSizeIfValue, firstSlotSizeIfNotValue);
+      nextSlotOffset =
+          ternaryTypeIsValue(
+              type.getArg().valueRequisites(), nextSlotOffsetIfValue, nextSlotOffsetIfNotValue);
+      alignment = contLayout.alignment;
+      nextSegment = contLayout.nextSegment;
     }
 
     @Override
     public void visit(IRTagT type) {
-      size += "sizeof(unsigned char)";
-      String oldOffset = currentOffset;
+      size = CSize.zero();
+      firstSlotOffset = arch.unsignedCharSize;
+      firstSlotSize = arch.unsignedCharSize;
+      alignment = CAlignment.one();
+
       for (int i = 0; i < type.getChoices().size(); ++i) {
-        if (buffer.isEmpty()) {
-          size += " + (";
-        } else {
-          // Read the chosen tag from the buffer
-          // We do this in order to determine the actual size of the value
-          String tag = "*(unsigned char*)(" + buffer.get() + currentOffset + ")";
-          size += " + (" + tag + " != " + i + " ? 0 : (";
-        }
-        currentOffset += " + sizeof(unsigned char)";
-        type.getChoices().get(i).accept(this);
-        currentOffset = oldOffset;
-        size += ")";
-        if (buffer.isPresent()) {
-          size += ")";
-        }
+        LayoutCalculator layout = recurse(type.getChoices().get(i), offset);
+        size = size.max(layout.size);
+        alignment = alignment.max(layout.alignment);
       }
+
+      size = arch.unsignedCharSize.add(size);
+      nextSlotOffset = CSize.expression("UNKNOWN"); // nextSlotOffsetWithTag should be used for this
     }
 
     @Override
@@ -2267,54 +2428,80 @@ public class CGenerator extends IRInstructionVisitor {
     public void visit(IRVarT type) {
       if (type.getType() >= definedTypes) {
         // The variable must refer to a type bound in the environment.
-        size += typeSize(type(type.getType()));
+        String typeVar = type(type.getType());
+        size = typeSize(typeVar);
+        firstSlotOffset = size; // TODO: should we store this in the type? could be a close or reset type
+        firstSlotSize = size;
+        alignment = typeAlignment(typeVar);
       } else {
         // The variable refers to a type bound in the current type, e.g. a recursive type.
         // In that case, since recursive types reset the buffer, we consider their size to be 0.
-        size += "0";
+        size = CSize.zero();
+        firstSlotOffset = CSize.zero();
+        firstSlotSize = CSize.zero();
+        alignment = CAlignment.one();
       }
     }
 
     @Override
     public void visit(IRIntT type) {
-      size += "sizeof(int)";
+      size = arch.intSize;
+      firstSlotOffset = arch.intSize;
+      firstSlotSize = arch.intSize;
+      alignment = arch.intAlignment;
     }
 
     @Override
     public void visit(IRBoolT type) {
-      size += "sizeof(unsigned char)";
+      size = arch.unsignedCharSize;
+      firstSlotOffset = arch.unsignedCharSize;
+      firstSlotSize = arch.unsignedCharSize;
+      alignment = arch.unsignedCharAlignment;
     }
 
     @Override
     public void visit(IRStringT type) {
-      size += "sizeof(char*)";
+      size = arch.pointerSize;
+      firstSlotOffset = arch.pointerSize;
+      firstSlotSize = arch.pointerSize;
+      alignment = arch.pointerAlignment;
     }
 
     @Override
     public void visit(IRTypeT type) {
-      size += "sizeof(struct record*) + sizeof(struct type) + sizeof(unsigned char)";
+      size = CSize.sizeOf("struct type_slot");
+      firstSlotOffset = CSize.sizeOf("struct type_slot");
+      firstSlotSize = CSize.sizeOf("struct type_slot");
+      alignment = arch.pointerAlignment;
     }
 
     @Override
     public void visit(IRExponentialT type) {
-      if (optimizePrimitiveExponentials) {
-        String id = typeId(type.getInner());
-        size += "(" + id + " == " + TYPE_ID_OTHER + " ? " + "sizeof(struct exponential*)" + " : ";
-        size += id + " == " + TYPE_ID_INT + " ? sizeof(int) : ";
-        size += "sizeof(unsigned char))"; // for TYPE_ID_BOOL
-      } else {
-        size += "sizeof(struct exponential*)";
-      }
+      throw new UnsupportedOperationException("Exponentials unimplemented");
+      // if (optimizePrimitiveExponentials) {
+      //   String id = typeId(type.getInner());
+      //   size += "(" + id + " == " + TYPE_ID_OTHER + " ? " + "sizeof(struct exponential*)" + " :
+      // ";
+      //   size += id + " == " + TYPE_ID_INT + " ? sizeof(int) : ";
+      //   size += "sizeof(unsigned char))"; // for TYPE_ID_BOOL
+      // } else {
+      //   size += "sizeof(struct exponential*)";
+      // }
     }
 
     @Override
     public void visit(IRCellT type) {
-      size += "sizeof(struct cell*)";
+      throw new UnsupportedOperationException("Cells unimplemented");
+      // size += "sizeof(struct cell*)";
     }
 
     @Override
-    public void visit(IRFlipT type) {
-      type.getCont().accept(this);
+    public void visit(IRResetT type) {
+      nextSegment = Optional.of(type.getCont());
+      size = CSize.zero(); // End of the segment
+      firstSlotOffset = offset;
+      firstSlotSize = CSize.zero();
+      alignment = CAlignment.one();
     }
   }
 
@@ -2373,7 +2560,10 @@ public class CGenerator extends IRInstructionVisitor {
 
     @Override
     public void visit(IRVar expr) {
-      code += pop(expr.getRecord(), expr.getType());
+      CSize offset = nextSlotOffset(expr.getType());
+      code +=
+          accessRecord(
+              record(expr.getRecord()) + " -= " + offset, offset.toString(), cType(expr.getType()));
     }
 
     @Override

@@ -2,32 +2,31 @@ package pt.inescid.cllsj.compiler.ir.instructions;
 
 import java.util.function.Function;
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
-import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
 import pt.inescid.cllsj.compiler.ir.type.IRType;
 
 public class IRPushType extends IRPush {
-  private IRType type;
-  private boolean isPositive;
-  private IRValueRequisites valueRequisites;
+  private int argRecord;
+  private IRType argType;
+  private boolean argIsPositive;
 
   public IRPushType(
-      int record, IRType type, boolean isPositive, IRValueRequisites valueRequisites) {
-    super(record);
-    this.type = type;
-    this.isPositive = isPositive;
-    this.valueRequisites = valueRequisites;
+      int record, IRType recordType, int argRecord, IRType argType, boolean argIsPositive) {
+    super(record, recordType);
+    this.argRecord = argRecord;
+    this.argType = argType;
+    this.argIsPositive = argIsPositive;
   }
 
-  public IRType getType() {
-    return type;
+  public int getArgRecord() {
+    return argRecord;
   }
 
-  public boolean isPositive() {
-    return isPositive;
+  public IRType getArgType() {
+    return argType;
   }
 
-  public IRValueRequisites getValueRequisites() {
-    return valueRequisites;
+  public boolean isArgPositive() {
+    return argIsPositive;
   }
 
   @Override
@@ -37,26 +36,24 @@ public class IRPushType extends IRPush {
 
   @Override
   public String toString() {
-    return "pushType("
-        + getRecord()
-        + ", "
-        + type
-        + ", "
-        + (isPositive ? "positive" : "negative")
-        + ", "
-        + valueRequisites
-        + ")";
+    return toString(
+        "pushType", argRecord + ", " + argType + ", " + (argIsPositive ? "positive" : "negative"));
   }
 
   @Override
-  public void substituteTypes(
-      Function<IRType, IRType> types, Function<IRValueRequisites, IRValueRequisites> requisites) {
-    this.type = types.apply(this.type);
-    this.valueRequisites = requisites.apply(this.valueRequisites);
+  public void renameRecords(Function<Integer, Integer> renamer) {
+    super.renameRecords(renamer);
+    argRecord = renamer.apply(argRecord);
+  }
+
+  @Override
+  public void substituteTypes(Function<IRType, IRType> types) {
+    super.substituteTypes(types);
+    argType = types.apply(argType);
   }
 
   @Override
   public IRInstruction clone() {
-    return new IRPushType(getRecord(), type, isPositive, valueRequisites.clone());
+    return new IRPushType(getRecord(), getRecordType(), argRecord, argType, argIsPositive);
   }
 }

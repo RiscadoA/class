@@ -3,16 +3,9 @@ package pt.inescid.cllsj.compiler.ir.instructions;
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 import pt.inescid.cllsj.compiler.ir.type.IRType;
 
-public class IRScan extends IRPush {
-  private IRType type;
-
-  public IRScan(int record, IRType type) {
-    super(record);
-    this.type = type;
-  }
-
-  public IRType getType() {
-    return type;
+public class IRPushScan extends IRPush {
+  public IRPushScan(int record, IRType recordType) {
+    super(record, recordType);
   }
 
   @Override
@@ -22,11 +15,11 @@ public class IRScan extends IRPush {
 
   @Override
   public String toString() {
-    return "scan(" + getRecord() + ", " + type + ")";
+    return toString("pushScan");
   }
 
   @Override
   public IRInstruction clone() {
-    return new IRScan(getRecord(), type);
+    return new IRPushScan(getRecord(), getRecordType());
   }
 }

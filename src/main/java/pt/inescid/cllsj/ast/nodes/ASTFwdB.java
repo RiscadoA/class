@@ -24,6 +24,7 @@ public class ASTFwdB extends ASTNode {
 
   String ch1;
   String ch2;
+  ASTType type;
 
   public ASTFwdB(String _ch1, String _ch2) {
     ch1 = _ch1;
@@ -44,6 +45,10 @@ public class ASTFwdB extends ASTNode {
 
   public void setCh2(String ch2) {
     this.ch2 = ch2;
+  }
+
+  public ASTType getType() {
+    return type;
   }
 
   public void ASTInsertPipe(Function<ASTNode, ASTNode> f, ASTNode from) throws Exception {
@@ -124,6 +129,7 @@ public class ASTFwdB extends ASTNode {
               + tt2.toStr(ep)
               + " non dual types.");
 
+    type = tt2;
     ed.upd(ch1, null);
   }
 

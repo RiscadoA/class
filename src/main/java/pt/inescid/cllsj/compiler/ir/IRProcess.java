@@ -4,13 +4,12 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
 import pt.inescid.cllsj.compiler.ir.instructions.IRInstruction;
-import pt.inescid.cllsj.compiler.ir.type.IRType;
 
 public class IRProcess {
   private int recordArgumentCount;
   private int exponentialArgumentCount;
-  private List<IRType> recordTypes;
-  private List<IRType> exponentialTypes;
+  private int recordCount;
+  private int exponentialCount;
   private int endPoints;
   private IRBlock entry;
   private List<IRBlock> blocks;
@@ -21,17 +20,17 @@ public class IRProcess {
   public IRProcess(
       int recordArgumentCount,
       int exponentialArgumentCount,
-      List<IRType> recordTypes,
-      List<IRType> exponentialTypes,
-      List<Boolean> typeVariablePolarites,
+      int recordCount,
+      int exponentialCount,
+      List<Boolean> typeVariablePolarities,
       int endPoints,
       boolean inlineable,
       boolean recursive) {
     this.recordArgumentCount = recordArgumentCount;
     this.exponentialArgumentCount = exponentialArgumentCount;
-    this.recordTypes = new ArrayList<>(recordTypes);
-    this.exponentialTypes = new ArrayList<>(exponentialTypes);
-    this.typeVariablePolarities = new ArrayList<>(typeVariablePolarites);
+    this.recordCount = recordCount;
+    this.exponentialCount = exponentialCount;
+    this.typeVariablePolarities = new ArrayList<>(typeVariablePolarities);
     this.endPoints = endPoints;
     this.entry = new IRBlock(null);
     this.blocks = new ArrayList<>();
@@ -52,43 +51,27 @@ public class IRProcess {
   }
 
   public int getRecordCount() {
-    return recordTypes.size();
+    return recordCount;
   }
 
-  public int addRecord(IRType type) {
-    int index = recordTypes.size();
-    recordTypes.add(type);
-    return index;
+  public int addRecord() {
+    return recordCount++;
   }
 
-  public void removeRecord(int index) {
-    recordTypes.remove(index);
-  }
-
-  public IRType getRecordType(int index) {
-    return recordTypes.get(index);
-  }
-
-  public void setRecordType(int index, IRType type) {
-    recordTypes.set(index, type);
+  public void removeRecord() {
+    recordCount--;
   }
 
   public int getExponentialCount() {
-    return exponentialTypes.size();
+    return exponentialCount;
   }
 
-  public IRType getExponentialType(int index) {
-    return exponentialTypes.get(index);
+  public int addExponential() {
+    return exponentialCount++;
   }
 
-  public int addExponential(IRType type) {
-    int index = exponentialTypes.size();
-    exponentialTypes.add(type);
-    return index;
-  }
-
-  public void removeExponential(int index) {
-    exponentialTypes.remove(index);
+  public void removeExponential() {
+    exponentialCount--;
   }
 
   public int addType(boolean polarity) {
