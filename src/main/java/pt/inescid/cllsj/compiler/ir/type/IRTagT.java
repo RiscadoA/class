@@ -3,7 +3,6 @@ package pt.inescid.cllsj.compiler.ir.type;
 import java.util.List;
 import java.util.function.BiFunction;
 import pt.inescid.cllsj.compiler.ir.IRTypeVisitor;
-import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
 
 public class IRTagT extends IRType {
   private List<IRType> choices;
@@ -38,10 +37,7 @@ public class IRTagT extends IRType {
   }
 
   @Override
-  public IRType substituteReqs(
-      int offset, BiFunction<Integer, IRValueRequisites, IRValueRequisites> reqs) {
-    List<IRType> newChoices =
-        choices.stream().map(choice -> choice.substituteReqs(offset, reqs)).toList();
-    return new IRTagT(newChoices);
+  public boolean equals(IRType other) {
+    return other instanceof IRTagT && ((IRTagT) other).getChoices().equals(getChoices());
   }
 }

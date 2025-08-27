@@ -1,13 +1,11 @@
 package pt.inescid.cllsj.compiler.ir.flow;
 
 import java.util.Optional;
-import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
 import pt.inescid.cllsj.compiler.ir.type.IRType;
 
 public class IRFlowType {
   private Optional<Boolean> isPositive = Optional.empty();
   private Optional<IRType> type = Optional.empty();
-  private Optional<IRValueRequisites> valueRequisites = Optional.empty();
 
   public IRFlowType() {}
 
@@ -15,10 +13,9 @@ public class IRFlowType {
     this.isPositive = Optional.of(isPositive);
   }
 
-  public IRFlowType(IRType type, boolean isPositive, IRValueRequisites valueRequisites) {
+  public IRFlowType(IRType type, boolean isPositive) {
     this.type = Optional.of(type);
     this.isPositive = Optional.of(isPositive);
-    this.valueRequisites = Optional.of(valueRequisites);
   }
 
   public Optional<IRType> getType() {
@@ -27,10 +24,6 @@ public class IRFlowType {
 
   public Optional<Boolean> isPositive() {
     return isPositive;
-  }
-
-  public Optional<IRValueRequisites> getValueRequisites() {
-    return valueRequisites;
   }
 
   public IRFlowType clone() {
@@ -44,9 +37,6 @@ public class IRFlowType {
     }
     if (!other.type.equals(type)) {
       merged.type = Optional.empty();
-    }
-    if (!other.valueRequisites.equals(valueRequisites)) {
-      merged.valueRequisites = Optional.empty();
     }
     return clone();
   }
@@ -67,12 +57,6 @@ public class IRFlowType {
     sb.append(", type=");
     if (type.isPresent()) {
       sb.append(type.get().toString());
-    } else {
-      sb.append("?");
-    }
-    sb.append(", value=");
-    if (valueRequisites.isPresent()) {
-      sb.append(valueRequisites.get().toString());
     } else {
       sb.append("?");
     }

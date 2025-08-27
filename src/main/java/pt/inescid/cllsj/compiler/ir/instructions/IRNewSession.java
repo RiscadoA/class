@@ -3,14 +3,17 @@ package pt.inescid.cllsj.compiler.ir.instructions;
 import java.util.Optional;
 import java.util.function.Function;
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
+import pt.inescid.cllsj.compiler.ir.type.IRType;
 
 public class IRNewSession extends IRInstruction {
   private int record; // Index of the record to be initialized.
   private Optional<String> label; // Label for the initial continuation.
+  private IRType type; // Type of the session.
 
-  public IRNewSession(int record, String label) {
+  public IRNewSession(int record, String label, IRType type) {
     this.record = record;
     this.label = Optional.ofNullable(label);
+    this.type = type;
   }
 
   public int getRecord() {
@@ -19,6 +22,10 @@ public class IRNewSession extends IRInstruction {
 
   public Optional<String> getLabel() {
     return label;
+  }
+
+  public IRType getType() {
+    return type;
   }
 
   public void setLabel(Optional<String> label) {
@@ -33,7 +40,7 @@ public class IRNewSession extends IRInstruction {
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder("newSession(");
-    sb.append(record);
+    sb.append(record).append("[").append(type).append("]");
     if (label.isPresent()) {
       sb.append(", ").append(label.get());
     }
@@ -43,7 +50,7 @@ public class IRNewSession extends IRInstruction {
 
   @Override
   public IRInstruction clone() {
-    IRNewSession clone = new IRNewSession(record, null);
+    IRNewSession clone = new IRNewSession(record, null, type);
     clone.setLabel(label);
     return clone;
   }
@@ -63,5 +70,10 @@ public class IRNewSession extends IRInstruction {
     } else {
       label = Optional.empty();
     }
+  }
+
+  @Override
+  public void substituteTypes(Function<IRType, IRType> types) {
+    type = types.apply(type);
   }
 }

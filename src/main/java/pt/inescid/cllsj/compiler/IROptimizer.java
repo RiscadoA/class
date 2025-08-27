@@ -9,27 +9,21 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.BiFunction;
 import java.util.function.Function;
 import pt.inescid.cllsj.compiler.ir.IRBlock;
 import pt.inescid.cllsj.compiler.ir.IRProcess;
 import pt.inescid.cllsj.compiler.ir.IRProgram;
 import pt.inescid.cllsj.compiler.ir.IRTypeVisitor;
-import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
 import pt.inescid.cllsj.compiler.ir.flow.IRFlow;
 import pt.inescid.cllsj.compiler.ir.flow.IRFlowContinuation;
-import pt.inescid.cllsj.compiler.ir.flow.IRFlowLocation;
-import pt.inescid.cllsj.compiler.ir.flow.IRFlowRecord;
 import pt.inescid.cllsj.compiler.ir.flow.IRFlowState;
 import pt.inescid.cllsj.compiler.ir.instructions.*;
 import pt.inescid.cllsj.compiler.ir.type.IRBoolT;
 import pt.inescid.cllsj.compiler.ir.type.IRCellT;
 import pt.inescid.cllsj.compiler.ir.type.IRCloseT;
 import pt.inescid.cllsj.compiler.ir.type.IRExponentialT;
-import pt.inescid.cllsj.compiler.ir.type.IRFlipT;
 import pt.inescid.cllsj.compiler.ir.type.IRIntT;
+import pt.inescid.cllsj.compiler.ir.type.IRResetT;
 import pt.inescid.cllsj.compiler.ir.type.IRSessionT;
 import pt.inescid.cllsj.compiler.ir.type.IRStringT;
 import pt.inescid.cllsj.compiler.ir.type.IRTagT;
@@ -362,193 +356,198 @@ public class IROptimizer {
     }
   }
 
-  public void optimizeKnownSlots(IRProgram ir) {
-    for (Map.Entry<String, IRProcess> e : ir.getProcesses().entrySet()) {
-      if (!processFlows.containsKey(e.getKey())) {
-        throw new IllegalStateException(
-            "Analysis must be enabled to perform known slots optimization");
-      }
-      optimizeKnownSlots(e.getValue(), processFlows.get(e.getKey()));
-    }
-  }
+  // public void optimizeKnownSlots(IRProgram ir) {
+  //   for (Map.Entry<String, IRProcess> e : ir.getProcesses().entrySet()) {
+  //     if (!processFlows.containsKey(e.getKey())) {
+  //       throw new IllegalStateException(
+  //           "Analysis must be enabled to perform known slots optimization");
+  //     }
+  //     optimizeKnownSlots(e.getValue(), processFlows.get(e.getKey()));
+  //   }
+  // }
 
-  private void optimizeKnownSlots(IRProcess ir, Map<IRBlock, IRFlow> flows) {
-    // Slost which have already been removed of types.
-    Map<Integer, Set<Integer>> removedSlots = new HashMap<>();
+  // private void optimizeKnownSlots(IRProcess ir, Map<IRBlock, IRFlow> flows) {
+  //   // Slost which have already been removed of types.
+  //   Map<Integer, Set<Integer>> removedSlots = new HashMap<>();
 
-    // Will store, for a given push instruction, the instructions which pop their data
-    Map<IRFlowLocation, IRFlowLocation> candidatePops = new HashMap<>();
+  //   // Will store, for a given push instruction, the instructions which pop their data
+  //   Map<IRFlowLocation, IRFlowLocation> candidatePops = new HashMap<>();
 
-    // We search for any pop instruction which popped a slot with a known pusher
-    for (IRBlock block : ir.getBlocksIncludingEntry()) {
-      if (!flows.containsKey(block)) {
-        continue; // No flow information for this block
-      }
-      IRFlow flow = flows.get(block);
+  //   // We search for any pop instruction which popped a slot with a known pusher
+  //   for (IRBlock block : ir.getBlocksIncludingEntry()) {
+  //     if (!flows.containsKey(block)) {
+  //       continue; // No flow information for this block
+  //     }
+  //     IRFlow flow = flows.get(block);
 
-      for (int i = 0; i < block.getInstructions().size(); ++i) {
-        IRInstruction instruction = block.getInstructions().get(i);
-        if (!(instruction instanceof IRPop)) {
-          continue; // Not what we're looking for
-        }
-        IRPop pop = (IRPop) instruction;
-        if (pop instanceof IRPopSession && ((IRPopSession) pop).getValueRequisites().canBeValue()) {
-          continue; // This code currently doesn't handle value session pushes and pops.
-        }
-        if (pop instanceof IRPopUnfold) {
-          continue; // We're not really popping data with these instructions
-        }
+  //     for (int i = 0; i < block.getInstructions().size(); ++i) {
+  //       IRInstruction instruction = block.getInstructions().get(i);
+  //       if (!(instruction instanceof IRPop)) {
+  //         continue; // Not what we're looking for
+  //       }
+  //       IRPop pop = (IRPop) instruction;
+  //       if (pop instanceof IRPopSession && ((IRPopSession)
+  // pop).getValueRequisites().canBeValue()) {
+  //         continue; // This code currently doesn't handle value session pushes and pops.
+  //       }
+  //       if (pop instanceof IRPopUnfold) {
+  //         continue; // We're not really popping data with these instructions
+  //       }
 
-        IRFlowRecord recordState = flow.getStates().get(i).getBoundRecord(pop.getRecord());
-        if (recordState.peek().isEmpty() || recordState.peek().get().getPusher().isEmpty()) {
-          continue; // Unknown slot, we can't do anything
-        }
-        IRFlowLocation pushLoc = recordState.peek().get().getPusher().get();
+  //       IRFlowRecord recordState = flow.getStates().get(i).getBoundRecord(pop.getRecord());
+  //       if (recordState.peek().isEmpty() || recordState.peek().get().getPusher().isEmpty()) {
+  //         continue; // Unknown slot, we can't do anything
+  //       }
+  //       IRFlowLocation pushLoc = recordState.peek().get().getPusher().get();
 
-        candidatePops.put(pushLoc, flow.getLocation(i));
-      }
-    }
+  //       candidatePops.put(pushLoc, flow.getLocation(i));
+  //     }
+  //   }
 
-    for (IRFlowLocation pushLoc : candidatePops.keySet()) {
-      IRFlowLocation popLoc = candidatePops.get(pushLoc);
-      IRPush push = (IRPush) pushLoc.getInstruction();
-      IRPop pop = (IRPop) popLoc.getInstruction();
+  //   for (IRFlowLocation pushLoc : candidatePops.keySet()) {
+  //     IRFlowLocation popLoc = candidatePops.get(pushLoc);
+  //     IRPush push = (IRPush) pushLoc.getInstruction();
+  //     IRPop pop = (IRPop) popLoc.getInstruction();
 
-      IRFlowRecord record = pushLoc.getNextState().getBoundRecord(push.getRecord());
-      if (record.getNextSlotIndex().isEmpty()) {
-        continue; // We need to know which part of the type we're removing
-      }
-      int slotIndex = record.getNextSlotIndex().get() - 1;
-      if (removedSlots.containsKey(push.getRecord())) {
-        // We might need to decrement the slot index if previous slots have already been removed
-        Set<Integer> slots = removedSlots.get(push.getRecord());
-        slotIndex -= slots.stream().filter(i -> i < record.getNextSlotIndex().get()).count();
-      }
+  //     IRFlowRecord record = pushLoc.getNextState().getBoundRecord(push.getRecord());
+  //     if (record.getNextSlotIndex().isEmpty()) {
+  //       continue; // We need to know which part of the type we're removing
+  //     }
+  //     int slotIndex = record.getNextSlotIndex().get() - 1;
+  //     if (removedSlots.containsKey(push.getRecord())) {
+  //       // We might need to decrement the slot index if previous slots have already been removed
+  //       Set<Integer> slots = removedSlots.get(push.getRecord());
+  //       slotIndex -= slots.stream().filter(i -> i < record.getNextSlotIndex().get()).count();
+  //     }
 
-      // We must go through each location and ensure that there's a single execution
-      // path from the push to the pop.
-      if (!pushLoc.hasSinglePathUntil(popLoc)) {
-        continue; // We could optimize this across many branches but it is currently unimplemented
-      }
+  //     // We must go through each location and ensure that there's a single execution
+  //     // path from the push to the pop.
+  //     if (!pushLoc.hasSinglePathUntil(popLoc)) {
+  //       continue; // We could optimize this across many branches but it is currently
+  // unimplemented
+  //     }
 
-      // Depending on the type of pop instruction, we'll try merging their argument data,
-      // so that the push/pop pair becomes unnecessary
-      boolean removePush = true;
-      if (pop instanceof IRPopExponential) {
-        int popped = ((IRPopExponential) pop).getArgExponential();
+  //     // Depending on the type of pop instruction, we'll try merging their argument data,
+  //     // so that the push/pop pair becomes unnecessary
+  //     boolean removePush = true;
+  //     if (pop instanceof IRPopExponential) {
+  //       int popped = ((IRPopExponential) pop).getArgExponential();
 
-        if (push instanceof IRPushExponential) {
-          int pushed = ((IRPushExponential) push).getExponential();
+  //       if (push instanceof IRPushExponential) {
+  //         int pushed = ((IRPushExponential) push).getExponential();
 
-          // We need to remove any IRDetachExponential instructions found for the pushed exponential
-          pushLoc.forEachAfter(
-              loc -> {
-                if (loc.getInstruction() instanceof IRDetachExponential) {
-                  IRDetachExponential detach = (IRDetachExponential) loc.getInstruction();
-                  if (detach.getExponential() == pushed) {
-                    loc.removeInstruction();
-                    return false;
-                  }
-                }
-                return true;
-              });
+  //         // We need to remove any IRDetachExponential instructions found for the pushed
+  // exponential
+  //         pushLoc.forEachAfter(
+  //             loc -> {
+  //               if (loc.getInstruction() instanceof IRDetachExponential) {
+  //                 IRDetachExponential detach = (IRDetachExponential) loc.getInstruction();
+  //                 if (detach.getExponential() == pushed) {
+  //                   loc.removeInstruction();
+  //                   return false;
+  //                 }
+  //               }
+  //               return true;
+  //             });
 
-          for (IRBlock block : ir.getBlocksIncludingEntry()) {
-            for (IRInstruction instr : block.getInstructions()) {
-              instr.renameExponentials(r -> r == popped ? pushed : r);
-            }
-          }
-        } else if (push instanceof IRPushExpression) {
-          removePush = false;
-          IRPushExpression pushExpr = (IRPushExpression) push;
-          pushLoc.replaceInstruction(
-              new IRNewExponentialExpression(popped, pushExpr.getExpression()));
-        } else if (push instanceof IRScan) {
-          removePush = false;
-          IRScan scan = (IRScan) push;
-          pushLoc.replaceInstruction(new IRNewExponentialScan(popped, scan.getType()));
-        } else {
-          continue; // Unsupported exponential push
-        }
-      } else if (pop instanceof IRPopSession) {
-        int pushed = ((IRPushSession) push).getArgRecord();
-        int popped = ((IRPopSession) pop).getArgRecord();
-        for (IRBlock block : ir.getBlocksIncludingEntry()) {
-          for (IRInstruction instr : block.getInstructions()) {
-            instr.renameRecords(r -> r == popped ? pushed : r);
-          }
-        }
-      } else if (pop instanceof IRPopClose) {
-        // We don't really need to do anything other than removing the instructions
-      } else if (pop instanceof IRPopTag) {
-        // For the tags, the jump has already been optimized away by the known jump optimization
-        if (!((IRPopTag) pop).getCases().isEmpty()) {
-          continue; // Known jump optimization didn't run?
-        }
-      } else {
-        continue; // Unimplemented pop type
-      }
+  //         for (IRBlock block : ir.getBlocksIncludingEntry()) {
+  //           for (IRInstruction instr : block.getInstructions()) {
+  //             instr.renameExponentials(r -> r == popped ? pushed : r);
+  //           }
+  //         }
+  //       } else if (push instanceof IRPushExpression) {
+  //         removePush = false;
+  //         IRPushExpression pushExpr = (IRPushExpression) push;
+  //         pushLoc.replaceInstruction(
+  //             new IRNewExponentialExpression(popped, pushExpr.getExpression()));
+  //       } else if (push instanceof IRScan) {
+  //         removePush = false;
+  //         IRScan scan = (IRScan) push;
+  //         pushLoc.replaceInstruction(new IRNewExponentialScan(popped, scan.getType()));
+  //       } else {
+  //         continue; // Unsupported exponential push
+  //       }
+  //     } else if (pop instanceof IRPopSession) {
+  //       int pushed = ((IRPushSession) push).getArgRecord();
+  //       int popped = ((IRPopSession) pop).getArgRecord();
+  //       for (IRBlock block : ir.getBlocksIncludingEntry()) {
+  //         for (IRInstruction instr : block.getInstructions()) {
+  //           instr.renameRecords(r -> r == popped ? pushed : r);
+  //         }
+  //       }
+  //     } else if (pop instanceof IRPopClose) {
+  //       // We don't really need to do anything other than removing the instructions
+  //     } else if (pop instanceof IRPopTag) {
+  //       // For the tags, the jump has already been optimized away by the known jump optimization
+  //       if (!((IRPopTag) pop).getCases().isEmpty()) {
+  //         continue; // Known jump optimization didn't run?
+  //       }
+  //     } else {
+  //       continue; // Unimplemented pop type
+  //     }
 
-      // Now, we simply remove both instructions and modify the type accordingly
-      IRType oldType = ir.getRecordType(push.getRecord());
-      IRType newType = TypeModifier.removeNth(pushLoc.getPreviousState(), oldType, slotIndex);
+  //     // Now, we simply remove both instructions and modify the type accordingly
+  //     IRType oldType = ir.getRecordType(push.getRecord());
+  //     IRType newType = TypeModifier.removeNth(pushLoc.getPreviousState(), oldType, slotIndex);
 
-      if (newType instanceof IRCloseT) {
-        // We might be able to remove the session entirely
-        AtomicReference<Optional<IRFlowLocation>> newLoc = new AtomicReference<>(Optional.empty());
-        AtomicReference<Optional<IRFlowLocation>> freeLoc = new AtomicReference<>(Optional.empty());
+  //     if (newType instanceof IRCloseT) {
+  //       // We might be able to remove the session entirely
+  //       AtomicReference<Optional<IRFlowLocation>> newLoc = new
+  // AtomicReference<>(Optional.empty());
+  //       AtomicReference<Optional<IRFlowLocation>> freeLoc = new
+  // AtomicReference<>(Optional.empty());
 
-        pushLoc.forEachBefore(
-            loc -> {
-              if (loc.getInstruction() instanceof IRNewSession) {
-                if (((IRNewSession) loc.getInstruction()).getRecord() == push.getRecord()) {
-                  newLoc.set(Optional.of(loc));
-                  return false;
-                }
-              } else if (loc.getInstruction().usesRecord(push.getRecord())) {
-                return false;
-              }
-              return true;
-            });
+  //       pushLoc.forEachBefore(
+  //           loc -> {
+  //             if (loc.getInstruction() instanceof IRNewSession) {
+  //               if (((IRNewSession) loc.getInstruction()).getRecord() == push.getRecord()) {
+  //                 newLoc.set(Optional.of(loc));
+  //                 return false;
+  //               }
+  //             } else if (loc.getInstruction().usesRecord(push.getRecord())) {
+  //               return false;
+  //             }
+  //             return true;
+  //           });
 
-        popLoc.forEachAfter(
-            loc -> {
-              if (loc.getInstruction() instanceof IRFreeSession) {
-                if (((IRFreeSession) loc.getInstruction()).getRecord() == push.getRecord()) {
-                  freeLoc.set(Optional.of(loc));
-                  return false;
-                }
-              } else if (loc.getInstruction().usesRecord(push.getRecord())) {
-                return false;
-              }
-              return true;
-            });
+  //       popLoc.forEachAfter(
+  //           loc -> {
+  //             if (loc.getInstruction() instanceof IRFreeSession) {
+  //               if (((IRFreeSession) loc.getInstruction()).getRecord() == push.getRecord()) {
+  //                 freeLoc.set(Optional.of(loc));
+  //                 return false;
+  //               }
+  //             } else if (loc.getInstruction().usesRecord(push.getRecord())) {
+  //               return false;
+  //             }
+  //             return true;
+  //           });
 
-        // If the record is still used between the push and the pop, we can't delete it
-        pushLoc.forEachAfter(
-            loc -> {
-              if (loc != popLoc && loc.getInstruction().usesRecord(push.getRecord())) {
-                freeLoc.set(Optional.empty());
-                newLoc.set(Optional.empty());
-              }
-              return loc != popLoc;
-            });
+  //       // If the record is still used between the push and the pop, we can't delete it
+  //       pushLoc.forEachAfter(
+  //           loc -> {
+  //             if (loc != popLoc && loc.getInstruction().usesRecord(push.getRecord())) {
+  //               freeLoc.set(Optional.empty());
+  //               newLoc.set(Optional.empty());
+  //             }
+  //             return loc != popLoc;
+  //           });
 
-        if (newLoc.get().isPresent() && freeLoc.get().isPresent()) {
-          newLoc.get().get().removeInstruction();
-          freeLoc.get().get().removeInstruction();
-        }
-      }
+  //       if (newLoc.get().isPresent() && freeLoc.get().isPresent()) {
+  //         newLoc.get().get().removeInstruction();
+  //         freeLoc.get().get().removeInstruction();
+  //       }
+  //     }
 
-      if (removePush) {
-        pushLoc.removeInstruction();
-      }
-      popLoc.removeInstruction();
+  //     if (removePush) {
+  //       pushLoc.removeInstruction();
+  //     }
+  //     popLoc.removeInstruction();
 
-      ir.setRecordType(push.getRecord(), newType);
-      removedSlots.computeIfAbsent(push.getRecord(), k -> new HashSet<>()).add(slotIndex);
-    }
-  }
+  //     ir.setRecordType(push.getRecord(), newType);
+  //     removedSlots.computeIfAbsent(push.getRecord(), k -> new HashSet<>()).add(slotIndex);
+  //   }
+  // }
 
   public void removeUnusedRecords(IRProgram ir) {
     for (Map.Entry<String, IRProcess> e : ir.getProcesses().entrySet()) {
@@ -578,10 +577,8 @@ public class IROptimizer {
         recordRebindings.put(i, i - delta);
       }
     }
-    for (int i = ir.getRecordCount() - 1; i >= 0; --i) {
-      if (unusedRecords.contains(i)) {
-        ir.removeRecord(i);
-      }
+    for (int i = 0; i < ir.getRecordCount(); ++i) {
+      ir.removeRecord();
     }
 
     // Finally, rename all records in the instructions
@@ -620,10 +617,8 @@ public class IROptimizer {
         exponentialRebindings.put(i, i - delta);
       }
     }
-    for (int i = ir.getExponentialCount() - 1; i >= 0; --i) {
-      if (unusedExponentials.contains(i)) {
-        ir.removeExponential(i);
-      }
+    for (int i = 0; i < unusedExponentials.size(); ++i) {
+      ir.removeExponential();
     }
 
     // Finally, rename all records in the instructions
@@ -706,7 +701,7 @@ public class IROptimizer {
 
         IRFlow forwardFlow = flows.get(forwardBlock);
         flipBlock.getInstructions().removeLast();
-        IRFlipForward flipForward = new IRFlipForward(x, y);
+        IRFlipForward flipForward = new IRFlipForward(x, y, forward.getType());
         if (!forward.isEndPoint()) {
           flipForward.removeEndPoint();
         }
@@ -740,143 +735,147 @@ public class IROptimizer {
   //
   // This change requires modifying the type of the record being pushed, e.g.,
   // if 1 was of type session(Y); X, then the new type will be session(Y); close.
-  public void removeUnnecessaryValuePushes(IRProgram ir) {
-    ir.forEachProcess(
-        (name, proc) -> {
-          removeUnnecessaryValuePushes(proc, processFlows.get(name));
-        });
-  }
+  // public void removeUnnecessaryValuePushes(IRProgram ir) {
+  //   ir.forEachProcess(
+  //       (name, proc) -> {
+  //         removeUnnecessaryValuePushes(proc, processFlows.get(name));
+  //       });
+  // }
 
-  private void removeUnnecessaryValuePushes(IRProcess ir, Map<IRBlock, IRFlow> flows) {
-    Map<Integer, List<IRFlowLocation>> candidates = new HashMap<>();
+  // private void removeUnnecessaryValuePushes(IRProcess ir, Map<IRBlock, IRFlow> flows) {
+  //   Map<Integer, List<IRFlowLocation>> candidates = new HashMap<>();
 
-    // We search for any pushSession instruction which is certainly pushing a value
-    for (IRBlock block : ir.getBlocksIncludingEntry()) {
-      if (!flows.containsKey(block)) {
-        continue; // No flow information for this block
-      }
-      for (int i = 0; i < block.getInstructions().size(); ++i) {
-        IRInstruction instruction = block.getInstructions().get(i);
-        if (!(instruction instanceof IRPushSession)) {
-          continue; // Not what we're looking for
-        }
-        IRPushSession pushSession = (IRPushSession) instruction;
-        if (!pushSession.getValueRequisites().mustBeValue()) {
-          continue; // Not necessarily a value push
-        }
+  //   // We search for any pushSession instruction which is certainly pushing a value
+  //   for (IRBlock block : ir.getBlocksIncludingEntry()) {
+  //     if (!flows.containsKey(block)) {
+  //       continue; // No flow information for this block
+  //     }
+  //     for (int i = 0; i < block.getInstructions().size(); ++i) {
+  //       IRInstruction instruction = block.getInstructions().get(i);
+  //       if (!(instruction instanceof IRPushSession)) {
+  //         continue; // Not what we're looking for
+  //       }
+  //       IRPushSession pushSession = (IRPushSession) instruction;
+  //       if (!pushSession.getValueRequisites().mustBeValue()) {
+  //         continue; // Not necessarily a value push
+  //       }
 
-        // We store the location of this instruction associated with the record being consumed.
-        List<IRFlowLocation> locs =
-            candidates.computeIfAbsent(pushSession.getArgRecord(), k -> new ArrayList<>());
-        locs.add(flows.get(block).getLocation(i));
+  //       // We store the location of this instruction associated with the record being consumed.
+  //       List<IRFlowLocation> locs =
+  //           candidates.computeIfAbsent(pushSession.getArgRecord(), k -> new ArrayList<>());
+  //       locs.add(flows.get(block).getLocation(i));
 
-        // Now we go back in the flow and look for the first push(argRecord, ...) instruction.
-        // If there is branching, we need to check all branches.
-      }
-    }
+  //       // Now we go back in the flow and look for the first push(argRecord, ...) instruction.
+  //       // If there is branching, we need to check all branches.
+  //     }
+  //   }
 
-    for (int candidate : candidates.keySet()) {
-      for (IRFlowLocation pushSessionLoc : candidates.get(candidate)) {
-        IRPushSession pushSession = (IRPushSession) pushSessionLoc.getInstruction();
-        int argRecord = pushSession.getArgRecord();
-        AtomicBoolean recordModified = new AtomicBoolean(false);
+  //   for (int candidate : candidates.keySet()) {
+  //     for (IRFlowLocation pushSessionLoc : candidates.get(candidate)) {
+  //       IRPushSession pushSession = (IRPushSession) pushSessionLoc.getInstruction();
+  //       int argRecord = pushSession.getArgRecord();
+  //       AtomicBoolean recordModified = new AtomicBoolean(false);
 
-        Map<Integer, IRFlowLocation> detachedExponentials = new HashMap<>();
-        Map<Integer, IRFlowLocation> decRefExponentials = new HashMap<>();
+  //       Map<Integer, IRFlowLocation> detachedExponentials = new HashMap<>();
+  //       Map<Integer, IRFlowLocation> decRefExponentials = new HashMap<>();
 
-        pushSessionLoc.forEachBefore(
-            loc -> {
-              IRInstruction instr = loc.getInstruction();
+  //       pushSessionLoc.forEachBefore(
+  //           loc -> {
+  //             IRInstruction instr = loc.getInstruction();
 
-              if (instr instanceof IRDetachExponential) {
-                IRDetachExponential detachExponential = (IRDetachExponential) instr;
-                detachedExponentials.put(detachExponential.getExponential(), loc);
-              }
+  //             if (instr instanceof IRDetachExponential) {
+  //               IRDetachExponential detachExponential = (IRDetachExponential) instr;
+  //               detachedExponentials.put(detachExponential.getExponential(), loc);
+  //             }
 
-              if (instr instanceof IRDecRefExponential) {
-                IRDecRefExponential decRefExponential = (IRDecRefExponential) instr;
-                decRefExponentials.putIfAbsent(decRefExponential.getExponential(), loc);
-              }
+  //             if (instr instanceof IRDecRefExponential) {
+  //               IRDecRefExponential decRefExponential = (IRDecRefExponential) instr;
+  //               decRefExponentials.putIfAbsent(decRefExponential.getExponential(), loc);
+  //             }
 
-              if (instr instanceof IRPush) {
-                IRPush push = (IRPush) instr;
-                if (push.getRecord() == argRecord) {
-                  if (recordModified.get() == false) {
-                    // If the main record wasn't modified from this push until the pushSession,
-                    // then we can avoid moving the push instruction and just change the record
-                    // target
-                    //
-                    // This requires us moving the push session instruction before this instruction
-                    pushSessionLoc.moveInstructionBefore(loc);
-                    push.setRecord(pushSession.getRecord());
-                  } else {
-                    // If it was modified, then we have no choice but to move the push instruction
-                    // ahead
+  //             if (instr instanceof IRPush) {
+  //               IRPush push = (IRPush) instr;
+  //               if (push.getRecord() == argRecord) {
+  //                 if (recordModified.get() == false) {
+  //                   // If the main record wasn't modified from this push until the pushSession,
+  //                   // then we can avoid moving the push instruction and just change the record
+  //                   // target
+  //                   //
+  //                   // This requires us moving the push session instruction before this
+  // instruction
+  //                   pushSessionLoc.moveInstructionBefore(loc);
+  //                   push.setRecord(pushSession.getRecord());
+  //                 } else {
+  //                   // If it was modified, then we have no choice but to move the push
+  // instruction
+  //                   // ahead
 
-                    if (push instanceof IRScan) {
-                      // We can't move IRScan instructions, as they have side effects
-                      return false;
-                    }
+  //                   if (push instanceof IRScan) {
+  //                     // We can't move IRScan instructions, as they have side effects
+  //                     return false;
+  //                   }
 
-                    if (push instanceof IRPushExpression) {
-                      // These instructions have associated clean up instructions
-                      // We could also move those but that is not implemented yet, so leave them
-                      return false;
-                    }
+  //                   if (push instanceof IRPushExpression) {
+  //                     // These instructions have associated clean up instructions
+  //                     // We could also move those but that is not implemented yet, so leave them
+  //                     return false;
+  //                   }
 
-                    // If we pushed an exponential and later detached it, we must move the detach to
-                    // after the new push.
-                    // Additionally, if we decremented the reference count of exponential, we must
-                    // move it too.
-                    if (push instanceof IRPushExponential) {
-                      IRPushExponential pushExponential = (IRPushExponential) push;
-                      if (detachedExponentials.containsKey(pushExponential.getExponential())) {
-                        IRFlowLocation detachLoc =
-                            detachedExponentials.get(pushExponential.getExponential());
-                        pushSessionLoc.insertInstructionAfter(detachLoc.getInstruction());
-                        detachLoc.removeInstruction();
-                      }
-                      if (decRefExponentials.containsKey(pushExponential.getExponential())) {
-                        IRFlowLocation decRefLoc =
-                            decRefExponentials.get(pushExponential.getExponential());
-                        pushSessionLoc.insertInstructionAfter(decRefLoc.getInstruction());
-                        decRefLoc.removeInstruction();
-                      }
-                    }
+  //                   // If we pushed an exponential and later detached it, we must move the detach
+  // to
+  //                   // after the new push.
+  //                   // Additionally, if we decremented the reference count of exponential, we
+  // must
+  //                   // move it too.
+  //                   if (push instanceof IRPushExponential) {
+  //                     IRPushExponential pushExponential = (IRPushExponential) push;
+  //                     if (detachedExponentials.containsKey(pushExponential.getExponential())) {
+  //                       IRFlowLocation detachLoc =
+  //                           detachedExponentials.get(pushExponential.getExponential());
+  //                       pushSessionLoc.insertInstructionAfter(detachLoc.getInstruction());
+  //                       detachLoc.removeInstruction();
+  //                     }
+  //                     if (decRefExponentials.containsKey(pushExponential.getExponential())) {
+  //                       IRFlowLocation decRefLoc =
+  //                           decRefExponentials.get(pushExponential.getExponential());
+  //                       pushSessionLoc.insertInstructionAfter(decRefLoc.getInstruction());
+  //                       decRefLoc.removeInstruction();
+  //                     }
+  //                   }
 
-                    push.setRecord(pushSession.getRecord());
-                    loc.moveInstructionAfter(pushSessionLoc);
-                    ir.setRecordType(
-                        argRecord,
-                        TypeModifier.removeLast(
-                            loc.getPreviousState(), ir.getRecordType(argRecord)));
-                  }
-                  return true;
-                }
-              }
+  //                   push.setRecord(pushSession.getRecord());
+  //                   loc.moveInstructionAfter(pushSessionLoc);
+  //                   ir.setRecordType(
+  //                       argRecord,
+  //                       TypeModifier.removeLast(
+  //                           loc.getPreviousState(), ir.getRecordType(argRecord)));
+  //                 }
+  //                 return true;
+  //               }
+  //             }
 
-              if (instr instanceof IRNewSession) {
-                IRNewSession newSession = (IRNewSession) instr;
-                if (newSession.getRecord() == argRecord) {
-                  loc.removeInstruction();
-                  pushSessionLoc.removeInstruction();
-                  return false;
-                }
-              }
+  //             if (instr instanceof IRNewSession) {
+  //               IRNewSession newSession = (IRNewSession) instr;
+  //               if (newSession.getRecord() == argRecord) {
+  //                 loc.removeInstruction();
+  //                 pushSessionLoc.removeInstruction();
+  //                 return false;
+  //               }
+  //             }
 
-              if (instr.usesRecord(argRecord)) {
-                return false;
-              }
+  //             if (instr.usesRecord(argRecord)) {
+  //               return false;
+  //             }
 
-              if (instr.usesRecord(pushSession.getRecord())) {
-                recordModified.set(true);
-              }
+  //             if (instr.usesRecord(pushSession.getRecord())) {
+  //               recordModified.set(true);
+  //             }
 
-              return true; // Continue iterating
-            });
-      }
-    }
-  }
+  //             return true; // Continue iterating
+  //           });
+  //     }
+  //   }
+  // }
 
   // Searches for blocks of code like:
   //
@@ -891,87 +890,87 @@ public class IROptimizer {
   //
   // This change requires modifying the type of the record being popped, e.g.,
   // if 1 was of type session(Y); X, then the new type will be X.
-  public void removeUnnecessaryValuePops(IRProgram ir) {
-    ir.forEachProcess(
-        (name, proc) -> {
-          removeUnnecessaryValuePops(proc, processFlows.get(name));
-        });
-  }
+  // public void removeUnnecessaryValuePops(IRProgram ir) {
+  //   ir.forEachProcess(
+  //       (name, proc) -> {
+  //         removeUnnecessaryValuePops(proc, processFlows.get(name));
+  //       });
+  // }
 
-  private void removeUnnecessaryValuePops(IRProcess ir, Map<IRBlock, IRFlow> flows) {
-    Map<Integer, List<IRFlowLocation>> candidates = new HashMap<>();
+  // private void removeUnnecessaryValuePops(IRProcess ir, Map<IRBlock, IRFlow> flows) {
+  //   Map<Integer, List<IRFlowLocation>> candidates = new HashMap<>();
 
-    // We search for any popSession instruction which is certainly popping a value
-    for (IRBlock block : ir.getBlocksIncludingEntry()) {
-      if (!flows.containsKey(block)) {
-        continue; // No flow information for this block
-      }
-      for (int i = 0; i < block.getInstructions().size(); ++i) {
-        IRInstruction instruction = block.getInstructions().get(i);
-        if (!(instruction instanceof IRPopSession)) {
-          continue; // Not what we're looking for
-        }
-        IRPopSession popSession = (IRPopSession) instruction;
-        if (!popSession.getValueRequisites().mustBeValue()) {
-          continue; // Not necessarily a value pop
-        }
+  //   // We search for any popSession instruction which is certainly popping a value
+  //   for (IRBlock block : ir.getBlocksIncludingEntry()) {
+  //     if (!flows.containsKey(block)) {
+  //       continue; // No flow information for this block
+  //     }
+  //     for (int i = 0; i < block.getInstructions().size(); ++i) {
+  //       IRInstruction instruction = block.getInstructions().get(i);
+  //       if (!(instruction instanceof IRPopSession)) {
+  //         continue; // Not what we're looking for
+  //       }
+  //       IRPopSession popSession = (IRPopSession) instruction;
+  //       if (!popSession.getValueRequisites().mustBeValue()) {
+  //         continue; // Not necessarily a value pop
+  //       }
 
-        // We store the location of this instruction associated with the record being produced.
-        List<IRFlowLocation> locs =
-            candidates.computeIfAbsent(popSession.getArgRecord(), k -> new ArrayList<>());
-        locs.add(flows.get(block).getLocation(i));
+  //       // We store the location of this instruction associated with the record being produced.
+  //       List<IRFlowLocation> locs =
+  //           candidates.computeIfAbsent(popSession.getArgRecord(), k -> new ArrayList<>());
+  //       locs.add(flows.get(block).getLocation(i));
 
-        // Now we go ahead in the flow and look for the first pop(argRecord, ...) instruction.
-        // If there is branching, we need to check all branches.
-      }
-    }
+  //       // Now we go ahead in the flow and look for the first pop(argRecord, ...) instruction.
+  //       // If there is branching, we need to check all branches.
+  //     }
+  //   }
 
-    for (int candidate : candidates.keySet()) {
-      for (IRFlowLocation popSessionLoc : candidates.get(candidate)) {
-        IRPopSession popSession = (IRPopSession) popSessionLoc.getInstruction();
-        int argRecord = popSession.getArgRecord();
+  //   for (int candidate : candidates.keySet()) {
+  //     for (IRFlowLocation popSessionLoc : candidates.get(candidate)) {
+  //       IRPopSession popSession = (IRPopSession) popSessionLoc.getInstruction();
+  //       int argRecord = popSession.getArgRecord();
 
-        popSessionLoc.forEachAfter(
-            loc -> {
-              IRInstruction instr = loc.getInstruction();
+  //       popSessionLoc.forEachAfter(
+  //           loc -> {
+  //             IRInstruction instr = loc.getInstruction();
 
-              if (instr instanceof IRPopTag) {
-                // We can't move this!
-                // Although we maybe could move the pop session to all of the branches?
-                return false;
-              }
+  //             if (instr instanceof IRPopTag) {
+  //               // We can't move this!
+  //               // Although we maybe could move the pop session to all of the branches?
+  //               return false;
+  //             }
 
-              if (instr instanceof IRPop) {
-                IRPop pop = (IRPop) instr;
-                if (pop.getRecord() == argRecord) {
-                  pop.setRecord(popSession.getRecord());
-                  loc.moveInstructionBefore(popSessionLoc);
-                  ir.setRecordType(
-                      argRecord,
-                      TypeModifier.removeFirst(
-                          loc.getPreviousState(), ir.getRecordType(argRecord)));
-                  return true;
-                }
-              }
+  //             if (instr instanceof IRPop) {
+  //               IRPop pop = (IRPop) instr;
+  //               if (pop.getRecord() == argRecord) {
+  //                 pop.setRecord(popSession.getRecord());
+  //                 loc.moveInstructionBefore(popSessionLoc);
+  //                 ir.setRecordType(
+  //                     argRecord,
+  //                     TypeModifier.removeFirst(
+  //                         loc.getPreviousState(), ir.getRecordType(argRecord)));
+  //                 return true;
+  //               }
+  //             }
 
-              if (instr instanceof IRFreeSession) {
-                IRFreeSession freeSession = (IRFreeSession) instr;
-                if (freeSession.getRecord() == argRecord) {
-                  loc.removeInstruction();
-                  popSessionLoc.removeInstruction();
-                  return false;
-                }
-              }
+  //             if (instr instanceof IRFreeSession) {
+  //               IRFreeSession freeSession = (IRFreeSession) instr;
+  //               if (freeSession.getRecord() == argRecord) {
+  //                 loc.removeInstruction();
+  //                 popSessionLoc.removeInstruction();
+  //                 return false;
+  //               }
+  //             }
 
-              if (instr.usesRecord(argRecord)) {
-                return false;
-              }
+  //             if (instr.usesRecord(argRecord)) {
+  //               return false;
+  //             }
 
-              return true; // Continue iterating
-            });
-      }
-    }
-  }
+  //             return true; // Continue iterating
+  //           });
+  //     }
+  //   }
+  // }
 
   public void inlineProcesses(IRProgram ir, int maxComplexity, boolean allowLoops) {
     Map<String, Integer> evaluated = new HashMap<>();
@@ -1057,80 +1056,9 @@ public class IROptimizer {
       }
 
       // Functions which perform variable substitution on the types of the called process.
-      BiFunction<Integer, IRValueRequisites, IRValueRequisites> substituteValueReqs =
-          (offset, reqs) -> {
-            if (reqs.mustBeValue() || !reqs.canBeValue()) {
-              return reqs;
-            }
-
-            Map<Integer, Boolean> reqPolarities = new HashMap<>();
-            List<Integer> reqValues = new ArrayList<>();
-
-            for (int t : reqs.getRequiredTypePolarities().keySet()) {
-              boolean p = reqs.getRequiredTypePolarities().get(t);
-              if (t < offset) {
-                reqPolarities.put(t, p);
-                continue;
-              }
-              t -= offset;
-
-              boolean found = false;
-              for (IRCallProcess.TypeArgument arg : call.getTypeArguments()) {
-                if (arg.getTargetType() == t) {
-                  if (arg.getSourceTypePolarity() == p) {
-                    found = true;
-                    break;
-                  } else {
-                    return IRValueRequisites.notValue();
-                  }
-                }
-              }
-              if (!found) {
-                if (!typeMap.containsKey(t)) {
-                  throw new IllegalStateException(
-                      "Type " + t + " not found in type map for process call " + callName);
-                }
-                reqPolarities.put(typeMap.get(t) + offset, p);
-              }
-            }
-
-            for (int t : reqs.getTypesWhichMustBeValues()) {
-              if (t < offset) {
-                reqValues.add(t);
-                continue;
-              }
-              t -= offset;
-
-              boolean found = false;
-              for (IRCallProcess.TypeArgument arg : call.getTypeArguments()) {
-                if (arg.getTargetType() == t) {
-                  found = true;
-                  if (arg.getSourceTypeValueRequisites().mustBeValue()) {
-                    break;
-                  } else if (!arg.getSourceTypeValueRequisites().canBeValue()) {
-                    return IRValueRequisites.notValue();
-                  } else {
-                    for (Map.Entry<Integer, Boolean> e :
-                        arg.getSourceTypeValueRequisites().getRequiredTypePolarities().entrySet()) {
-                      reqPolarities.put(e.getKey() + offset, e.getValue());
-                    }
-                    for (int t2 : arg.getSourceTypeValueRequisites().getTypesWhichMustBeValues()) {
-                      reqValues.add(t2 + offset);
-                    }
-                    break;
-                  }
-                }
-              }
-              if (!found) {
-                reqValues.add(typeMap.get(t) + offset);
-              }
-            }
-
-            return IRValueRequisites.value(reqPolarities, reqValues);
-          };
       Function<IRType, IRType> substituteTypeVars =
           type -> {
-            IRType result = type.substituteReqs(0, substituteValueReqs);
+            IRType result = type;
             for (IRCallProcess.TypeArgument arg : call.getTypeArguments()) {
               result =
                   result.substituteVar(
@@ -1138,7 +1066,7 @@ public class IROptimizer {
                       0,
                       (offset, var) -> {
                         if (var.hasPrecedingFlip(arg.getSourceTypePolarity())) {
-                          return new IRFlipT(arg.getSourceType());
+                          return new IRResetT(arg.getSourceType());
                         } else {
                           return arg.getSourceType();
                         }
@@ -1162,26 +1090,19 @@ public class IROptimizer {
         if (callProc.isRecursive()) {
           // If the process is recursive, we need to keep arguments separate, as
           // the process will call itself on those same arguments which would overwrite ours
-          recordMap.put(
-              arg.getTargetRecord(),
-              proc.addRecord(
-                  substituteTypeVars.apply(callProc.getRecordType(arg.getTargetRecord()))));
+          recordMap.put(arg.getTargetRecord(), proc.addRecord());
         } else {
           recordMap.put(arg.getTargetRecord(), arg.getSourceRecord());
         }
       }
       for (int j = callProc.getRecordArgumentCount(); j < callProc.getRecordCount(); ++j) {
-        recordMap.put(j, proc.addRecord(substituteTypeVars.apply(callProc.getRecordType(j))));
+        recordMap.put(j, proc.addRecord());
       }
       Map<Integer, Integer> exponentialMap = new HashMap<>();
       for (IRCallProcess.ExponentialArgument arg : call.getExponentialArguments()) {
         if (callProc.isRecursive()) {
           // Same thing as above
-          exponentialMap.put(
-              arg.getTargetExponential(),
-              proc.addExponential(
-                  substituteTypeVars.apply(
-                      callProc.getExponentialType(arg.getTargetExponential()))));
+          exponentialMap.put(arg.getTargetExponential(), proc.addExponential());
         } else {
           exponentialMap.put(arg.getTargetExponential(), arg.getSourceExponential());
         }
@@ -1189,8 +1110,7 @@ public class IROptimizer {
       for (int j = callProc.getExponentialArgumentCount();
           j < callProc.getExponentialCount();
           ++j) {
-        exponentialMap.put(
-            j, proc.addExponential(substituteTypeVars.apply(callProc.getExponentialType(j))));
+        exponentialMap.put(j, proc.addExponential());
       }
 
       // Identify the block we'll be adding the inlined process' entry instructions
@@ -1221,8 +1141,7 @@ public class IROptimizer {
             newInstr.renameRecords(recordMap::get);
             newInstr.renameExponentials(exponentialMap::get);
             newInstr.renameLabels(labelMap::get);
-            newInstr.substituteTypes(
-                substituteTypeVars, reqs -> substituteValueReqs.apply(0, reqs));
+            newInstr.substituteTypes(substituteTypeVars);
 
             // If it is a recursive call, turn into a IRCallLoop instruction
             if (callProc.isRecursive() && newInstr instanceof IRCallProcess) {
@@ -1385,7 +1304,7 @@ public class IROptimizer {
 
     @Override
     public void visit(IRSessionT type) {
-      Optional<Boolean> isValue = state.isValue(type.getValueRequisites());
+      Optional<Boolean> isValue = state.isValue(type.getArg());
 
       if (isValue.isPresent() && isValue.get() == true) {
         if (modification == Modification.REMOVE_NTH) {
@@ -1396,7 +1315,7 @@ public class IROptimizer {
             if (arg instanceof IRCloseT) {
               result = type.getCont();
             } else {
-              result = new IRSessionT(arg, type.getCont(), type.getValueRequisites());
+              result = new IRSessionT(arg, type.getCont());
             }
           } else {
             // Remove from the continuation side
@@ -1404,7 +1323,7 @@ public class IROptimizer {
             if (cont instanceof IRCloseT) {
               result = type.getArg();
             } else {
-              result = new IRSessionT(type.getArg(), cont, type.getValueRequisites());
+              result = new IRSessionT(type.getArg(), cont);
             }
           }
         } else if (modification == Modification.REMOVE_LAST) {
@@ -1412,7 +1331,7 @@ public class IROptimizer {
           if (cont instanceof IRCloseT) {
             result = type.getArg();
           } else {
-            result = new IRSessionT(type.getArg(), cont, type.getValueRequisites());
+            result = new IRSessionT(type.getArg(), cont);
           }
         }
       } else if (isValue.isPresent() && isValue.get() == false) {
@@ -1420,17 +1339,13 @@ public class IROptimizer {
           if (index == 0) {
             result = type.getCont();
           } else {
-            result =
-                new IRSessionT(
-                    type.getArg(), recurse(type.getCont(), 1), type.getValueRequisites());
+            result = new IRSessionT(type.getArg(), recurse(type.getCont(), 1));
           }
         } else if (modification == Modification.REMOVE_LAST) {
           if (type.getCont() instanceof IRCloseT) {
             result = new IRCloseT();
           } else {
-            result =
-                new IRSessionT(
-                    type.getArg(), recurse(type.getCont(), 0), type.getValueRequisites());
+            result = new IRSessionT(type.getArg(), recurse(type.getCont(), 0));
           }
         }
       } else {
@@ -1458,7 +1373,7 @@ public class IROptimizer {
     }
 
     @Override
-    public void visit(IRFlipT type) {
+    public void visit(IRResetT type) {
       type.getCont().accept(this);
     }
   }
@@ -1479,9 +1394,9 @@ public class IROptimizer {
 
     @Override
     public void visit(IRSessionT type) {
-      if (type.getValueRequisites().mustBeValue()) {
+      if (type.valueRequisites().mustBeValue()) {
         result = count(type.getArg());
-      } else if (!type.getValueRequisites().canBeValue()) {
+      } else if (!type.valueRequisites().canBeValue()) {
         result = 1;
       } else {
         throw new UnsupportedOperationException(
@@ -1499,7 +1414,7 @@ public class IROptimizer {
     }
 
     @Override
-    public void visit(IRFlipT type) {
+    public void visit(IRResetT type) {
       type.getCont().accept(this);
     }
   }

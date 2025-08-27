@@ -2,7 +2,6 @@ package pt.inescid.cllsj.compiler.ir.type;
 
 import java.util.function.BiFunction;
 import pt.inescid.cllsj.compiler.ir.IRTypeVisitor;
-import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
 
 public class IRStringT extends IRType {
   @Override
@@ -21,8 +20,7 @@ public class IRStringT extends IRType {
   }
 
   @Override
-  public IRType substituteReqs(
-      int offset, BiFunction<Integer, IRValueRequisites, IRValueRequisites> reqs) {
-    return this;
+  public boolean equals(IRType other) {
+    return other instanceof IRStringT;
   }
 }

@@ -3,17 +3,18 @@ package pt.inescid.cllsj.compiler.ir.instructions;
 import java.util.List;
 import java.util.function.Function;
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
-import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
 import pt.inescid.cllsj.compiler.ir.type.IRType;
 
 public class IRCallProcess extends IRInstruction {
   public static class LinearArgument {
     private int sourceRecord;
     private int targetRecord;
+    private IRType recordType;
 
-    public LinearArgument(int sourceRecord, int targetRecord) {
+    public LinearArgument(int sourceRecord, int targetRecord, IRType recordType) {
       this.sourceRecord = sourceRecord;
       this.targetRecord = targetRecord;
+      this.recordType = recordType;
     }
 
     public int getSourceRecord() {
@@ -22,6 +23,10 @@ public class IRCallProcess extends IRInstruction {
 
     public int getTargetRecord() {
       return targetRecord;
+    }
+
+    public IRType getRecordType() {
+      return recordType;
     }
   }
 
@@ -45,27 +50,17 @@ public class IRCallProcess extends IRInstruction {
 
   public static class TypeArgument {
     private IRType sourceType;
-    private IRValueRequisites sourceTypeValueRequisites;
     private boolean sourceTypePolarity;
     private int targetType;
 
-    public TypeArgument(
-        IRType sourceType,
-        IRValueRequisites sourceTypeValueRequisites,
-        boolean sourceTypePolarity,
-        int targetType) {
+    public TypeArgument(IRType sourceType, boolean sourceTypePolarity, int targetType) {
       this.sourceType = sourceType;
-      this.sourceTypeValueRequisites = sourceTypeValueRequisites;
       this.sourceTypePolarity = sourceTypePolarity;
       this.targetType = targetType;
     }
 
     public IRType getSourceType() {
       return sourceType;
-    }
-
-    public IRValueRequisites getSourceTypeValueRequisites() {
-      return sourceTypeValueRequisites;
     }
 
     public boolean getSourceTypePolarity() {
@@ -130,13 +125,7 @@ public class IRCallProcess extends IRInstruction {
       str += ", end point";
     }
     for (TypeArgument arg : this.typeArguments) {
-      str +=
-          ", T"
-              + arg.getTargetType()
-              + " <- "
-              + arg.getSourceType()
-              + " "
-              + arg.getSourceTypeValueRequisites();
+      str += ", T" + arg.getTargetType() + " <- " + arg.getSourceType();
     }
     for (LinearArgument arg : this.linearArguments) {
       str += ", L" + arg.getTargetRecord() + " <- " + arg.getSourceRecord();
@@ -153,19 +142,14 @@ public class IRCallProcess extends IRInstruction {
         new IRCallProcess(
             processName,
             linearArguments.stream()
-                .map(arg -> new LinearArgument(arg.sourceRecord, arg.targetRecord))
+                .map(arg -> new LinearArgument(arg.sourceRecord, arg.targetRecord, arg.recordType))
                 .toList(),
             exponentialArguments.stream()
                 .map(arg -> new ExponentialArgument(arg.sourceExponential, arg.targetExponential))
                 .toList(),
             typeArguments.stream()
                 .map(
-                    arg ->
-                        new TypeArgument(
-                            arg.sourceType,
-                            arg.sourceTypeValueRequisites,
-                            arg.sourceTypePolarity,
-                            arg.targetType))
+                    arg -> new TypeArgument(arg.sourceType, arg.sourceTypePolarity, arg.targetType))
                 .toList());
     clone.isEndPoint = isEndPoint;
     return clone;
@@ -186,11 +170,12 @@ public class IRCallProcess extends IRInstruction {
   }
 
   @Override
-  public void substituteTypes(
-      Function<IRType, IRType> types, Function<IRValueRequisites, IRValueRequisites> requisites) {
+  public void substituteTypes(Function<IRType, IRType> types) {
+    for (LinearArgument arg : linearArguments) {
+      arg.recordType = types.apply(arg.recordType);
+    }
     for (TypeArgument arg : typeArguments) {
       arg.sourceType = types.apply(arg.sourceType);
-      arg.sourceTypeValueRequisites = requisites.apply(arg.sourceTypeValueRequisites);
     }
   }
 }

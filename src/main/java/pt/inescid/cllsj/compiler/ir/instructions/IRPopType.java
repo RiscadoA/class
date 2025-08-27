@@ -3,6 +3,7 @@ package pt.inescid.cllsj.compiler.ir.instructions;
 import java.util.Optional;
 import java.util.function.Function;
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
+import pt.inescid.cllsj.compiler.ir.type.IRType;
 
 public class IRPopType extends IRPop {
   public static class Case {
@@ -27,15 +28,22 @@ public class IRPopType extends IRPop {
     }
   }
 
+  private int argRecord;
   private int argType;
   private Optional<Case> positive;
   private Optional<Case> negative;
 
-  public IRPopType(int record, int argType, Case positive, Case negative) {
-    super(record);
+  public IRPopType(
+      int record, IRType recordType, int argRecord, int argType, Case positive, Case negative) {
+    super(record, recordType);
+    this.argRecord = argRecord;
     this.argType = argType;
     this.positive = Optional.ofNullable(positive);
     this.negative = Optional.ofNullable(negative);
+  }
+
+  public int getArgRecord() {
+    return argRecord;
   }
 
   public int getArgType() {
@@ -70,8 +78,8 @@ public class IRPopType extends IRPop {
 
   @Override
   public String toString() {
-    StringBuilder sb = new StringBuilder("popType(");
-    sb.append(getRecord()).append(", ");
+    StringBuilder sb = new StringBuilder();
+    sb.append(argRecord).append(", ");
     sb.append(argType);
     if (positive.isPresent()) {
       sb.append(", +").append(positive.get().label);
@@ -79,8 +87,7 @@ public class IRPopType extends IRPop {
     if (negative.isPresent()) {
       sb.append(", -").append(negative.get().label);
     }
-    sb.append(")");
-    return sb.toString();
+    return toString("popType", sb.toString());
   }
 
   @Override
@@ -89,7 +96,7 @@ public class IRPopType extends IRPop {
         positive.isPresent() ? new Case(positive.get().label, positive.get().endPoints) : null;
     Case neg =
         negative.isPresent() ? new Case(negative.get().label, negative.get().endPoints) : null;
-    return new IRPopType(getRecord(), argType, pos, neg);
+    return new IRPopType(getRecord(), getRecordType(), argRecord, argType, pos, neg);
   }
 
   @Override
@@ -102,5 +109,11 @@ public class IRPopType extends IRPop {
       negative =
           Optional.of(new Case(renamer.apply(negative.get().label), negative.get().endPoints));
     }
+  }
+
+  @Override
+  public void renameRecords(Function<Integer, Integer> renamer) {
+    super.renameRecords(renamer);
+    argRecord = renamer.apply(argRecord);
   }
 }

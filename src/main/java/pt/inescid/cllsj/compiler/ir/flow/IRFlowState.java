@@ -7,14 +7,13 @@ import java.util.Optional;
 import java.util.Stack;
 import pt.inescid.cllsj.compiler.IRAnalyzer;
 import pt.inescid.cllsj.compiler.ir.IRTypeVisitor;
-import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
 import pt.inescid.cllsj.compiler.ir.type.IRBoolT;
 import pt.inescid.cllsj.compiler.ir.type.IRCellT;
 import pt.inescid.cllsj.compiler.ir.type.IRCloseT;
 import pt.inescid.cllsj.compiler.ir.type.IRExponentialT;
-import pt.inescid.cllsj.compiler.ir.type.IRFlipT;
 import pt.inescid.cllsj.compiler.ir.type.IRIntT;
 import pt.inescid.cllsj.compiler.ir.type.IRRecT;
+import pt.inescid.cllsj.compiler.ir.type.IRResetT;
 import pt.inescid.cllsj.compiler.ir.type.IRSessionT;
 import pt.inescid.cllsj.compiler.ir.type.IRStringT;
 import pt.inescid.cllsj.compiler.ir.type.IRTagT;
@@ -257,14 +256,18 @@ public class IRFlowState {
     return sb.toString();
   }
 
-  public Optional<Boolean> isValue(IRValueRequisites requisites) {
+  public Optional<Boolean> isValue(IRType type) {
+    return isValue(type.valueRequisites());
+  }
+
+  public Optional<Boolean> isValue(IRType.ValueRequisites requisites) {
     if (requisites.mustBeValue()) {
       return Optional.of(true);
     } else if (requisites.canBeValue()) {
       boolean certainlyAValue = true;
 
       for (int t : requisites.getTypesWhichMustBeValues()) {
-        Optional<IRValueRequisites> req = boundType(t).getValueRequisites();
+        Optional<IRType.ValueRequisites> req = boundType(t).getType().map(IRType::valueRequisites);
         if (req.isEmpty()) {
           certainlyAValue = false;
           continue;
@@ -320,7 +323,7 @@ public class IRFlowState {
 
     @Override
     public void visit(IRSessionT type) {
-      Optional<Boolean> isValue = isValue(type.getValueRequisites());
+      Optional<Boolean> isValue = isValue(type.getArg());
       if (isValue.isEmpty()) {
         return;
       }
@@ -362,7 +365,7 @@ public class IRFlowState {
     }
 
     @Override
-    public void visit(IRFlipT type) {
+    public void visit(IRResetT type) {
       type.getCont().accept(this);
     }
 

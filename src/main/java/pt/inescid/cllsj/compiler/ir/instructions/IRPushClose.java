@@ -1,10 +1,11 @@
 package pt.inescid.cllsj.compiler.ir.instructions;
 
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
+import pt.inescid.cllsj.compiler.ir.type.IRType;
 
 public class IRPushClose extends IRPush {
-  public IRPushClose(int record) {
-    super(record);
+  public IRPushClose(int record, IRType recordType) {
+    super(record, recordType);
   }
 
   @Override
@@ -14,11 +15,11 @@ public class IRPushClose extends IRPush {
 
   @Override
   public String toString() {
-    return "pushClose(" + getRecord() + ")";
+    return toString("pushClose");
   }
 
   @Override
   public IRInstruction clone() {
-    return new IRPushClose(getRecord());
+    return new IRPushClose(getRecord(), getRecordType());
   }
 }

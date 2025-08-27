@@ -2,12 +2,13 @@ package pt.inescid.cllsj.compiler.ir.instructions;
 
 import java.util.function.Function;
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
+import pt.inescid.cllsj.compiler.ir.type.IRType;
 
 public class IRPopExponential extends IRPop {
   private int argExponential;
 
-  public IRPopExponential(int record, int argExponential) {
-    super(record);
+  public IRPopExponential(int record, IRType recordType, int argExponential) {
+    super(record, recordType);
     this.argExponential = argExponential;
   }
 
@@ -17,7 +18,7 @@ public class IRPopExponential extends IRPop {
 
   @Override
   public IRInstruction clone() {
-    return new IRPopExponential(getRecord(), argExponential);
+    return new IRPopExponential(getRecord(), getRecordType(), argExponential);
   }
 
   @Override
@@ -27,7 +28,7 @@ public class IRPopExponential extends IRPop {
 
   @Override
   public String toString() {
-    return "popExponential(" + getRecord() + ", " + argExponential + ")";
+    return toString("popExponential", Integer.toString(argExponential));
   }
 
   @Override

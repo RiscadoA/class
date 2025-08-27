@@ -31,21 +31,10 @@ public class IRProgram {
         String pol = process.getValue().isTypeVariablePositive(i) ? "positive" : "negative";
         result += "    type " + i + ": " + pol + "\n";
       }
-      for (int i = 0; i < process.getValue().getRecordCount(); i++) {
-        result += "    ";
-        if (i < process.getValue().getRecordArgumentCount()) {
-          result += "arg ";
-        }
-        result += "record " + i + ": " + process.getValue().getRecordType(i).toString() + "\n";
-      }
-      for (int i = 0; i < process.getValue().getExponentialCount(); i++) {
-        result += "    ";
-        if (i < process.getValue().getExponentialArgumentCount()) {
-          result += "arg ";
-        }
-        result +=
-            "exponential " + i + ": " + process.getValue().getExponentialType(i).toString() + "\n";
-      }
+      result += "    arg records: " + process.getValue().getRecordArgumentCount() + "\n";
+      result += "    arg exponentials: " + process.getValue().getExponentialArgumentCount() + "\n";
+      result += "    records: " + process.getValue().getRecordCount() + "\n";
+      result += "    exponentials: " + process.getValue().getExponentialCount() + "\n";
       result += "    endPoints: " + process.getValue().getEndPoints() + "\n";
       result += "    inlineable: " + process.getValue().isInlineable() + "\n";
       result += "    recursive: " + process.getValue().isRecursive() + "\n";

@@ -2,10 +2,12 @@ package pt.inescid.cllsj.compiler.ir.instructions;
 
 import java.util.function.Function;
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
+import pt.inescid.cllsj.compiler.ir.type.IRType;
 
 public class IRForward extends IRInstruction {
   private int negRecord; // Index of the record whose session is of a reading type.
   private int posRecord; // Index of the record whose session is of a writing type.
+  private IRType type; // Type of the data being forwarded.
 
   // Used by the known jump optimization to avoid jumping after a forward
   // Happens when the continuation is known at compile time
@@ -14,9 +16,10 @@ public class IRForward extends IRInstruction {
 
   private boolean isEndPoint = true;
 
-  public IRForward(int negRecord, int posRecord) {
+  public IRForward(int negRecord, int posRecord, IRType type) {
     this.negRecord = negRecord;
     this.posRecord = posRecord;
+    this.type = type;
   }
 
   public int getNegRecord() {
@@ -25,6 +28,10 @@ public class IRForward extends IRInstruction {
 
   public int getPosRecord() {
     return posRecord;
+  }
+
+  public IRType getType() {
+    return type;
   }
 
   public boolean shouldReturn() {
@@ -53,6 +60,7 @@ public class IRForward extends IRInstruction {
     StringBuilder sb = new StringBuilder("forward(");
     sb.append("-").append(negRecord);
     sb.append(", +").append(posRecord);
+    sb.append(", ").append(type);
     if (!shouldReturn) {
       sb.append(", no return");
     } else if (isEndPoint()) {
@@ -64,7 +72,7 @@ public class IRForward extends IRInstruction {
 
   @Override
   public IRInstruction clone() {
-    IRForward clone = new IRForward(negRecord, posRecord);
+    IRForward clone = new IRForward(negRecord, posRecord, type);
     clone.shouldReturn = shouldReturn;
     clone.isEndPoint = isEndPoint;
     return clone;
@@ -78,4 +86,9 @@ public class IRForward extends IRInstruction {
 
   @Override
   public void renameExponentials(Function<Integer, Integer> renamer) {}
+
+  @Override
+  public void substituteTypes(Function<IRType, IRType> types) {
+    type = types.apply(type);
+  }
 }

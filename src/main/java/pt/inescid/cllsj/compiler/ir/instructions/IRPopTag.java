@@ -4,6 +4,7 @@ import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
+import pt.inescid.cllsj.compiler.ir.type.IRType;
 
 public class IRPopTag extends IRPop {
   public static class Case {
@@ -30,8 +31,8 @@ public class IRPopTag extends IRPop {
 
   private Map<Integer, Case> cases; // Cases for each tag.
 
-  public IRPopTag(int record, Map<Integer, Case> cases) {
-    super(record);
+  public IRPopTag(int record, IRType recordType, Map<Integer, Case> cases) {
+    super(record, recordType);
     this.cases = cases;
   }
 
@@ -54,24 +55,22 @@ public class IRPopTag extends IRPop {
 
   @Override
   public String toString() {
-    String str = "popTag(" + getRecord();
+    StringBuilder sb = new StringBuilder();
     for (Map.Entry<Integer, Case> entry : this.cases.entrySet()) {
-      str +=
-          ", "
-              + entry.getKey()
-              + " -> "
-              + entry.getValue().label
-              + " ("
-              + entry.getValue().endPoints
-              + ")";
+      if (!sb.isEmpty()) {
+        sb.append(", ");
+      }
+      sb.append(entry.getKey()).append(" -> ");
+      sb.append(entry.getValue().label + " (" + entry.getValue().endPoints + ")");
     }
-    return str + ")";
+    return toString("popTag", sb.toString());
   }
 
   @Override
   public IRInstruction clone() {
     return new IRPopTag(
         getRecord(),
+        getRecordType(),
         cases.entrySet().stream()
             .collect(
                 Collectors.toMap(

@@ -29,6 +29,7 @@ public class ASTCase extends ASTNode {
   String ch;
   TreeMap<String, ASTNode> cases;
   HashMap<String, ASTType> casetypes;
+  ASTOfferT offerType;
 
   public ASTCase(String id) {
     ch = id;
@@ -82,6 +83,10 @@ public class ASTCase extends ASTNode {
 
   public Map<String, ASTNode> getCases() {
     return cases;
+  }
+
+  public ASTOfferT getOfferType() {
+    return offerType;
   }
 
   public void ASTInsertPipe(Function<ASTNode, ASTNode> f, ASTNode from) throws Exception {
@@ -178,8 +183,8 @@ public class ASTCase extends ASTNode {
     ty = ty.unfoldType(ep);
     ty = ASTType.unfoldRecInfer(ty, this, ch, ep);
     if (ty instanceof ASTOfferT) {
-      ASTOfferT tyr = (ASTOfferT) ty;
-      Map<String, ASTType> tcase = tyr.getcases();
+      offerType = (ASTOfferT) ty;
+      Map<String, ASTType> tcase = offerType.getcases();
 
       for (Iterator<String> itCasesTyp = tcase.keySet().iterator(); itCasesTyp.hasNext(); ) {
         String lab = itCasesTyp.next();

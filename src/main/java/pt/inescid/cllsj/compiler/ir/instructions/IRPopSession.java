@@ -2,25 +2,24 @@ package pt.inescid.cllsj.compiler.ir.instructions;
 
 import java.util.function.Function;
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
-import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
 import pt.inescid.cllsj.compiler.ir.type.IRType;
 
 public class IRPopSession extends IRPop {
   private int argRecord; // Index where the new record will be stored.
-  private IRValueRequisites valueRequisites;
+  private IRType argRecordType;
 
-  public IRPopSession(int record, int argRecord, IRValueRequisites valueRequisites) {
-    super(record);
+  public IRPopSession(int record, IRType recordType, int argRecord, IRType argRecordType) {
+    super(record, recordType);
     this.argRecord = argRecord;
-    this.valueRequisites = valueRequisites;
+    this.argRecordType = argRecordType;
   }
 
   public int getArgRecord() {
     return argRecord;
   }
 
-  public IRValueRequisites getValueRequisites() {
-    return valueRequisites;
+  public IRType getArgRecordType() {
+    return argRecordType;
   }
 
   @Override
@@ -30,12 +29,12 @@ public class IRPopSession extends IRPop {
 
   @Override
   public String toString() {
-    return "popSession(" + getRecord() + ", " + argRecord + ", " + valueRequisites + ")";
+    return toString("popSession", Integer.toString(argRecord) + "[" + argRecordType + "]");
   }
 
   @Override
   public IRInstruction clone() {
-    return new IRPopSession(getRecord(), argRecord, valueRequisites);
+    return new IRPopSession(getRecord(), getRecordType(), argRecord, argRecordType);
   }
 
   @Override
@@ -45,8 +44,8 @@ public class IRPopSession extends IRPop {
   }
 
   @Override
-  public void substituteTypes(
-      Function<IRType, IRType> types, Function<IRValueRequisites, IRValueRequisites> requisites) {
-    valueRequisites = requisites.apply(valueRequisites);
+  public void substituteTypes(Function<IRType, IRType> types) {
+    super.substituteTypes(types);
+    argRecordType = types.apply(argRecordType);
   }
 }

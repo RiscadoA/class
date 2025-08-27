@@ -3,7 +3,6 @@ package pt.inescid.cllsj.compiler.ir.instructions;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
-import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
 import pt.inescid.cllsj.compiler.ir.type.IRType;
 
 public abstract class IRInstruction {
@@ -19,8 +18,7 @@ public abstract class IRInstruction {
 
   public void renameLabels(Function<String, String> renamer) {}
 
-  public void substituteTypes(
-      Function<IRType, IRType> types, Function<IRValueRequisites, IRValueRequisites> requisites) {}
+  public void substituteTypes(Function<IRType, IRType> types) {}
 
   public boolean usesRecord(int record) {
     AtomicBoolean result = new AtomicBoolean(false);

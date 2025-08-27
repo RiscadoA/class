@@ -58,6 +58,10 @@ public abstract class IRInstructionVisitor {
     visit((IRPop) instruction);
   }
 
+  public void visit(IRResetSession instruction) {
+    visit((IRResetSession) instruction);
+  }
+
   public void visit(IRFlip instruction) {
     visit((IRInstruction) instruction);
   }
@@ -118,7 +122,7 @@ public abstract class IRInstructionVisitor {
     visit((IRInstruction) instruction);
   }
 
-  public void visit(IRScan instruction) {
+  public void visit(IRPushScan instruction) {
     visit((IRPush) instruction);
   }
 

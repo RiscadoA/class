@@ -2,12 +2,13 @@ package pt.inescid.cllsj.compiler.ir.instructions;
 
 import java.util.function.Function;
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
+import pt.inescid.cllsj.compiler.ir.type.IRType;
 
 public class IRPushExponential extends IRPush {
   private int exponential;
 
-  public IRPushExponential(int record, int exponential) {
-    super(record);
+  public IRPushExponential(int record, IRType recordType, int exponential) {
+    super(record, recordType);
     this.exponential = exponential;
   }
 
@@ -22,7 +23,7 @@ public class IRPushExponential extends IRPush {
 
   @Override
   public String toString() {
-    return "pushExponential(" + getRecord() + ", " + exponential + ")";
+    return toString("pushExponential", Integer.toString(exponential));
   }
 
   @Override
@@ -32,6 +33,6 @@ public class IRPushExponential extends IRPush {
 
   @Override
   public IRInstruction clone() {
-    return new IRPushExponential(getRecord(), exponential);
+    return new IRPushExponential(getRecord(), getRecordType(), exponential);
   }
 }
