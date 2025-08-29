@@ -24,6 +24,7 @@ import pt.inescid.cllsj.ast.types.ASTType;
 
 public class ASTDiscard extends ASTNode {
   String chr;
+  ASTCoAffineT coAffineT;
 
   public ASTDiscard(String _chr) {
     chr = _chr;
@@ -35,6 +36,10 @@ public class ASTDiscard extends ASTNode {
 
   public void setCh(String ch) {
     this.chr = ch;
+  }
+
+  public ASTCoAffineT getCoAffineT() {
+    return coAffineT;
   }
 
   public void ASTInsertPipe(Function<ASTNode, ASTNode> f, ASTNode from) throws Exception {
@@ -66,7 +71,7 @@ public class ASTDiscard extends ASTNode {
     ty = ty.unfoldType(ep);
     ty = ASTType.unfoldRecInfer(ty, this, chr, ep);
     if (ty instanceof ASTCoAffineT) {
-      ASTCoAffineT tyr = (ASTCoAffineT) ty;
+      coAffineT = (ASTCoAffineT) ty;
       ed.upd(chr, null);
     } else
       throw new TypeError(

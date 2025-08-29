@@ -1,13 +1,8 @@
+use 1
 affine 1
 send 1
 close 1
-affine 2
-send 2
-close 2
-affine 3
-send 3
-close 3
-use 1
 recv 1
 wait 1
 discard 2
+affine 2
