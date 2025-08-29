@@ -351,7 +351,7 @@ public class IRAnalyzer extends IRInstructionVisitor {
   @Override
   public void visit(IRPushType instruction) {
     IRFlowRecord record = state.getBoundRecord(instruction.getRecord());
-    IRFlowRecord argRecord = state.getBoundRecord(instruction.getArgRecord());
+    IRFlowRecord argRecord = state.getBoundRecord(instruction.getContRecord());
 
     IRFlowType type = new IRFlowType(instruction.getArgType(), instruction.isArgPositive());
     record.doPush(this, state, IRFlowSlot.type(location, type));

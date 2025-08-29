@@ -1338,13 +1338,14 @@ public class CGenerator extends IRInstructionVisitor {
   @Override
   public void visit(IRPushType instruction) {
     StringBuilder value = new StringBuilder("(struct type_slot) {");
-    value.append(".record = ").append(record(instruction.getArgRecord())).append(", ");
+    value.append(".record = ").append(record(instruction.getContRecord())).append(", ");
     value
         .append(".type = ")
         .append(typeInitializer(instruction.getArgType(), instruction.isArgPositive()));
     value.append("}");
-    putAssign(accessRecord(instruction.getRecord(), "type_slot"), value.toString());
+    putAssign(accessRecord(instruction.getRecord(), "struct type_slot"), value.toString());
     putAdvanceRecord(instruction.getRecord(), instruction.getRecordType());
+    putConsumeRecord(instruction.getContRecord(), instruction.getContRecordType());
   }
 
   @Override
@@ -1352,6 +1353,7 @@ public class CGenerator extends IRInstructionVisitor {
     String typeSlot = accessRecord(instruction.getRecord(), "struct type_slot");
     putAssign(record(instruction.getArgRecord()), typeSlot + ".record");
     putAssign(type(instruction.getArgType()), typeSlot + ".type");
+    putAdvanceRecord(instruction.getRecord(), instruction.getRecordType());
 
     if (instruction.getPositive().isPresent() || instruction.getNegative().isPresent()) {
       int maxEndPoints = instruction.getEndPoints();
@@ -2251,13 +2253,6 @@ public class CGenerator extends IRInstructionVisitor {
         .add(layout.padding)
         .add(layout.size)
         .subtract(layout.firstSlotOffset);
-
-    // CSize ifReset = CSize.zero();
-    // CSize ifNotReset =
-    //
-    // arch.recordHeaderSize.add(layout.padding).add(layout.size).subtract(layout.firstSlotSize);
-
-    // return ternaryTypeIsReset(type, ifReset, ifNotReset);
   }
 
   // Given the current record type, returns how much the cursor should be moved back to access
@@ -2430,7 +2425,7 @@ public class CGenerator extends IRInstructionVisitor {
         // The variable must refer to a type bound in the environment.
         String typeVar = type(type.getType());
         size = typeSize(typeVar);
-        firstSlotOffset = size; // TODO: should we store this in the type? could be a close or reset type
+        firstSlotOffset = ternaryTypeIsReset(type, offset, size);
         firstSlotSize = size;
         alignment = typeAlignment(typeVar);
       } else {
