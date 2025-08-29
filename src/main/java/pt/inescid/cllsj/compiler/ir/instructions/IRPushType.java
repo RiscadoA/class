@@ -26,7 +26,7 @@ public class IRPushType extends IRPush {
     if (!(getRecordType() instanceof IRTypeT)) {
       throw new UnsupportedOperationException("Record must be of type IRTypeT");
     }
-    IRTypeT type = (IRTypeT)getRecordType();
+    IRTypeT type = (IRTypeT) getRecordType();
     return type.getCont();
   }
 
@@ -45,7 +45,8 @@ public class IRPushType extends IRPush {
 
   @Override
   public String toString() {
-    return toString("pushType", contRecord + ", " + argType + ", " + (argIsPositive ? "positive" : "negative"));
+    return toString(
+        "pushType", contRecord + ", " + argType + ", " + (argIsPositive ? "positive" : "negative"));
   }
 
   @Override

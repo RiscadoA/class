@@ -1938,7 +1938,8 @@ public class CGenerator extends IRInstructionVisitor {
     LayoutCalculator desiredLayout = layout(type.getArg(), contLayout.offset.add(contLayout.size));
     LayoutCalculator currentLayout = layout(argType);
 
-    if (currentLayout.padding.equals(desiredLayout.padding) && currentLayout.size.equals(desiredLayout.size)) {
+    if (currentLayout.padding.equals(desiredLayout.padding)
+        && currentLayout.size.equals(desiredLayout.size)) {
       // Equal memory layout, we can just copy the entire data at once!
       putCopy(
           desiredLayout.size.subtract(desiredLayout.firstSlotOffset).retreatPointer(record),
@@ -1982,7 +1983,8 @@ public class CGenerator extends IRInstructionVisitor {
     LayoutCalculator desiredLayout = layout(argType);
     LayoutCalculator currentLayout = layout(type.getArg(), contLayout.offset.add(contLayout.size));
 
-    if (currentLayout.padding.equals(desiredLayout.padding) && currentLayout.size.equals(desiredLayout.size)) {
+    if (currentLayout.padding.equals(desiredLayout.padding)
+        && currentLayout.size.equals(desiredLayout.size)) {
       // Equal padding, we can just copy the entire data at once!
       putCopy(
           desiredLayout.firstSlotSize.subtract(desiredLayout.size).advancePointer(argRecord),
@@ -2291,7 +2293,8 @@ public class CGenerator extends IRInstructionVisitor {
 
   private LayoutCalculator layout(IRType type, int definedTypes, CSize offset) {
     CAlignment alignment = alignment(type, definedTypes);
-    LayoutCalculator calc = new LayoutCalculator(definedTypes, offset.align(alignment), offset.align(alignment));
+    LayoutCalculator calc =
+        new LayoutCalculator(definedTypes, offset.align(alignment), offset.align(alignment));
     calc.padding = offset.padding(alignment);
     type.accept(calc);
     return calc;
@@ -2329,7 +2332,8 @@ public class CGenerator extends IRInstructionVisitor {
       this(definedTypes, resetOffset, resetOffset, nextSlotOffset);
     }
 
-    public LayoutCalculator(int definedTypes, CSize resetOffset, CSize offset, CSize nextSlotOffset) {
+    public LayoutCalculator(
+        int definedTypes, CSize resetOffset, CSize offset, CSize nextSlotOffset) {
       this.resetOffset = resetOffset;
       this.offset = offset;
       this.definedTypes = definedTypes;
@@ -2341,7 +2345,8 @@ public class CGenerator extends IRInstructionVisitor {
     }
 
     private LayoutCalculator recurse(IRType type, CSize offset, CSize nextSlotOffset) {
-      LayoutCalculator calc = new LayoutCalculator(definedTypes, resetOffset, offset, nextSlotOffset);
+      LayoutCalculator calc =
+          new LayoutCalculator(definedTypes, resetOffset, offset, nextSlotOffset);
       type.accept(calc);
       return calc;
     }

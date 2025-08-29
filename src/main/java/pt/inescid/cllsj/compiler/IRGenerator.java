@@ -27,7 +27,6 @@ import pt.inescid.cllsj.compiler.ir.instructions.IRCallProcess.LinearArgument;
 import pt.inescid.cllsj.compiler.ir.instructions.IRCallProcess.TypeArgument;
 import pt.inescid.cllsj.compiler.ir.type.IRCloseT;
 import pt.inescid.cllsj.compiler.ir.type.IRExponentialT;
-import pt.inescid.cllsj.compiler.ir.type.IRRecT;
 import pt.inescid.cllsj.compiler.ir.type.IRResetT;
 import pt.inescid.cllsj.compiler.ir.type.IRSessionT;
 import pt.inescid.cllsj.compiler.ir.type.IRType;
@@ -313,10 +312,13 @@ public class IRGenerator extends ASTNodeVisitor {
     block.add(new IRReturn(previousRecord));
 
     // Generate code for the node's continuation.
-    visitBlock(closure, () -> {
-      reset(nextRecord, node.getTypeRhs());
-      node.getRhs().accept(this);;
-    });
+    visitBlock(
+        closure,
+        () -> {
+          reset(nextRecord, node.getTypeRhs());
+          node.getRhs().accept(this);
+          ;
+        });
     previousRecord(node.getChs());
   }
 
@@ -558,15 +560,18 @@ public class IRGenerator extends ASTNodeVisitor {
     IRBlock discardBlock = process.addBlock("affine_discard");
     IRBlock useBlock = process.addBlock("affine_use");
     Map<Integer, IRPopTag.Case> cases = new HashMap<>();
-    block.add(new IRPopTag(record(node.getCh()), intoIRType(new ASTAffineT(node.getContType())), cases));
+    block.add(
+        new IRPopTag(record(node.getCh()), intoIRType(new ASTAffineT(node.getContType())), cases));
 
     // Generate the use:
     // - we just execute the continuation of the affine, nothing special
     cases.put(1, new IRPopTag.Case(useBlock.getLabel(), countEndPoints(node.getRhs())));
-    visitBlock(useBlock, () -> {
-      resetIfPositive(record(node.getCh()), node.getContType());
-      node.getRhs().accept(this);
-    });
+    visitBlock(
+        useBlock,
+        () -> {
+          resetIfPositive(record(node.getCh()), node.getContType());
+          node.getRhs().accept(this);
+        });
 
     // Generate the discard:
     // - we must discard any inherited affines
@@ -600,7 +605,8 @@ public class IRGenerator extends ASTNodeVisitor {
   @Override
   public void visit(ASTUse node) {
     // Tag 1 represents use for affine records
-    block.add(new IRPushTag(record(node.getCh()), intoIRType(new ASTCoAffineT(node.getContType())), 1));
+    block.add(
+        new IRPushTag(record(node.getCh()), intoIRType(new ASTCoAffineT(node.getContType())), 1));
 
     // Flip if the remainder of the session type is negative.
     flipAndResetIfNegative(record(node.getCh()), node.getContType());
