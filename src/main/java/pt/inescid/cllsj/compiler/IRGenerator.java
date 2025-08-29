@@ -546,10 +546,7 @@ public class IRGenerator extends ASTNodeVisitor {
     flipAndReset(record(node.getCh()), node.getRhsType());
 
     if (node.rec) {
-      block.add(new IRPushUnfold(record(node.getCh()), new IRRecT(intoIRType(node.getRhsType()))));
       flipIfNegative(record(node.getCh()), node.getRhsType());
-    } else {
-      block.add(new IRPopUnfold(record(node.getCh()), new IRRecT(intoIRType(node.getRhsType()))));
     }
 
     node.getRhs().accept(this);
