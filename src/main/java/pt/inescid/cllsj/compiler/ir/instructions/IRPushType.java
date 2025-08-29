@@ -3,22 +3,31 @@ package pt.inescid.cllsj.compiler.ir.instructions;
 import java.util.function.Function;
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 import pt.inescid.cllsj.compiler.ir.type.IRType;
+import pt.inescid.cllsj.compiler.ir.type.IRTypeT;
 
 public class IRPushType extends IRPush {
-  private int argRecord;
+  private int contRecord;
   private IRType argType;
   private boolean argIsPositive;
 
   public IRPushType(
-      int record, IRType recordType, int argRecord, IRType argType, boolean argIsPositive) {
+      int record, IRType recordType, int contRecord, IRType argType, boolean argIsPositive) {
     super(record, recordType);
-    this.argRecord = argRecord;
+    this.contRecord = contRecord;
     this.argType = argType;
     this.argIsPositive = argIsPositive;
   }
 
-  public int getArgRecord() {
-    return argRecord;
+  public int getContRecord() {
+    return contRecord;
+  }
+
+  public IRType getContRecordType() {
+    if (!(getRecordType() instanceof IRTypeT)) {
+      throw new UnsupportedOperationException("Record must be of type IRTypeT");
+    }
+    IRTypeT type = (IRTypeT)getRecordType();
+    return type.getCont();
   }
 
   public IRType getArgType() {
@@ -36,14 +45,13 @@ public class IRPushType extends IRPush {
 
   @Override
   public String toString() {
-    return toString(
-        "pushType", argRecord + ", " + argType + ", " + (argIsPositive ? "positive" : "negative"));
+    return toString("pushType", contRecord + ", " + argType + ", " + (argIsPositive ? "positive" : "negative"));
   }
 
   @Override
   public void renameRecords(Function<Integer, Integer> renamer) {
     super.renameRecords(renamer);
-    argRecord = renamer.apply(argRecord);
+    contRecord = renamer.apply(contRecord);
   }
 
   @Override
@@ -54,6 +62,6 @@ public class IRPushType extends IRPush {
 
   @Override
   public IRInstruction clone() {
-    return new IRPushType(getRecord(), getRecordType(), argRecord, argType, argIsPositive);
+    return new IRPushType(getRecord(), getRecordType(), contRecord, argType, argIsPositive);
   }
 }

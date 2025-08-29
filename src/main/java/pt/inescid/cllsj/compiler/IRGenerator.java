@@ -302,6 +302,7 @@ public class IRGenerator extends ASTNodeVisitor {
     // Initialize the continuation record, and flip to it if its session type is positive.
     block.add(new IRNewSession(nextRecord, closure.getLabel(), intoIRType(node.getTypeRhs())));
     flipIfPositive(nextRecord, node.getTypeRhs());
+    reset(nextRecord, node.getTypeRhs());
     block.add(
         new IRPushType(
             previousRecord,
@@ -312,7 +313,10 @@ public class IRGenerator extends ASTNodeVisitor {
     block.add(new IRReturn(previousRecord));
 
     // Generate code for the node's continuation.
-    visitBlock(closure, node.getRhs());
+    visitBlock(closure, () -> {
+      reset(nextRecord, node.getTypeRhs());
+      node.getRhs().accept(this);;
+    });
     previousRecord(node.getChs());
   }
 
