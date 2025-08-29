@@ -49,6 +49,10 @@ public class ASTUse extends ASTNode {
     rhs.show();
   }
 
+  public ASTType getContType() {
+    return contType;
+  }
+
   public void setrhs(ASTType t) {
     contType = t;
   }

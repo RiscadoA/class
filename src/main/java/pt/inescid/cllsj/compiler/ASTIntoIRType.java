@@ -22,7 +22,7 @@ public class ASTIntoIRType extends ASTTypeVisitor {
 
   public static IRType convert(
       IRGenerator gen, Env<EnvEntry> ep, ASTType type, Map<String, Integer> typeMap) {
-    return convert(gen, ep, type, typeMap, Optional.empty(), type.getPolarityCatch(ep));
+    return convert(gen, ep, type, typeMap, Optional.empty(), type.getPolarityForCompilerCatch(ep));
   }
 
   public static IRType convert(
@@ -38,7 +38,7 @@ public class ASTIntoIRType extends ASTTypeVisitor {
   }
 
   private IRType recurse(Env<EnvEntry> ep, ASTType type) {
-    Optional<Boolean> resultPolarity = type.getPolarityCatch(ep);
+    Optional<Boolean> resultPolarity = type.getPolarityForCompilerCatch(ep);
     IRType result = convert(gen, ep, type, typeMap, currentPolarity, resultPolarity);
 
     if (resultPolarity.isPresent()
@@ -249,12 +249,18 @@ public class ASTIntoIRType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTAffineT type) {
-    type.getin().accept(this);
+    ir = new IRTagT(List.of(
+      new IRResetT(new IRCloseT()),
+      recurse(ep, type.getin())
+    ));
   }
 
   @Override
   public void visit(ASTCoAffineT type) {
-    type.getin().accept(this);
+    ir = new IRTagT(List.of(
+      new IRResetT(new IRCloseT()),
+      recurse(ep, type.getin())
+    ));
   }
 
   @Override

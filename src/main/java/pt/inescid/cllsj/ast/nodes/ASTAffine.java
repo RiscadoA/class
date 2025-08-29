@@ -78,6 +78,14 @@ public class ASTAffine extends ASTNode {
     return usageSet.getOrDefault(id, coaffineSet.get(id));
   }
 
+  public Map<String, ASTType> getUsageSet() {
+    return usageSet;
+  }
+
+  public Map<String, ASTType> getCoaffineSet() {
+    return coaffineSet;
+  }
+
   public void ASTInsertPipe(Function<ASTNode, ASTNode> f, ASTNode from) throws Exception {
     if (from == rhs) {
       ASTNode nnode = f.apply(from);

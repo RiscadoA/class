@@ -554,17 +554,70 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTAffine node) {
-    throw new UnsupportedOperationException("Affines are not supported yet");
+    // Generate a pop tag instruction
+    IRBlock discardBlock = process.addBlock("affine_discard");
+    IRBlock useBlock = process.addBlock("affine_use");
+    Map<Integer, IRPopTag.Case> cases = new HashMap<>();
+    block.add(new IRPopTag(record(node.getCh()), intoIRType(new ASTAffineT(node.getContType())), cases));
+
+    // Generate the use:
+    // - we just execute the continuation of the affine, nothing special
+    cases.put(1, new IRPopTag.Case(useBlock.getLabel(), countEndPoints(node.getRhs())));
+    visitBlock(useBlock, () -> {
+      resetIfPositive(record(node.getCh()), node.getContType());
+      node.getRhs().accept(this);
+    });
+
+    // Generate the discard:
+    // - we must discard any inherited affines
+    // - decrement the reference count of unused cells and exponentials
+    cases.put(0, new IRPopTag.Case(discardBlock.getLabel(), 1));
+
+    for (String name : exponentialNamesFreeIn(node)) {
+      discardBlock.add(new IRDecRefExponential(exponential(name)));
+    }
+
+    for (String name : node.getUsageSet().keySet()) {
+      discardBlock.add(new IRDecRefCell(record(name)));
+    }
+
+    for (String name : node.getCoaffineSet().keySet()) {
+      ASTType type = node.getCoaffineSet().get(name);
+
+      IRBlock contBlock = process.addBlock("affine_discard_flip");
+
+      discardBlock.add(new IRPushTag(record(name), intoIRType(type), 0));
+      discardBlock.add(new IRFlip(record(name), new IRCloseT(), contBlock.getLabel()));
+      discardBlock = contBlock;
+      discardBlock.add(new IRPopClose(record(name), new IRCloseT()));
+      discardBlock.add(new IRFreeSession(record(name)));
+    }
+
+    discardBlock.add(new IRPushClose(record(node.getCh()), new IRCloseT()));
+    discardBlock.add(new IRReturn(record(node.getCh())));
   }
 
   @Override
   public void visit(ASTUse node) {
-    throw new UnsupportedOperationException("Affines are not supported yet");
+    // Tag 1 represents use for affine records
+    block.add(new IRPushTag(record(node.getCh()), intoIRType(new ASTCoAffineT(node.getContType())), 1));
+
+    // Flip if the remainder of the session type is negative.
+    flipAndResetIfNegative(record(node.getCh()), node.getContType());
+
+    node.getRhs().accept(this);
   }
 
   @Override
   public void visit(ASTDiscard node) {
-    throw new UnsupportedOperationException("Affines are not supported yet");
+    IRBlock contBlock = process.addBlock("discard_flip");
+
+    // Tag 0 represents discard for affine records
+    block.add(new IRPushTag(record(node.getCh()), intoIRType(node.getCoAffineT()), 0));
+    block.add(new IRFlip(record(node.getCh()), new IRCloseT(), contBlock.getLabel()));
+    contBlock.add(new IRPopClose(record(node.getCh()), new IRCloseT()));
+    contBlock.add(new IRFreeSession(record(node.getCh())));
+    contBlock.add(new IRNextTask());
   }
 
   @Override
@@ -704,7 +757,7 @@ public class IRGenerator extends ASTNodeVisitor {
     if (type instanceof ASTIdT) {
       return dual ^ environment().isPositive(((ASTIdT) type).getid());
     } else {
-      return dual ^ type.isPosCatch(ep);
+      return dual ^ type.getPolarityForCompilerCatch(ep).get();
     }
   }
 
@@ -908,7 +961,7 @@ public class IRGenerator extends ASTNodeVisitor {
 
     @Override
     public void visit(ASTAffine node) {
-      count += 1;
+      node.getRhs().accept(this);
     }
 
     @Override
@@ -1506,7 +1559,9 @@ public class IRGenerator extends ASTNodeVisitor {
       public void visit(ASTExpr node) {}
 
       @Override
-      public void visit(ASTAffine node) {}
+      public void visit(ASTAffine node) {
+        node.getRhs().accept(this);
+      }
 
       @Override
       public void visit(ASTUse node) {
@@ -1678,7 +1733,9 @@ public class IRGenerator extends ASTNodeVisitor {
       public void visit(ASTExpr node) {}
 
       @Override
-      public void visit(ASTAffine node) {}
+      public void visit(ASTAffine node) {
+        node.getRhs().accept(this);
+      }
 
       @Override
       public void visit(ASTUse node) {
