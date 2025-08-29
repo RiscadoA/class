@@ -138,14 +138,6 @@ public abstract class IRInstructionVisitor {
     visit((IRPop) instruction);
   }
 
-  public void visit(IRPushUnfold instruction) {
-    visit((IRPush) instruction);
-  }
-
-  public void visit(IRPopUnfold instruction) {
-    visit((IRPop) instruction);
-  }
-
   public void visit(IRCleanRecord instruction) {
     visit((IRInstruction) instruction);
   }

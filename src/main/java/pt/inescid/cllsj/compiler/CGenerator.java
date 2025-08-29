@@ -3,6 +3,7 @@ package pt.inescid.cllsj.compiler;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -1438,16 +1439,6 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   @Override
-  public void visit(IRPushUnfold instruction) {
-    // Do nothing
-  }
-
-  @Override
-  public void visit(IRPopUnfold instruction) {
-    // Do nothing
-  }
-
-  @Override
   public void visit(IRPushCell instruction) {
     throw new UnsupportedOperationException("Cells are still not supported");
   }
@@ -2231,13 +2222,16 @@ public class CGenerator extends IRInstructionVisitor {
 
   // Returns the maximum size of all segments of the given type, including padding.
   private CSize totalSize(IRType type) {
-    LayoutCalculator layout = layout(type);
+    return totalSize(type, 0);
+  }
+
+  private CSize totalSize(IRType type, int definedTypes) {
+    LayoutCalculator layout = layout(type, definedTypes);
     CSize size = layout.padding.add(layout.size);
-    if (layout.nextSegment.isPresent()) {
-      return size.max(totalSize(layout.nextSegment.get()));
-    } else {
-      return size;
+    for (LayoutCalculator.Segment segment : layout.nextSegments) {
+      size = size.max(totalSize(segment.type, segment.definedTypes));
     }
+    return size;
   }
 
   // Returns the offset of the last slot of the given type in relation to the current cursor
@@ -2276,20 +2270,28 @@ public class CGenerator extends IRInstructionVisitor {
         .add(caseLayout.firstSlotOffset);
   }
 
-  private CAlignment alignment(IRType type) {
+  private CAlignment alignment(IRType type, int definedTypes) {
     // The offset doesn't affect the alignment
-    LayoutCalculator calc = new LayoutCalculator(CSize.zero(), CSize.zero());
+    LayoutCalculator calc = new LayoutCalculator(definedTypes, CSize.zero(), CSize.zero());
     type.accept(calc);
     return calc.alignment;
   }
 
   private LayoutCalculator layout(IRType type) {
-    return layout(type, arch.recordHeaderSize);
+    return layout(type, 0);
+  }
+
+  private LayoutCalculator layout(IRType type, int definedTypes) {
+    return layout(type, definedTypes, arch.recordHeaderSize);
   }
 
   private LayoutCalculator layout(IRType type, CSize offset) {
-    CAlignment alignment = alignment(type);
-    LayoutCalculator calc = new LayoutCalculator(offset.align(alignment), offset.align(alignment));
+    return layout(type, 0, offset);
+  }
+
+  private LayoutCalculator layout(IRType type, int definedTypes, CSize offset) {
+    CAlignment alignment = alignment(type, definedTypes);
+    LayoutCalculator calc = new LayoutCalculator(definedTypes, offset.align(alignment), offset.align(alignment));
     calc.padding = offset.padding(alignment);
     type.accept(calc);
     return calc;
@@ -2311,16 +2313,26 @@ public class CGenerator extends IRInstructionVisitor {
     public CSize nextSlotOffset; // Offset to the start of the next slot
     public CAlignment alignment; // Required alignment of the type
     public CSize padding; // Number of padding bytes to add after the offset
-    public Optional<IRType> nextSegment = Optional.empty(); // Segment which comes after this one
+    public List<Segment> nextSegments = List.of(); // Segments which comes after this one
 
-    public LayoutCalculator(CSize resetOffset, CSize nextSlotOffset) {
-      this(resetOffset, resetOffset, nextSlotOffset);
+    public class Segment {
+      public IRType type;
+      public int definedTypes;
+
+      public Segment(IRType type, int definedTypes) {
+        this.type = type;
+        this.definedTypes = definedTypes;
+      }
     }
 
-    public LayoutCalculator(CSize resetOffset, CSize offset, CSize nextSlotOffset) {
+    public LayoutCalculator(int definedTypes, CSize resetOffset, CSize nextSlotOffset) {
+      this(definedTypes, resetOffset, resetOffset, nextSlotOffset);
+    }
+
+    public LayoutCalculator(int definedTypes, CSize resetOffset, CSize offset, CSize nextSlotOffset) {
       this.resetOffset = resetOffset;
       this.offset = offset;
-      this.definedTypes = 0;
+      this.definedTypes = definedTypes;
       this.nextSlotOffset = nextSlotOffset;
     }
 
@@ -2329,13 +2341,7 @@ public class CGenerator extends IRInstructionVisitor {
     }
 
     private LayoutCalculator recurse(IRType type, CSize offset, CSize nextSlotOffset) {
-      return recurse(type, offset, nextSlotOffset, definedTypes);
-    }
-
-    private LayoutCalculator recurse(
-        IRType type, CSize offset, CSize nextSlotOffset, int definedTypes) {
-      LayoutCalculator calc = new LayoutCalculator(resetOffset, offset, nextSlotOffset);
-      calc.definedTypes = definedTypes;
+      LayoutCalculator calc = new LayoutCalculator(definedTypes, resetOffset, offset, nextSlotOffset);
       type.accept(calc);
       return calc;
     }
@@ -2357,7 +2363,7 @@ public class CGenerator extends IRInstructionVisitor {
     public void visit(IRSessionT type) {
       LayoutCalculator contLayout = recurse(type.getCont(), offset);
 
-      CAlignment alignmentIfValue = alignment(type.getArg());
+      CAlignment alignmentIfValue = alignment(type.getArg(), definedTypes);
       CAlignment alignmentIfNotValue = arch.pointerAlignment;
 
       CSize paddingIfValue = offset.add(contLayout.size).padding(alignmentIfValue);
@@ -2392,7 +2398,7 @@ public class CGenerator extends IRInstructionVisitor {
           ternaryTypeIsValue(
               type.getArg().valueRequisites(), nextSlotOffsetIfValue, nextSlotOffsetIfNotValue);
       alignment = contLayout.alignment;
-      nextSegment = contLayout.nextSegment;
+      nextSegments = contLayout.nextSegments;
     }
 
     @Override
@@ -2402,10 +2408,12 @@ public class CGenerator extends IRInstructionVisitor {
       firstSlotSize = arch.unsignedCharSize;
       alignment = CAlignment.one();
 
+      nextSegments = new ArrayList<>();
       for (int i = 0; i < type.getChoices().size(); ++i) {
         LayoutCalculator layout = recurse(type.getChoices().get(i), offset);
         size = size.max(layout.size);
         alignment = alignment.max(layout.alignment);
+        nextSegments.addAll(layout.nextSegments);
       }
 
       size = arch.unsignedCharSize.add(size);
@@ -2414,9 +2422,11 @@ public class CGenerator extends IRInstructionVisitor {
 
     @Override
     public void visit(IRRecT type) {
-      definedTypes += 1;
-      type.getInner().accept(this);
-      definedTypes -= 1;
+      nextSegments = List.of(new Segment(type.getInner(), definedTypes + 1));
+      size = CSize.zero(); // End of the segment
+      firstSlotOffset = offset;
+      firstSlotSize = CSize.zero();
+      alignment = CAlignment.one();
     }
 
     @Override
@@ -2492,7 +2502,7 @@ public class CGenerator extends IRInstructionVisitor {
 
     @Override
     public void visit(IRResetT type) {
-      nextSegment = Optional.of(type.getCont());
+      nextSegments = List.of(new Segment(type.getCont(), definedTypes));
       size = CSize.zero(); // End of the segment
       firstSlotOffset = offset;
       firstSlotSize = CSize.zero();

@@ -279,15 +279,15 @@ public class IRAnalyzer extends IRInstructionVisitor {
     state.getBoundRecord(instruction.getRecord()).doPop(location);
   }
 
-  @Override
-  public void visit(IRPushUnfold instruction) {
-    state.getBoundRecord(instruction.getRecord()).doPushUnfold();
-  }
+  // @Override
+  // public void visit(IRPushUnfold instruction) {
+  //   state.getBoundRecord(instruction.getRecord()).doPushUnfold();
+  // }
 
-  @Override
-  public void visit(IRPopUnfold instruction) {
-    state.getBoundRecord(instruction.getRecord()).doPopUnfold();
-  }
+  // @Override
+  // public void visit(IRPopUnfold instruction) {
+  //   state.getBoundRecord(instruction.getRecord()).doPopUnfold();
+  // }
 
   @Override
   public void visit(IRPushTag instruction) {
