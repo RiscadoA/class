@@ -37,6 +37,7 @@ public class ASTId extends ASTNode {
   List<ASTType> parTypes;
   // List<Integer> poffsets;
   List<String> gpars;
+  List<ASTType> gparTypes;
   List<ASTType> tpars;
   List<ASTType> tparsGen;
 
@@ -47,6 +48,7 @@ public class ASTId extends ASTNode {
     pars = new ArrayList<String>();
     parTypes = new ArrayList<>();
     gpars = new ArrayList<String>();
+    gparTypes = new ArrayList<>();
     tpars = new ArrayList<ASTType>();
     exprs = new ArrayList<ASTExpr>();
     gexprs = new ArrayList<ASTExpr>();
@@ -70,6 +72,10 @@ public class ASTId extends ASTNode {
 
   public List<String> getGPars() {
     return gpars;
+  }
+
+  public List<ASTType> getGParTypes() {
+    return gparTypes;
   }
 
   public List<ASTType> getTPars() {
@@ -248,6 +254,8 @@ public class ASTId extends ASTNode {
         // add type to linear type environment
         ed = ed.assoc(ch, new ASTWhyT(formal));
       } else gpars.add(((ASTVId) gexpr).ch);
+
+      gparTypes.add(formal);
     }
 
     // System.out.println("TC ID " + id + " S 2");

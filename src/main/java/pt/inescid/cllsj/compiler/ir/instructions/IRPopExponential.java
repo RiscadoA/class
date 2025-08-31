@@ -2,6 +2,7 @@ package pt.inescid.cllsj.compiler.ir.instructions;
 
 import java.util.function.Function;
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
+import pt.inescid.cllsj.compiler.ir.type.IRExponentialT;
 import pt.inescid.cllsj.compiler.ir.type.IRType;
 
 public class IRPopExponential extends IRPop {
@@ -14,6 +15,14 @@ public class IRPopExponential extends IRPop {
 
   public int getArgExponential() {
     return argExponential;
+  }
+
+  public IRType getArgExponentialType() {
+    if (!(getRecordType().leftmostTail() instanceof IRExponentialT)) {
+      throw new IllegalStateException("Record type is not exponential");
+    }
+
+    return ((IRExponentialT) getRecordType().leftmostTail()).getInner();
   }
 
   @Override

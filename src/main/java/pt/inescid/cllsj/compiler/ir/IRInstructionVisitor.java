@@ -90,7 +90,7 @@ public abstract class IRInstructionVisitor {
     visit((IRInstruction) instruction);
   }
 
-  public void visit(IRNewExponential instruction) {
+  public void visit(IRNewExponentialProcess instruction) {
     visit((IRInstruction) instruction);
   }
 
@@ -111,10 +111,6 @@ public abstract class IRInstructionVisitor {
   }
 
   public void visit(IRCallExponential instruction) {
-    visit((IRInstruction) instruction);
-  }
-
-  public void visit(IRDetachExponential instruction) {
     visit((IRInstruction) instruction);
   }
 

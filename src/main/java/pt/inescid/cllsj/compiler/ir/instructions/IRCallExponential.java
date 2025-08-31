@@ -2,32 +2,29 @@ package pt.inescid.cllsj.compiler.ir.instructions;
 
 import java.util.function.Function;
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
+import pt.inescid.cllsj.compiler.ir.type.IRType;
 
 public class IRCallExponential extends IRInstruction {
   private int exponential;
+  private IRType exponentialType;
   private int argRecord;
 
-  // Used when the reference count of the exponential should be decreased.
-  // Enables the compiler to optimize memory management by using the original record instead of
-  // cloning it when the reference count gets to zero.
-  private boolean decRefCount;
-
-  public IRCallExponential(int exponential, int argRecord, boolean decRefCount) {
+  public IRCallExponential(int exponential, IRType exponentialType, int argRecord) {
     this.exponential = exponential;
+    this.exponentialType = exponentialType;
     this.argRecord = argRecord;
-    this.decRefCount = decRefCount;
   }
 
   public int getExponential() {
     return exponential;
   }
 
-  public int getArgRecord() {
-    return argRecord;
+  public IRType getExponentialType() {
+    return exponentialType;
   }
 
-  public boolean shouldDecreaseRefCount() {
-    return decRefCount;
+  public int getArgRecord() {
+    return argRecord;
   }
 
   @Override
@@ -37,17 +34,12 @@ public class IRCallExponential extends IRInstruction {
 
   @Override
   public String toString() {
-    return "callExponential("
-        + exponential
-        + ", "
-        + argRecord
-        + (decRefCount ? ", decRefCount" : "")
-        + ")";
+    return "callExponential(" + exponential + "[" + exponentialType + "], " + argRecord + ")";
   }
 
   @Override
   public IRInstruction clone() {
-    return new IRCallExponential(exponential, argRecord, decRefCount);
+    return new IRCallExponential(exponential, exponentialType, argRecord);
   }
 
   @Override
@@ -58,5 +50,10 @@ public class IRCallExponential extends IRInstruction {
   @Override
   public void renameExponentials(Function<Integer, Integer> renamer) {
     exponential = renamer.apply(exponential);
+  }
+
+  @Override
+  public void substituteTypes(Function<IRType, IRType> types) {
+    exponentialType = types.apply(exponentialType);
   }
 }

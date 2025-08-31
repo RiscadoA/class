@@ -2,18 +2,27 @@ package pt.inescid.cllsj.compiler.ir.instructions;
 
 import java.util.function.Function;
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
+import pt.inescid.cllsj.compiler.ir.type.IRExponentialT;
 import pt.inescid.cllsj.compiler.ir.type.IRType;
 
 public class IRPushExponential extends IRPush {
-  private int exponential;
+  private int argExponential;
 
-  public IRPushExponential(int record, IRType recordType, int exponential) {
+  public IRPushExponential(int record, IRType recordType, int argExponential) {
     super(record, recordType);
-    this.exponential = exponential;
+    this.argExponential = argExponential;
   }
 
-  public int getExponential() {
-    return exponential;
+  public int getArgExponential() {
+    return argExponential;
+  }
+
+  public IRType getArgExponentialType() {
+    if (!(getRecordType().leftmostTail() instanceof IRExponentialT)) {
+      throw new IllegalStateException("Record type is not exponential");
+    }
+
+    return ((IRExponentialT) getRecordType().leftmostTail()).getInner();
   }
 
   @Override
@@ -23,16 +32,16 @@ public class IRPushExponential extends IRPush {
 
   @Override
   public String toString() {
-    return toString("pushExponential", Integer.toString(exponential));
+    return toString("pushExponential", Integer.toString(argExponential));
   }
 
   @Override
   public void renameExponentials(Function<Integer, Integer> renamer) {
-    exponential = renamer.apply(exponential);
+    argExponential = renamer.apply(argExponential);
   }
 
   @Override
   public IRInstruction clone() {
-    return new IRPushExponential(getRecord(), getRecordType(), exponential);
+    return new IRPushExponential(getRecord(), getRecordType(), argExponential);
   }
 }

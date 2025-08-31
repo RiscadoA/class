@@ -332,7 +332,7 @@ public class IRAnalyzer extends IRInstructionVisitor {
 
   @Override
   public void visit(IRPushExponential instruction) {
-    IRFlowExponential exponential = state.getBoundExponential(instruction.getExponential());
+    IRFlowExponential exponential = state.getBoundExponential(instruction.getArgExponential());
     IRFlowSlot slot = IRFlowSlot.exponential(location, exponential.getHeapLocation());
     state.getBoundRecord(instruction.getRecord()).doPush(this, state, slot);
   }
@@ -393,21 +393,22 @@ public class IRAnalyzer extends IRInstructionVisitor {
   }
 
   @Override
-  public void visit(IRNewExponential instruction) {
-    IRFlowRecord record = state.getBoundRecord(instruction.getRecord());
-    IRFlowExponential exponential;
+  public void visit(IRNewExponentialProcess instruction) {
+    // TODO:
+    // IRFlowRecord record = state.getBoundRecord(instruction.getRecord());
+    // IRFlowExponential exponential;
 
-    IRFlowSlot slot = record.doPop(location);
-    if (slot.isValue() && record.getSlotCount().get() == 0) {
-      exponential = state.allocateExponential(Optional.of(List.of(slot)));
-    } else {
-      slot.markLost(this, state);
-      exponential = state.allocateExponential(Optional.empty());
-    }
+    // IRFlowSlot slot = record.doPop(location);
+    // if (slot.isValue() && record.getSlotCount().get() == 0) {
+    //   exponential = state.allocateExponential(Optional.of(List.of(slot)));
+    // } else {
+    //   slot.markLost(this, state);
+    //   exponential = state.allocateExponential(Optional.empty());
+    // }
 
-    state.unbindRecord(instruction.getRecord());
-    state.freeRecord(record);
-    state.bindExponential(instruction.getExponential(), exponential);
+    // state.unbindRecord(instruction.getRecord());
+    // state.freeRecord(record);
+    // state.bindExponential(instruction.getExponential(), exponential);
   }
 
   @Override
@@ -471,11 +472,6 @@ public class IRAnalyzer extends IRInstructionVisitor {
 
   @Override
   public void visit(IRDecRefExponential instruction) {}
-
-  @Override
-  public void visit(IRDetachExponential instruction) {
-    state.unbindExponential(instruction.getExponential());
-  }
 
   @Override
   public void visit(IRSleep instruction) {}

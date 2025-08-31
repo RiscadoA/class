@@ -23,6 +23,7 @@ public class CGenerator extends IRInstructionVisitor {
   private static final String TMP_EXPONENTIAL = "tmp_exponential";
   private static final String TMP_THREAD = "tmp_thread";
   private static final String TMP_CELL = "tmp_cell";
+  private static final String TMP_INT = "tmp_int";
 
   private static final String TASK = "task";
   private static final String ENV = "env";
@@ -30,6 +31,9 @@ public class CGenerator extends IRInstructionVisitor {
   private static final int TYPE_ID_OTHER = 0;
   private static final int TYPE_ID_INT = 1;
   private static final int TYPE_ID_BOOL = 2;
+  private static final int TYPE_ID_CLOSE = 3;
+
+  private static int nextLabel = 0;
 
   private IRProgram ir;
   private String code = "";
@@ -219,6 +223,19 @@ public class CGenerator extends IRInstructionVisitor {
     }
     putBlankLine();
 
+    // Define the environment struct.
+    putLine("struct environment {");
+    incIndent();
+    if (disableConcurrency) {
+      putLine("int end_points;");
+    } else {
+      putLine("atomic_int end_points;");
+    }
+    putLine("void* bindings[];");
+    decIndent();
+    putLine("};");
+    putBlankLine();
+
     // Holds the data present at the start of a record buffer.
     putLine("struct record_header {");
     incIndent();
@@ -237,8 +254,11 @@ public class CGenerator extends IRInstructionVisitor {
     } else {
       putLine("atomic_int ref_count;");
     }
-    putLine("struct environment* env;");
+    putLine("int env_record_count;");
+    putLine("int env_exponential_count;");
+    putLine("int env_type_count;");
     putLine("void* entry;");
+    putLine("void* data[];");
     decIndent();
     putLine("};");
     putBlankLine();
@@ -258,18 +278,6 @@ public class CGenerator extends IRInstructionVisitor {
     incIndent();
     putLine("char* record;");
     putLine("struct type type;");
-    decIndent();
-    putLine("};");
-    putBlankLine();
-
-    // Define the environment struct.
-    putLine("struct environment {");
-    incIndent();
-    if (disableConcurrency) {
-      putLine("int end_points;");
-    } else {
-      putLine("atomic_int end_points;");
-    }
     decIndent();
     putLine("};");
     putBlankLine();
@@ -324,6 +332,21 @@ public class CGenerator extends IRInstructionVisitor {
     putLineEnd();
     putBlankLine();
 
+    // Utility macros for accessing exponential arguments and the template exponential env
+    put("#define EXPONENTIAL_ARG(var, exp_i) (*(struct exponential**)(");
+    put("(char*)(var) + ");
+    put("sizeof(struct exponential) + ");
+    put("sizeof(struct exponential*) * (exp_i)");
+    put("))");
+    putLineEnd();
+    put("#define EXPONENTIAL_ENV_TEMPLATE(var, exp_count) ((struct environment*)(");
+    put("(char*)(var) + ");
+    put("sizeof(struct exponential) + ");
+    put("sizeof(struct exponential*) * (exp_count)");
+    put("))");
+    putLineEnd();
+    putBlankLine();
+
     // Utility macros to for handling alignment and padding
     putLine("#define ALIGN(offset, alignment) ((offset) + ((alignment) - 1) & -(alignment))");
     putLine("#define PADDING(offset, alignment) (-(offset) & ((alignment) - 1))");
@@ -331,6 +354,23 @@ public class CGenerator extends IRInstructionVisitor {
 
     // Utility macro for getting the maximum value of two values.
     putLine("#define MAX(a, b) ((a) > (b) ? (a) : (b))");
+    putBlankLine();
+
+    // Function used to decrement the reference counts of all exponential arguments of a given
+    // exponential.
+    putLine("void dec_ref_arg_exponentials(struct exponential* exp) {");
+    incIndent();
+    putLine("for (int i = 0; i < " + exponentialEnvExponentialCount("exp") + "; ++i) {");
+    incIndent();
+    putIf(
+        exponentialArgExponential("exp", "i") + " != NULL",
+        () -> {
+          putDecrementExponentialRefCount(exponentialArgExponential("exp", "i"));
+        });
+    decIndent();
+    putLine("}");
+    decIndent();
+    putLine("}");
     putBlankLine();
 
     // Functions used for printing debug info
@@ -530,6 +570,7 @@ public class CGenerator extends IRInstructionVisitor {
       putStatement("pthread_t " + TMP_THREAD);
     }
     putStatement("struct cell* " + TMP_CELL);
+    putStatement("int " + TMP_INT);
     putBlankLine();
 
     // Initialize the task list.
@@ -1384,8 +1425,102 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   @Override
-  public void visit(IRNewExponential instruction) {
-    throw new UnsupportedOperationException("Exponentials are still not supported");
+  public void visit(IRNewExponentialProcess instruction) {
+    IRProcess process = ir.getProcesses().get(instruction.getProcessName());
+
+    putAllocExponential(
+        exponential(instruction.getExponential()),
+        process.getRecordCount(),
+        process.getExponentialCount(),
+        process.getTypeVariableCount());
+    putAssign(exponentialRefCount(instruction.getExponential()), "1");
+    putAssign(exponentialEnvRecordCount(instruction.getExponential()), process.getRecordCount());
+    putAssign(
+        exponentialEnvExponentialCount(instruction.getExponential()),
+        process.getExponentialCount());
+    putAssign(
+        exponentialEnvTypeCount(instruction.getExponential()), process.getTypeVariableCount());
+    putAssign(
+        exponentialEntry(instruction.getExponential()),
+        labelAddress("proc_" + instruction.getProcessName()));
+
+    // Initialize the argument exponentials
+    // These pointers are only kept for reference counting purposes
+    for (int i = 0; i < process.getExponentialCount(); ++i) {
+      String value = "NULL";
+      for (ExponentialArgument arg : instruction.getExponentialArguments()) {
+        if (arg.getTargetExponential() == i) {
+          value =
+              ternaryTypeId(
+                  arg.getExponentialType(),
+                  "NULL",
+                  "NULL",
+                  exponential(arg.getSourceExponential()));
+          break;
+        }
+      }
+      putAssign(exponentialArgExponential(instruction.getExponential(), i), value);
+    }
+
+    // Initialize the environment template with the necessary arguments
+    String envTemplate = exponentialEnvTemplate(instruction.getExponential());
+    putAssign(environmentEndPoints(envTemplate), process.getEndPoints());
+    for (ExponentialArgument arg : instruction.getExponentialArguments()) {
+      putAssign(
+          exponential(envTemplate, process.getRecordCount(), arg.getTargetExponential()),
+          exponential(arg.getSourceExponential()));
+    }
+    for (TypeArgument arg : instruction.getTypeArguments()) {
+      putAssign(
+          type(
+              envTemplate,
+              process.getRecordCount(),
+              process.getExponentialCount(),
+              arg.getTargetType()),
+          typeInitializer(arg.getSourceType(), arg.getSourceTypePolarity()));
+    }
+
+    // Runnable ifValue = () -> {
+    //   putAllocEnvironment(TMP_ENV, instruction.getProcessName());
+    //   String contLabel = makeLabel("new_exponential_process");
+
+    //   // Initialize the linear record
+    //   putAllocRecord(record(TMP_ENV, 0), instruction.getType());
+    //   StringBuilder value = new StringBuilder("(struct record_header) {");
+    //   value
+    //       .append(".cont = ")
+    //       .append(labelAddress(contLabel))
+    //       .append(", ");
+    //   value.append(".cont_env = ").append(ENV).append(", ");
+    //   value.append("}");
+    //   putAssign(accessRecord(TMP_ENV, 0, "0", "struct record_header"), value.toString());
+    //   putResetRecord(record(TMP_ENV, 0), instruction.getType());
+
+    //   // Bind the arguments to the new environment
+    //   for (ExponentialArgument arg : instruction.getExponentialArguments()) {
+    //     putAssign(
+    //         exponential(TMP_ENV, process.getRecordCount(), arg.getTargetExponential()),
+    //         exponential(arg.getSourceExponential()));
+    //   }
+    //   for (TypeArgument arg : instruction.getTypeArguments()) {
+    //     putAssign(
+    //         type(
+    //             TMP_ENV,
+    //             process.getRecordCount(),
+    //             process.getExponentialCount(),
+    //             arg.getTargetType()),
+    //         typeInitializer(arg.getSourceType(), arg.getSourceTypePolarity()));
+    //   }
+
+    //   // Jump to the process
+    //   putAssign(ENV, TMP_ENV);
+    //   putConstantGoto("proc_" + instruction.getProcessName());
+
+    //   // After returning from the process, we must copy the stored value into the exponential
+    //   // The problem is that
+    //   putLabel(contLabel);
+    // };
+
   }
 
   @Override
@@ -1400,32 +1535,136 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRPushExponential instruction) {
-    throw new UnsupportedOperationException("Exponentials are still not supported");
+    Runnable forInt =
+        () ->
+            putAssign(
+                accessRecord(instruction.getRecord(), "int"),
+                exponentialAsInteger(instruction.getArgExponential()));
+
+    Runnable forBool =
+        () ->
+            putAssign(
+                accessRecord(instruction.getRecord(), "unsigned char"),
+                exponentialAsInteger(instruction.getArgExponential()));
+
+    Runnable forOther =
+        () ->
+            putAssign(
+                accessRecord(instruction.getRecord(), "struct exponential*"),
+                exponential(instruction.getArgExponential()));
+
+    putSwitchTypeId(instruction.getArgExponentialType(), forInt, forBool, forOther);
+    putAdvanceRecord(instruction.getRecord(), instruction.getRecordType());
   }
 
   @Override
   public void visit(IRPopExponential instruction) {
-    throw new UnsupportedOperationException("Exponentials are still not supported");
+    String forInt = integerAsExponential(accessRecord(instruction.getRecord(), "int"));
+    String forBool = boolAsExponential(accessRecord(instruction.getRecord(), "unsigned char"));
+    String forOther = accessRecord(instruction.getRecord(), "struct exponential*");
+
+    String value = ternaryTypeId(instruction.getArgExponentialType(), forInt, forBool, forOther);
+    putAssign(exponential(instruction.getArgExponential()), value);
+    putAdvanceRecord(instruction.getRecord(), instruction.getRecordType());
   }
 
   @Override
   public void visit(IRCallExponential instruction) {
-    throw new UnsupportedOperationException("Exponentials are still not supported");
+    // Start by allocating the new record
+    IRType expType = instruction.getExponentialType();
+    putAllocRecord(record(instruction.getArgRecord()), expType);
+
+    Runnable forInt = () -> {
+      putResetRecord(record(instruction.getArgRecord()), expType);
+      putAssign(accessRecord(instruction.getArgRecord(), "int"), exponentialAsInteger(instruction.getExponential()));
+    };
+
+    Runnable forBool = () -> {
+      putResetRecord(record(instruction.getArgRecord()), expType);
+      putAssign(accessRecord(instruction.getArgRecord(), "unsigned char"), exponentialAsBool(instruction.getExponential()));
+    };
+
+    Runnable forOther = () -> {
+      // Instantiate an environment for the exponential process from its template
+      putAllocEnvironment(
+          TMP_ENV,
+          exponentialEnvRecordCount(instruction.getExponential()),
+          exponentialEnvExponentialCount(instruction.getExponential()),
+          exponentialEnvTypeCount(instruction.getExponential()));
+      putCopy(
+          TMP_ENV,
+          exponentialEnvTemplate(instruction.getExponential()),
+          environmentSize(
+              exponentialEnvRecordCount(instruction.getExponential()),
+              exponentialEnvExponentialCount(instruction.getExponential()),
+              exponentialEnvTypeCount(instruction.getExponential())));
+
+      // Increment the reference count of any argument exponentials
+      putLine(
+          "for (int i = 0; i < "
+              + exponentialEnvExponentialCount(instruction.getExponential())
+              + "; ++i) {");
+      incIndent();
+      putIf(
+          exponentialArgExponential(instruction.getExponential(), "i") + " != NULL",
+          () ->
+              putIncrementAtomic(
+                  exponentialRefCount(exponentialArgExponential(instruction.getExponential(), "i"))));
+      decIndent();
+      putLine("}");
+
+      // If the exponential type is reset, then it means that we'll be writing to it immediately
+      // In that case, the continuation should be set to the exponential process
+      Runnable ifReset = () -> {
+        StringBuilder value = new StringBuilder("(struct record_header) {");
+        value.append(".cont = ").append(exponentialEntry(instruction.getExponential())).append(", ");
+        value.append(".cont_env = ").append(TMP_ENV).append(", ");
+        value.append(".cont_record = 0");
+        value.append("}");
+        putAssign(accessRecord(instruction.getArgRecord(), "struct record_header"), value.toString());
+
+        putResetRecord(record(instruction.getArgRecord()), ((IRResetT)expType).getCont());
+        putAssign(record(TMP_ENV, 0), record(instruction.getArgRecord()));
+      };
+
+      // Otherwise, since we'll reading from it, we must set the continuation to the current
+      // process and jump to the exponential process immediately
+      Runnable ifNotReset = () -> {
+        String label = makeLabel("call_exponential_return");
+
+        StringBuilder value = new StringBuilder("(struct record_header) {");
+        value.append(".cont = ").append(labelAddress(label)).append(", ");
+        value.append(".cont_env = ").append(ENV).append(", ");
+        value.append(".cont_record = ").append(instruction.getArgRecord());
+        value.append("}");
+        putAssign(accessRecord(instruction.getArgRecord(), "struct record_header"), value.toString());
+
+        putResetRecord(record(instruction.getArgRecord()), expType);
+        putAssign(record(TMP_ENV, 0), record(instruction.getArgRecord()));
+
+        putAssign(TMP_CONT, exponentialEntry(instruction.getExponential()));
+        putAssign(ENV, TMP_ENV);
+        putComputedGoto(TMP_CONT);
+        putLabel(label);
+      };
+
+      putSwitchTypeIsResetAndNotClose(expType, ifReset, ifNotReset);
+    };
+
+    putSwitchTypeId(expType, forInt, forBool, forOther);
   }
 
   @Override
   public void visit(IRIncRefExponential instruction) {
-    throw new UnsupportedOperationException("Exponentials are still not supported");
+    putIfNotIntOrBool(
+        instruction.getType(),
+        () -> putIncrementAtomic(exponentialRefCount(instruction.getExponential())));
   }
 
   @Override
   public void visit(IRDecRefExponential instruction) {
-    throw new UnsupportedOperationException("Exponentials are still not supported");
-  }
-
-  @Override
-  public void visit(IRDetachExponential instruction) {
-    throw new UnsupportedOperationException("Exponentials are still not supported");
+    putDecrementExponentialRefCount(
+        exponential(instruction.getExponential()), instruction.getType());
   }
 
   @Override
@@ -1508,6 +1747,7 @@ public class CGenerator extends IRInstructionVisitor {
 
   private String typeInitializer(IRType type, boolean polarity) {
     String flags = ", .flags = 0";
+    flags += " | (" + typeId(type) + ") << 3";
     flags += " | (" + typeIsReset(type) + ") << 2";
     if (optimizeSendValue) {
       flags += " | (" + typeIsValue(type) + ") << 1";
@@ -1539,43 +1779,69 @@ public class CGenerator extends IRInstructionVisitor {
       return Integer.toString(TYPE_ID_INT);
     } else if (type instanceof IRBoolT) {
       return Integer.toString(TYPE_ID_BOOL);
+    } else if (type instanceof IRCloseT) {
+      return Integer.toString(TYPE_ID_CLOSE);
     } else {
       return Integer.toString(TYPE_ID_OTHER);
     }
   }
 
   private String typeId(String type) {
-    return type + ".id";
+    return "((" + type + ".flags >> 3) & 3)";
   }
 
-  private void putSwitchTypeId(IRType type, Runnable forInt, Runnable forBool, Runnable forOther) {
+  private String ternaryTypeId(IRType type, String forInt, String forBool, String forOther) {
     if (optimizePrimitiveExponentials && type instanceof IRIntT) {
-      forInt.run();
+      return forInt;
     } else if (optimizePrimitiveExponentials && type instanceof IRBoolT) {
-      forBool.run();
+      return forBool;
     } else if (optimizePrimitiveExponentials && type instanceof IRVarT) {
       String typeId = typeId(type(((IRVarT) type).getType()));
-      putLine("switch (" + typeId + ") {");
-      incIndent();
-      putLine("case " + TYPE_ID_INT + ": {/* int */");
-      incIndent();
-      forInt.run();
-      decIndent();
-      putLine("} break;");
-      putLine("case " + TYPE_ID_BOOL + ": {/* bool */");
-      incIndent();
-      forBool.run();
-      decIndent();
-      putLine("} break;");
-      putLine("default: {/* other */");
-      incIndent();
-      forOther.run();
-      decIndent();
-      putLine("} break;");
-      decIndent();
-      putLine("}");
+      return "("
+          + typeId
+          + " == "
+          + TYPE_ID_INT
+          + " ? ("
+          + forInt
+          + ") : "
+          + typeId
+          + " ? ("
+          + forBool
+          + ") : ("
+          + forOther
+          + "))";
     } else {
-      forOther.run();
+      return forOther;
+    }
+  }
+
+  private CSize ternaryTypeId(IRType type, CSize forInt, CSize forBool, CSize forOther) {
+    if (optimizePrimitiveExponentials && type instanceof IRIntT) {
+      return forInt;
+    } else if (optimizePrimitiveExponentials && type instanceof IRBoolT) {
+      return forBool;
+    } else if (optimizePrimitiveExponentials && type instanceof IRVarT) {
+      String typeId = typeId(type(((IRVarT) type).getType()));
+      return CSize.ternary(typeId
+          + " == "
+          + TYPE_ID_INT, forInt, CSize.ternary(typeId + " == " + TYPE_ID_BOOL, forBool, forOther));
+    } else {
+      return forOther;
+    }
+  }
+
+  private CAlignment ternaryTypeId(IRType type, CAlignment forInt, CAlignment forBool, CAlignment forOther) {
+    if (optimizePrimitiveExponentials && type instanceof IRIntT) {
+      return forInt;
+    } else if (optimizePrimitiveExponentials && type instanceof IRBoolT) {
+      return forBool;
+    } else if (optimizePrimitiveExponentials && type instanceof IRVarT) {
+      String typeId = typeId(type(((IRVarT) type).getType()));
+      return CAlignment.ternary(typeId
+          + " == "
+          + TYPE_ID_INT, forInt, CAlignment.ternary(typeId + " == " + TYPE_ID_BOOL, forBool, forOther));
+    } else {
+      return forOther;
     }
   }
 
@@ -1598,6 +1864,21 @@ public class CGenerator extends IRInstructionVisitor {
     } else if (type instanceof IRVarT) {
       IRVarT var = (IRVarT) type;
       return typeIsReset(type(var.getType()), var.getFlipPolarity());
+    } else {
+      return "0";
+    }
+  }
+
+  private String typeIsResetAndNotClose(String type, Optional<Boolean> flipPolarity) {
+    return typeId(type) + " != " + TYPE_ID_CLOSE + " && " + typeIsReset(type, flipPolarity);
+  }
+
+  private String typeIsResetAndNotClose(IRType type) {
+    if (type instanceof IRResetT) {
+      return "1";
+    } else if (type instanceof IRVarT) {
+      IRVarT var = (IRVarT) type;
+      return typeIsResetAndNotClose(type(var.getType()), var.getFlipPolarity());
     } else {
       return "0";
     }
@@ -1713,24 +1994,24 @@ public class CGenerator extends IRInstructionVisitor {
     return exponential(ENV, recordCount, exponential);
   }
 
-  private String readExponentialInteger(int exponential) {
+  private String exponentialAsInteger(int exponential) {
     // Hacky, but works as long as sizeof(int) < sizeof(struct exponential*)
     // We're just casting the address of the exponential to an int
     return "(int)(unsigned int)(uintptr_t)(" + exponential(exponential) + ")";
   }
 
-  private String readExponentialBool(int exponential) {
+  private String exponentialAsBool(int exponential) {
     // Hacky, but works as long as sizeof(unsigned char) < sizeof(struct exponential*)
     // We're just casting the address of the exponential to an unsigned char
     return "(unsigned char)(uintptr_t)(" + exponential(exponential) + ")";
   }
 
-  private String writeExponentialInteger(String cValue) {
+  private String integerAsExponential(String cValue) {
     // Same as above but the cast is in the opposite direction
     return "(struct exponential*)(uintptr_t)((unsigned int)(" + cValue + "))";
   }
 
-  private String writeExponentialBool(String cValue) {
+  private String boolAsExponential(String cValue) {
     // Same as above but the cast is in the opposite direction
     return "(struct exponential*)(uintptr_t)(" + cValue + ")";
   }
@@ -1741,6 +2022,84 @@ public class CGenerator extends IRInstructionVisitor {
 
   private String exponentialRefCount(int exponential) {
     return exponentialRefCount(exponential(exponential));
+  }
+
+  private String exponentialEnvRecordCount(String exponential) {
+    return exponential + "->env_record_count";
+  }
+
+  private String exponentialEnvRecordCount(int exponential) {
+    return exponentialEnvRecordCount(exponential(exponential));
+  }
+
+  private String exponentialEnvExponentialCount(String exponential) {
+    return exponential + "->env_exponential_count";
+  }
+
+  private String exponentialEnvExponentialCount(int exponential) {
+    return exponentialEnvExponentialCount(exponential(exponential));
+  }
+
+  private String exponentialEnvTypeCount(String exponential) {
+    return exponential + "->env_type_count";
+  }
+
+  private String exponentialEnvTypeCount(int exponential) {
+    return exponentialEnvTypeCount(exponential(exponential));
+  }
+
+  private String exponentialEntry(String exponential) {
+    return exponential + "->entry";
+  }
+
+  private String exponentialEntry(int exponential) {
+    return exponentialEntry(exponential(exponential));
+  }
+
+  private String exponentialArgExponential(String exponential, String index) {
+    return "EXPONENTIAL_ARG(" + exponential + ", " + index + ")";
+  }
+
+  private String exponentialArgExponential(int exponential, String index) {
+    return exponentialArgExponential(exponential(exponential), index);
+  }
+
+  private String exponentialArgExponential(String exponential, int index) {
+    return exponentialArgExponential(exponential, Integer.toString(index));
+  }
+
+  private String exponentialArgExponential(int exponential, int index) {
+    return exponentialArgExponential(exponential(exponential), index);
+  }
+
+  private String exponentialEnvTemplate(String exponential) {
+    return "EXPONENTIAL_ENV_TEMPLATE("
+        + exponential
+        + ", "
+        + exponentialEnvExponentialCount(exponential)
+        + ")";
+  }
+
+  private String exponentialEnvTemplate(int exponential) {
+    return exponentialEnvTemplate(exponential(exponential));
+  }
+
+  private CSize environmentSize(int recordCount, int exponentialCount, int typeCount) {
+    return environmentSize(
+        Integer.toString(recordCount),
+        Integer.toString(exponentialCount),
+        Integer.toString(typeCount));
+  }
+
+  private CSize environmentSize(String recordCount, String exponentialCount, String typeCount) {
+    return CSize.expression(
+        "sizeof(struct environment) + "
+            + recordCount
+            + " * sizeof(char*) + "
+            + exponentialCount
+            + " * sizeof(struct exponential*) + "
+            + typeCount
+            + " * sizeof(struct type)");
   }
 
   private String cellMutex(String cell) {
@@ -1781,6 +2140,19 @@ public class CGenerator extends IRInstructionVisitor {
 
   // ================================= Statement building helpers =================================
 
+  private void putDecrementExponentialRefCount(String var) {
+    putIf(
+        decrementAtomic(exponentialRefCount(var)) + " == 0",
+        () -> {
+          putStatement("dec_ref_arg_exponentials(" + var + ")");
+          putFreeExponential(var);
+        });
+  }
+
+  private void putDecrementExponentialRefCount(String var, IRType type) {
+    putIfNotIntOrBool(type, () -> putDecrementExponentialRefCount(var));
+  }
+
   private void putDecrementEndPoints(boolean isEndPoint, Runnable free) {
     if (isEndPoint) {
       if (optimizeSingleEndpoint && ir.getProcesses().get(procName).getEndPoints() == 1) {
@@ -1806,14 +2178,7 @@ public class CGenerator extends IRInstructionVisitor {
   private void putAllocEnvironment(
       String var, String recordCount, String exponentialCount, String typeCount) {
     putAssign(
-        var,
-        "managed_alloc(sizeof(struct environment) + "
-            + recordCount
-            + " * sizeof(char*) + "
-            + exponentialCount
-            + " * sizeof(struct exponential*) + "
-            + typeCount
-            + " * sizeof(struct type))");
+        var, "managed_alloc(" + environmentSize(recordCount, exponentialCount, typeCount) + ")");
     if (profile) {
       putIncrementAtomic("env_allocs");
       putIncrementAtomic("env_current");
@@ -1890,6 +2255,30 @@ public class CGenerator extends IRInstructionVisitor {
     putLine("managed_free(" + var + ");");
     if (profile) {
       putIncrementAtomic("task_frees");
+    }
+  }
+
+  private void putAllocExponential(
+      String var, int recordCount, int exponentialCount, int typeCount) {
+    putAssign(
+        var,
+        "managed_alloc(sizeof(struct exponential) + "
+            + exponentialCount
+            + " * sizeof(struct exponential*) + "
+            + environmentSize(recordCount, exponentialCount, typeCount)
+            + ")");
+    if (profile) {
+      putIncrementAtomic("exponential_allocs");
+    }
+  }
+
+  private void putFreeExponential(String var) {
+    if (trace) {
+      putDebugLn("[freeExponential(" + var + ")]");
+    }
+    putLine("managed_free(" + var + ");");
+    if (profile) {
+      putIncrementAtomic("exponential_frees");
     }
   }
 
@@ -2010,6 +2399,10 @@ public class CGenerator extends IRInstructionVisitor {
     }
   }
 
+  private String makeLabel(String base) {
+    return procName + "_" + base + (nextLabel++);
+  }
+
   private void putLabel(String label) {
     put(label + ":");
     putLineEnd();
@@ -2085,6 +2478,46 @@ public class CGenerator extends IRInstructionVisitor {
     putAssignSub(var, nextSlotOffsetWithTag(currentType, tag));
   }
 
+  private void putIfNotIntOrBool(IRType type, Runnable runnable) {
+    if (optimizePrimitiveExponentials && type instanceof IRVarT) {
+      putIf(typeId(type(((IRVarT) type).getType())) + " == " + TYPE_ID_OTHER, runnable);
+    } else if (!optimizePrimitiveExponentials
+        || !(type instanceof IRIntT || type instanceof IRBoolT)) {
+      runnable.run();
+    }
+  }
+
+  private void putSwitchTypeId(IRType type, Runnable forInt, Runnable forBool, Runnable forOther) {
+    if (optimizePrimitiveExponentials && type instanceof IRIntT) {
+      forInt.run();
+    } else if (optimizePrimitiveExponentials && type instanceof IRBoolT) {
+      forBool.run();
+    } else if (optimizePrimitiveExponentials && type instanceof IRVarT) {
+      String typeId = typeId(type(((IRVarT) type).getType()));
+      putLine("switch (" + typeId + ") {");
+      incIndent();
+      putLine("case " + TYPE_ID_INT + ": {/* int */");
+      incIndent();
+      forInt.run();
+      decIndent();
+      putLine("} break;");
+      putLine("case " + TYPE_ID_BOOL + ": {/* bool */");
+      incIndent();
+      forBool.run();
+      decIndent();
+      putLine("} break;");
+      putLine("default: {/* other */");
+      incIndent();
+      forOther.run();
+      decIndent();
+      putLine("} break;");
+      decIndent();
+      putLine("}");
+    } else {
+      forOther.run();
+    }
+  }
+
   private void putIfTypeIsNotValue(IRType.ValueRequisites requisites, Runnable ifNotValue) {
     putSwitchTypeIsValue(requisites, Optional.empty(), Optional.of(ifNotValue));
   }
@@ -2112,6 +2545,16 @@ public class CGenerator extends IRInstructionVisitor {
       }
     } else if (ifNotValue.isPresent()) {
       ifNotValue.get().run();
+    }
+  }
+
+  private void putSwitchTypeIsResetAndNotClose(IRType type, Runnable ifReset, Runnable ifNotReset) {
+    if (type instanceof IRResetT) {
+      ifReset.run();
+    } else if (type instanceof IRVarT) {
+      putIfElse(typeIsReset(type), ifReset, ifNotReset);
+    } else {
+      ifNotReset.run();
     }
   }
 
@@ -2487,16 +2930,10 @@ public class CGenerator extends IRInstructionVisitor {
 
     @Override
     public void visit(IRExponentialT type) {
-      throw new UnsupportedOperationException("Exponentials unimplemented");
-      // if (optimizePrimitiveExponentials) {
-      //   String id = typeId(type.getInner());
-      //   size += "(" + id + " == " + TYPE_ID_OTHER + " ? " + "sizeof(struct exponential*)" + " :
-      // ";
-      //   size += id + " == " + TYPE_ID_INT + " ? sizeof(int) : ";
-      //   size += "sizeof(unsigned char))"; // for TYPE_ID_BOOL
-      // } else {
-      //   size += "sizeof(struct exponential*)";
-      // }
+      size = ternaryTypeId(type.getInner(), arch.intSize, arch.unsignedCharSize, arch.pointerSize);
+      firstSlotOffset = ternaryTypeId(type.getInner(), arch.intSize, arch.unsignedCharSize, arch.pointerSize);
+      firstSlotSize = ternaryTypeId(type.getInner(), arch.intSize, arch.unsignedCharSize, arch.pointerSize);
+      alignment = ternaryTypeId(type.getInner(), arch.intAlignment, arch.unsignedCharAlignment, arch.pointerAlignment);
     }
 
     @Override
