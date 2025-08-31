@@ -2,7 +2,7 @@ package pt.inescid.cllsj.compiler.ir;
 
 import pt.inescid.cllsj.compiler.ir.instructions_old.*;
 
-public abstract class IRInstructionVisitor {
+public abstract class IRInstructionVisitorOld {
   // Catch all for instructions which do not have their own visit method
   public abstract void visit(IRInstruction instruction);
 

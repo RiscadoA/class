@@ -3,7 +3,7 @@ package pt.inescid.cllsj.compiler.ir.instructions_old;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
-import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
+import pt.inescid.cllsj.compiler.ir.IRInstructionVisitorOld;
 import pt.inescid.cllsj.compiler.ir.type.IRVarT;
 
 public class IRCallLoop extends IRInstruction {
@@ -69,7 +69,7 @@ public class IRCallLoop extends IRInstruction {
   }
 
   @Override
-  public void accept(IRInstructionVisitor visitor) {
+  public void accept(IRInstructionVisitorOld visitor) {
     visitor.visit(this);
   }
 

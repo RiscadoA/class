@@ -3,7 +3,7 @@ package pt.inescid.cllsj.compiler.ir.instructions_old;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
+import pt.inescid.cllsj.compiler.ir.IRInstructionVisitorOld;
 import pt.inescid.cllsj.compiler.ir.type.IRType;
 
 public class IRPopTag extends IRPop {
@@ -49,7 +49,7 @@ public class IRPopTag extends IRPop {
   }
 
   @Override
-  public void accept(IRInstructionVisitor visitor) {
+  public void accept(IRInstructionVisitorOld visitor) {
     visitor.visit(this);
   }
 

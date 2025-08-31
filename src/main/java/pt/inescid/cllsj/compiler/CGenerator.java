@@ -15,7 +15,7 @@ import pt.inescid.cllsj.compiler.ir.instructions_old.IRCallProcess.LinearArgumen
 import pt.inescid.cllsj.compiler.ir.instructions_old.IRCallProcess.TypeArgument;
 import pt.inescid.cllsj.compiler.ir.type.*;
 
-public class CGenerator extends IRInstructionVisitor {
+public class CGenerator extends IRInstructionVisitorOld {
   private static final String TMP_TASK = "tmp_task";
   private static final String TMP_ENV = "tmp_env";
   private static final String TMP_CONT = "tmp_cont";

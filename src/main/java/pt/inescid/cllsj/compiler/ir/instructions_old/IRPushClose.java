@@ -1,6 +1,6 @@
 package pt.inescid.cllsj.compiler.ir.instructions_old;
 
-import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
+import pt.inescid.cllsj.compiler.ir.IRInstructionVisitorOld;
 import pt.inescid.cllsj.compiler.ir.type.IRType;
 
 public class IRPushClose extends IRPush {
@@ -9,7 +9,7 @@ public class IRPushClose extends IRPush {
   }
 
   @Override
-  public void accept(IRInstructionVisitor visitor) {
+  public void accept(IRInstructionVisitorOld visitor) {
     visitor.visit(this);
   }
 

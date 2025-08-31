@@ -6,7 +6,7 @@ import java.util.Map;
 import java.util.Optional;
 import pt.inescid.cllsj.compiler.ir.IRBlock;
 import pt.inescid.cllsj.compiler.ir.IRExpressionVisitor;
-import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
+import pt.inescid.cllsj.compiler.ir.IRInstructionVisitorOld;
 import pt.inescid.cllsj.compiler.ir.IRProcess;
 import pt.inescid.cllsj.compiler.ir.expressions.IRAdd;
 import pt.inescid.cllsj.compiler.ir.expressions.IRAnd;
@@ -29,7 +29,7 @@ import pt.inescid.cllsj.compiler.ir.instructions_old.*;
 import pt.inescid.cllsj.compiler.ir.type.*;
 
 // Visitor which analyses the IR of a given process and generates a control and data flow graph.
-public class IRAnalyzer extends IRInstructionVisitor {
+public class IRAnalyzer extends IRInstructionVisitorOld {
   private Map<IRBlock, IRFlow> flows = new HashMap<>();
   private IRFlow flow;
   private IRFlowState state;

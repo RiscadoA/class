@@ -1,7 +1,7 @@
 package pt.inescid.cllsj.compiler.ir.instructions_old;
 
 import java.util.function.Function;
-import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
+import pt.inescid.cllsj.compiler.ir.IRInstructionVisitorOld;
 import pt.inescid.cllsj.compiler.ir.type.IRType;
 
 public class IRCallExponential extends IRInstruction {
@@ -28,7 +28,7 @@ public class IRCallExponential extends IRInstruction {
   }
 
   @Override
-  public void accept(IRInstructionVisitor visitor) {
+  public void accept(IRInstructionVisitorOld visitor) {
     visitor.visit(this);
   }
 
