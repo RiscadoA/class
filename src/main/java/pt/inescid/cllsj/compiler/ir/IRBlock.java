@@ -2,7 +2,6 @@ package pt.inescid.cllsj.compiler.ir;
 
 import java.util.ArrayList;
 import java.util.List;
-
 import pt.inescid.cllsj.compiler.ir.instructions_old.IRInstruction;
 
 public class IRBlock {

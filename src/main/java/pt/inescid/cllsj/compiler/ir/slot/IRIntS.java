@@ -3,13 +3,13 @@ package pt.inescid.cllsj.compiler.ir.slot;
 import pt.inescid.cllsj.compiler.ir.IRSlotVisitor;
 
 public class IRIntS extends IRSlot {
-    @Override
-    public void accept(IRSlotVisitor visitor) {
-        visitor.visit(this);
-    }
+  @Override
+  public void accept(IRSlotVisitor visitor) {
+    visitor.visit(this);
+  }
 
-    @Override
-    public String toString() {
-        return "int";
-    }
+  @Override
+  public String toString() {
+    return "int";
+  }
 }

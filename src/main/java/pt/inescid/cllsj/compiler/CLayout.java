@@ -1,7 +1,6 @@
 package pt.inescid.cllsj.compiler;
 
 import java.util.function.Function;
-
 import pt.inescid.cllsj.compiler.ir.IRSlotVisitor;
 import pt.inescid.cllsj.compiler.ir.slot.*;
 
@@ -14,14 +13,15 @@ public class CLayout {
     this.alignment = alignment;
   }
 
-  public static CLayout compute(IRSlotSequence sequence, CArchitecture arch, Function<Integer, CLayout> varToLayout) {
+  public static CLayout compute(
+      IRSlotSequence sequence, CArchitecture arch, Function<Integer, CLayout> varToLayout) {
     Visitor visitor = new Visitor(arch, varToLayout);
     for (IRSlot slot : sequence.list()) {
       slot.accept(visitor);
     }
     return visitor.layout;
   }
-  
+
   private static class Visitor extends IRSlotVisitor {
     private CLayout layout = new CLayout(CSize.zero(), CAlignment.one());
     private CArchitecture arch;
@@ -40,7 +40,7 @@ public class CLayout {
     private void visit(CLayout elementLayout) {
       visit(elementLayout.size, elementLayout.alignment);
     }
-    
+
     @Override
     public void visit(IRIntS slot) {
       visit(arch.intSize, arch.intAlignment);
@@ -76,8 +76,8 @@ public class CLayout {
       CLayout passedLayout = CLayout.compute(slot.getPassedSlots(), arch, varToLayout);
 
       visit(
-        arch.pointerSize.align(passedLayout.alignment).add(passedLayout.size),
-        arch.pointerAlignment.max(passedLayout.alignment));
+          arch.pointerSize.align(passedLayout.alignment).add(passedLayout.size),
+          arch.pointerAlignment.max(passedLayout.alignment));
     }
 
     @Override

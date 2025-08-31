@@ -1574,82 +1574,99 @@ public class CGenerator extends IRInstructionVisitor {
     IRType expType = instruction.getExponentialType();
     putAllocRecord(record(instruction.getArgRecord()), expType);
 
-    Runnable forInt = () -> {
-      putResetRecord(record(instruction.getArgRecord()), expType);
-      putAssign(accessRecord(instruction.getArgRecord(), "int"), exponentialAsInteger(instruction.getExponential()));
-    };
+    Runnable forInt =
+        () -> {
+          putResetRecord(record(instruction.getArgRecord()), expType);
+          putAssign(
+              accessRecord(instruction.getArgRecord(), "int"),
+              exponentialAsInteger(instruction.getExponential()));
+        };
 
-    Runnable forBool = () -> {
-      putResetRecord(record(instruction.getArgRecord()), expType);
-      putAssign(accessRecord(instruction.getArgRecord(), "unsigned char"), exponentialAsBool(instruction.getExponential()));
-    };
+    Runnable forBool =
+        () -> {
+          putResetRecord(record(instruction.getArgRecord()), expType);
+          putAssign(
+              accessRecord(instruction.getArgRecord(), "unsigned char"),
+              exponentialAsBool(instruction.getExponential()));
+        };
 
-    Runnable forOther = () -> {
-      // Instantiate an environment for the exponential process from its template
-      putAllocEnvironment(
-          TMP_ENV,
-          exponentialEnvRecordCount(instruction.getExponential()),
-          exponentialEnvExponentialCount(instruction.getExponential()),
-          exponentialEnvTypeCount(instruction.getExponential()));
-      putCopy(
-          TMP_ENV,
-          exponentialEnvTemplate(instruction.getExponential()),
-          environmentSize(
+    Runnable forOther =
+        () -> {
+          // Instantiate an environment for the exponential process from its template
+          putAllocEnvironment(
+              TMP_ENV,
               exponentialEnvRecordCount(instruction.getExponential()),
               exponentialEnvExponentialCount(instruction.getExponential()),
-              exponentialEnvTypeCount(instruction.getExponential())));
+              exponentialEnvTypeCount(instruction.getExponential()));
+          putCopy(
+              TMP_ENV,
+              exponentialEnvTemplate(instruction.getExponential()),
+              environmentSize(
+                  exponentialEnvRecordCount(instruction.getExponential()),
+                  exponentialEnvExponentialCount(instruction.getExponential()),
+                  exponentialEnvTypeCount(instruction.getExponential())));
 
-      // Increment the reference count of any argument exponentials
-      putLine(
-          "for (int i = 0; i < "
-              + exponentialEnvExponentialCount(instruction.getExponential())
-              + "; ++i) {");
-      incIndent();
-      putIf(
-          exponentialArgExponential(instruction.getExponential(), "i") + " != NULL",
-          () ->
-              putIncrementAtomic(
-                  exponentialRefCount(exponentialArgExponential(instruction.getExponential(), "i"))));
-      decIndent();
-      putLine("}");
+          // Increment the reference count of any argument exponentials
+          putLine(
+              "for (int i = 0; i < "
+                  + exponentialEnvExponentialCount(instruction.getExponential())
+                  + "; ++i) {");
+          incIndent();
+          putIf(
+              exponentialArgExponential(instruction.getExponential(), "i") + " != NULL",
+              () ->
+                  putIncrementAtomic(
+                      exponentialRefCount(
+                          exponentialArgExponential(instruction.getExponential(), "i"))));
+          decIndent();
+          putLine("}");
 
-      // If the exponential type is reset, then it means that we'll be writing to it immediately
-      // In that case, the continuation should be set to the exponential process
-      Runnable ifReset = () -> {
-        StringBuilder value = new StringBuilder("(struct record_header) {");
-        value.append(".cont = ").append(exponentialEntry(instruction.getExponential())).append(", ");
-        value.append(".cont_env = ").append(TMP_ENV).append(", ");
-        value.append(".cont_record = 0");
-        value.append("}");
-        putAssign(accessRecord(instruction.getArgRecord(), "struct record_header"), value.toString());
+          // If the exponential type is reset, then it means that we'll be writing to it immediately
+          // In that case, the continuation should be set to the exponential process
+          Runnable ifReset =
+              () -> {
+                StringBuilder value = new StringBuilder("(struct record_header) {");
+                value
+                    .append(".cont = ")
+                    .append(exponentialEntry(instruction.getExponential()))
+                    .append(", ");
+                value.append(".cont_env = ").append(TMP_ENV).append(", ");
+                value.append(".cont_record = 0");
+                value.append("}");
+                putAssign(
+                    accessRecord(instruction.getArgRecord(), "struct record_header"),
+                    value.toString());
 
-        putResetRecord(record(instruction.getArgRecord()), ((IRResetT)expType).getCont());
-        putAssign(record(TMP_ENV, 0), record(instruction.getArgRecord()));
-      };
+                putResetRecord(record(instruction.getArgRecord()), ((IRResetT) expType).getCont());
+                putAssign(record(TMP_ENV, 0), record(instruction.getArgRecord()));
+              };
 
-      // Otherwise, since we'll reading from it, we must set the continuation to the current
-      // process and jump to the exponential process immediately
-      Runnable ifNotReset = () -> {
-        String label = makeLabel("call_exponential_return");
+          // Otherwise, since we'll reading from it, we must set the continuation to the current
+          // process and jump to the exponential process immediately
+          Runnable ifNotReset =
+              () -> {
+                String label = makeLabel("call_exponential_return");
 
-        StringBuilder value = new StringBuilder("(struct record_header) {");
-        value.append(".cont = ").append(labelAddress(label)).append(", ");
-        value.append(".cont_env = ").append(ENV).append(", ");
-        value.append(".cont_record = ").append(instruction.getArgRecord());
-        value.append("}");
-        putAssign(accessRecord(instruction.getArgRecord(), "struct record_header"), value.toString());
+                StringBuilder value = new StringBuilder("(struct record_header) {");
+                value.append(".cont = ").append(labelAddress(label)).append(", ");
+                value.append(".cont_env = ").append(ENV).append(", ");
+                value.append(".cont_record = ").append(instruction.getArgRecord());
+                value.append("}");
+                putAssign(
+                    accessRecord(instruction.getArgRecord(), "struct record_header"),
+                    value.toString());
 
-        putResetRecord(record(instruction.getArgRecord()), expType);
-        putAssign(record(TMP_ENV, 0), record(instruction.getArgRecord()));
+                putResetRecord(record(instruction.getArgRecord()), expType);
+                putAssign(record(TMP_ENV, 0), record(instruction.getArgRecord()));
 
-        putAssign(TMP_CONT, exponentialEntry(instruction.getExponential()));
-        putAssign(ENV, TMP_ENV);
-        putComputedGoto(TMP_CONT);
-        putLabel(label);
-      };
+                putAssign(TMP_CONT, exponentialEntry(instruction.getExponential()));
+                putAssign(ENV, TMP_ENV);
+                putComputedGoto(TMP_CONT);
+                putLabel(label);
+              };
 
-      putSwitchTypeIsResetAndNotClose(expType, ifReset, ifNotReset);
-    };
+          putSwitchTypeIsResetAndNotClose(expType, ifReset, ifNotReset);
+        };
 
     putSwitchTypeId(expType, forInt, forBool, forOther);
   }
@@ -1822,24 +1839,27 @@ public class CGenerator extends IRInstructionVisitor {
       return forBool;
     } else if (optimizePrimitiveExponentials && type instanceof IRVarT) {
       String typeId = typeId(type(((IRVarT) type).getType()));
-      return CSize.ternary(typeId
-          + " == "
-          + TYPE_ID_INT, forInt, CSize.ternary(typeId + " == " + TYPE_ID_BOOL, forBool, forOther));
+      return CSize.ternary(
+          typeId + " == " + TYPE_ID_INT,
+          forInt,
+          CSize.ternary(typeId + " == " + TYPE_ID_BOOL, forBool, forOther));
     } else {
       return forOther;
     }
   }
 
-  private CAlignment ternaryTypeId(IRType type, CAlignment forInt, CAlignment forBool, CAlignment forOther) {
+  private CAlignment ternaryTypeId(
+      IRType type, CAlignment forInt, CAlignment forBool, CAlignment forOther) {
     if (optimizePrimitiveExponentials && type instanceof IRIntT) {
       return forInt;
     } else if (optimizePrimitiveExponentials && type instanceof IRBoolT) {
       return forBool;
     } else if (optimizePrimitiveExponentials && type instanceof IRVarT) {
       String typeId = typeId(type(((IRVarT) type).getType()));
-      return CAlignment.ternary(typeId
-          + " == "
-          + TYPE_ID_INT, forInt, CAlignment.ternary(typeId + " == " + TYPE_ID_BOOL, forBool, forOther));
+      return CAlignment.ternary(
+          typeId + " == " + TYPE_ID_INT,
+          forInt,
+          CAlignment.ternary(typeId + " == " + TYPE_ID_BOOL, forBool, forOther));
     } else {
       return forOther;
     }
@@ -2931,9 +2951,16 @@ public class CGenerator extends IRInstructionVisitor {
     @Override
     public void visit(IRExponentialT type) {
       size = ternaryTypeId(type.getInner(), arch.intSize, arch.unsignedCharSize, arch.pointerSize);
-      firstSlotOffset = ternaryTypeId(type.getInner(), arch.intSize, arch.unsignedCharSize, arch.pointerSize);
-      firstSlotSize = ternaryTypeId(type.getInner(), arch.intSize, arch.unsignedCharSize, arch.pointerSize);
-      alignment = ternaryTypeId(type.getInner(), arch.intAlignment, arch.unsignedCharAlignment, arch.pointerAlignment);
+      firstSlotOffset =
+          ternaryTypeId(type.getInner(), arch.intSize, arch.unsignedCharSize, arch.pointerSize);
+      firstSlotSize =
+          ternaryTypeId(type.getInner(), arch.intSize, arch.unsignedCharSize, arch.pointerSize);
+      alignment =
+          ternaryTypeId(
+              type.getInner(),
+              arch.intAlignment,
+              arch.unsignedCharAlignment,
+              arch.pointerAlignment);
     }
 
     @Override

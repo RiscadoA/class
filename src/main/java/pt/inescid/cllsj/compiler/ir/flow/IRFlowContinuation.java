@@ -1,7 +1,6 @@
 package pt.inescid.cllsj.compiler.ir.flow;
 
 import java.util.Optional;
-
 import pt.inescid.cllsj.compiler.ir.instructions_old.IRFlip;
 import pt.inescid.cllsj.compiler.ir.instructions_old.IRInstruction;
 import pt.inescid.cllsj.compiler.ir.instructions_old.IRNewSession;
