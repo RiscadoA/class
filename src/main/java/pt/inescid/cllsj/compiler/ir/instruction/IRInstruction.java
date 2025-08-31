@@ -7,7 +7,6 @@ import pt.inescid.cllsj.compiler.ir.IRCodeLocation;
 import pt.inescid.cllsj.compiler.ir.IRDataLocation;
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 import pt.inescid.cllsj.compiler.ir.IRSessionId;
-import pt.inescid.cllsj.compiler.ir.slot.IRSlotSequence;
 
 public abstract class IRInstruction {
   public abstract void accept(IRInstructionVisitor visitor);
@@ -19,8 +18,6 @@ public abstract class IRInstruction {
   public void replaceCodeLocations(Function<IRCodeLocation, IRCodeLocation> replacer) {}
 
   public void replaceDataLocations(Function<IRDataLocation, IRDataLocation> replacer) {}
-
-  public void replaceSlots(Function<IRSlotSequence, IRSlotSequence> replacer) {}
 
   public boolean usesSession(IRSessionId sessionId) {
     AtomicBoolean uses = new AtomicBoolean(false);
