@@ -16,26 +16,26 @@ import pt.inescid.cllsj.ast.ASTExprVisitor;
 import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.nodes.*;
 import pt.inescid.cllsj.ast.types.*;
-import pt.inescid.cllsj.compiler.ir.IRBlock;
-import pt.inescid.cllsj.compiler.ir.IRProcess;
-import pt.inescid.cllsj.compiler.ir.IRProgram;
-import pt.inescid.cllsj.compiler.ir.expressions.*;
-import pt.inescid.cllsj.compiler.ir.instructions_old.*;
-import pt.inescid.cllsj.compiler.ir.instructions_old.IRCallProcess.ExponentialArgument;
-import pt.inescid.cllsj.compiler.ir.instructions_old.IRCallProcess.LinearArgument;
-import pt.inescid.cllsj.compiler.ir.instructions_old.IRCallProcess.TypeArgument;
-import pt.inescid.cllsj.compiler.ir.type.IRCloseT;
-import pt.inescid.cllsj.compiler.ir.type.IRExponentialT;
-import pt.inescid.cllsj.compiler.ir.type.IRResetT;
-import pt.inescid.cllsj.compiler.ir.type.IRSessionT;
-import pt.inescid.cllsj.compiler.ir.type.IRType;
-import pt.inescid.cllsj.compiler.ir.type.IRTypeT;
-import pt.inescid.cllsj.compiler.ir.type.IRVarT;
+import pt.inescid.cllsj.compiler.ir.old.IRBlockOld;
+import pt.inescid.cllsj.compiler.ir.old.IRProcessOld;
+import pt.inescid.cllsj.compiler.ir.old.IRProgramOld;
+import pt.inescid.cllsj.compiler.ir.old.expressions.*;
+import pt.inescid.cllsj.compiler.ir.old.instructions_old.*;
+import pt.inescid.cllsj.compiler.ir.old.instructions_old.IRCallProcess.ExponentialArgument;
+import pt.inescid.cllsj.compiler.ir.old.instructions_old.IRCallProcess.LinearArgument;
+import pt.inescid.cllsj.compiler.ir.old.instructions_old.IRCallProcess.TypeArgument;
+import pt.inescid.cllsj.compiler.ir.old.type.IRCloseT;
+import pt.inescid.cllsj.compiler.ir.old.type.IRExponentialT;
+import pt.inescid.cllsj.compiler.ir.old.type.IRResetT;
+import pt.inescid.cllsj.compiler.ir.old.type.IRSessionT;
+import pt.inescid.cllsj.compiler.ir.old.type.IRType;
+import pt.inescid.cllsj.compiler.ir.old.type.IRTypeT;
+import pt.inescid.cllsj.compiler.ir.old.type.IRVarT;
 
 public class IRGenerator extends ASTNodeVisitor {
-  private IRProgram program = new IRProgram();
-  private IRProcess process;
-  private IRBlock block;
+  private IRProgramOld program = new IRProgramOld();
+  private IRProcessOld process;
+  private IRBlockOld block;
   private Stack<Environment> environments = new Stack<>();
   private Env<EnvEntry> ep;
 
@@ -43,7 +43,7 @@ public class IRGenerator extends ASTNodeVisitor {
   public boolean optimizeSendForward = true;
   public boolean optimizeSendValue = true;
 
-  public IRProgram generate(Env<EnvEntry> ep, ASTProgram ast) {
+  public IRProgramOld generate(Env<EnvEntry> ep, ASTProgram ast) {
     for (ASTProcDef procDef : ast.getProcDefs()) {
       this.ep = ep;
       for (int i = 0; i < procDef.getTArgs().size(); ++i) {
@@ -79,9 +79,9 @@ public class IRGenerator extends ASTNodeVisitor {
       ASTNode node,
       boolean inlineable,
       boolean recursive) {
-    IRProcess oldProcess = process;
+    IRProcessOld oldProcess = process;
     process =
-        new IRProcess(
+        new IRProcessOld(
             linearArgumentCount,
             exponentialArgumentCount,
             env.recordCount(),
@@ -97,12 +97,12 @@ public class IRGenerator extends ASTNodeVisitor {
     process = oldProcess;
   }
 
-  private void visitBlock(IRBlock block, ASTNode node) {
+  private void visitBlock(IRBlockOld block, ASTNode node) {
     visitBlock(block, () -> node.accept(this));
   }
 
-  private void visitBlock(IRBlock block, Runnable runnable) {
-    IRBlock oldBlock = this.block;
+  private void visitBlock(IRBlockOld block, Runnable runnable) {
+    IRBlockOld oldBlock = this.block;
     this.block = block;
     runnable.run();
     this.block = oldBlock;
@@ -137,7 +137,7 @@ public class IRGenerator extends ASTNodeVisitor {
       }
     }
 
-    IRBlock negBlock = process.addBlock(negLabel);
+    IRBlockOld negBlock = process.addBlock(negLabel);
     block.add(
         new IRNewSession(record(node.getCh()), negBlock.getLabel(), intoIRType(node.getChType())));
     reset(record(node.getCh()), node.getChType());
@@ -152,7 +152,7 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTMix node) {
-    IRBlock rhs = process.addBlock("mix_rhs");
+    IRBlockOld rhs = process.addBlock("mix_rhs");
 
     // If an exponential occurs in both branches, we need to increment its reference count.
     Set<String> exponentials = exponentialNamesFreeIn(node);
@@ -222,7 +222,7 @@ public class IRGenerator extends ASTNodeVisitor {
     } else {
       pushedRecord = record(node.getCho());
 
-      IRBlock closure = process.addBlock("send_closure");
+      IRBlockOld closure = process.addBlock("send_closure");
       block.add(new IRNewSession(pushedRecord, closure.getLabel(), intoIRType(node.getLhsType())));
 
       // Flip to the argument if its session type is positive.
@@ -267,7 +267,7 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTSendTy node) {
-    IRBlock closure = process.addBlock("send_ty_closure");
+    IRBlockOld closure = process.addBlock("send_ty_closure");
 
     int previousRecord = record(node.getChs());
     nextRecord(node.getChs());
@@ -299,8 +299,8 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTRecvTy node) {
-    IRBlock positiveBlock = process.addBlock("recv_ty_positive");
-    IRBlock negativeBlock = process.addBlock("recv_ty_negative");
+    IRBlockOld positiveBlock = process.addBlock("recv_ty_positive");
+    IRBlockOld negativeBlock = process.addBlock("recv_ty_negative");
 
     int previousRecord = record(node.getChs());
     nextRecord(node.getChs());
@@ -362,7 +362,7 @@ public class IRGenerator extends ASTNodeVisitor {
       String caseLabel = node.getCaseLabelFromIndex(i);
       ASTNode caseNode = node.getCase(caseLabel);
 
-      IRBlock caseBlock = process.addBlock("case_" + caseLabel.substring(1));
+      IRBlockOld caseBlock = process.addBlock("case_" + caseLabel.substring(1));
       cases.put(i, new IRPopTag.Case(caseBlock.getLabel(), countEndPoints(caseNode)));
 
       // Decrement the reference count of any unused exponentials in this case.
@@ -473,8 +473,8 @@ public class IRGenerator extends ASTNodeVisitor {
     Set<String> exponentials = exponentialNamesFreeIn(node);
     GeneratedExpression expr = generateExpression(node.getExpr());
 
-    IRBlock thenBlock = process.addBlock("if_then");
-    IRBlock elseBlock = process.addBlock("if_else");
+    IRBlockOld thenBlock = process.addBlock("if_then");
+    IRBlockOld elseBlock = process.addBlock("if_else");
 
     IRBranch.Case then = new IRBranch.Case(thenBlock.getLabel(), countEndPoints(node.getThen()));
     IRBranch.Case otherwise =
@@ -569,8 +569,8 @@ public class IRGenerator extends ASTNodeVisitor {
   @Override
   public void visit(ASTAffine node) {
     // Generate a pop tag instruction
-    IRBlock discardBlock = process.addBlock("affine_discard");
-    IRBlock useBlock = process.addBlock("affine_use");
+    IRBlockOld discardBlock = process.addBlock("affine_discard");
+    IRBlockOld useBlock = process.addBlock("affine_use");
     Map<Integer, IRPopTag.Case> cases = new HashMap<>();
     block.add(
         new IRPopTag(record(node.getCh()), intoIRType(new ASTAffineT(node.getContType())), cases));
@@ -601,7 +601,7 @@ public class IRGenerator extends ASTNodeVisitor {
     for (String name : node.getCoaffineSet().keySet()) {
       ASTType type = node.getCoaffineSet().get(name);
 
-      IRBlock contBlock = process.addBlock("affine_discard_flip");
+      IRBlockOld contBlock = process.addBlock("affine_discard_flip");
 
       discardBlock.add(new IRPushTag(record(name), intoIRType(type), 0));
       discardBlock.add(new IRFlip(record(name), new IRCloseT(), contBlock.getLabel()));
@@ -628,7 +628,7 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTDiscard node) {
-    IRBlock contBlock = process.addBlock("discard_flip");
+    IRBlockOld contBlock = process.addBlock("discard_flip");
 
     // Tag 0 represents discard for affine records
     block.add(new IRPushTag(record(node.getCh()), intoIRType(node.getCoAffineT()), 0));
@@ -661,7 +661,7 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTShare node) {
-    IRBlock rhs = process.addBlock("share_rhs");
+    IRBlockOld rhs = process.addBlock("share_rhs");
 
     // Increment the reference count of the cell.
     block.add(new IRIncRefCell(record(node.getCh())));
@@ -703,7 +703,7 @@ public class IRGenerator extends ASTNodeVisitor {
   }
 
   private void flip(int record, ASTType contType) {
-    IRBlock contBlock = process.addBlock("flip");
+    IRBlockOld contBlock = process.addBlock("flip");
     block.add(new IRFlip(record, intoIRType(contType), contBlock.getLabel()));
     block = contBlock;
   }
@@ -731,7 +731,7 @@ public class IRGenerator extends ASTNodeVisitor {
     }
   }
 
-  private void decExponentialRefIfUnused(IRBlock block, ASTNode node, String name) {
+  private void decExponentialRefIfUnused(IRBlockOld block, ASTNode node, String name) {
     if (!nameFreeIn(node, name)) {
       block.add(new IRDecRefExponential(exponential(name), exponentialType(name)));
     }
@@ -1020,7 +1020,8 @@ public class IRGenerator extends ASTNodeVisitor {
       return expr;
     }
 
-    public void cleanUp(IRBlock block, Optional<ASTNode> continuation, boolean cleanExponentials) {
+    public void cleanUp(
+        IRBlockOld block, Optional<ASTNode> continuation, boolean cleanExponentials) {
       for (String record : usedRecords) {
         block.add(new IRFreeSession(record(record)));
       }

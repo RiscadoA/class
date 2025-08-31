@@ -1,0 +1,80 @@
+package pt.inescid.cllsj.compiler.ir.old.type;
+
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.function.BiFunction;
+import pt.inescid.cllsj.compiler.ir.old.IRTypeVisitor;
+
+public class IRVarT extends IRType {
+  // Index of the type variable, counting from the end.
+  // I.e., index 0 refers to the last introduced type, such that in `sendty B; sendty A; send B; A`,
+  // the type variable A has index 0, and the type variable B as index 1.
+  private int type;
+
+  // If the type needs a preceding 'IRFlipT', but we were not able to determine it at type
+  // conversion time,
+  // (e.g., because the type variable polarity is only known later in the program flow), this
+  // variable
+  // holds the polarity which, if held by the variable, would require a preceding 'IRFlipT'.
+  private Optional<Boolean> flipPolarity;
+
+  public IRVarT(int type, Optional<Boolean> flipPolarity) {
+    this.type = type;
+    this.flipPolarity = flipPolarity;
+  }
+
+  public int getType() {
+    return type;
+  }
+
+  // Checks if a 'IRFlipT' should have been preceding this variable, given the actual polarity of
+  // the variable.
+  public boolean hasPrecedingFlip(boolean varPolarity) {
+    return flipPolarity.isPresent() && flipPolarity.get() == varPolarity;
+  }
+
+  public Optional<Boolean> getFlipPolarity() {
+    return flipPolarity;
+  }
+
+  public void accept(IRTypeVisitor visitor) {
+    visitor.visit(this);
+  }
+
+  @Override
+  public String toString() {
+    String fs = flipPolarity.map(p -> p ? "+" : "-").orElse("");
+    return "var" + fs + " " + type;
+  }
+
+  @Override
+  public IRType substituteVar(int index, int offset, BiFunction<Integer, IRVarT, IRType> types) {
+    if (index == this.type) {
+      return types.apply(offset, this);
+    } else {
+      return this;
+    }
+  }
+
+  @Override
+  public ValueRequisites valueRequisites() {
+    Map<Integer, Boolean> reqPolarities;
+    if (flipPolarity.isPresent()) {
+      reqPolarities = Map.of(type, !flipPolarity.get());
+    } else {
+      reqPolarities = Map.of();
+    }
+
+    List<Integer> reqValues = List.of(type);
+
+    return ValueRequisites.value(reqPolarities, reqValues);
+  }
+
+  @Override
+  public boolean equals(IRType other) {
+    return other instanceof IRVarT
+        && ((IRVarT) other).getType() == getType()
+        && ((IRVarT) other).getFlipPolarity().equals(getFlipPolarity());
+  }
+}

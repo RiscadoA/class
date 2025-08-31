@@ -10,52 +10,52 @@ import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
 import java.util.function.Function;
-import pt.inescid.cllsj.compiler.ir.IRBlock;
-import pt.inescid.cllsj.compiler.ir.IRProcess;
-import pt.inescid.cllsj.compiler.ir.IRProgram;
-import pt.inescid.cllsj.compiler.ir.IRTypeVisitor;
-import pt.inescid.cllsj.compiler.ir.flow.IRFlow;
-import pt.inescid.cllsj.compiler.ir.flow.IRFlowContinuation;
-import pt.inescid.cllsj.compiler.ir.flow.IRFlowState;
-import pt.inescid.cllsj.compiler.ir.instructions_old.*;
-import pt.inescid.cllsj.compiler.ir.type.IRBoolT;
-import pt.inescid.cllsj.compiler.ir.type.IRCellT;
-import pt.inescid.cllsj.compiler.ir.type.IRCloseT;
-import pt.inescid.cllsj.compiler.ir.type.IRExponentialT;
-import pt.inescid.cllsj.compiler.ir.type.IRIntT;
-import pt.inescid.cllsj.compiler.ir.type.IRResetT;
-import pt.inescid.cllsj.compiler.ir.type.IRSessionT;
-import pt.inescid.cllsj.compiler.ir.type.IRStringT;
-import pt.inescid.cllsj.compiler.ir.type.IRTagT;
-import pt.inescid.cllsj.compiler.ir.type.IRType;
-import pt.inescid.cllsj.compiler.ir.type.IRTypeT;
-import pt.inescid.cllsj.compiler.ir.type.IRVarT;
+import pt.inescid.cllsj.compiler.ir.old.IRBlockOld;
+import pt.inescid.cllsj.compiler.ir.old.IRProcessOld;
+import pt.inescid.cllsj.compiler.ir.old.IRProgramOld;
+import pt.inescid.cllsj.compiler.ir.old.IRTypeVisitor;
+import pt.inescid.cllsj.compiler.ir.old.flow.IRFlow;
+import pt.inescid.cllsj.compiler.ir.old.flow.IRFlowContinuation;
+import pt.inescid.cllsj.compiler.ir.old.flow.IRFlowState;
+import pt.inescid.cllsj.compiler.ir.old.instructions_old.*;
+import pt.inescid.cllsj.compiler.ir.old.type.IRBoolT;
+import pt.inescid.cllsj.compiler.ir.old.type.IRCellT;
+import pt.inescid.cllsj.compiler.ir.old.type.IRCloseT;
+import pt.inescid.cllsj.compiler.ir.old.type.IRExponentialT;
+import pt.inescid.cllsj.compiler.ir.old.type.IRIntT;
+import pt.inescid.cllsj.compiler.ir.old.type.IRResetT;
+import pt.inescid.cllsj.compiler.ir.old.type.IRSessionT;
+import pt.inescid.cllsj.compiler.ir.old.type.IRStringT;
+import pt.inescid.cllsj.compiler.ir.old.type.IRTagT;
+import pt.inescid.cllsj.compiler.ir.old.type.IRType;
+import pt.inescid.cllsj.compiler.ir.old.type.IRTypeT;
+import pt.inescid.cllsj.compiler.ir.old.type.IRVarT;
 
 public class IROptimizer {
-  private Map<String, Map<IRBlock, IRFlow>> processFlows = new HashMap<>();
+  private Map<String, Map<IRBlockOld, IRFlow>> processFlows = new HashMap<>();
 
-  public void analyze(IRProgram program) {
+  public void analyze(IRProgramOld program) {
     processFlows.clear();
     int processCount = program.getProcesses().size();
     int done = 0;
-    for (Map.Entry<String, IRProcess> e : program.getProcesses().entrySet()) {
+    for (Map.Entry<String, IRProcessOld> e : program.getProcesses().entrySet()) {
       System.err.println(
           "Analyzing process: " + e.getKey() + " (" + ++done + "/" + processCount + ")");
       processFlows.put(e.getKey(), IRAnalyzer.analyze(e.getValue()));
     }
   }
 
-  public void printProcessFlows(IRProgram program) {
-    for (Map.Entry<String, Map<IRBlock, IRFlow>> e : processFlows.entrySet()) {
-      IRProcess p = program.getProcesses().get(e.getKey());
+  public void printProcessFlows(IRProgramOld program) {
+    for (Map.Entry<String, Map<IRBlockOld, IRFlow>> e : processFlows.entrySet()) {
+      IRProcessOld p = program.getProcesses().get(e.getKey());
       System.out.println(e.getKey() + ":");
       System.out.println(e.getValue().get(p.getEntry()));
       System.out.println();
     }
   }
 
-  public void optimizeKnownJumps(IRProgram ir) {
-    for (Map.Entry<String, IRProcess> e : ir.getProcesses().entrySet()) {
+  public void optimizeKnownJumps(IRProgramOld ir) {
+    for (Map.Entry<String, IRProcessOld> e : ir.getProcesses().entrySet()) {
       if (!processFlows.containsKey(e.getKey())) {
         throw new IllegalStateException(
             "Analysis must be enabled to perform known jumps optimization");
@@ -64,7 +64,7 @@ public class IROptimizer {
     }
   }
 
-  private void optimizeKnownJumps(IRProcess ir, Map<IRBlock, IRFlow> flows) {
+  private void optimizeKnownJumps(IRProcessOld ir, Map<IRBlockOld, IRFlow> flows) {
     while (true) {
       Optional<IRFlow> prev = Optional.empty();
       Optional<IRFlow> next = Optional.empty();
@@ -94,11 +94,11 @@ public class IROptimizer {
     }
   }
 
-  public void optimizeKnownEndPoints(IRProgram ir) {
+  public void optimizeKnownEndPoints(IRProgramOld ir) {
     ir.forEachProcess((n, p) -> optimizeKnownEndPoints(p, processFlows.get(n)));
   }
 
-  private void optimizeKnownEndPoints(IRProcess ir, Map<IRBlock, IRFlow> flows) {
+  private void optimizeKnownEndPoints(IRProcessOld ir, Map<IRBlockOld, IRFlow> flows) {
     for (IRFlow flow : flows.values()) {
       // We want to find the blocks which have at least one outgoing flow.
       // Those blocks should never be end points.
@@ -134,7 +134,7 @@ public class IROptimizer {
     }
   }
 
-  private void concatFlows(IRProcess ir, IRFlow prev, IRFlow next) {
+  private void concatFlows(IRProcessOld ir, IRFlow prev, IRFlow next) {
     // Get the last instruction on the current block
     IRInstruction last = prev.getBlock().getInstructions().getLast();
     prev.getStates().removeLast(); // Duplicated state
@@ -262,11 +262,12 @@ public class IROptimizer {
 
   // Modifies the end points of all branch instructions leading to block.
   // If positive, increases the end point count, otherwise, decreases it.
-  private void modifyEndPoints(IRProcess ir, IRBlock block, int endPoints) {
+  private void modifyEndPoints(IRProcessOld ir, IRBlockOld block, int endPoints) {
     modifyEndPoints(ir, block, endPoints, new HashSet<>());
   }
 
-  private void modifyEndPoints(IRProcess ir, IRBlock block, int endPoints, Set<IRBlock> visited) {
+  private void modifyEndPoints(
+      IRProcessOld ir, IRBlockOld block, int endPoints, Set<IRBlockOld> visited) {
     if (endPoints == 0) {
       return;
     }
@@ -282,7 +283,7 @@ public class IROptimizer {
     }
 
     // Find blocks which reference this block
-    for (IRBlock introducer : ir.getBlocksIncludingEntry()) {
+    for (IRBlockOld introducer : ir.getBlocksIncludingEntry()) {
       boolean referenced = false;
       for (IRInstruction instr : introducer.getInstructions()) {
         if (instr.usesLabel(block.getLabel())) {
@@ -549,20 +550,20 @@ public class IROptimizer {
   //   }
   // }
 
-  public void removeUnusedRecords(IRProgram ir) {
-    for (Map.Entry<String, IRProcess> e : ir.getProcesses().entrySet()) {
+  public void removeUnusedRecords(IRProgramOld ir) {
+    for (Map.Entry<String, IRProcessOld> e : ir.getProcesses().entrySet()) {
       removeUnusedRecords(e.getValue());
     }
   }
 
-  private void removeUnusedRecords(IRProcess ir) {
+  private void removeUnusedRecords(IRProcessOld ir) {
     // First, figure out which records are unused
     Set<Integer> unusedRecords = new HashSet<>();
     for (int i = ir.getRecordArgumentCount(); i < ir.getRecordCount(); ++i) {
       unusedRecords.add(i);
     }
 
-    for (IRBlock block : ir.getBlocksIncludingEntry()) {
+    for (IRBlockOld block : ir.getBlocksIncludingEntry()) {
       for (IRInstruction instr : block.getInstructions()) {
         unusedRecords.removeIf(r -> instr.usesRecord(r));
       }
@@ -582,27 +583,27 @@ public class IROptimizer {
     }
 
     // Finally, rename all records in the instructions
-    for (IRBlock block : ir.getBlocksIncludingEntry()) {
+    for (IRBlockOld block : ir.getBlocksIncludingEntry()) {
       for (IRInstruction instr : block.getInstructions()) {
         instr.renameRecords(recordRebindings::get);
       }
     }
   }
 
-  public void removeUnusedExponentials(IRProgram ir) {
-    for (Map.Entry<String, IRProcess> e : ir.getProcesses().entrySet()) {
+  public void removeUnusedExponentials(IRProgramOld ir) {
+    for (Map.Entry<String, IRProcessOld> e : ir.getProcesses().entrySet()) {
       removeUnusedExponentials(e.getValue());
     }
   }
 
-  private void removeUnusedExponentials(IRProcess ir) {
+  private void removeUnusedExponentials(IRProcessOld ir) {
     // First, figure out which exponentials are unused
     Set<Integer> unusedExponentials = new HashSet<>();
     for (int i = ir.getExponentialArgumentCount(); i < ir.getExponentialCount(); ++i) {
       unusedExponentials.add(i);
     }
 
-    for (IRBlock block : ir.getBlocksIncludingEntry()) {
+    for (IRBlockOld block : ir.getBlocksIncludingEntry()) {
       for (IRInstruction instr : block.getInstructions()) {
         unusedExponentials.removeIf(r -> instr.usesExponential(r));
       }
@@ -622,24 +623,24 @@ public class IROptimizer {
     }
 
     // Finally, rename all records in the instructions
-    for (IRBlock block : ir.getBlocksIncludingEntry()) {
+    for (IRBlockOld block : ir.getBlocksIncludingEntry()) {
       for (IRInstruction instr : block.getInstructions()) {
         instr.renameExponentials(exponentialRebindings::get);
       }
     }
   }
 
-  public void removeUnreachableBlocks(IRProgram ir) {
-    for (Map.Entry<String, IRProcess> e : ir.getProcesses().entrySet()) {
+  public void removeUnreachableBlocks(IRProgramOld ir) {
+    for (Map.Entry<String, IRProcessOld> e : ir.getProcesses().entrySet()) {
       removeUnreachableBlocks(e.getValue(), processFlows.get(e.getKey()));
     }
   }
 
-  private void removeUnreachableBlocks(IRProcess ir, Map<IRBlock, IRFlow> flows) {
+  private void removeUnreachableBlocks(IRProcessOld ir, Map<IRBlockOld, IRFlow> flows) {
     while (true) {
-      Optional<IRBlock> toRemove = Optional.empty();
+      Optional<IRBlockOld> toRemove = Optional.empty();
 
-      for (IRBlock block : ir.getBlocks()) {
+      for (IRBlockOld block : ir.getBlocks()) {
         if (!flows.containsKey(block) || flows.get(block).getSources().isEmpty()) {
           toRemove = Optional.of(block);
           break;
@@ -660,12 +661,12 @@ public class IROptimizer {
     }
   }
 
-  public void optimizeFlipForward(IRProgram ir) {
-    for (Map.Entry<String, IRProcess> e : ir.getProcesses().entrySet()) {
-      Map<IRBlock, IRFlow> flows = processFlows.get(e.getKey());
-      Set<IRBlock> blocksToRemove = new HashSet<>();
+  public void optimizeFlipForward(IRProgramOld ir) {
+    for (Map.Entry<String, IRProcessOld> e : ir.getProcesses().entrySet()) {
+      Map<IRBlockOld, IRFlow> flows = processFlows.get(e.getKey());
+      Set<IRBlockOld> blocksToRemove = new HashSet<>();
 
-      for (IRBlock flipBlock : e.getValue().getBlocksIncludingEntry()) {
+      for (IRBlockOld flipBlock : e.getValue().getBlocksIncludingEntry()) {
         if (!flows.containsKey(flipBlock)) {
           continue;
         }
@@ -676,7 +677,7 @@ public class IROptimizer {
           continue; // Not what we're looking for
         }
         IRFlip flip = (IRFlip) maybeFlip;
-        IRBlock forwardBlock = e.getValue().getBlock(flip.getContLabel());
+        IRBlockOld forwardBlock = e.getValue().getBlock(flip.getContLabel());
         IRInstruction maybeForward = forwardBlock.getInstructions().getFirst();
         if (!(maybeForward instanceof IRForward)) {
           continue; // Not what we're looking for
@@ -712,7 +713,7 @@ public class IROptimizer {
         blocksToRemove.add(forwardBlock);
       }
 
-      for (IRBlock block : blocksToRemove) {
+      for (IRBlockOld block : blocksToRemove) {
         IRFlow flow = flows.remove(block);
         for (IRFlow source : flow.getSources()) {
           source.removeTarget(flow);
@@ -972,7 +973,7 @@ public class IROptimizer {
   //   }
   // }
 
-  public void inlineProcesses(IRProgram ir, int maxComplexity, boolean allowLoops) {
+  public void inlineProcesses(IRProgramOld ir, int maxComplexity, boolean allowLoops) {
     Map<String, Integer> evaluated = new HashMap<>();
     Set<String> visited = new HashSet<>();
     ir.forEachProcess(
@@ -980,7 +981,7 @@ public class IROptimizer {
   }
 
   private void inlineProcesses(
-      IRProgram ir,
+      IRProgramOld ir,
       int maxComplexity,
       String name,
       boolean allowLoops,
@@ -989,11 +990,11 @@ public class IROptimizer {
     if (!visited.add(name)) {
       return;
     }
-    IRProcess proc = ir.getProcesses().get(name);
+    IRProcessOld proc = ir.getProcesses().get(name);
 
     // Search for process calls which we can inline
     for (int i = 0, end = proc.getBlocksIncludingEntry().size(); i < end; ++i) {
-      IRBlock block = proc.getBlocksIncludingEntry().get(i);
+      IRBlockOld block = proc.getBlocksIncludingEntry().get(i);
       IRInstruction instr = block.getInstructions().getLast();
       if (!(instr instanceof IRCallProcess)) {
         continue; // Not a process call
@@ -1003,7 +1004,7 @@ public class IROptimizer {
       IRCallProcess call = (IRCallProcess) instr;
       String callName = call.getProcessName();
       inlineProcesses(ir, maxComplexity, callName, allowLoops, evaluated, visited);
-      IRProcess callProc = ir.getProcesses().get(callName);
+      IRProcessOld callProc = ir.getProcesses().get(callName);
       if (!callProc.isInlineable() || (!allowLoops && callProc.isRecursive())) {
         continue;
       }
@@ -1115,7 +1116,7 @@ public class IROptimizer {
 
       // Identify the block we'll be adding the inlined process' entry instructions
       // If the process is recursive (and thus, a loop), we need to create a new block
-      IRBlock entryBlock;
+      IRBlockOld entryBlock;
       if (callProc.isRecursive()) {
         entryBlock = proc.addBlock(call.getProcessName());
         block.add(
@@ -1128,7 +1129,7 @@ public class IROptimizer {
 
       // Create a mapping from labels in the inlined process to labels in the current process
       Map<String, String> labelMap = new HashMap<>();
-      for (IRBlock callBlock : callProc.getBlocks()) {
+      for (IRBlockOld callBlock : callProc.getBlocks()) {
         labelMap.put(
             callBlock.getLabel(),
             proc.addBlock(call.getProcessName() + "_" + callBlock.getLabel()).getLabel());
@@ -1178,8 +1179,8 @@ public class IROptimizer {
       }
 
       // Add all blocks of the process to the current process
-      for (IRBlock callBlock : callProc.getBlocks()) {
-        IRBlock newBlock = proc.getBlock(labelMap.get(callBlock.getLabel()));
+      for (IRBlockOld callBlock : callProc.getBlocks()) {
+        IRBlockOld newBlock = proc.getBlock(labelMap.get(callBlock.getLabel()));
         for (IRInstruction callInstr : callBlock.getInstructions()) {
           newBlock.add(convertInstruction.apply(callInstr));
         }
@@ -1192,7 +1193,7 @@ public class IROptimizer {
     }
   }
 
-  public void removeUnusedProcesses(IRProgram ir, String entryProcess) {
+  public void removeUnusedProcesses(IRProgramOld ir, String entryProcess) {
     // BFS to find all processes which are used by the entry process
     Set<String> used = new HashSet<>();
     Queue<String> queue = new LinkedList<>();
@@ -1201,9 +1202,9 @@ public class IROptimizer {
 
     while (!queue.isEmpty()) {
       String procName = queue.poll();
-      IRProcess proc = ir.getProcesses().get(procName);
+      IRProcessOld proc = ir.getProcesses().get(procName);
 
-      for (IRBlock block : proc.getBlocksIncludingEntry()) {
+      for (IRBlockOld block : proc.getBlocksIncludingEntry()) {
         for (IRInstruction instr : block.getInstructions()) {
           if (instr instanceof IRCallProcess) {
             IRCallProcess call = (IRCallProcess) instr;
@@ -1420,7 +1421,7 @@ public class IROptimizer {
   }
 
   // Heuristic for how complex a process is
-  private int complexity(IRProcess process) {
+  private int complexity(IRProcessOld process) {
     return process.getBlocks().size();
   }
 }

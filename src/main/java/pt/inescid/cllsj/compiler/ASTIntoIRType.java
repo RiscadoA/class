@@ -10,7 +10,7 @@ import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.TypeEntry;
 import pt.inescid.cllsj.ast.ASTTypeVisitor;
 import pt.inescid.cllsj.ast.types.*;
-import pt.inescid.cllsj.compiler.ir.type.*;
+import pt.inescid.cllsj.compiler.ir.old.type.*;
 
 public class ASTIntoIRType extends ASTTypeVisitor {
   private IRGenerator gen;

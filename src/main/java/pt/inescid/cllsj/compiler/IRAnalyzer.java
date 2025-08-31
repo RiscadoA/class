@@ -4,39 +4,39 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import pt.inescid.cllsj.compiler.ir.IRBlock;
-import pt.inescid.cllsj.compiler.ir.IRExpressionVisitor;
-import pt.inescid.cllsj.compiler.ir.IRInstructionVisitorOld;
-import pt.inescid.cllsj.compiler.ir.IRProcess;
-import pt.inescid.cllsj.compiler.ir.expressions.IRAdd;
-import pt.inescid.cllsj.compiler.ir.expressions.IRAnd;
-import pt.inescid.cllsj.compiler.ir.expressions.IRBool;
-import pt.inescid.cllsj.compiler.ir.expressions.IRDiv;
-import pt.inescid.cllsj.compiler.ir.expressions.IREq;
-import pt.inescid.cllsj.compiler.ir.expressions.IRExponentialVar;
-import pt.inescid.cllsj.compiler.ir.expressions.IRExpression;
-import pt.inescid.cllsj.compiler.ir.expressions.IRGt;
-import pt.inescid.cllsj.compiler.ir.expressions.IRInt;
-import pt.inescid.cllsj.compiler.ir.expressions.IRLt;
-import pt.inescid.cllsj.compiler.ir.expressions.IRMul;
-import pt.inescid.cllsj.compiler.ir.expressions.IRNot;
-import pt.inescid.cllsj.compiler.ir.expressions.IROr;
-import pt.inescid.cllsj.compiler.ir.expressions.IRString;
-import pt.inescid.cllsj.compiler.ir.expressions.IRSub;
-import pt.inescid.cllsj.compiler.ir.expressions.IRVar;
-import pt.inescid.cllsj.compiler.ir.flow.*;
-import pt.inescid.cllsj.compiler.ir.instructions_old.*;
-import pt.inescid.cllsj.compiler.ir.type.*;
+import pt.inescid.cllsj.compiler.ir.old.IRBlockOld;
+import pt.inescid.cllsj.compiler.ir.old.IRExpressionVisitor;
+import pt.inescid.cllsj.compiler.ir.old.IRInstructionVisitorOld;
+import pt.inescid.cllsj.compiler.ir.old.IRProcessOld;
+import pt.inescid.cllsj.compiler.ir.old.expressions.IRAdd;
+import pt.inescid.cllsj.compiler.ir.old.expressions.IRAnd;
+import pt.inescid.cllsj.compiler.ir.old.expressions.IRBool;
+import pt.inescid.cllsj.compiler.ir.old.expressions.IRDiv;
+import pt.inescid.cllsj.compiler.ir.old.expressions.IREq;
+import pt.inescid.cllsj.compiler.ir.old.expressions.IRExponentialVar;
+import pt.inescid.cllsj.compiler.ir.old.expressions.IRExpression;
+import pt.inescid.cllsj.compiler.ir.old.expressions.IRGt;
+import pt.inescid.cllsj.compiler.ir.old.expressions.IRInt;
+import pt.inescid.cllsj.compiler.ir.old.expressions.IRLt;
+import pt.inescid.cllsj.compiler.ir.old.expressions.IRMul;
+import pt.inescid.cllsj.compiler.ir.old.expressions.IRNot;
+import pt.inescid.cllsj.compiler.ir.old.expressions.IROr;
+import pt.inescid.cllsj.compiler.ir.old.expressions.IRString;
+import pt.inescid.cllsj.compiler.ir.old.expressions.IRSub;
+import pt.inescid.cllsj.compiler.ir.old.expressions.IRVar;
+import pt.inescid.cllsj.compiler.ir.old.flow.*;
+import pt.inescid.cllsj.compiler.ir.old.instructions_old.*;
+import pt.inescid.cllsj.compiler.ir.old.type.*;
 
 // Visitor which analyses the IR of a given process and generates a control and data flow graph.
 public class IRAnalyzer extends IRInstructionVisitorOld {
-  private Map<IRBlock, IRFlow> flows = new HashMap<>();
+  private Map<IRBlockOld, IRFlow> flows = new HashMap<>();
   private IRFlow flow;
   private IRFlowState state;
-  private IRProcess process;
+  private IRProcessOld process;
   private IRFlowLocation location;
 
-  public static Map<IRBlock, IRFlow> analyze(IRProcess process) {
+  public static Map<IRBlockOld, IRFlow> analyze(IRProcessOld process) {
     IRAnalyzer analyzer = new IRAnalyzer(process);
     for (int i = 0; i < process.getTypeVariableCount(); ++i) {
       analyzer.state.bindType(i, new IRFlowType(process.isTypeVariablePositive(i)));
@@ -51,7 +51,7 @@ public class IRAnalyzer extends IRInstructionVisitorOld {
     return analyzer.flows;
   }
 
-  private IRAnalyzer(IRProcess process) {
+  private IRAnalyzer(IRProcessOld process) {
     this.process = process;
     this.flow = new IRFlow(process.getEntry());
     this.state = new IRFlowState();
@@ -66,7 +66,7 @@ public class IRAnalyzer extends IRInstructionVisitorOld {
     return getFlow(process.getBlock(label));
   }
 
-  public IRFlow getFlow(IRBlock block) {
+  public IRFlow getFlow(IRBlockOld block) {
     IRFlow flow;
     if (!flows.containsKey(block)) {
       flow = new IRFlow(block);
@@ -94,7 +94,7 @@ public class IRAnalyzer extends IRInstructionVisitorOld {
     visit(process.getBlock(label), type);
   }
 
-  private void visit(IRBlock block, VisitType type) {
+  private void visit(IRBlockOld block, VisitType type) {
     // Create a new flow object (if we haven't passed through it yet).
     IRFlow previousFlow = this.flow;
     IRFlowState previousState = this.state;

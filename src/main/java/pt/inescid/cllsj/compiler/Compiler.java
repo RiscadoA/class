@@ -14,7 +14,7 @@ import pt.inescid.cllsj.ast.nodes.ASTInclude;
 import pt.inescid.cllsj.ast.nodes.ASTPList;
 import pt.inescid.cllsj.ast.nodes.ASTProgram;
 import pt.inescid.cllsj.ast.nodes.ASTProgramWithIncludes;
-import pt.inescid.cllsj.compiler.ir.IRProgram;
+import pt.inescid.cllsj.compiler.ir.old.IRProgramOld;
 
 public class Compiler {
   public String entryProcess = "main";
@@ -80,7 +80,7 @@ public class Compiler {
       return 0;
     }
 
-    IRProgram ir;
+    IRProgramOld ir;
     try {
       IRGenerator gen = new IRGenerator();
       gen.optimizeExponentialExpressionToForward = optimizeExponentialExpressionToForward;

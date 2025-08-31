@@ -8,12 +8,18 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import pt.inescid.cllsj.compiler.ir.*;
-import pt.inescid.cllsj.compiler.ir.expressions.*;
-import pt.inescid.cllsj.compiler.ir.instructions_old.*;
-import pt.inescid.cllsj.compiler.ir.instructions_old.IRCallProcess.ExponentialArgument;
-import pt.inescid.cllsj.compiler.ir.instructions_old.IRCallProcess.LinearArgument;
-import pt.inescid.cllsj.compiler.ir.instructions_old.IRCallProcess.TypeArgument;
-import pt.inescid.cllsj.compiler.ir.type.*;
+import pt.inescid.cllsj.compiler.ir.old.IRBlockOld;
+import pt.inescid.cllsj.compiler.ir.old.IRExpressionVisitor;
+import pt.inescid.cllsj.compiler.ir.old.IRInstructionVisitorOld;
+import pt.inescid.cllsj.compiler.ir.old.IRProcessOld;
+import pt.inescid.cllsj.compiler.ir.old.IRProgramOld;
+import pt.inescid.cllsj.compiler.ir.old.IRTypeVisitor;
+import pt.inescid.cllsj.compiler.ir.old.expressions.*;
+import pt.inescid.cllsj.compiler.ir.old.instructions_old.*;
+import pt.inescid.cllsj.compiler.ir.old.instructions_old.IRCallProcess.ExponentialArgument;
+import pt.inescid.cllsj.compiler.ir.old.instructions_old.IRCallProcess.LinearArgument;
+import pt.inescid.cllsj.compiler.ir.old.instructions_old.IRCallProcess.TypeArgument;
+import pt.inescid.cllsj.compiler.ir.old.type.*;
 
 public class CGenerator extends IRInstructionVisitorOld {
   private static final String TMP_TASK = "tmp_task";
@@ -35,7 +41,7 @@ public class CGenerator extends IRInstructionVisitorOld {
 
   private static int nextLabel = 0;
 
-  private IRProgram ir;
+  private IRProgramOld ir;
   private String code = "";
   private int indentLevel = 0;
   private String procName;
@@ -58,7 +64,7 @@ public class CGenerator extends IRInstructionVisitorOld {
   public int customAllocatorSizeDivisor = 64;
   public int customAllocatorLevels = 4;
 
-  public String generate(IRProgram ir) {
+  public String generate(IRProgramOld ir) {
     this.ir = ir;
 
     // Add the necessary includes.
@@ -600,7 +606,7 @@ public class CGenerator extends IRInstructionVisitorOld {
         });
 
     // Generate code for each process.
-    for (Map.Entry<String, IRProcess> procEntry : ir.getProcesses().entrySet()) {
+    for (Map.Entry<String, IRProcessOld> procEntry : ir.getProcesses().entrySet()) {
       typeCount = procEntry.getValue().getTypeVariableCount();
       recordCount = procEntry.getValue().getRecordCount();
       exponentialCount = procEntry.getValue().getExponentialCount();
@@ -610,7 +616,7 @@ public class CGenerator extends IRInstructionVisitorOld {
       putLabel(label);
       visitBlock(procEntry.getKey(), procEntry.getValue().getEntry());
 
-      for (IRBlock block : procEntry.getValue().getBlocks()) {
+      for (IRBlockOld block : procEntry.getValue().getBlocks()) {
         label = "block_" + procEntry.getKey() + "_" + block.getLabel();
         putLabel(label);
         visitBlock(procEntry.getKey(), block);
@@ -758,7 +764,7 @@ public class CGenerator extends IRInstructionVisitorOld {
 
   // ================================= IR instruction visitors ==================================
 
-  private void visitBlock(String procName, IRBlock block) {
+  private void visitBlock(String procName, IRBlockOld block) {
     this.procName = procName;
 
     for (IRInstruction instruction : block.getInstructions()) {
@@ -795,7 +801,7 @@ public class CGenerator extends IRInstructionVisitorOld {
 
   @Override
   public void visit(IRCallProcess instruction) {
-    IRProcess process = ir.getProcesses().get(instruction.getProcessName());
+    IRProcessOld process = ir.getProcesses().get(instruction.getProcessName());
 
     Runnable notATailCall =
         () -> {
@@ -1426,7 +1432,7 @@ public class CGenerator extends IRInstructionVisitorOld {
 
   @Override
   public void visit(IRNewExponentialProcess instruction) {
-    IRProcess process = ir.getProcesses().get(instruction.getProcessName());
+    IRProcessOld process = ir.getProcesses().get(instruction.getProcessName());
 
     putAllocExponential(
         exponential(instruction.getExponential()),
@@ -2216,7 +2222,7 @@ public class CGenerator extends IRInstructionVisitorOld {
   }
 
   private void putAllocEnvironment(String var, String processName) {
-    IRProcess process = ir.getProcesses().get(processName);
+    IRProcessOld process = ir.getProcesses().get(processName);
     putAllocEnvironment(
         var,
         process.getRecordCount(),
