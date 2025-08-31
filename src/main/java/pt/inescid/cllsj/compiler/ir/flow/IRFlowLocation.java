@@ -2,7 +2,8 @@ package pt.inescid.cllsj.compiler.ir.flow;
 
 import java.util.Optional;
 import java.util.function.Function;
-import pt.inescid.cllsj.compiler.ir.instructions.IRInstruction;
+
+import pt.inescid.cllsj.compiler.ir.instructions_old.IRInstruction;
 
 public class IRFlowLocation {
   private IRFlow flow;

@@ -9,10 +9,10 @@ import java.util.Optional;
 import java.util.Set;
 import pt.inescid.cllsj.compiler.ir.*;
 import pt.inescid.cllsj.compiler.ir.expressions.*;
-import pt.inescid.cllsj.compiler.ir.instructions.*;
-import pt.inescid.cllsj.compiler.ir.instructions.IRCallProcess.ExponentialArgument;
-import pt.inescid.cllsj.compiler.ir.instructions.IRCallProcess.LinearArgument;
-import pt.inescid.cllsj.compiler.ir.instructions.IRCallProcess.TypeArgument;
+import pt.inescid.cllsj.compiler.ir.instructions_old.*;
+import pt.inescid.cllsj.compiler.ir.instructions_old.IRCallProcess.ExponentialArgument;
+import pt.inescid.cllsj.compiler.ir.instructions_old.IRCallProcess.LinearArgument;
+import pt.inescid.cllsj.compiler.ir.instructions_old.IRCallProcess.TypeArgument;
 import pt.inescid.cllsj.compiler.ir.type.*;
 
 public class CGenerator extends IRInstructionVisitor {

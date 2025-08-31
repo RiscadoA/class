@@ -1,10 +1,11 @@
 package pt.inescid.cllsj.compiler.ir.flow;
 
 import java.util.Optional;
-import pt.inescid.cllsj.compiler.ir.instructions.IRFlip;
-import pt.inescid.cllsj.compiler.ir.instructions.IRInstruction;
-import pt.inescid.cllsj.compiler.ir.instructions.IRNewSession;
-import pt.inescid.cllsj.compiler.ir.instructions.IRReturn;
+
+import pt.inescid.cllsj.compiler.ir.instructions_old.IRFlip;
+import pt.inescid.cllsj.compiler.ir.instructions_old.IRInstruction;
+import pt.inescid.cllsj.compiler.ir.instructions_old.IRNewSession;
+import pt.inescid.cllsj.compiler.ir.instructions_old.IRReturn;
 
 public class IRFlowContinuation {
   private String label;

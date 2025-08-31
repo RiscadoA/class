@@ -6,7 +6,7 @@ import java.util.List;
 import java.util.Set;
 import pt.inescid.cllsj.compiler.IRAnalyzer;
 import pt.inescid.cllsj.compiler.ir.IRBlock;
-import pt.inescid.cllsj.compiler.ir.instructions.IRInstruction;
+import pt.inescid.cllsj.compiler.ir.instructions_old.IRInstruction;
 
 public class IRFlow {
   private IRBlock block;

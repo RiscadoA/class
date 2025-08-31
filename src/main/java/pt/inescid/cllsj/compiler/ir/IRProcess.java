@@ -3,7 +3,8 @@ package pt.inescid.cllsj.compiler.ir;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
-import pt.inescid.cllsj.compiler.ir.instructions.IRInstruction;
+
+import pt.inescid.cllsj.compiler.ir.instructions_old.IRInstruction;
 
 public class IRProcess {
   private int recordArgumentCount;

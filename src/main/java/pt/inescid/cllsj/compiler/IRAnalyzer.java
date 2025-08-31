@@ -25,7 +25,7 @@ import pt.inescid.cllsj.compiler.ir.expressions.IRString;
 import pt.inescid.cllsj.compiler.ir.expressions.IRSub;
 import pt.inescid.cllsj.compiler.ir.expressions.IRVar;
 import pt.inescid.cllsj.compiler.ir.flow.*;
-import pt.inescid.cllsj.compiler.ir.instructions.*;
+import pt.inescid.cllsj.compiler.ir.instructions_old.*;
 import pt.inescid.cllsj.compiler.ir.type.*;
 
 // Visitor which analyses the IR of a given process and generates a control and data flow graph.
