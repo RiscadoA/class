@@ -29,7 +29,7 @@ public class IRExponentialVar extends IRExpression {
 
   @Override
   public String toString() {
-    return "exponential " + exponential;
+    return "E" + exponential + "[" + type + "]";
   }
 
   @Override

@@ -1,0 +1,12 @@
+proc main() {
+    cut {
+        println("!"); !a(b: ~lint); println(b); ()
+        |a: ?lint|
+        println("?"); ?a;
+        par {
+            println("call 1"); call a(y); let y 1
+            ||
+            println("call 2"); call a(z); let z 1
+        }
+    }
+};;

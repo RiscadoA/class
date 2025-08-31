@@ -15,6 +15,10 @@ public abstract class CAlignment {
     return new CAlignmentExpression(expr);
   }
 
+  public static CAlignment ternary(String condition, CAlignment then, CAlignment otherwise) {
+    return expression("((" + condition + ") ? (" + then + ") : (" + otherwise + "))");
+  }
+
   public CAlignment max(CAlignment other) {
     return new CAlignmentMax(this, other);
   }

@@ -2,16 +2,23 @@ package pt.inescid.cllsj.compiler.ir.instructions;
 
 import java.util.function.Function;
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
+import pt.inescid.cllsj.compiler.ir.type.IRType;
 
 public class IRDecRefExponential extends IRInstruction {
   private int exponential;
+  private IRType type;
 
-  public IRDecRefExponential(int exponential) {
+  public IRDecRefExponential(int exponential, IRType type) {
     this.exponential = exponential;
+    this.type = type;
   }
 
   public int getExponential() {
     return exponential;
+  }
+
+  public IRType getType() {
+    return type;
   }
 
   @Override
@@ -21,12 +28,12 @@ public class IRDecRefExponential extends IRInstruction {
 
   @Override
   public String toString() {
-    return "decRefExponential(" + exponential + ")";
+    return "decRefExponential(" + exponential + "[" + type + "])";
   }
 
   @Override
   public IRInstruction clone() {
-    return new IRDecRefExponential(exponential);
+    return new IRDecRefExponential(exponential, type);
   }
 
   @Override
@@ -35,5 +42,10 @@ public class IRDecRefExponential extends IRInstruction {
   @Override
   public void renameExponentials(Function<Integer, Integer> renamer) {
     exponential = renamer.apply(exponential);
+  }
+
+  @Override
+  public void substituteTypes(Function<IRType, IRType> types) {
+    type = types.apply(type);
   }
 }

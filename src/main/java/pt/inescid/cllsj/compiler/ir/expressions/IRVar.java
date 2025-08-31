@@ -29,7 +29,7 @@ public class IRVar extends IRExpression {
 
   @Override
   public String toString() {
-    return "record " + record;
+    return "L" + record + "[" + type + "]";
   }
 
   @Override

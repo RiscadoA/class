@@ -33,10 +33,13 @@ public class IRCallProcess extends IRInstruction {
   public static class ExponentialArgument {
     private int sourceExponential;
     private int targetExponential;
+    private IRType exponentialType;
 
-    public ExponentialArgument(int sourceExponential, int targetExponential) {
+    public ExponentialArgument(
+        int sourceExponential, int targetExponential, IRType exponentialType) {
       this.sourceExponential = sourceExponential;
       this.targetExponential = targetExponential;
+      this.exponentialType = exponentialType;
     }
 
     public int getSourceExponential() {
@@ -45,6 +48,10 @@ public class IRCallProcess extends IRInstruction {
 
     public int getTargetExponential() {
       return targetExponential;
+    }
+
+    public IRType getExponentialType() {
+      return exponentialType;
     }
   }
 
@@ -145,7 +152,10 @@ public class IRCallProcess extends IRInstruction {
                 .map(arg -> new LinearArgument(arg.sourceRecord, arg.targetRecord, arg.recordType))
                 .toList(),
             exponentialArguments.stream()
-                .map(arg -> new ExponentialArgument(arg.sourceExponential, arg.targetExponential))
+                .map(
+                    arg ->
+                        new ExponentialArgument(
+                            arg.sourceExponential, arg.targetExponential, arg.exponentialType))
                 .toList(),
             typeArguments.stream()
                 .map(
@@ -173,6 +183,9 @@ public class IRCallProcess extends IRInstruction {
   public void substituteTypes(Function<IRType, IRType> types) {
     for (LinearArgument arg : linearArguments) {
       arg.recordType = types.apply(arg.recordType);
+    }
+    for (ExponentialArgument arg : exponentialArguments) {
+      arg.exponentialType = types.apply(arg.exponentialType);
     }
     for (TypeArgument arg : typeArguments) {
       arg.sourceType = types.apply(arg.sourceType);
