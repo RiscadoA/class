@@ -37,4 +37,20 @@ public class IRDataLocation {
   public String toString() {
     return (remote ? "remote" : "local") + "(" + id + ")[" + offset.toString() + "]";
   }
+
+  @Override
+  public boolean equals(Object obj) {
+    if (this == obj) return true;
+    if (obj == null || getClass() != obj.getClass()) return false;
+    IRDataLocation other = (IRDataLocation) obj;
+    return id == other.id && remote == other.remote && offset.equals(other.offset);
+  }
+
+  @Override
+  public int hashCode() {
+    int result = Integer.hashCode(id);
+    result = 31 * result + Boolean.hashCode(remote);
+    result = 31 * result + offset.hashCode();
+    return result;
+  }
 }
