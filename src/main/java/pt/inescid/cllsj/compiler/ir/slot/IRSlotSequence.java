@@ -9,8 +9,16 @@ public class IRSlotSequence {
         this.slots = slots;
     }
 
-    public List<IRSlot> getSlots() {
+    public List<IRSlot> list() {
         return slots;
+    }
+
+    public IRSlot get(int index) {
+        return slots.get(index);
+    }
+
+    public int size() {
+        return slots.size();
     }
 
     @Override

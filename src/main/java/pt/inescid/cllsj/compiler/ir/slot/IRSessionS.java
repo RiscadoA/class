@@ -9,6 +9,10 @@ public class IRSessionS extends IRSlot {
         this.passedSlots = passedSlots;
     }
 
+    public IRSlotSequence getPassedSlots() {
+        return passedSlots;
+    }
+
     @Override
     public void accept(IRSlotVisitor visitor) {
         visitor.visit(this);
