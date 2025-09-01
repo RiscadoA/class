@@ -3,7 +3,7 @@ package pt.inescid.cllsj.compiler.ir.instruction;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
-import pt.inescid.cllsj.compiler.ir.IRCodeLocation;
+import pt.inescid.cllsj.compiler.ir.id.IRCodeLocation;
 
 public class IRBlock {
   private IRCodeLocation location;

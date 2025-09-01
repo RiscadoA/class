@@ -1,8 +1,8 @@
 package pt.inescid.cllsj.compiler.ir.instruction;
 
-import pt.inescid.cllsj.compiler.ir.IRDataLocation;
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
-import pt.inescid.cllsj.compiler.ir.IRSessionId;
+import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
+import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
 
 public class IRBindSession extends IRAccess {
   private IRSessionId sessionId;

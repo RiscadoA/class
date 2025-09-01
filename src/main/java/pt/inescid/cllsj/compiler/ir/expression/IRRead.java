@@ -1,8 +1,8 @@
 package pt.inescid.cllsj.compiler.ir.expression;
 
 import java.util.function.Function;
-import pt.inescid.cllsj.compiler.ir.IRDataLocation;
 import pt.inescid.cllsj.compiler.ir.IRExpressionVisitor;
+import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlot;
 
 public class IRRead extends IRExpression {

@@ -1,7 +1,7 @@
 package pt.inescid.cllsj.compiler.ir.instruction;
 
-import pt.inescid.cllsj.compiler.ir.IRCodeLocation;
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
+import pt.inescid.cllsj.compiler.ir.id.IRCodeLocation;
 
 public class IRPushTask extends IRInstruction {
   private IRCodeLocation location;

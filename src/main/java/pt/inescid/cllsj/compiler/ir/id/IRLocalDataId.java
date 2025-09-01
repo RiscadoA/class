@@ -1,4 +1,4 @@
-package pt.inescid.cllsj.compiler.ir;
+package pt.inescid.cllsj.compiler.ir.id;
 
 import java.util.List;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotSequence;

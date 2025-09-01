@@ -1,9 +1,9 @@
 package pt.inescid.cllsj.compiler.ir.instruction;
 
 import java.util.function.Function;
-import pt.inescid.cllsj.compiler.ir.IRDataLocation;
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
 import pt.inescid.cllsj.compiler.ir.expression.IRExpression;
+import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
 
 public class IRWriteExpression extends IRWrite {
   private IRExpression expr;

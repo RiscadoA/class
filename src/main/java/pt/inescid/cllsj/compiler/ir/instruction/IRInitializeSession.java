@@ -1,9 +1,9 @@
 package pt.inescid.cllsj.compiler.ir.instruction;
 
 import java.util.function.Function;
-import pt.inescid.cllsj.compiler.ir.IRCodeLocation;
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
-import pt.inescid.cllsj.compiler.ir.IRSessionId;
+import pt.inescid.cllsj.compiler.ir.id.IRCodeLocation;
+import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
 
 public class IRInitializeSession extends IRInstruction {
   private IRSessionId sessionId;

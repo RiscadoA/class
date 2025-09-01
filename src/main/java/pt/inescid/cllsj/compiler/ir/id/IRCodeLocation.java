@@ -1,4 +1,4 @@
-package pt.inescid.cllsj.compiler.ir;
+package pt.inescid.cllsj.compiler.ir.id;
 
 public class IRCodeLocation {
   private String label;

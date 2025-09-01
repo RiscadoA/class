@@ -1,4 +1,4 @@
-package pt.inescid.cllsj.compiler.ir;
+package pt.inescid.cllsj.compiler.ir.id;
 
 public class IRSessionId {
   private int index;

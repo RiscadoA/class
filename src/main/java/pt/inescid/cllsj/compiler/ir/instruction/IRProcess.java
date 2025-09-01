@@ -3,10 +3,10 @@ package pt.inescid.cllsj.compiler.ir.instruction;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Stream;
-import pt.inescid.cllsj.compiler.ir.IRCodeLocation;
-import pt.inescid.cllsj.compiler.ir.IRLocalDataId;
-import pt.inescid.cllsj.compiler.ir.IRProcessId;
-import pt.inescid.cllsj.compiler.ir.IRSessionId;
+import pt.inescid.cllsj.compiler.ir.id.IRCodeLocation;
+import pt.inescid.cllsj.compiler.ir.id.IRLocalDataId;
+import pt.inescid.cllsj.compiler.ir.id.IRProcessId;
+import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotCombinations;
 
 public class IRProcess {

@@ -1,7 +1,7 @@
 package pt.inescid.cllsj.compiler.ir.instruction;
 
-import pt.inescid.cllsj.compiler.ir.IRDataLocation;
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
+import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlot;
 
 public class IRWriteScan extends IRWrite {

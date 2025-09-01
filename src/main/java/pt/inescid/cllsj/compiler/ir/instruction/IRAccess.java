@@ -1,6 +1,6 @@
 package pt.inescid.cllsj.compiler.ir.instruction;
 
-import pt.inescid.cllsj.compiler.ir.IRDataLocation;
+import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
 
 public abstract class IRAccess extends IRInstruction {
   protected IRDataLocation location;
