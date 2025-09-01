@@ -3,6 +3,7 @@ package pt.inescid.cllsj.compiler.c;
 import java.io.PrintStream;
 import pt.inescid.cllsj.compiler.Compiler;
 import pt.inescid.cllsj.compiler.ir.id.IRCodeLocation;
+import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
 import pt.inescid.cllsj.compiler.ir.instruction.*;
 
 public class CGenerator extends IRInstructionVisitor {
@@ -394,8 +395,8 @@ public class CGenerator extends IRInstructionVisitor {
           // Declare the registers.
           putStatement("register struct task* " + TASK);
           putStatement("register char* " + ENV);
-          putStatement("register char* " + TMP_PTR1);
-          putStatement("register char* " + TMP_PTR2);
+          putStatement("register void* " + TMP_PTR1);
+          putStatement("register void* " + TMP_PTR2);
           putStatement("register int " + TMP_INT);
           putBlankLine();
 
@@ -556,29 +557,41 @@ public class CGenerator extends IRInstructionVisitor {
 
   private void generate(IRProcess process) {
     this.process = process;
-
     putBlankLine();
-    process
-        .streamBlocks()
-        .forEach(
-            block -> {
-              putLabel(codeLocationLabel(block.getLocation()));
-              block.stream().forEach(i -> i.accept(this));
-            });
+    process.streamBlocks().forEach(block -> generate(block));
+  }
+
+  private void generate(IRBlock block) {
+    putLabel(codeLocationLabel(block.getLocation()));
+    block.stream().forEach(i -> generate(i));
+  }
+
+  private void generate(IRInstruction instr) {
+    if (compiler.tracing.get()) {
+      putDebugLn(instr.toString());
+    }
+    instr.accept(this);
   }
 
   // ============================ Instruction generation visit methods ============================
 
   @Override
   public void visit(IRPushTask instr) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    putAssign(TMP_PTR1, TASK);
+    putAllocTask(TASK);
+    putAssign(taskNext(TASK), cast(TMP_PTR1, "(struct task*)"));
+    putAssign(taskCont(TASK), codeLocationAddress(instr.getLocation()));
+    putAssign(taskContEnv(TASK), ENV);
   }
 
   @Override
   public void visit(IRPopTask instr) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    putAssign(TMP_PTR1, TASK);
+    putAssign(TMP_PTR2, taskCont(TASK));
+    putAssign(ENV, taskContEnv(TASK));
+    putAssign(TASK, taskNext(TASK));
+    putFree(TMP_PTR1);
+    putComputedGoto(TMP_PTR2);
   }
 
   @Override
@@ -683,6 +696,10 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   // =============================== Base expression building helpers =============================
+
+  private String cast(String expr, String type) {
+    return "(" + type + ")(" + expr + ")";
+  }
 
   private String labelAddress(String label) {
     return "&&" + label;
