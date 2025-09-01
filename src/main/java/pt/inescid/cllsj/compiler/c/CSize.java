@@ -1,4 +1,4 @@
-package pt.inescid.cllsj.compiler;
+package pt.inescid.cllsj.compiler.c;
 
 public abstract class CSize {
   public static CSize zero() {

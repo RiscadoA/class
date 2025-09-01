@@ -1,4 +1,4 @@
-package pt.inescid.cllsj.compiler;
+package pt.inescid.cllsj.compiler.c;
 
 import java.util.function.Function;
 import pt.inescid.cllsj.compiler.ir.slot.*;
