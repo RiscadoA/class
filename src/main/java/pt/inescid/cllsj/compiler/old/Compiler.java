@@ -1,4 +1,4 @@
-package pt.inescid.cllsj.compiler;
+package pt.inescid.cllsj.compiler.old;
 
 import java.io.FileInputStream;
 import java.nio.file.Path;
@@ -17,8 +17,6 @@ import pt.inescid.cllsj.ast.nodes.ASTProgramWithIncludes;
 import pt.inescid.cllsj.compiler.ast.ASTPrinter;
 import pt.inescid.cllsj.compiler.ast.ASTSessionRenamer;
 import pt.inescid.cllsj.compiler.ir.old.IRProgramOld;
-import pt.inescid.cllsj.compiler.old.CGenerator;
-import pt.inescid.cllsj.compiler.old.IRGenerator;
 
 public class Compiler {
   public String entryProcess = "main";

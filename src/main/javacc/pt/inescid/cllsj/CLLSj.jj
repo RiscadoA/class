@@ -9,7 +9,7 @@ import java.util.concurrent.*;
 
 import pt.inescid.cllsj.ast.nodes.*;
 import pt.inescid.cllsj.ast.types.*;
-import pt.inescid.cllsj.compiler.Compiler;
+import pt.inescid.cllsj.compiler.old.Compiler;
 
 public class CLLSj {
 
