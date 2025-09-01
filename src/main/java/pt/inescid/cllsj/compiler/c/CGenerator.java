@@ -1,10 +1,13 @@
 package pt.inescid.cllsj.compiler.c;
 
 import java.io.PrintStream;
+import java.util.List;
+
 import pt.inescid.cllsj.compiler.Compiler;
 import pt.inescid.cllsj.compiler.ir.id.IRCodeLocation;
 import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
 import pt.inescid.cllsj.compiler.ir.id.IRLocalDataId;
+import pt.inescid.cllsj.compiler.ir.id.IRProcessId;
 import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
 import pt.inescid.cllsj.compiler.ir.instruction.*;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlot;
@@ -199,9 +202,6 @@ public class CGenerator extends IRInstructionVisitor {
     }
     putBlankLine();
 
-    putLine("void* thread(void* entry);");
-    putBlankLine();
-
     // Define types used during execution
     putStruct(
         "session",
@@ -394,6 +394,9 @@ public class CGenerator extends IRInstructionVisitor {
       putBlankLine();
     }
 
+    putLine("void* thread(void* entry);");
+    putBlankLine();
+
     // Contains the actual process code and the registers necessary to execute it
     putBlock(
         "void executor(struct task* entry)",
@@ -411,6 +414,16 @@ public class CGenerator extends IRInstructionVisitor {
           putAssign(taskCont(TASK), labelAddress("end"));
           putBlankLine();
 
+          // Jump to the entry process.
+          IRProcessId entryProcessId = new IRProcessId(compiler.entryProcess.get());
+          if (program.get(entryProcessId) == null) {
+            throw new IllegalArgumentException("Entry process " + compiler.entryProcess.get() + " not found");
+          }
+          IRProcess entryProcess = program.get(entryProcessId);
+          generate(new IRCallProcess(entryProcess.getId(), List.of(), List.of(), List.of()));
+          putBlankLine();
+
+          // Generate all processes
           program.stream()
               .forEach(
                   p -> {
