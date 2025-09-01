@@ -12,12 +12,28 @@ public class CLayout {
     this.alignment = alignment;
   }
 
+  public static CLayout compute(IRSlotCombinations combinations, CArchitecture arch, Function<Integer, CLayout> varToLayout) {
+    CLayout layout = new CLayout(CSize.zero(), CAlignment.one());
+    for (IRSlotSequence sequence : combinations.list()) {
+      CLayout sequenceLayout = compute(sequence, arch, varToLayout);
+      layout.size = layout.size.max(sequenceLayout.size);
+      layout.alignment = layout.alignment.max(sequenceLayout.alignment);
+    }
+    return layout;
+  }
+
   public static CLayout compute(
       IRSlotSequence sequence, CArchitecture arch, Function<Integer, CLayout> varToLayout) {
     Visitor visitor = new Visitor(arch, varToLayout);
     for (IRSlot slot : sequence.list()) {
       slot.accept(visitor);
     }
+    return visitor.layout;
+  }
+
+  public static CLayout compute(IRSlot slot, CArchitecture arch, Function<Integer, CLayout> varToLayout) {
+    Visitor visitor = new Visitor(arch, varToLayout);
+    slot.accept(visitor);
     return visitor.layout;
   }
 

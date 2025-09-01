@@ -4,7 +4,12 @@ import java.io.PrintStream;
 import pt.inescid.cllsj.compiler.Compiler;
 import pt.inescid.cllsj.compiler.ir.id.IRCodeLocation;
 import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
+import pt.inescid.cllsj.compiler.ir.id.IRLocalDataId;
+import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
 import pt.inescid.cllsj.compiler.ir.instruction.*;
+import pt.inescid.cllsj.compiler.ir.slot.IRSlot;
+import pt.inescid.cllsj.compiler.ir.slot.IRSlotCombinations;
+import pt.inescid.cllsj.compiler.ir.slot.IRSlotSequence;
 
 public class CGenerator extends IRInstructionVisitor {
   // Auxiliary registers used in the execution of a single instruction
@@ -203,7 +208,7 @@ public class CGenerator extends IRInstructionVisitor {
         () -> {
           putStatement("void* cont");
           putStatement("char* cont_env");
-          putStatement("char* cont_value");
+          putStatement("char* cont_data");
         });
 
     putStruct(
@@ -674,6 +679,95 @@ public class CGenerator extends IRInstructionVisitor {
 
   // ============================ Structure expression building helpers ===========================
 
+  private CSize endPointsOffset() {
+    // The end point counter is stored right at the beginning of the environment
+    return CSize.zero();
+  }
+
+  private String endPoints() {
+    String ptr = endPointsOffset().advancePointer(ENV);
+    return access(ptr, compiler.concurrency.get() ? "atomic_int" : "int");
+  }
+
+  private CSize sessionStartOffset() {
+    // The end point counter comes before the sessions.
+    return endPointsOffset().add(compiler.arch.intSize).align(compiler.arch.pointerAlignment);
+  }
+
+  private CSize sessionSize() {
+    return compiler.arch.pointerSize.multiply(3).align(compiler.arch.pointerAlignment);
+  }
+
+  private CSize sessionOffset(IRSessionId id) {
+    return sessionStartOffset().add(sessionSize().multiply(id.getIndex()));
+  }
+
+  private String session(IRSessionId id) {
+    CSize offset = sessionOffset(id);
+    return access(offset.advancePointer(ENV), "struct session");
+  }
+
+  private CSize localDataStartOffset() {
+    return sessionStartOffset().add(sessionSize().multiply(process.getSessionCount()));
+  }
+
+  private CSize localDataOffset(IRLocalDataId localDataId) {
+    // First get the offset to the end of the previous local data section
+    CSize result = localDataStartOffset();
+    for (int i = 0; i < localDataId.getIndex(); ++i) {
+      IRSlotCombinations total = process.getLocalData(new IRLocalDataId(i));
+      CLayout totalLayout = layout(total);
+      result = result.align(totalLayout.alignment).add(totalLayout.size);
+    }
+
+    // Then align that pointer to our required alignment,
+    // which is obtained from all possible slot combinations
+    IRSlotCombinations total = process.getLocalData(localDataId);
+    CLayout totalLayout = layout(total);
+    return result.align(totalLayout.alignment);
+  }
+
+  private String localData(IRLocalDataId localDataId, IRSlotSequence offset, IRSlot slot) {
+    // Get the offset to the local data section
+    CSize localDataOffset = localDataOffset(localDataId);
+
+    CLayout offsetLayout = layout(offset);
+    CLayout slotLayout = layout(slot);
+
+    // Now we got two scenarios:
+    // 1. The data is polymorphic, and thus we must dereference the pointer first
+    // 2. The data is not polymorphic, and we apply the offset to the section start
+
+    if (process.getLocalData(localDataId).isPolymorphic()) {
+      String localData = localDataOffset.advancePointer(ENV);
+      String pointer = access(localData, "char*");
+      CSize finalOffset = offsetLayout.size.align(slotLayout.alignment);
+      return finalOffset.advancePointer(pointer);
+    } else {
+      CSize finalOffset = localDataOffset.add(offsetLayout.size).align(slotLayout.alignment);
+      return finalOffset.advancePointer(ENV);
+    }
+  }
+
+  private String remoteData(IRSessionId sessionId, IRSlotSequence offset, IRSlot slot) {
+    // Get the pointer to the start of the session's remote data
+    String dataPointer =  sessionContData(session(sessionId));
+
+    CLayout offsetLayout = layout(offset);
+    CLayout slotLayout = layout(slot);
+
+    CSize finalOffset = offsetLayout.size.align(slotLayout.alignment);
+    return finalOffset.advancePointer(dataPointer);
+  }
+
+  private String data(IRDataLocation data, IRSlotSequence offset, IRSlot slot) {
+    if (data.isRemote()) {
+      return remoteData(data.getSessionId(), offset, slot);
+    } else {
+      return localData(data.getLocalDataId(), offset, slot);
+    }
+  }
+
   private String taskNext(String var) {
     return var + "->next";
   }
@@ -684,6 +778,36 @@ public class CGenerator extends IRInstructionVisitor {
 
   private String taskContEnv(String var) {
     return var + "->cont_env";
+  }
+
+  private String sessionCont(String var) {
+    return var + "->cont";
+  }
+
+  private String sessionContEnv(String var) {
+    return var + "->cont_env";
+  }
+
+  private String sessionContData(String var) {
+    return var + "->cont_data";
+  }
+
+  private CLayout layout(IRSlotCombinations combinations) {
+    return CLayout.compute(combinations, compiler.arch, typeId -> {
+      throw new UnsupportedOperationException("Type variables still haven't been implemented");
+    });
+  }
+
+  private CLayout layout(IRSlotSequence sequence) {
+    return CLayout.compute(sequence, compiler.arch, typeId -> {
+      throw new UnsupportedOperationException("Type variables still haven't been implemented");
+    });
+  }
+
+  private CLayout layout(IRSlot slot) {
+    return CLayout.compute(slot, compiler.arch, typeId -> {
+      throw new UnsupportedOperationException("Type variables still haven't been implemented");
+    });
   }
 
   // ============================ Structure statement building helpers ============================
@@ -699,6 +823,14 @@ public class CGenerator extends IRInstructionVisitor {
 
   private String cast(String expr, String type) {
     return "(" + type + ")(" + expr + ")";
+  }
+
+  private String castAndDeref(String expr, String type) {
+    return "(*" + cast(expr, type) + ")";
+  }
+
+  private String access(String expr, String type) {
+    return castAndDeref(expr, type + "*");
   }
 
   private String labelAddress(String label) {

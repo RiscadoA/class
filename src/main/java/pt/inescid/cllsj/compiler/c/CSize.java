@@ -22,11 +22,21 @@ public abstract class CSize {
   }
 
   public String advancePointer(String pointer) {
-    return pointer + " + " + this;
+    String offset = toString();
+    if (offset.equals("0")) {
+      return pointer;
+    } else {
+      return pointer + " + " + offset;
+    }
   }
 
   public String retreatPointer(String pointer) {
-    return pointer + " - (" + this + ")";
+    String offset = toString();
+    if (offset.equals("0")) {
+      return pointer;
+    } else {
+      return pointer + " - (" + offset + ")";
+    }
   }
 
   public CSize add(CSize other) {
@@ -35,6 +45,14 @@ public abstract class CSize {
 
   public CSize subtract(CSize other) {
     return new CSizeSubtract(this, other);
+  }
+
+  public CSize multiply(int constant) {
+    return multiply(constant(constant));
+  }
+
+  public CSize multiply(CSize other) {
+    return new CSizeMultiply(this, other);
   }
 
   public CSize max(CSize other) {
@@ -164,6 +182,53 @@ public abstract class CSize {
     @Override
     public String toExpression() {
       return lhs + " - (" + rhs + ")";
+    }
+  }
+
+  private static class CSizeMultiply extends CSize {
+    public CSize lhs;
+    public CSize rhs;
+
+    public CSizeMultiply(CSize lhs, CSize rhs) {
+      this.lhs = lhs;
+      this.rhs = rhs;
+    }
+
+    @Override
+    protected CSize simplify(int remainder) {
+      CSize lhs = this.lhs.simplify(0);
+      CSize rhs = this.rhs.simplify(0);
+
+      if (lhs instanceof CSizeConstant) {
+        int bytes = ((CSizeConstant)lhs).bytes;
+        if (bytes == 1) {
+          return rhs.simplify(remainder);
+        } else if (bytes == 0) {
+          return constant(remainder);
+        }
+      }
+
+      if (rhs instanceof CSizeConstant) {
+        int bytes = ((CSizeConstant)rhs).bytes;
+        if (bytes == 1) {
+          return lhs.simplify(remainder);
+        } else if (bytes == 0) {
+          return constant(remainder);
+        }
+      }
+
+      if (lhs instanceof CSizeConstant && rhs instanceof CSizeConstant) {
+        int lhsBytes = ((CSizeConstant)lhs).bytes;
+        int rhsBytes = ((CSizeConstant)rhs).bytes;
+        return constant(lhsBytes * rhsBytes + remainder);
+      }
+
+      return lhs.multiply(rhs).addRemainder(remainder);
+    }
+
+    @Override
+    public String toExpression() {
+      return "(" + lhs + ") * (" + rhs + ")";
     }
   }
 
