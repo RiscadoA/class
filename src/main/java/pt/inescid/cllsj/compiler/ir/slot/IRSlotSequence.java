@@ -1,5 +1,6 @@
 package pt.inescid.cllsj.compiler.ir.slot;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class IRSlotSequence {
@@ -21,6 +22,30 @@ public class IRSlotSequence {
 
   public int size() {
     return slots.size();
+  }
+
+  public boolean isPolymorphic() {
+    return slots.stream().anyMatch(s -> s instanceof IRVarS);
+  }
+
+  public void instantiateTypeVariable(int typeId, IRSlotSequence sequence) {
+    for (int i = 0; i < slots.size(); ++i) {
+      if (!(slots.get(i) instanceof IRVarS)) {
+        continue;
+      }
+
+      IRVarS slot = (IRVarS) slots.get(i);
+      if (slot.getTypeId() != typeId) {
+        continue;
+      }
+
+      slots.remove(i);
+      slots.addAll(i, sequence.list());
+    }
+  }
+
+  public IRSlotSequence clone() {
+    return new IRSlotSequence(new ArrayList<>(slots));
   }
 
   @Override
