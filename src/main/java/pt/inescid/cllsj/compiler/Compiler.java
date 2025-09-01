@@ -14,6 +14,8 @@ import pt.inescid.cllsj.ast.nodes.ASTInclude;
 import pt.inescid.cllsj.ast.nodes.ASTPList;
 import pt.inescid.cllsj.ast.nodes.ASTProgram;
 import pt.inescid.cllsj.ast.nodes.ASTProgramWithIncludes;
+import pt.inescid.cllsj.compiler.ast.ASTPrinter;
+import pt.inescid.cllsj.compiler.ast.ASTSessionRenamer;
 import pt.inescid.cllsj.compiler.ir.old.IRProgramOld;
 import pt.inescid.cllsj.compiler.old.CGenerator;
 import pt.inescid.cllsj.compiler.old.IRGenerator;
@@ -59,7 +61,7 @@ public class Compiler {
     }
 
     try {
-      SessionRenamer.execute(ast);
+      ASTSessionRenamer.execute(ast);
     } catch (Exception e) {
       System.err.println("Renaming error: " + e.getMessage());
       e.printStackTrace();

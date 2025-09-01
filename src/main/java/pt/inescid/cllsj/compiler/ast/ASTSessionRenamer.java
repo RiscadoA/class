@@ -1,4 +1,4 @@
-package pt.inescid.cllsj.compiler;
+package pt.inescid.cllsj.compiler.ast;
 
 import java.util.HashMap;
 import java.util.List;
@@ -8,7 +8,7 @@ import pt.inescid.cllsj.ast.ASTExprVisitor;
 import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.nodes.*;
 
-public class SessionRenamer extends ASTNodeVisitor {
+public class ASTSessionRenamer extends ASTNodeVisitor {
   // How many different occurrences of each session name have been found
   private Map<String, Integer> occurrences = new HashMap<>();
   private Map<String, Stack<Integer>> current = new HashMap<>();
@@ -109,7 +109,7 @@ public class SessionRenamer extends ASTNodeVisitor {
   }
 
   public static void execute(ASTNode node) {
-    node.accept(new SessionRenamer());
+    node.accept(new ASTSessionRenamer());
   }
 
   private String sanitize(String session) {

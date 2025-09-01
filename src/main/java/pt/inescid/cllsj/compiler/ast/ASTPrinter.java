@@ -1,4 +1,4 @@
-package pt.inescid.cllsj.compiler;
+package pt.inescid.cllsj.compiler.ast;
 
 import java.io.PrintStream;
 import java.util.Map;
