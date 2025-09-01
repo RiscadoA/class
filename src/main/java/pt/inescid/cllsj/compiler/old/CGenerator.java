@@ -10,7 +10,6 @@ import java.util.Set;
 import pt.inescid.cllsj.compiler.c.CAlignment;
 import pt.inescid.cllsj.compiler.c.CArchitecture;
 import pt.inescid.cllsj.compiler.c.CSize;
-import pt.inescid.cllsj.compiler.ir.*;
 import pt.inescid.cllsj.compiler.ir.old.IRBlockOld;
 import pt.inescid.cllsj.compiler.ir.old.IRExpressionVisitor;
 import pt.inescid.cllsj.compiler.ir.old.IRInstructionVisitorOld;

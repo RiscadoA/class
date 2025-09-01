@@ -14,6 +14,9 @@ public class Compiler {
   public Settings.Flag profiling;
   public Settings.Flag concurrency;
 
+  public Settings.Int allocatorLevels;
+  public Settings.Int allocatorSizeDivisor;
+
   public CArchitecture arch;
 
   private Settings.Int intSize;
@@ -42,6 +45,13 @@ public class Compiler {
             "concurrency",
             "Generates concurrency aware code, enabling concurrent constructs",
             true);
+
+    allocatorLevels =
+        settings.addInt(
+            "allocator-levels", "Sets the number of levels in the custom allocator", 64);
+    allocatorSizeDivisor =
+        settings.addInt(
+            "allocator-size-divisor", "Sets the number of levels in the custom allocator", 4);
 
     intSize = settings.addInt("int-size", "Size of int C type in bytes", 4);
     intAlignment = settings.addInt("int-alignment", "Alignment of int C type in bytes", 4);
@@ -75,6 +85,13 @@ public class Compiler {
           intAlignment.set(1);
           unsignedCharAlignment.set(1);
           pointerAlignment.set(1);
+        });
+
+    settings.addMode(
+        "no-custom-allocator",
+        "Uses malloc/free directly instead of the custom allocator",
+        () -> {
+          allocatorLevels.set(0);
         });
   }
 
