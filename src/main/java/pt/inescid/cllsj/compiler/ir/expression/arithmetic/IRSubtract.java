@@ -21,6 +21,6 @@ public class IRSubtract extends IRArithmeticBinaryOp {
 
   @Override
   public String toString() {
-    return "(" + lhs + " - " + rhs + ")";    
+    return "(" + lhs + " - " + rhs + ")";
   }
 }

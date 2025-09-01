@@ -21,6 +21,6 @@ public class IROr extends IRBooleanBinaryOp {
 
   @Override
   public String toString() {
-    return "(" + lhs + " or " + rhs + ")";    
+    return "(" + lhs + " or " + rhs + ")";
   }
 }

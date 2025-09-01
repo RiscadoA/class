@@ -2,7 +2,6 @@ package pt.inescid.cllsj.compiler.ir.instruction;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
-
 import pt.inescid.cllsj.compiler.ir.IRCodeLocation;
 import pt.inescid.cllsj.compiler.ir.IRDataLocation;
 import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
@@ -21,12 +20,13 @@ public abstract class IRInstruction {
 
   public boolean usesSession(IRSessionId sessionId) {
     AtomicBoolean uses = new AtomicBoolean(false);
-    replaceSessions(sid -> {
-      if (sid.equals(sessionId)) {
-        uses.set(true);
-      }
-      return sid;
-    });
+    replaceSessions(
+        sid -> {
+          if (sid.equals(sessionId)) {
+            uses.set(true);
+          }
+          return sid;
+        });
     return uses.get();
   }
 }

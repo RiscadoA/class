@@ -21,6 +21,6 @@ public class IRNot extends IRUnaryOp {
 
   @Override
   public String toString() {
-    return "not(" + inner + ")";    
+    return "not(" + inner + ")";
   }
 }

@@ -21,6 +21,6 @@ public class IRGreaterThan extends IRBooleanBinaryOp {
 
   @Override
   public String toString() {
-    return "(" + lhs + " > " + rhs + ")";    
+    return "(" + lhs + " > " + rhs + ")";
   }
 }

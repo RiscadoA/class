@@ -21,6 +21,6 @@ public class IRAnd extends IRBooleanBinaryOp {
 
   @Override
   public String toString() {
-    return "(" + lhs + " and " + rhs + ")";    
+    return "(" + lhs + " and " + rhs + ")";
   }
 }
