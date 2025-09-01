@@ -6,6 +6,7 @@ import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
 import pt.inescid.cllsj.compiler.ir.id.IRLocalDataId;
 import pt.inescid.cllsj.compiler.ir.id.IRProcessId;
 import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
+import pt.inescid.cllsj.compiler.ir.slot.IRSlotCombinations;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotSequence;
 
 public class IRCallProcess extends IRInstruction {
@@ -46,15 +47,31 @@ public class IRCallProcess extends IRInstruction {
     public SessionArgument clone() {
       return new SessionArgument(sourceSessionId, targetSessionId, valueOffset);
     }
-  }
-  ;
 
-  public static class TypeArgument {
-    public TypeArgument clone() {
-      return new TypeArgument();
+    @Override
+    public String toString() {
+      return targetSessionId + " <- " + sourceSessionId + "[" + valueOffset + "]";
     }
   }
-  ;
+
+  public static class TypeArgument {
+    private IRSlotCombinations sourceCombinations;
+    private int targetType;
+
+    public TypeArgument(IRSlotCombinations sourceCombinations, int targetType) {
+      this.sourceCombinations = sourceCombinations;
+      this.targetType = targetType;
+    }
+
+    public TypeArgument clone() {
+      return new TypeArgument(sourceCombinations, targetType);
+    }
+
+    @Override
+    public String toString() {
+      return targetType + " <- [" + sourceCombinations + "]";
+    }
+  }
 
   public static class DataArgument {
     // Where to get the data from in the source process
@@ -88,8 +105,12 @@ public class IRCallProcess extends IRInstruction {
     public DataArgument clone() {
       return new DataArgument(sourceLocation, targetDataId, slots);
     }
+
+    @Override
+    public String toString() {
+      return targetDataId + " <- " + sourceLocation + "[" + slots + "]";
+    }
   }
-  ;
 
   private IRProcessId processId;
   private List<SessionArgument> sessionArguments;
@@ -149,5 +170,22 @@ public class IRCallProcess extends IRInstruction {
         sessionArguments.stream().map(SessionArgument::clone).toList(),
         typeArguments.stream().map(TypeArgument::clone).toList(),
         dataArguments.stream().map(DataArgument::clone).toList());
+  }
+
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
+    sb.append("callProcess(").append(processId);
+    for (SessionArgument arg : sessionArguments) {
+      sb.append(", ").append(arg.toString());
+    }
+    for (TypeArgument arg : typeArguments) {
+      sb.append(", ").append(arg.toString());
+    }
+    for (DataArgument arg : dataArguments) {
+      sb.append(", ").append(arg.toString());
+    }
+    sb.append(")");
+    return sb.toString();
   }
 }

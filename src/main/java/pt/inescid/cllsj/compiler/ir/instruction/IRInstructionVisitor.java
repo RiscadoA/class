@@ -22,4 +22,12 @@ public abstract class IRInstructionVisitor {
   public abstract void visit(IRPopTask instr);
 
   public abstract void visit(IRCallProcess instr);
+
+  public abstract void visit(IRWriteExponentialFromProcess instr);
+
+  public abstract void visit(IRCallExponential instr);
+
+  public abstract void visit(IRIncreaseExponentialReferences instr);
+
+  public abstract void visit(IRDecreaseExponentialReferences instr);
 }
