@@ -3,15 +3,15 @@ package pt.inescid.cllsj.compiler;
 import java.util.Optional;
 
 public abstract class CAlignment {
-  static CAlignment one() {
+  public static CAlignment one() {
     return constant(1);
   }
 
-  static CAlignment constant(int bytes) {
+  public static CAlignment constant(int bytes) {
     return new CAlignmentConstant(bytes);
   }
 
-  static CAlignment expression(String expr) {
+  public static CAlignment expression(String expr) {
     return new CAlignmentExpression(expr);
   }
 

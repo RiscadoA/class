@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Consumer;
-import pt.inescid.cllsj.compiler.IRAnalyzer;
+import pt.inescid.cllsj.compiler.old.IRAnalyzer;
 
 public class IRFlowRecord {
   private IRFlowLocation introductionLocation;

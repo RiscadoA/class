@@ -1,4 +1,4 @@
-package pt.inescid.cllsj.compiler;
+package pt.inescid.cllsj.compiler.old;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -7,6 +7,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import pt.inescid.cllsj.compiler.CAlignment;
+import pt.inescid.cllsj.compiler.CArchitecture;
+import pt.inescid.cllsj.compiler.CSize;
 import pt.inescid.cllsj.compiler.ir.*;
 import pt.inescid.cllsj.compiler.ir.old.IRBlockOld;
 import pt.inescid.cllsj.compiler.ir.old.IRExpressionVisitor;

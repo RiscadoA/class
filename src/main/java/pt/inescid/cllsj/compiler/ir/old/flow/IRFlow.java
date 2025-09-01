@@ -4,9 +4,9 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import pt.inescid.cllsj.compiler.IRAnalyzer;
 import pt.inescid.cllsj.compiler.ir.old.IRBlockOld;
 import pt.inescid.cllsj.compiler.ir.old.instructions_old.IRInstruction;
+import pt.inescid.cllsj.compiler.old.IRAnalyzer;
 
 public class IRFlow {
   private IRBlockOld block;

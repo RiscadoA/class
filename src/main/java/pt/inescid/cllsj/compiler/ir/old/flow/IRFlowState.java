@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Stack;
-import pt.inescid.cllsj.compiler.IRAnalyzer;
 import pt.inescid.cllsj.compiler.ir.old.IRTypeVisitor;
 import pt.inescid.cllsj.compiler.ir.old.type.IRBoolT;
 import pt.inescid.cllsj.compiler.ir.old.type.IRCellT;
@@ -20,6 +19,7 @@ import pt.inescid.cllsj.compiler.ir.old.type.IRTagT;
 import pt.inescid.cllsj.compiler.ir.old.type.IRType;
 import pt.inescid.cllsj.compiler.ir.old.type.IRTypeT;
 import pt.inescid.cllsj.compiler.ir.old.type.IRVarT;
+import pt.inescid.cllsj.compiler.old.IRAnalyzer;
 
 public class IRFlowState {
   private static int nextExponentialLocation = 0;

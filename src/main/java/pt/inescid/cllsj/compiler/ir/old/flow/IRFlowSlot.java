@@ -1,7 +1,7 @@
 package pt.inescid.cllsj.compiler.ir.old.flow;
 
 import java.util.Optional;
-import pt.inescid.cllsj.compiler.IRAnalyzer;
+import pt.inescid.cllsj.compiler.old.IRAnalyzer;
 
 public class IRFlowSlot {
   private static enum Type {

@@ -1,19 +1,19 @@
 package pt.inescid.cllsj.compiler;
 
 public abstract class CSize {
-  static CSize zero() {
+  public static CSize zero() {
     return constant(0);
   }
 
-  static CSize constant(int bytes) {
+  public static CSize constant(int bytes) {
     return new CSizeConstant(bytes);
   }
 
-  static CSize expression(String expr) {
+  public static CSize expression(String expr) {
     return new CSizeExpression(expr);
   }
 
-  static CSize sizeOf(String cType) {
+  public static CSize sizeOf(String cType) {
     return expression("sizeof(" + cType + ")");
   }
 

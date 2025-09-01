@@ -1,4 +1,4 @@
-package pt.inescid.cllsj.compiler;
+package pt.inescid.cllsj.compiler.old;
 
 import java.util.HashMap;
 import java.util.List;
