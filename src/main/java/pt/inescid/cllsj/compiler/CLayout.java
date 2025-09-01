@@ -1,7 +1,6 @@
 package pt.inescid.cllsj.compiler;
 
 import java.util.function.Function;
-import pt.inescid.cllsj.compiler.ir.IRSlotVisitor;
 import pt.inescid.cllsj.compiler.ir.slot.*;
 
 public class CLayout {

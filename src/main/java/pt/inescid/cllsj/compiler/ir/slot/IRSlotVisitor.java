@@ -1,6 +1,4 @@
-package pt.inescid.cllsj.compiler.ir;
-
-import pt.inescid.cllsj.compiler.ir.slot.*;
+package pt.inescid.cllsj.compiler.ir.slot;
 
 public abstract class IRSlotVisitor {
   public abstract void visit(IRIntS slot);

@@ -1,6 +1,5 @@
-package pt.inescid.cllsj.compiler.ir;
+package pt.inescid.cllsj.compiler.ir.expression;
 
-import pt.inescid.cllsj.compiler.ir.expression.*;
 import pt.inescid.cllsj.compiler.ir.expression.arithmetic.*;
 import pt.inescid.cllsj.compiler.ir.expression.bool.*;
 import pt.inescid.cllsj.compiler.ir.expression.literal.IRBoolLiteral;

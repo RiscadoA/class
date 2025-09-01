@@ -1,6 +1,6 @@
 package pt.inescid.cllsj.compiler.ir.expression.literal;
 
-import pt.inescid.cllsj.compiler.ir.IRExpressionVisitor;
+import pt.inescid.cllsj.compiler.ir.expression.IRExpressionVisitor;
 import pt.inescid.cllsj.compiler.ir.expression.IRLiteral;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlot;
 import pt.inescid.cllsj.compiler.ir.slot.IRStringS;

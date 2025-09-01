@@ -1,7 +1,5 @@
 package pt.inescid.cllsj.compiler.ir.instruction;
 
-import pt.inescid.cllsj.compiler.ir.IRInstructionVisitor;
-
 public class IRPopTask extends IRInstruction {
   private boolean isEndPoint;
 

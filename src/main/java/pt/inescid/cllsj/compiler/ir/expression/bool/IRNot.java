@@ -1,7 +1,7 @@
 package pt.inescid.cllsj.compiler.ir.expression.bool;
 
-import pt.inescid.cllsj.compiler.ir.IRExpressionVisitor;
 import pt.inescid.cllsj.compiler.ir.expression.IRExpression;
+import pt.inescid.cllsj.compiler.ir.expression.IRExpressionVisitor;
 import pt.inescid.cllsj.compiler.ir.expression.IRUnaryOp;
 
 public class IRNot extends IRUnaryOp {

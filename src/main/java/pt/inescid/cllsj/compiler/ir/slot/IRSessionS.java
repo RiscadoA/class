@@ -1,7 +1,5 @@
 package pt.inescid.cllsj.compiler.ir.slot;
 
-import pt.inescid.cllsj.compiler.ir.IRSlotVisitor;
-
 public class IRSessionS extends IRSlot {
   private IRSlotSequence passedSlots;
 

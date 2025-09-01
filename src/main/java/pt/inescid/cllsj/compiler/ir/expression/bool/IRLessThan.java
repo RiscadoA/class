@@ -1,8 +1,8 @@
 package pt.inescid.cllsj.compiler.ir.expression.bool;
 
-import pt.inescid.cllsj.compiler.ir.IRExpressionVisitor;
 import pt.inescid.cllsj.compiler.ir.expression.IRBooleanBinaryOp;
 import pt.inescid.cllsj.compiler.ir.expression.IRExpression;
+import pt.inescid.cllsj.compiler.ir.expression.IRExpressionVisitor;
 
 public class IRLessThan extends IRBooleanBinaryOp {
   public IRLessThan(IRExpression lhs, IRExpression rhs) {

@@ -1,8 +1,8 @@
 package pt.inescid.cllsj.compiler.ir.expression.arithmetic;
 
-import pt.inescid.cllsj.compiler.ir.IRExpressionVisitor;
 import pt.inescid.cllsj.compiler.ir.expression.IRArithmeticBinaryOp;
 import pt.inescid.cllsj.compiler.ir.expression.IRExpression;
+import pt.inescid.cllsj.compiler.ir.expression.IRExpressionVisitor;
 
 public class IRAdd extends IRArithmeticBinaryOp {
   public IRAdd(IRExpression lhs, IRExpression rhs) {
