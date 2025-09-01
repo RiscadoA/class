@@ -3,6 +3,10 @@ package pt.inescid.cllsj.compiler.ir;
 public class IRCodeLocation {
   private String label;
 
+  public static IRCodeLocation entry() {
+    return new IRCodeLocation("entry");
+  }
+
   public static IRCodeLocation label(String label) {
     return new IRCodeLocation(label);
   }

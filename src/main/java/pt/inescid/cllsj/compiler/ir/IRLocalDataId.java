@@ -1,9 +1,12 @@
 package pt.inescid.cllsj.compiler.ir;
 
-public class IRSessionId {
+import java.util.List;
+import pt.inescid.cllsj.compiler.ir.slot.IRSlotSequence;
+
+public class IRLocalDataId {
   private int index;
 
-  public IRSessionId(int index) {
+  public IRLocalDataId(int index) {
     this.index = index;
   }
 
@@ -11,20 +14,20 @@ public class IRSessionId {
     return index;
   }
 
-  public IRLocalDataId getLocalData() {
-    return new IRLocalDataId(index);
+  public IRDataLocation getLocation() {
+    return IRDataLocation.local(this, new IRSlotSequence(List.of()));
   }
 
   @Override
   public String toString() {
-    return "s" + index;
+    return "d" + index;
   }
 
   @Override
   public boolean equals(Object obj) {
     if (this == obj) return true;
     if (obj == null || getClass() != obj.getClass()) return false;
-    IRSessionId other = (IRSessionId) obj;
+    IRLocalDataId other = (IRLocalDataId) obj;
     return index == other.index;
   }
 
