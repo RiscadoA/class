@@ -4,6 +4,7 @@ import java.io.PrintStream;
 import java.util.List;
 import java.util.function.Function;
 import pt.inescid.cllsj.compiler.Compiler;
+import pt.inescid.cllsj.compiler.ir.expression.IRExpression;
 import pt.inescid.cllsj.compiler.ir.id.IRCodeLocation;
 import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
 import pt.inescid.cllsj.compiler.ir.id.IRLocalDataId;
@@ -701,8 +702,14 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRPrint instr) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    String value = expression(instr.getExpression());
+    CPrintGenerator gen = CPrintGenerator.forValue(value, instr.getExpression().getSlot());
+
+    if (instr.hasNewLine()) {
+      gen.formatString += "\\n";
+    }
+
+    putStatement("printf(\"" + gen.formatString + "\", " + gen.argument + ")");
   }
 
   @Override
@@ -826,6 +833,10 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   // ============================ Structure expression building helpers ===========================
+
+  private String expression(IRExpression expr) {
+    return CExpressionGenerator.generate(expr, read -> data(currentProcessLayout, ENV, read.getLocation(), read.getSlot()));
+  }
 
   private String endPoints() {
     return endPoints(currentProcessLayout, ENV);
