@@ -1,6 +1,7 @@
 package pt.inescid.cllsj.compiler.c;
 
 import java.util.function.Function;
+import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
 import pt.inescid.cllsj.compiler.ir.slot.*;
 
 public class CLayout {
@@ -12,10 +13,13 @@ public class CLayout {
     this.alignment = alignment;
   }
 
-  public static CLayout compute(IRSlotCombinations combinations, CArchitecture arch, Function<Integer, CLayout> varToLayout) {
+  public static CLayout compute(
+      IRSlotCombinations combinations,
+      CArchitecture arch,
+      Function<IRTypeId, CLayout> typeLayoutProvider) {
     CLayout layout = new CLayout(CSize.zero(), CAlignment.one());
     for (IRSlotSequence sequence : combinations.list()) {
-      CLayout sequenceLayout = compute(sequence, arch, varToLayout);
+      CLayout sequenceLayout = compute(sequence, arch, typeLayoutProvider);
       layout.size = layout.size.max(sequenceLayout.size);
       layout.alignment = layout.alignment.max(sequenceLayout.alignment);
     }
@@ -23,16 +27,17 @@ public class CLayout {
   }
 
   public static CLayout compute(
-      IRSlotSequence sequence, CArchitecture arch, Function<Integer, CLayout> varToLayout) {
-    Visitor visitor = new Visitor(arch, varToLayout);
+      IRSlotSequence sequence, CArchitecture arch, Function<IRTypeId, CLayout> typeLayoutProvider) {
+    Visitor visitor = new Visitor(arch, typeLayoutProvider);
     for (IRSlot slot : sequence.list()) {
       slot.accept(visitor);
     }
     return visitor.layout;
   }
 
-  public static CLayout compute(IRSlot slot, CArchitecture arch, Function<Integer, CLayout> varToLayout) {
-    Visitor visitor = new Visitor(arch, varToLayout);
+  public static CLayout compute(
+      IRSlot slot, CArchitecture arch, Function<IRTypeId, CLayout> typeLayoutProvider) {
+    Visitor visitor = new Visitor(arch, typeLayoutProvider);
     slot.accept(visitor);
     return visitor.layout;
   }
@@ -40,11 +45,11 @@ public class CLayout {
   private static class Visitor extends IRSlotVisitor {
     private CLayout layout = new CLayout(CSize.zero(), CAlignment.one());
     private CArchitecture arch;
-    private Function<Integer, CLayout> varToLayout;
+    private Function<IRTypeId, CLayout> typeLayoutProvider;
 
-    public Visitor(CArchitecture arch, Function<Integer, CLayout> varToLayout) {
+    public Visitor(CArchitecture arch, Function<IRTypeId, CLayout> typeLayoutProvider) {
       this.arch = arch;
-      this.varToLayout = varToLayout;
+      this.typeLayoutProvider = typeLayoutProvider;
     }
 
     private void visit(CSize elementSize, CAlignment elementAlignment) {
@@ -88,7 +93,7 @@ public class CLayout {
 
     @Override
     public void visit(IRSessionS slot) {
-      CLayout passedLayout = CLayout.compute(slot.getPassedSlots(), arch, varToLayout);
+      CLayout passedLayout = CLayout.compute(slot.getPassedSlots(), arch, typeLayoutProvider);
 
       visit(
           arch.pointerSize.align(passedLayout.alignment).add(passedLayout.size),
@@ -97,7 +102,7 @@ public class CLayout {
 
     @Override
     public void visit(IRVarS slot) {
-      visit(varToLayout.apply(slot.getTypeId()));
+      visit(typeLayoutProvider.apply(slot.getTypeId()));
     }
   }
 }

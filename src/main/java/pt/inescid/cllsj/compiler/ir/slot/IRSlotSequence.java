@@ -2,6 +2,7 @@ package pt.inescid.cllsj.compiler.ir.slot;
 
 import java.util.ArrayList;
 import java.util.List;
+import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
 
 public class IRSlotSequence {
   private List<IRSlot> slots;
@@ -24,18 +25,24 @@ public class IRSlotSequence {
     return slots.size();
   }
 
-  public boolean isPolymorphic() {
-    return slots.stream().anyMatch(s -> s instanceof IRVarS);
+  public IRSlotSequence merge(IRSlot slot) {
+    return merge(new IRSlotSequence(List.of(slot)));
   }
 
-  public void instantiateTypeVariable(int typeId, IRSlotSequence sequence) {
+  public IRSlotSequence merge(IRSlotSequence other) {
+    List<IRSlot> newSlots = new ArrayList<>(slots);
+    newSlots.addAll(other.slots);
+    return new IRSlotSequence(newSlots);
+  }
+
+  public void instantiateTypeVariable(IRTypeId typeId, IRSlotSequence sequence) {
     for (int i = 0; i < slots.size(); ++i) {
       if (!(slots.get(i) instanceof IRVarS)) {
         continue;
       }
 
       IRVarS slot = (IRVarS) slots.get(i);
-      if (slot.getTypeId() != typeId) {
+      if (!slot.getTypeId().equals(typeId)) {
         continue;
       }
 

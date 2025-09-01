@@ -1,13 +1,15 @@
 package pt.inescid.cllsj.compiler.ir.slot;
 
-public class IRVarS extends IRSlot {
-  private int typeId;
+import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
 
-  public IRVarS(int typeId) {
+public class IRVarS extends IRSlot {
+  private IRTypeId typeId;
+
+  public IRVarS(IRTypeId typeId) {
     this.typeId = typeId;
   }
 
-  public int getTypeId() {
+  public IRTypeId getTypeId() {
     return typeId;
   }
 
@@ -18,6 +20,6 @@ public class IRVarS extends IRSlot {
 
   @Override
   public String toString() {
-    return "var(" + typeId + ")";
+    return typeId.toString();
   }
 }

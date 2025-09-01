@@ -1,5 +1,6 @@
 package pt.inescid.cllsj.compiler.ir.id;
 
+import pt.inescid.cllsj.compiler.ir.slot.IRSlot;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotSequence;
 
 public class IRDataLocation {
@@ -41,6 +42,14 @@ public class IRDataLocation {
 
   public IRSlotSequence getOffset() {
     return offset;
+  }
+
+  public IRDataLocation advance(IRSlot slot) {
+    return new IRDataLocation(index, remote, offset.merge(slot));
+  }
+
+  public IRDataLocation advance(IRSlotSequence offset) {
+    return new IRDataLocation(index, remote, this.offset.merge(offset));
   }
 
   @Override

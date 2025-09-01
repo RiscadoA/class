@@ -2,13 +2,14 @@ package pt.inescid.cllsj.compiler.c;
 
 import java.io.PrintStream;
 import java.util.List;
-
+import java.util.function.Function;
 import pt.inescid.cllsj.compiler.Compiler;
 import pt.inescid.cllsj.compiler.ir.id.IRCodeLocation;
 import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
 import pt.inescid.cllsj.compiler.ir.id.IRLocalDataId;
 import pt.inescid.cllsj.compiler.ir.id.IRProcessId;
 import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
+import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
 import pt.inescid.cllsj.compiler.ir.instruction.*;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlot;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotCombinations;
@@ -31,7 +32,8 @@ public class CGenerator extends IRInstructionVisitor {
   private IRProgram program;
   private PrintStream output;
 
-  private IRProcess process;
+  private IRProcess currentProcess;
+  private CProcessLayout currentProcessLayout;
   private int indentLevel = 0;
 
   public static void generate(Compiler compiler, IRProgram program, PrintStream output) {
@@ -203,6 +205,13 @@ public class CGenerator extends IRInstructionVisitor {
     putBlankLine();
 
     // Define types used during execution
+    putStruct(
+        "type",
+        () -> {
+          putStatement("int size");
+          putStatement("int alignment;");
+        });
+
     putStruct(
         "session",
         () -> {
@@ -417,7 +426,8 @@ public class CGenerator extends IRInstructionVisitor {
           // Jump to the entry process.
           IRProcess entryProcess = program.get(new IRProcessId(compiler.entryProcess.get()));
           if (entryProcess == null) {
-            throw new IllegalArgumentException("Entry process " + compiler.entryProcess.get() + " not found");
+            throw new IllegalArgumentException(
+                "Entry process " + compiler.entryProcess.get() + " not found");
           }
           generate(new IRCallProcess(entryProcess.getId(), List.of(), List.of(), List.of(), false));
           putBlankLine();
@@ -574,7 +584,14 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   private void generate(IRProcess process) {
-    this.process = process;
+    this.currentProcess = process;
+    this.currentProcessLayout =
+        CProcessLayout.compute(
+            compiler,
+            process,
+            id -> {
+              throw new UnsupportedOperationException("Polymorphic types not supported yet");
+            });
     putBlankLine();
     process.streamBlocks().forEach(block -> generate(block));
   }
@@ -615,11 +632,14 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRInitializeSession instr) {
+    CSize contDataOffset = currentProcessLayout.dataOffset(instr.getSessionId().getLocalData());
+    CSize contSessionOffset = currentProcessLayout.sessionOffset(instr.getSessionId());
+
     StringBuilder sb = new StringBuilder("(struct session)");
     sb.append("{cont=").append(codeLocationAddress(instr.getContinuation()));
     sb.append(",cont_env=").append(ENV);
-    sb.append(",cont_data_offset=").append(localDataBegin(instr.getSessionId()));
-    sb.append(",cont_session_offset=").append(sessionBegin(instr.getSessionId()));
+    sb.append(",cont_data_offset=").append(contDataOffset);
+    sb.append(",cont_session_offset=").append(contSessionOffset);
     sb.append("}");
     putAssign(session(instr.getSessionId()), sb.toString());
   }
@@ -693,15 +713,85 @@ public class CGenerator extends IRInstructionVisitor {
       throw new IllegalArgumentException("Called process " + calledProcessId + " not found");
     }
 
+    CProcessLayout calledLayout =
+        CProcessLayout.compute(
+            compiler,
+            calledProcess,
+            typeId -> {
+              // We need to find the type layout for given type identifier in the called process
+              // This type was passed as an argument, so we search for it
+              IRCallProcess.TypeArgument arg =
+                  instr.getTypeArguments().stream()
+                      .filter(a -> a.getTargetType().equals(typeId))
+                      .findFirst()
+                      .orElseThrow(
+                          () ->
+                              new IllegalArgumentException(
+                                  "Type argument "
+                                      + typeId
+                                      + " not found in call to process "
+                                      + calledProcessId));
+
+              // Now we can just compute the layout of the source type in the current process
+              return layout(arg.getSourceCombinations());
+            });
+
     // Allocate a new environment for the called process
-    putAllocEnvironment(TMP_PTR1, calledProcess);
-    
+    putAllocEnvironment(TMP_PTR1, calledLayout);
+    String newEnv = cast(TMP_PTR1, "char*");
+
+    for (IRCallProcess.TypeArgument arg : instr.getTypeArguments()) {
+      // Get a reference to the target type in the new environment
+      String targetType = type(calledLayout, newEnv, arg.getTargetType());
+
+      // Compute the layout of the source type in the current environment
+      CLayout sourceLayout = layout(arg.getSourceCombinations());
+
+      // Store the type information
+      StringBuilder sb = new StringBuilder("(struct type)");
+      sb.append("{size=").append(sourceLayout.size);
+      sb.append(",alignment=").append(sourceLayout.alignment);
+      sb.append("}");
+      putAssign(targetType, sb.toString());
+    }
+
     for (IRCallProcess.SessionArgument arg : instr.getSessionArguments()) {
-      
+      // Get references to the source and target sessions
+      String source = session(arg.getSourceSessionId());
+      String target = session(calledLayout, newEnv, arg.getTargetSessionId());
+
+      // Compute the new continuation data offset for the target session
+      // This is used when the calling process wants the called process to
+      // write to a specific offset within the remote data section.
+      String contDataOffset = sessionContDataOffset(target);
+      CLayout offsetLayout = layout(arg.getDataOffset());
+      CLayout slotLayout = layout(arg.getDataSlot());
+      CSize newContDataOffset =
+          CSize.expression(contDataOffset)
+              .align(offsetLayout.alignment)
+              .add(offsetLayout.size)
+              .align(slotLayout.alignment);
+
+      // Copy the session data
+      putAssign(target, source);
+      putAssign(contDataOffset, newContDataOffset);
+
+      // Update the remote session's continuation to match the new environment
+      String remoteSession = remoteSession(arg.getSourceSessionId());
+      putAssign(sessionContEnv(remoteSession), newEnv);
+      putAssign(
+          sessionContSessionOffset(remoteSession),
+          calledLayout.sessionOffset(arg.getTargetSessionId()));
+      putAssign(
+          sessionContDataOffset(remoteSession),
+          calledLayout.dataOffset(arg.getTargetSessionId().getLocalData()));
     }
 
     for (IRCallProcess.DataArgument arg : instr.getDataArguments()) {
-
+      // Here we simply copy data from some location in the current environment to
+      // a local data section in the new environment
+      IRDataLocation target = IRDataLocation.local(arg.getTargetDataId(), IRSlotSequence.EMPTY);
+      putCopy(calledLayout, newEnv, target, arg.getSourceLocation(), arg.getSlots());
     }
 
     // Decrement the end points of the current process, if applicable
@@ -737,154 +827,139 @@ public class CGenerator extends IRInstructionVisitor {
 
   // ============================ Structure expression building helpers ===========================
 
-  private CSize endPointsBegin() {
-    // The end point counter is stored right at the beginning of the environment
-    return CSize.zero();
+  private String endPoints() {
+    return endPoints(currentProcessLayout, ENV);
   }
 
-  private CSize endPointsEnd(IRProcess process) {
-    if (compiler.optimizeSingleEndpoint.get() && process.getEndPoints() == 1) {
-      return endPointsBegin();
-    } else {
-      return endPointsBegin().add(compiler.arch.intSize);
-    }
-  }
-
-  private CSize endPointsEnd() {
-    return endPointsEnd(process);
-  }
-
-  private String endPoints(IRProcess process) {
-    if (compiler.optimizeSingleEndpoint.get() && process.getEndPoints() == 1) {
-      throw new UnsupportedOperationException("End points were optimized away");
-    }
-
-    String ptr = endPointsBegin().advancePointer(ENV);
+  private String endPoints(CProcessLayout layout, String env) {
+    String ptr = layout.endPointsOffset().advancePointer(ENV);
     return access(ptr, compiler.concurrency.get() ? "atomic_int" : "int");
   }
 
-  private String endPoints() {
-    return endPoints(process);
+  private CLayout typeLayout(IRTypeId typeId) {
+    return typeLayout(currentProcessLayout, ENV, typeId);
   }
 
-  private CSize sessionsBegin() {
-    return sessionsBegin(process);
+  private CLayout typeLayout(CProcessLayout layout, String env, IRTypeId typeId) {
+    String type = type(layout, env, typeId);
+    return new CLayout(
+        CSize.expression(typeSize(type)), CAlignment.expression(typeAlignment(type)));
   }
 
-  private CSize sessionsBegin(IRProcess process) {
-    // The end point counter comes before the sessions.
-    return endPointsEnd(process).align(compiler.arch.pointerAlignment);
+  private String type(CProcessLayout layout, String env, IRTypeId id) {
+    CSize offset = layout.typeOffset(id);
+    return access(offset.advancePointer(env), "struct type");
   }
 
-  private CSize sessionSize() {
-    return CSize.sizeOf("struct session");
+  private CSize sessionOffset(IRSessionId id) {
+    return sessionOffset(currentProcessLayout, id);
   }
 
-  private CSize sessionBegin(IRSessionId id) {
-    return sessionBegin(process, id);
-  }
-
-  private CSize sessionBegin(IRProcess process, IRSessionId id) {
-    return sessionsBegin(process).add(sessionSize().multiply(id.getIndex()));
-  }
-
-  private String session(IRProcess process, IRSessionId id) {
-    return access(sessionBegin(process, id).advancePointer(ENV), "struct session");
+  private CSize sessionOffset(CProcessLayout layout, IRSessionId id) {
+    return layout.sessionOffset(id);
   }
 
   private String session(IRSessionId id) {
-    return session(process, id);
+    return session(currentProcessLayout, ENV, id);
+  }
+
+  private String session(CProcessLayout layout, String env, IRSessionId id) {
+    return access(sessionOffset(layout, id).advancePointer(env), "struct session");
   }
 
   private String remoteSession(IRSessionId id) {
-    String session = session(id);
+    return remoteSession(session(id));
+  }
+
+  private String remoteSession(String session) {
     String remoteEnv = sessionContEnv(session);
     CSize offset = CSize.expression(sessionContSessionOffset(session));
     return offset.advancePointer(remoteEnv);
   }
 
-  private CSize localDataBegin() {
-    return sessionsBegin().add(sessionSize().multiply(process.getSessionCount()));
+  private CSize localDataOffset(IRSessionId sessionId) {
+    return localDataOffset(currentProcessLayout, sessionId);
   }
 
-  private CSize localDataBegin(IRSessionId sessionId) {
-    return localDataBegin(sessionId.getLocalData());
+  private CSize localDataOffset(IRLocalDataId localDataId) {
+    return localDataOffset(currentProcessLayout, localDataId);
   }
 
-  private CSize localDataBegin(IRLocalDataId localDataId) {
-    // First get the offset to the end of the previous local data section
-    CSize result = localDataBegin();
-    for (int i = 0; i < localDataId.getIndex(); ++i) {
-      IRSlotCombinations total = process.getLocalData(new IRLocalDataId(i));
-      CLayout totalLayout = layout(total);
-      result = result.align(totalLayout.alignment).add(totalLayout.size);
-    }
-
-    // Then align that pointer to our required alignment,
-    // which is obtained from all possible slot combinations
-    IRSlotCombinations total = process.getLocalData(localDataId);
-    CLayout totalLayout = layout(total);
-    return result.align(totalLayout.alignment);
+  private CSize localDataOffset(CProcessLayout layout, IRSessionId sessionId) {
+    return localDataOffset(layout, sessionId.getLocalData());
   }
 
-  private String localData(IRSessionId sessionId) {
-    return localData(sessionId.getLocalData());
+  private CSize localDataOffset(CProcessLayout layout, IRLocalDataId localDataId) {
+    return layout.dataOffset(localDataId);
   }
 
   private String localData(IRLocalDataId localDataId) {
-    return localDataBegin(localDataId).advancePointer(ENV);
+    return localData(currentProcessLayout, ENV, localDataId);
+  }
+
+  private String localData(IRSessionId sessionId) {
+    return localData(currentProcessLayout, ENV, sessionId);
+  }
+
+  private String localData(CProcessLayout layout, String env, IRSessionId sessionId) {
+    return localData(layout, env, sessionId.getLocalData());
+  }
+
+  private String localData(CProcessLayout layout, String env, IRLocalDataId localDataId) {
+    return localDataOffset(layout, localDataId).advancePointer(env);
   }
 
   private String localData(IRLocalDataId localDataId, IRSlotSequence offset, IRSlot slot) {
-    // Get the offset to the local data section
-    CSize localDataOffset = localDataBegin(localDataId);
+    return localData(currentProcessLayout, ENV, localDataId, offset, slot);
+  }
 
+  private String localData(
+      CProcessLayout layout,
+      String env,
+      IRLocalDataId localDataId,
+      IRSlotSequence offset,
+      IRSlot slot) {
     CLayout offsetLayout = layout(offset);
     CLayout slotLayout = layout(slot);
-
-    // Now we got two scenarios:
-    // 1. The data is polymorphic, and thus we must dereference the pointer first
-    // 2. The data is not polymorphic, and we apply the offset to the section start
-
-    if (process.getLocalData(localDataId).isPolymorphic()) {
-      String localData = localDataOffset.advancePointer(ENV);
-      String pointer = access(localData, "char*");
-      CSize finalOffset = offsetLayout.size.align(slotLayout.alignment);
-      return finalOffset.advancePointer(pointer);
-    } else {
-      CSize finalOffset = localDataOffset.add(offsetLayout.size).align(slotLayout.alignment);
-      return finalOffset.advancePointer(ENV);
-    }
+    CSize finalOffset =
+        localDataOffset(layout, localDataId).add(offsetLayout.size).align(slotLayout.alignment);
+    return finalOffset.advancePointer(env);
   }
 
   private String remoteData(IRSessionId sessionId, IRSlotSequence offset, IRSlot slot) {
+    return remoteData(currentProcessLayout, ENV, sessionId, offset, slot);
+  }
+
+  private String remoteData(
+      CProcessLayout layout,
+      String env,
+      IRSessionId sessionId,
+      IRSlotSequence offset,
+      IRSlot slot) {
     // Get the pointer to the start of the session's remote data
     CSize baseOffset = CSize.expression(sessionContDataOffset(session(sessionId)));
 
     CLayout offsetLayout = layout(offset);
     CLayout slotLayout = layout(slot);
 
-    CSize finalOffset = offsetLayout.size.align(slotLayout.alignment);
+    CSize finalOffset = baseOffset.add(offsetLayout.size).align(slotLayout.alignment);
     return finalOffset.advancePointer(sessionContEnv(session(sessionId)));
   }
 
-  private String data(IRDataLocation data, IRSlotSequence offset, IRSlot slot) {
+  private String data(CProcessLayout layout, String env, IRDataLocation data, IRSlot slot) {
     if (data.isRemote()) {
-      return remoteData(data.getSessionId(), offset, slot);
+      return remoteData(layout, env, data.getSessionId(), data.getOffset(), slot);
     } else {
-      return localData(data.getLocalDataId(), offset, slot);
+      return localData(layout, env, data.getLocalDataId(), data.getOffset(), slot);
     }
   }
 
-  private CSize environmentSize(IRProcess process) {
-    // Start from the beginning of the local data section
-    CSize result = localDataBegin();
-    for (int i = 0; i < process.getLocalDataCount(); ++i) {
-      IRSlotCombinations total = process.getLocalData(new IRLocalDataId(i));
-      CLayout totalLayout = layout(total);
-      result = result.align(totalLayout.alignment).add(totalLayout.size);
-    }
-    return result;
+  private String typeSize(String var) {
+    return var + ".size";
+  }
+
+  private String typeAlignment(String var) {
+    return var + ".alignment";
   }
 
   private String taskNext(String var) {
@@ -915,22 +990,55 @@ public class CGenerator extends IRInstructionVisitor {
     return var + ".cont_session_offset";
   }
 
+  private CProcessLayout layout(IRProcess process, Function<IRTypeId, CLayout> typeLayoutProvider) {
+    return CProcessLayout.compute(compiler, process, typeLayoutProvider);
+  }
+
   private CLayout layout(IRSlotCombinations combinations) {
-    return CLayout.compute(combinations, compiler.arch, typeId -> {
-      throw new UnsupportedOperationException("Type variables still haven't been implemented");
-    });
+    return CLayout.compute(combinations, compiler.arch, typeId -> typeLayout(typeId));
   }
 
   private CLayout layout(IRSlotSequence sequence) {
-    return CLayout.compute(sequence, compiler.arch, typeId -> {
-      throw new UnsupportedOperationException("Type variables still haven't been implemented");
-    });
+    return CLayout.compute(sequence, compiler.arch, typeId -> typeLayout(typeId));
   }
 
   private CLayout layout(IRSlot slot) {
-    return CLayout.compute(slot, compiler.arch, typeId -> {
-      throw new UnsupportedOperationException("Type variables still haven't been implemented");
-    });
+    return CLayout.compute(slot, compiler.arch, typeId -> typeLayout(typeId));
+  }
+
+  private void putCopy(IRDataLocation target, IRDataLocation source, IRSlotSequence slots) {
+    putCopy(currentProcessLayout, ENV, target, source, slots);
+  }
+
+  private void putCopy(
+      CProcessLayout targetLayout,
+      String targetEnv,
+      IRDataLocation target,
+      IRDataLocation source,
+      IRSlotSequence slots) {
+    putCopy(targetLayout, targetEnv, target, currentProcessLayout, ENV, source, slots);
+  }
+
+  private void putCopy(
+      CProcessLayout targetLayout,
+      String targetEnv,
+      IRDataLocation target,
+      CProcessLayout sourceLayout,
+      String sourceEnv,
+      IRDataLocation source,
+      IRSlotSequence slots) {
+    // The difficulty here lies in that the source and target may have different layouts.
+    // This is due to the fact that they might start in offsets with different alignments,
+    // and thus, have different paddings between slots.
+    //
+    // The simple way to solve this, which is what we do here, is to copy slot by slot.
+    IRSlotSequence offset = IRSlotSequence.EMPTY;
+    for (IRSlot slot : slots.list()) {
+      putCopy(
+          data(targetLayout, targetEnv, target.advance(offset), slot),
+          data(sourceLayout, sourceEnv, source.advance(offset), slot),
+          layout(slot).size);
+    }
   }
 
   // ============================ Structure statement building helpers ============================
@@ -949,8 +1057,8 @@ public class CGenerator extends IRInstructionVisitor {
     }
   }
 
-  private void putAllocEnvironment(String var, IRProcess process) {
-    putAlloc(var, environmentSize(process));
+  private void putAllocEnvironment(String var, CProcessLayout layout) {
+    putAlloc(var, layout.size());
     if (compiler.profiling.get()) {
       putIncrementAtomic("env_allocs");
     }
@@ -972,7 +1080,7 @@ public class CGenerator extends IRInstructionVisitor {
       return;
     }
 
-    if (compiler.optimizeSingleEndpoint.get() && process.getEndPoints() == 1) {
+    if (compiler.optimizeSingleEndpoint.get() && currentProcess.getEndPoints() == 1) {
       free.run();
     } else {
       putIf(decrementAtomic(endPoints()) + " == 0", free);
@@ -1002,7 +1110,7 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   private String codeLocationLabel(IRCodeLocation location) {
-    return codeLocationLabel(process, location);
+    return codeLocationLabel(currentProcess, location);
   }
 
   private String codeLocationAddress(IRCodeLocation location) {
@@ -1135,6 +1243,10 @@ public class CGenerator extends IRInstructionVisitor {
     if (!size.equals(CSize.zero())) {
       putStatement("memcpy(" + dst + ", " + src + ", " + size + ")");
     }
+  }
+
+  private void putAssign(String var, CSize what) {
+    putAssign(var, what.toString());
   }
 
   private void putAssign(String var, String what) {

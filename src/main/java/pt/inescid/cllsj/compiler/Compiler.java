@@ -64,7 +64,11 @@ public class Compiler {
     pointerAlignment =
         settings.addInt("pointer-alignment", "Alignment of pointer C type in bytes", 8);
 
-    optimizeSingleEndpoint = settings.addFlag("optimize-single-endpoint", "Optimizes away reference counting for processes with a single end point", true);
+    optimizeSingleEndpoint =
+        settings.addFlag(
+            "optimize-single-endpoint",
+            "Optimizes away reference counting for processes with a single end point",
+            true);
 
     settings.addMode(
         "optimize-sequential",

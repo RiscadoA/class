@@ -6,10 +6,39 @@ import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
 import pt.inescid.cllsj.compiler.ir.id.IRLocalDataId;
 import pt.inescid.cllsj.compiler.ir.id.IRProcessId;
 import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
+import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
+import pt.inescid.cllsj.compiler.ir.slot.IRSlot;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotCombinations;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotSequence;
 
 public class IRCallProcess extends IRInstruction {
+  public static class TypeArgument {
+    private IRSlotCombinations sourceCombinations;
+    private IRTypeId targetType;
+
+    public TypeArgument(IRSlotCombinations sourceCombinations, IRTypeId targetType) {
+      this.sourceCombinations = sourceCombinations;
+      this.targetType = targetType;
+    }
+
+    public IRSlotCombinations getSourceCombinations() {
+      return sourceCombinations;
+    }
+
+    public IRTypeId getTargetType() {
+      return targetType;
+    }
+
+    public TypeArgument clone() {
+      return new TypeArgument(sourceCombinations, targetType);
+    }
+
+    @Override
+    public String toString() {
+      return targetType + " <- [" + sourceCombinations + "]";
+    }
+  }
+
   public static class SessionArgument {
     // Which session in the source process to bind from
     private IRSessionId sourceSessionId;
@@ -17,14 +46,22 @@ public class IRCallProcess extends IRInstruction {
     // Which session in the target process to bind to
     private IRSessionId targetSessionId;
 
-    // How much to offset the session's remote value in the target process
-    private IRSlotSequence valueOffset;
+    // How much to offset the session's remote data in the target process
+    private IRSlotSequence dataOffset;
+
+    // Slot which will be at the beginning of the data section in the target process
+    // Necessary to align the data offset properly
+    private IRSlot dataSlot;
 
     public SessionArgument(
-        IRSessionId sourceSessionId, IRSessionId targetSessionId, IRSlotSequence valueOffset) {
+        IRSessionId sourceSessionId,
+        IRSessionId targetSessionId,
+        IRSlotSequence dataOffset,
+        IRSlot dataSlot) {
       this.sourceSessionId = sourceSessionId;
       this.targetSessionId = targetSessionId;
-      this.valueOffset = valueOffset;
+      this.dataOffset = dataOffset;
+      this.dataSlot = dataSlot;
     }
 
     public IRSessionId getSourceSessionId() {
@@ -35,8 +72,12 @@ public class IRCallProcess extends IRInstruction {
       return targetSessionId;
     }
 
-    public IRSlotSequence getValueOffset() {
-      return valueOffset;
+    public IRSlotSequence getDataOffset() {
+      return dataOffset;
+    }
+
+    public IRSlot getDataSlot() {
+      return dataSlot;
     }
 
     public void replaceSessions(Function<IRSessionId, IRSessionId> replacer) {
@@ -45,31 +86,12 @@ public class IRCallProcess extends IRInstruction {
     }
 
     public SessionArgument clone() {
-      return new SessionArgument(sourceSessionId, targetSessionId, valueOffset);
+      return new SessionArgument(sourceSessionId, targetSessionId, dataOffset, dataSlot);
     }
 
     @Override
     public String toString() {
-      return targetSessionId + " <- " + sourceSessionId + "[" + valueOffset + "]";
-    }
-  }
-
-  public static class TypeArgument {
-    private IRSlotCombinations sourceCombinations;
-    private int targetType;
-
-    public TypeArgument(IRSlotCombinations sourceCombinations, int targetType) {
-      this.sourceCombinations = sourceCombinations;
-      this.targetType = targetType;
-    }
-
-    public TypeArgument clone() {
-      return new TypeArgument(sourceCombinations, targetType);
-    }
-
-    @Override
-    public String toString() {
-      return targetType + " <- [" + sourceCombinations + "]";
+      return targetSessionId + " <- " + sourceSessionId + "[" + dataOffset + " | " + dataSlot + "]";
     }
   }
 
@@ -113,20 +135,20 @@ public class IRCallProcess extends IRInstruction {
   }
 
   private IRProcessId processId;
-  private List<SessionArgument> sessionArguments;
   private List<TypeArgument> typeArguments;
+  private List<SessionArgument> sessionArguments;
   private List<DataArgument> dataArguments;
   private boolean isEndPoint;
 
   public IRCallProcess(
       IRProcessId processId,
-      List<SessionArgument> sessionArguments,
       List<TypeArgument> typeArguments,
+      List<SessionArgument> sessionArguments,
       List<DataArgument> dataArguments,
       boolean isEndPoint) {
     this.processId = processId;
-    this.sessionArguments = sessionArguments;
     this.typeArguments = typeArguments;
+    this.sessionArguments = sessionArguments;
     this.dataArguments = dataArguments;
     this.isEndPoint = isEndPoint;
   }
@@ -174,8 +196,8 @@ public class IRCallProcess extends IRInstruction {
   public IRInstruction clone() {
     return new IRCallProcess(
         processId,
-        sessionArguments.stream().map(SessionArgument::clone).toList(),
         typeArguments.stream().map(TypeArgument::clone).toList(),
+        sessionArguments.stream().map(SessionArgument::clone).toList(),
         dataArguments.stream().map(DataArgument::clone).toList(),
         isEndPoint);
   }
@@ -187,10 +209,10 @@ public class IRCallProcess extends IRInstruction {
     if (isEndPoint) {
       sb.append(", end point");
     }
-    for (SessionArgument arg : sessionArguments) {
+    for (TypeArgument arg : typeArguments) {
       sb.append(", ").append(arg.toString());
     }
-    for (TypeArgument arg : typeArguments) {
+    for (SessionArgument arg : sessionArguments) {
       sb.append(", ").append(arg.toString());
     }
     for (DataArgument arg : dataArguments) {

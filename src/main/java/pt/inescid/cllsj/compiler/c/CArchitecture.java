@@ -14,6 +14,22 @@ public class CArchitecture {
   public CSize pointerSize = CSize.constant(8);
   public CAlignment pointerAlignment = CAlignment.constant(8);
 
+  public CSize sessionSize() {
+    return pointerSize.multiply(3);
+  }
+
+  public CAlignment sessionAlignment() {
+    return pointerAlignment;
+  }
+
+  public CSize typeSize() {
+    return intSize.multiply(2);
+  }
+
+  public CAlignment typeAlignment() {
+    return intAlignment;
+  }
+
   public static class Test {
     public String cType;
     public CSize expected;
@@ -28,9 +44,10 @@ public class CArchitecture {
   // running in
   public List<Test> getTests() {
     return List.of(
-        new Test("struct record_header", recordHeaderSize),
         new Test("int", intSize),
         new Test("unsigned char", unsignedCharSize),
-        new Test("void*", pointerSize));
+        new Test("void*", pointerSize),
+        new Test("struct session", sessionSize()),
+        new Test("struct type", typeSize()));
   }
 }

@@ -21,10 +21,6 @@ public class IRSlotCombinations {
     return sequences.size();
   }
 
-  public boolean isPolymorphic() {
-    return sequences.stream().anyMatch(s -> s.isPolymorphic());
-  }
-
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();

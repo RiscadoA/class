@@ -200,7 +200,7 @@ public abstract class CSize {
       CSize rhs = this.rhs.simplify(0);
 
       if (lhs instanceof CSizeConstant) {
-        int bytes = ((CSizeConstant)lhs).bytes;
+        int bytes = ((CSizeConstant) lhs).bytes;
         if (bytes == 1) {
           return rhs.simplify(remainder);
         } else if (bytes == 0) {
@@ -209,7 +209,7 @@ public abstract class CSize {
       }
 
       if (rhs instanceof CSizeConstant) {
-        int bytes = ((CSizeConstant)rhs).bytes;
+        int bytes = ((CSizeConstant) rhs).bytes;
         if (bytes == 1) {
           return lhs.simplify(remainder);
         } else if (bytes == 0) {
@@ -218,8 +218,8 @@ public abstract class CSize {
       }
 
       if (lhs instanceof CSizeConstant && rhs instanceof CSizeConstant) {
-        int lhsBytes = ((CSizeConstant)lhs).bytes;
-        int rhsBytes = ((CSizeConstant)rhs).bytes;
+        int lhsBytes = ((CSizeConstant) lhs).bytes;
+        int rhsBytes = ((CSizeConstant) rhs).bytes;
         return constant(lhsBytes * rhsBytes + remainder);
       }
 
