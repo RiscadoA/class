@@ -415,12 +415,11 @@ public class CGenerator extends IRInstructionVisitor {
           putBlankLine();
 
           // Jump to the entry process.
-          IRProcessId entryProcessId = new IRProcessId(compiler.entryProcess.get());
-          if (program.get(entryProcessId) == null) {
+          IRProcess entryProcess = program.get(new IRProcessId(compiler.entryProcess.get()));
+          if (entryProcess == null) {
             throw new IllegalArgumentException("Entry process " + compiler.entryProcess.get() + " not found");
           }
-          IRProcess entryProcess = program.get(entryProcessId);
-          generate(new IRCallProcess(entryProcess.getId(), List.of(), List.of(), List.of()));
+          generate(new IRCallProcess(entryProcess.getId(), List.of(), List.of(), List.of(), false));
           putBlankLine();
 
           // Generate all processes
@@ -688,8 +687,28 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRCallProcess instr) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    IRProcessId calledProcessId = instr.getProcessId();
+    IRProcess calledProcess = program.get(calledProcessId);
+    if (calledProcess == null) {
+      throw new IllegalArgumentException("Called process " + calledProcessId + " not found");
+    }
+
+    // Allocate a new environment for the called process
+    putAllocEnvironment(TMP_PTR1, calledProcess);
+    
+    for (IRCallProcess.SessionArgument arg : instr.getSessionArguments()) {
+      
+    }
+
+    for (IRCallProcess.DataArgument arg : instr.getDataArguments()) {
+
+    }
+
+    // Decrement the end points of the current process, if applicable
+    putDecrementEndPoints(instr.isEndPoint());
+
+    putAssign(ENV, cast(TMP_PTR1, "char*"));
+    putConstantGoto(codeLocationLabel(calledProcess, IRCodeLocation.entry()));
   }
 
   @Override
@@ -723,7 +742,7 @@ public class CGenerator extends IRInstructionVisitor {
     return CSize.zero();
   }
 
-  private CSize endPointsEnd() {
+  private CSize endPointsEnd(IRProcess process) {
     if (compiler.optimizeSingleEndpoint.get() && process.getEndPoints() == 1) {
       return endPointsBegin();
     } else {
@@ -731,7 +750,11 @@ public class CGenerator extends IRInstructionVisitor {
     }
   }
 
-  private String endPoints() {
+  private CSize endPointsEnd() {
+    return endPointsEnd(process);
+  }
+
+  private String endPoints(IRProcess process) {
     if (compiler.optimizeSingleEndpoint.get() && process.getEndPoints() == 1) {
       throw new UnsupportedOperationException("End points were optimized away");
     }
@@ -740,9 +763,17 @@ public class CGenerator extends IRInstructionVisitor {
     return access(ptr, compiler.concurrency.get() ? "atomic_int" : "int");
   }
 
+  private String endPoints() {
+    return endPoints(process);
+  }
+
   private CSize sessionsBegin() {
+    return sessionsBegin(process);
+  }
+
+  private CSize sessionsBegin(IRProcess process) {
     // The end point counter comes before the sessions.
-    return endPointsEnd().align(compiler.arch.pointerAlignment);
+    return endPointsEnd(process).align(compiler.arch.pointerAlignment);
   }
 
   private CSize sessionSize() {
@@ -750,11 +781,19 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   private CSize sessionBegin(IRSessionId id) {
-    return sessionsBegin().add(sessionSize().multiply(id.getIndex()));
+    return sessionBegin(process, id);
+  }
+
+  private CSize sessionBegin(IRProcess process, IRSessionId id) {
+    return sessionsBegin(process).add(sessionSize().multiply(id.getIndex()));
+  }
+
+  private String session(IRProcess process, IRSessionId id) {
+    return access(sessionBegin(process, id).advancePointer(ENV), "struct session");
   }
 
   private String session(IRSessionId id) {
-    return access(sessionBegin(id).advancePointer(ENV), "struct session");
+    return session(process, id);
   }
 
   private String remoteSession(IRSessionId id) {
@@ -958,8 +997,12 @@ public class CGenerator extends IRInstructionVisitor {
     return "&&" + label;
   }
 
-  private String codeLocationLabel(IRCodeLocation location) {
+  private String codeLocationLabel(IRProcess process, IRCodeLocation location) {
     return process.getId() + "_" + location.getLabel();
+  }
+
+  private String codeLocationLabel(IRCodeLocation location) {
+    return codeLocationLabel(process, location);
   }
 
   private String codeLocationAddress(IRCodeLocation location) {

@@ -116,16 +116,19 @@ public class IRCallProcess extends IRInstruction {
   private List<SessionArgument> sessionArguments;
   private List<TypeArgument> typeArguments;
   private List<DataArgument> dataArguments;
+  private boolean isEndPoint;
 
   public IRCallProcess(
       IRProcessId processId,
       List<SessionArgument> sessionArguments,
       List<TypeArgument> typeArguments,
-      List<DataArgument> dataArguments) {
+      List<DataArgument> dataArguments,
+      boolean isEndPoint) {
     this.processId = processId;
     this.sessionArguments = sessionArguments;
     this.typeArguments = typeArguments;
     this.dataArguments = dataArguments;
+    this.isEndPoint = isEndPoint;
   }
 
   public IRProcessId getProcessId() {
@@ -142,6 +145,10 @@ public class IRCallProcess extends IRInstruction {
 
   public List<DataArgument> getDataArguments() {
     return dataArguments;
+  }
+
+  public boolean isEndPoint() {
+    return isEndPoint;
   }
 
   @Override
@@ -169,13 +176,17 @@ public class IRCallProcess extends IRInstruction {
         processId,
         sessionArguments.stream().map(SessionArgument::clone).toList(),
         typeArguments.stream().map(TypeArgument::clone).toList(),
-        dataArguments.stream().map(DataArgument::clone).toList());
+        dataArguments.stream().map(DataArgument::clone).toList(),
+        isEndPoint);
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
     sb.append("callProcess(").append(processId);
+    if (isEndPoint) {
+      sb.append(", end point");
+    }
     for (SessionArgument arg : sessionArguments) {
       sb.append(", ").append(arg.toString());
     }
