@@ -208,7 +208,8 @@ public class CGenerator extends IRInstructionVisitor {
         () -> {
           putStatement("void* cont");
           putStatement("char* cont_env");
-          putStatement("char* cont_data");
+          putStatement("int cont_data_offset");
+          putStatement("int cont_session_offset");
         });
 
     putStruct(
@@ -591,30 +592,55 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRPopTask instr) {
+    putDecrementEndPoints(instr.isEndPoint());
     putAssign(TMP_PTR1, TASK);
     putAssign(TMP_PTR2, taskCont(TASK));
     putAssign(ENV, taskContEnv(TASK));
     putAssign(TASK, taskNext(TASK));
-    putFree(TMP_PTR1);
+    putFreeTask(TMP_PTR1);
     putComputedGoto(TMP_PTR2);
   }
 
   @Override
   public void visit(IRInitializeSession instr) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    StringBuilder sb = new StringBuilder("(struct session)");
+    sb.append("{cont=").append(codeLocationAddress(instr.getContinuation()));
+    sb.append(",cont_env=").append(ENV);
+    sb.append(",cont_data_offset=").append(localDataBegin(instr.getSessionId()));
+    sb.append(",cont_session_offset=").append(sessionBegin(instr.getSessionId()));
+    sb.append("}");
+    putAssign(session(instr.getSessionId()), sb.toString());
   }
 
   @Override
   public void visit(IRContinueSession instr) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    // TODO: here we assume that the remote continuation already points to us.
+    // is that always true?
+
+    String session = session(instr.getSessionId());
+
+    String remoteSession = remoteSession(instr.getSessionId());
+    String remoteSessionCont = sessionCont(remoteSession);
+
+    putAssign(TMP_PTR1, sessionCont(session));
+    putAssign(remoteSessionCont, codeLocationAddress(instr.getContinuation()));
+    putAssign(ENV, sessionContEnv(session));
+    putComputedGoto(TMP_PTR1);
   }
 
   @Override
   public void visit(IRFinishSession instr) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    String session = session(instr.getSessionId());
+
+    putAssign(TMP_PTR1, sessionCont(session));
+    if (instr.isEndPoint()) {
+      putAssign(TMP_PTR2, sessionContEnv(session));
+      putDecrementEndPoints(true);
+      putAssign(ENV, cast(TMP_PTR2, "char*"));
+    } else {
+      putAssign(ENV, sessionContEnv(session));
+    }
+    putComputedGoto(TMP_PTR1);
   }
 
   @Override
@@ -679,41 +705,63 @@ public class CGenerator extends IRInstructionVisitor {
 
   // ============================ Structure expression building helpers ===========================
 
-  private CSize endPointsOffset() {
+  private CSize endPointsBegin() {
     // The end point counter is stored right at the beginning of the environment
     return CSize.zero();
   }
 
+  private CSize endPointsEnd() {
+    if (compiler.optimizeSingleEndpoint.get() && process.getEndPoints() == 1) {
+      return endPointsBegin();
+    } else {
+      return endPointsBegin().add(compiler.arch.intSize);
+    }
+  }
+
   private String endPoints() {
-    String ptr = endPointsOffset().advancePointer(ENV);
+    if (compiler.optimizeSingleEndpoint.get() && process.getEndPoints() == 1) {
+      throw new UnsupportedOperationException("End points were optimized away");
+    }
+
+    String ptr = endPointsBegin().advancePointer(ENV);
     return access(ptr, compiler.concurrency.get() ? "atomic_int" : "int");
   }
 
-  private CSize sessionStartOffset() {
+  private CSize sessionsBegin() {
     // The end point counter comes before the sessions.
-    return endPointsOffset().add(compiler.arch.intSize).align(compiler.arch.pointerAlignment);
+    return endPointsEnd().align(compiler.arch.pointerAlignment);
   }
 
   private CSize sessionSize() {
-    return compiler.arch.pointerSize.multiply(3).align(compiler.arch.pointerAlignment);
+    return CSize.sizeOf("struct session");
   }
 
-  private CSize sessionOffset(IRSessionId id) {
-    return sessionStartOffset().add(sessionSize().multiply(id.getIndex()));
+  private CSize sessionBegin(IRSessionId id) {
+    return sessionsBegin().add(sessionSize().multiply(id.getIndex()));
   }
 
   private String session(IRSessionId id) {
-    CSize offset = sessionOffset(id);
-    return access(offset.advancePointer(ENV), "struct session");
+    return access(sessionBegin(id).advancePointer(ENV), "struct session");
   }
 
-  private CSize localDataStartOffset() {
-    return sessionStartOffset().add(sessionSize().multiply(process.getSessionCount()));
+  private String remoteSession(IRSessionId id) {
+    String session = session(id);
+    String remoteEnv = sessionContEnv(session);
+    CSize offset = CSize.expression(sessionContSessionOffset(session));
+    return offset.advancePointer(remoteEnv);
   }
 
-  private CSize localDataOffset(IRLocalDataId localDataId) {
+  private CSize localDataBegin() {
+    return sessionsBegin().add(sessionSize().multiply(process.getSessionCount()));
+  }
+
+  private CSize localDataBegin(IRSessionId sessionId) {
+    return localDataBegin(sessionId.getLocalData());
+  }
+
+  private CSize localDataBegin(IRLocalDataId localDataId) {
     // First get the offset to the end of the previous local data section
-    CSize result = localDataStartOffset();
+    CSize result = localDataBegin();
     for (int i = 0; i < localDataId.getIndex(); ++i) {
       IRSlotCombinations total = process.getLocalData(new IRLocalDataId(i));
       CLayout totalLayout = layout(total);
@@ -727,9 +775,17 @@ public class CGenerator extends IRInstructionVisitor {
     return result.align(totalLayout.alignment);
   }
 
+  private String localData(IRSessionId sessionId) {
+    return localData(sessionId.getLocalData());
+  }
+
+  private String localData(IRLocalDataId localDataId) {
+    return localDataBegin(localDataId).advancePointer(ENV);
+  }
+
   private String localData(IRLocalDataId localDataId, IRSlotSequence offset, IRSlot slot) {
     // Get the offset to the local data section
-    CSize localDataOffset = localDataOffset(localDataId);
+    CSize localDataOffset = localDataBegin(localDataId);
 
     CLayout offsetLayout = layout(offset);
     CLayout slotLayout = layout(slot);
@@ -751,13 +807,13 @@ public class CGenerator extends IRInstructionVisitor {
 
   private String remoteData(IRSessionId sessionId, IRSlotSequence offset, IRSlot slot) {
     // Get the pointer to the start of the session's remote data
-    String dataPointer =  sessionContData(session(sessionId));
+    CSize baseOffset = CSize.expression(sessionContDataOffset(session(sessionId)));
 
     CLayout offsetLayout = layout(offset);
     CLayout slotLayout = layout(slot);
 
     CSize finalOffset = offsetLayout.size.align(slotLayout.alignment);
-    return finalOffset.advancePointer(dataPointer);
+    return finalOffset.advancePointer(sessionContEnv(session(sessionId)));
   }
 
   private String data(IRDataLocation data, IRSlotSequence offset, IRSlot slot) {
@@ -766,6 +822,17 @@ public class CGenerator extends IRInstructionVisitor {
     } else {
       return localData(data.getLocalDataId(), offset, slot);
     }
+  }
+
+  private CSize environmentSize(IRProcess process) {
+    // Start from the beginning of the local data section
+    CSize result = localDataBegin();
+    for (int i = 0; i < process.getLocalDataCount(); ++i) {
+      IRSlotCombinations total = process.getLocalData(new IRLocalDataId(i));
+      CLayout totalLayout = layout(total);
+      result = result.align(totalLayout.alignment).add(totalLayout.size);
+    }
+    return result;
   }
 
   private String taskNext(String var) {
@@ -781,15 +848,19 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   private String sessionCont(String var) {
-    return var + "->cont";
+    return var + ".cont";
   }
 
   private String sessionContEnv(String var) {
-    return var + "->cont_env";
+    return var + ".cont_env";
   }
 
-  private String sessionContData(String var) {
-    return var + "->cont_data";
+  private String sessionContDataOffset(String var) {
+    return var + ".cont_data_offset";
+  }
+
+  private String sessionContSessionOffset(String var) {
+    return var + ".cont_session_offset";
   }
 
   private CLayout layout(IRSlotCombinations combinations) {
@@ -816,6 +887,43 @@ public class CGenerator extends IRInstructionVisitor {
     putAlloc(var, CSize.sizeOf("struct task"));
     if (compiler.profiling.get()) {
       putIncrementAtomic("task_allocs");
+    }
+  }
+
+  private void putFreeTask(String var) {
+    putFree(var);
+    if (compiler.profiling.get()) {
+      putIncrementAtomic("task_frees");
+    }
+  }
+
+  private void putAllocEnvironment(String var, IRProcess process) {
+    putAlloc(var, environmentSize(process));
+    if (compiler.profiling.get()) {
+      putIncrementAtomic("env_allocs");
+    }
+  }
+
+  private void putFreeEnvironment(String var) {
+    putFree(var);
+    if (compiler.profiling.get()) {
+      putIncrementAtomic("env_frees");
+    }
+  }
+
+  private void putDecrementEndPoints(boolean isEndPoint) {
+    putDecrementEndPoints(isEndPoint, () -> putFreeEnvironment(ENV));
+  }
+
+  private void putDecrementEndPoints(boolean isEndPoint, Runnable free) {
+    if (!isEndPoint) {
+      return;
+    }
+
+    if (compiler.optimizeSingleEndpoint.get() && process.getEndPoints() == 1) {
+      free.run();
+    } else {
+      putIf(decrementAtomic(endPoints()) + " == 0", free);
     }
   }
 

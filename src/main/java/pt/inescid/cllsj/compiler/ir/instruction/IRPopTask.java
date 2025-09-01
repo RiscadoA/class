@@ -3,10 +3,6 @@ package pt.inescid.cllsj.compiler.ir.instruction;
 public class IRPopTask extends IRInstruction {
   private boolean isEndPoint;
 
-  public IRPopTask() {
-    this(true);
-  }
-
   public IRPopTask(boolean isEndPoint) {
     this.isEndPoint = isEndPoint;
   }

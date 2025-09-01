@@ -18,13 +18,14 @@ public class Compiler {
   public Settings.Int allocatorSizeDivisor;
 
   public CArchitecture arch;
-
   private Settings.Int intSize;
   private Settings.Int intAlignment;
   private Settings.Int unsignedCharSize;
   private Settings.Int unsignedCharAlignment;
   private Settings.Int pointerSize;
   private Settings.Int pointerAlignment;
+
+  public Settings.Flag optimizeSingleEndpoint;
 
   public Compiler() {
     entryProcess = settings.addName('e', "entry", "Entry process name", "main");
@@ -62,6 +63,8 @@ public class Compiler {
     pointerSize = settings.addInt("pointer-size", "Size of pointer C type in bytes", 8);
     pointerAlignment =
         settings.addInt("pointer-alignment", "Alignment of pointer C type in bytes", 8);
+
+    optimizeSingleEndpoint = settings.addFlag("optimize-single-endpoint", "Optimizes away reference counting for processes with a single end point", true);
 
     settings.addMode(
         "optimize-sequential",
