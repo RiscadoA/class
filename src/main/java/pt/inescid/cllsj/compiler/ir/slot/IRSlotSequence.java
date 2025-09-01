@@ -5,6 +5,8 @@ import java.util.List;
 public class IRSlotSequence {
   private List<IRSlot> slots;
 
+  public static final IRSlotSequence EMPTY = new IRSlotSequence(List.of());
+
   public IRSlotSequence(List<IRSlot> slots) {
     this.slots = slots;
   }

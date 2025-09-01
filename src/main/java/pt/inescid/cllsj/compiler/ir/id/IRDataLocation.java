@@ -1,5 +1,6 @@
 package pt.inescid.cllsj.compiler.ir.id;
 
+
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotSequence;
 
 public class IRDataLocation {

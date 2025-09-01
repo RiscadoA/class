@@ -20,4 +20,6 @@ public abstract class IRInstructionVisitor {
   public abstract void visit(IRPushTask instr);
 
   public abstract void visit(IRPopTask instr);
+
+  public abstract void visit(IRCallProcess instr);
 }
