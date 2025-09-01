@@ -11,10 +11,23 @@ public class Settings {
   private Map<String, BaseSetting> settingsByName = new HashMap<>();
 
   public Flag addFlag(
+      Character shortName, String longName, String description, boolean defaultValue) {
+    return addFlag(Optional.of(shortName), longName, description, defaultValue);
+  }
+
+  public Flag addFlag(String longName, String description, boolean defaultValue) {
+    return addFlag(Optional.empty(), longName, description, defaultValue);
+  }
+
+  public Flag addFlag(
       Optional<Character> shortName, String longName, String description, boolean defaultValue) {
     Flag setting = new Flag(shortName, longName, description, defaultValue);
     addSetting(setting);
     return setting;
+  }
+
+  public Int addInt(String longName, String description, int defaultValue) {
+    return addInt(Optional.empty(), longName, description, defaultValue);
   }
 
   public Int addInt(
@@ -29,6 +42,26 @@ public class Settings {
     Path setting = new Path(shortName, longName, description, defaultValue);
     addSetting(setting);
     return setting;
+  }
+
+  public Name addName(
+      Character shortName, String longName, String description, String defaultValue) {
+    return addName(Optional.of(shortName), longName, description, defaultValue);
+  }
+
+  public Name addName(String longName, String description, String defaultValue) {
+    return addName(Optional.empty(), longName, description, defaultValue);
+  }
+
+  public Name addName(
+      Optional<Character> shortName, String longName, String description, String defaultValue) {
+    Name setting = new Name(shortName, longName, description, defaultValue);
+    addSetting(setting);
+    return setting;
+  }
+
+  public Mode addMode(String longName, String description, Runnable runnable) {
+    return addMode(Optional.empty(), longName, description, runnable);
   }
 
   public Mode addMode(
@@ -205,6 +238,27 @@ public class Settings {
               () ->
                   new IllegalArgumentException(
                       "Expected a value for path option " + getLongName())));
+    }
+  }
+
+  public static class Name extends ValueSetting<String> {
+    public Name(
+        Optional<Character> shortName, String longName, String description, String defaultValue) {
+      super(shortName, longName, description, defaultValue);
+    }
+
+    @Override
+    public Optional<String> getValueDescription() {
+      return Optional.of("name");
+    }
+
+    @Override
+    public void parse(Optional<String> value) {
+      set(
+          value.orElseThrow(
+              () ->
+                  new IllegalArgumentException(
+                      "Expected a value for name option " + getLongName())));
     }
   }
 
