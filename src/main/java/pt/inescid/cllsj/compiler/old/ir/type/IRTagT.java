@@ -2,7 +2,6 @@ package pt.inescid.cllsj.compiler.ir.old.type;
 
 import java.util.List;
 import java.util.function.BiFunction;
-
 import pt.inescid.cllsj.compiler.old.ir.IRTypeVisitor;
 
 public class IRTagT extends IRType {

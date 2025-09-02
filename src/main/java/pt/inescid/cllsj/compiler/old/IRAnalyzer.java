@@ -4,7 +4,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-
 import pt.inescid.cllsj.compiler.ir.old.expressions.IRAdd;
 import pt.inescid.cllsj.compiler.ir.old.expressions.IRAnd;
 import pt.inescid.cllsj.compiler.ir.old.expressions.IRBool;

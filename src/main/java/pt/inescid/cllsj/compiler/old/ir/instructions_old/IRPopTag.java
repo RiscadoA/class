@@ -3,7 +3,6 @@ package pt.inescid.cllsj.compiler.ir.old.instructions_old;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
-
 import pt.inescid.cllsj.compiler.ir.old.type.IRType;
 import pt.inescid.cllsj.compiler.old.ir.IRInstructionVisitorOld;
 

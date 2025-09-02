@@ -1,7 +1,6 @@
 package pt.inescid.cllsj.compiler.ir.old.instructions_old;
 
 import java.util.function.Function;
-
 import pt.inescid.cllsj.compiler.old.ir.IRInstructionVisitorOld;
 
 public class IRNewThread extends IRInstruction {

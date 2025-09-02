@@ -5,7 +5,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.function.BiFunction;
-
 import pt.inescid.cllsj.compiler.old.ir.IRTypeVisitor;
 
 public abstract class IRType {

@@ -3,7 +3,6 @@ package pt.inescid.cllsj.compiler.ir.old.instructions_old;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
-
 import pt.inescid.cllsj.compiler.ir.old.type.IRVarT;
 import pt.inescid.cllsj.compiler.old.ir.IRInstructionVisitorOld;
 

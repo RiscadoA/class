@@ -1,7 +1,6 @@
 package pt.inescid.cllsj.compiler.c;
 
 import java.util.function.Function;
-
 import pt.inescid.cllsj.compiler.ir.expression.IRExpression;
 import pt.inescid.cllsj.compiler.ir.expression.IRExpressionVisitor;
 import pt.inescid.cllsj.compiler.ir.expression.IRRead;
@@ -112,8 +111,7 @@ public class CExpressionGenerator extends IRExpressionVisitor {
 
   @Override
   public void visit(IREqual eq) {
-    if (eq.getLhs().getSlot() instanceof IRStringS ||
-        eq.getRhs().getSlot() instanceof IRStringS) {
+    if (eq.getLhs().getSlot() instanceof IRStringS || eq.getRhs().getSlot() instanceof IRStringS) {
       code.append("string_equal(");
       code.append(generateToString(eq.getLhs(), readGenerator));
       code.append(", ");

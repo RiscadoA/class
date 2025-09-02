@@ -40,7 +40,7 @@ public class CPrintGenerator extends IRSlotVisitor {
     formatString = "%s";
     argument = value;
   }
-   
+
   @Override
   public void visit(IRTagS slot) {
     throw new IllegalArgumentException("Cannot print tag values");

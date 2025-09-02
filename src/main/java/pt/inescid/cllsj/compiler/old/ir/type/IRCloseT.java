@@ -1,7 +1,6 @@
 package pt.inescid.cllsj.compiler.ir.old.type;
 
 import java.util.function.BiFunction;
-
 import pt.inescid.cllsj.compiler.old.ir.IRTypeVisitor;
 
 public class IRCloseT extends IRType {

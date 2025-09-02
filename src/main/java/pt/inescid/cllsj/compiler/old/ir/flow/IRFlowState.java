@@ -5,7 +5,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Stack;
-
 import pt.inescid.cllsj.compiler.ir.old.type.IRBoolT;
 import pt.inescid.cllsj.compiler.ir.old.type.IRCellT;
 import pt.inescid.cllsj.compiler.ir.old.type.IRCloseT;

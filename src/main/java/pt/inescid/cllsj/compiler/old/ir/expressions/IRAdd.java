@@ -1,7 +1,6 @@
 package pt.inescid.cllsj.compiler.ir.old.expressions;
 
 import java.util.function.Function;
-
 import pt.inescid.cllsj.compiler.ir.old.type.IRIntT;
 import pt.inescid.cllsj.compiler.ir.old.type.IRStringT;
 import pt.inescid.cllsj.compiler.ir.old.type.IRType;

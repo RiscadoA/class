@@ -10,7 +10,6 @@ import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
 import java.util.function.Function;
-
 import pt.inescid.cllsj.compiler.ir.old.flow.IRFlow;
 import pt.inescid.cllsj.compiler.ir.old.flow.IRFlowContinuation;
 import pt.inescid.cllsj.compiler.ir.old.flow.IRFlowState;
