@@ -99,14 +99,13 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTClose node) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    IRSessionId session = env.getSession(node.getCh()).getId();
+    block.add(new IRFinishSession(session, true));
   }
 
   @Override
   public void visit(ASTCoClose node) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    node.getRhs().accept(this);
   }
 
   @Override
