@@ -133,16 +133,15 @@ public class Compiler {
         () -> {
           concurrency.set(false);
         });
-    
+
     settings.addMode(
         "O0",
-        "no-optimization", 
+        "no-optimization",
         "Disables all optimization flags",
-      () -> {
-        optimizeSingleEndpoint.set(false);
-        optimizeSendForward.set(false);
-      }
-    );
+        () -> {
+          optimizeSingleEndpoint.set(false);
+          optimizeSendForward.set(false);
+        });
 
     settings.addMode(
         "32",

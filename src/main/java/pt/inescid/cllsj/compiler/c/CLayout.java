@@ -93,11 +93,7 @@ public class CLayout {
 
     @Override
     public void visit(IRSessionS slot) {
-      CLayout passedLayout = CLayout.compute(slot.getPassedSlots(), arch, typeLayoutProvider);
-
-      visit(
-          arch.pointerSize.align(passedLayout.alignment).add(passedLayout.size),
-          arch.pointerAlignment.max(passedLayout.alignment));
+      visit(arch.pointerSize, arch.pointerAlignment);
     }
 
     @Override

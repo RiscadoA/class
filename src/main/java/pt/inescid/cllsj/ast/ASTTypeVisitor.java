@@ -3,118 +3,59 @@ package pt.inescid.cllsj.ast;
 import pt.inescid.cllsj.ast.types.*;
 
 public abstract class ASTTypeVisitor {
-  // Catch all for types which do not have their own visit method
-  public abstract void visit(ASTType type);
+  public abstract void visit(ASTBangT type);
 
-  public void visit(ASTBangT type) {
-    visit((ASTType) type);
-  }
+  public abstract void visit(ASTBotT type);
 
-  public void visit(ASTBotT type) {
-    visit((ASTType) type);
-  }
+  public abstract void visit(ASTCaseT type);
 
-  public void visit(ASTCaseT type) {
-    visit((ASTType) type);
-  }
+  public abstract void visit(ASTCoRecT type);
 
-  public void visit(ASTCoRecT type) {
-    visit((ASTType) type);
-  }
+  public abstract void visit(ASTIdT type);
 
-  public void visit(ASTIdT type) {
-    visit((ASTType) type);
-  }
+  public abstract void visit(ASTNotT type);
 
-  public void visit(ASTNotT type) {
-    visit((ASTType) type);
-  }
+  public abstract void visit(ASTOfferT type);
 
-  public void visit(ASTOfferT type) {
-    visit((ASTType) type);
-  }
+  public abstract void visit(ASTOneT type);
 
-  public void visit(ASTOneT type) {
-    visit((ASTType) type);
-  }
+  public abstract void visit(ASTRecT type);
 
-  public void visit(ASTRecT type) {
-    visit((ASTType) type);
-  }
+  public abstract void visit(ASTRecvT type);
 
-  public void visit(ASTRecvT type) {
-    visit((ASTType) type);
-  }
+  public abstract void visit(ASTSendT type);
 
-  public void visit(ASTSendT type) {
-    visit((ASTType) type);
-  }
+  public abstract void visit(ASTWhyT type);
 
-  public void visit(ASTWhyT type) {
-    visit((ASTType) type);
-  }
+  public abstract void visit(ASTintT type);
 
-  public void visit(ASTintT type) {
-    visit((ASTType) type);
-  }
+  public abstract void visit(ASTCointT type);
 
-  public void visit(ASTCointT type) {
-    visit((ASTType) type);
-  }
+  public abstract void visit(ASTLintT type);
 
-  public void visit(ASTLintT type) {
-    visit((ASTType) type);
-  }
+  public abstract void visit(ASTLCointT type);
 
-  public void visit(ASTLCointT type) {
-    visit((ASTType) type);
-  }
+  public abstract void visit(ASTLboolT type);
 
-  public void visit(ASTLboolT type) {
-    visit((ASTType) type);
-  }
+  public abstract void visit(ASTCoLboolT type);
 
-  public void visit(ASTCoLboolT type) {
-    visit((ASTType) type);
-  }
+  public abstract void visit(ASTLstringT type);
 
-  public void visit(ASTLstringT type) {
-    visit((ASTType) type);
-  }
+  public abstract void visit(ASTCoLstringT type);
 
-  public void visit(ASTCoLstringT type) {
-    visit((ASTType) type);
-  }
+  public abstract void visit(ASTSendTT type);
 
-  public void visit(ASTSendTT type) {
-    visit((ASTType) type);
-  }
+  public abstract void visit(ASTRecvTT type);
 
-  public void visit(ASTRecvTT type) {
-    visit((ASTType) type);
-  }
+  public abstract void visit(ASTAffineT type);
 
-  public void visit(ASTAffineT type) {
-    visit((ASTType) type);
-  }
+  public abstract void visit(ASTCoAffineT type);
 
-  public void visit(ASTCoAffineT type) {
-    visit((ASTType) type);
-  }
+  public abstract void visit(ASTCellT type);
 
-  public void visit(ASTCellT type) {
-    visit((ASTType) type);
-  }
+  public abstract void visit(ASTUsageT type);
 
-  public void visit(ASTUsageT type) {
-    visit((ASTType) type);
-  }
+  public abstract void visit(ASTCellLT type);
 
-  public void visit(ASTCellLT type) {
-    visit((ASTType) type);
-  }
-
-  public void visit(ASTUsageLT type) {
-    visit((ASTType) type);
-  }
+  public abstract void visit(ASTUsageLT type);
 }

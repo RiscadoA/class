@@ -13,6 +13,10 @@ public class IRSlotSequence {
     this.slots = slots;
   }
 
+  public static IRSlotSequence of(IRSlot slot) {
+    return new IRSlotSequence(List.of(slot));
+  }
+
   public List<IRSlot> list() {
     return slots;
   }
@@ -25,11 +29,24 @@ public class IRSlotSequence {
     return slots.size();
   }
 
-  public IRSlotSequence merge(IRSlot slot) {
-    return merge(new IRSlotSequence(List.of(slot)));
+  public IRSlotSequence prefix(IRSlot slot) {
+    List<IRSlot> newSlots = new ArrayList<>();
+    newSlots.add(slot);
+    newSlots.addAll(slots);
+    return new IRSlotSequence(newSlots);
   }
 
-  public IRSlotSequence merge(IRSlotSequence other) {
+  public IRSlotSequence prefix(IRSlotSequence other) {
+    List<IRSlot> newSlots = new ArrayList<>(other.slots);
+    newSlots.addAll(slots);
+    return new IRSlotSequence(newSlots);
+  }
+
+  public IRSlotSequence suffix(IRSlot slot) {
+    return suffix(new IRSlotSequence(List.of(slot)));
+  }
+
+  public IRSlotSequence suffix(IRSlotSequence other) {
     List<IRSlot> newSlots = new ArrayList<>(slots);
     newSlots.addAll(other.slots);
     return new IRSlotSequence(newSlots);

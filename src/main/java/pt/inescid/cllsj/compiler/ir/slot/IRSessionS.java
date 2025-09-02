@@ -1,16 +1,6 @@
 package pt.inescid.cllsj.compiler.ir.slot;
 
 public class IRSessionS extends IRSlot {
-  private IRSlotSequence passedSlots;
-
-  public IRSessionS(IRSlotSequence passedSlots) {
-    this.passedSlots = passedSlots;
-  }
-
-  public IRSlotSequence getPassedSlots() {
-    return passedSlots;
-  }
-
   @Override
   public void accept(IRSlotVisitor visitor) {
     visitor.visit(this);
@@ -18,6 +8,6 @@ public class IRSessionS extends IRSlot {
 
   @Override
   public String toString() {
-    return "session(" + passedSlots.toString() + ")";
+    return "session";
   }
 }

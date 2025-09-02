@@ -290,6 +290,6 @@ public abstract class ASTType {
   }
 
   public void accept(ASTTypeVisitor visitor) {
-    visitor.visit(this);
+    throw new UnsupportedOperationException("Unimplemented method 'accept'");
   }
 }

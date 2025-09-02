@@ -5,8 +5,18 @@ import java.util.List;
 public class IRSlotCombinations {
   private List<IRSlotSequence> sequences;
 
+  public static final IRSlotCombinations EMPTY = new IRSlotCombinations(List.of());
+
   public IRSlotCombinations(List<IRSlotSequence> sequences) {
     this.sequences = sequences;
+  }
+
+  public static IRSlotCombinations of(IRSlot slot) {
+    return new IRSlotCombinations(List.of(IRSlotSequence.of(slot)));
+  }
+
+  public static IRSlotCombinations of(IRSlotSequence sequence) {
+    return new IRSlotCombinations(List.of(sequence));
   }
 
   public List<IRSlotSequence> list() {
@@ -19,6 +29,27 @@ public class IRSlotCombinations {
 
   public int size() {
     return sequences.size();
+  }
+
+  public IRSlotCombinations prefix(IRSlot slot) {
+    return new IRSlotCombinations(sequences.stream().map(seq -> seq.prefix(slot)).toList());
+  }
+
+  public IRSlotCombinations prefix(IRSlotSequence sequence) {
+    return new IRSlotCombinations(sequences.stream().map(seq -> sequence.prefix(seq)).toList());
+  }
+
+  public IRSlotCombinations prefix(IRSlotCombinations combinations) {
+    return new IRSlotCombinations(
+        combinations.sequences.stream()
+            .flatMap(seq1 -> sequences.stream().map(seq2 -> seq1.prefix(seq2)))
+            .toList());
+  }
+
+  public IRSlotCombinations merge(IRSlotCombinations other) {
+    List<IRSlotSequence> newSequences = sequences.stream().toList();
+    newSequences.addAll(other.sequences);
+    return new IRSlotCombinations(newSequences);
   }
 
   @Override

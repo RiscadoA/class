@@ -7,6 +7,7 @@ import pt.inescid.cllsj.compiler.ir.id.IRCodeLocation;
 import pt.inescid.cllsj.compiler.ir.id.IRLocalDataId;
 import pt.inescid.cllsj.compiler.ir.id.IRProcessId;
 import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
+import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotCombinations;
 
 public class IRProcess {
@@ -48,8 +49,8 @@ public class IRProcess {
     return new IRSessionId(sessionCount - 1);
   }
 
-  public int addType() {
-    return typeCount++;
+  public IRTypeId addType() {
+    return new IRTypeId(typeCount++);
   }
 
   public int getTypeCount() {
