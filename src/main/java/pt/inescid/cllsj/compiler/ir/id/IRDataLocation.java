@@ -1,22 +1,24 @@
 package pt.inescid.cllsj.compiler.ir.id;
 
+
 import pt.inescid.cllsj.compiler.ir.slot.IRSlot;
+import pt.inescid.cllsj.compiler.ir.slot.IRSlotOffset;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotSequence;
 
 public class IRDataLocation {
   private int index;
   private boolean remote; // True if the location is remote, false if local
-  private IRSlotSequence offset; // How many slots to skip from the base location
+  private IRSlotOffset offset;
 
-  public static IRDataLocation local(IRLocalDataId id, IRSlotSequence offset) {
+  public static IRDataLocation local(IRLocalDataId id, IRSlotOffset offset) {
     return new IRDataLocation(id.getIndex(), false, offset);
   }
 
-  public static IRDataLocation remote(IRSessionId id, IRSlotSequence offset) {
+  public static IRDataLocation remote(IRSessionId id, IRSlotOffset offset) {
     return new IRDataLocation(id.getIndex(), true, offset);
   }
 
-  private IRDataLocation(int index, boolean remote, IRSlotSequence offset) {
+  private IRDataLocation(int index, boolean remote, IRSlotOffset offset) {
     this.index = index;
     this.remote = remote;
     this.offset = offset;
@@ -40,16 +42,20 @@ public class IRDataLocation {
     return remote;
   }
 
-  public IRSlotSequence getOffset() {
+  public IRSlotOffset getOffset() {
     return offset;
   }
 
-  public IRDataLocation advance(IRSlot slot) {
-    return new IRDataLocation(index, remote, offset.merge(slot));
+  public IRDataLocation advance(IRSlot slot, IRSlot alignTo) {
+    return new IRDataLocation(index, remote, offset.advance(slot, alignTo));
   }
 
-  public IRDataLocation advance(IRSlotSequence offset) {
-    return new IRDataLocation(index, remote, this.offset.merge(offset));
+  public IRDataLocation advance(IRSlotSequence slots, IRSlot alignTo) {
+    return new IRDataLocation(index, remote, offset.advance(slots, alignTo));
+  }
+
+  public IRDataLocation advance(IRSlotOffset offset) {
+    return new IRDataLocation(index, remote, this.offset.advance(offset));
   }
 
   @Override
@@ -60,9 +66,7 @@ public class IRDataLocation {
     } else {
       b.append(new IRLocalDataId(index).toString());
     }
-    b.append("[");
     b.append(offset.toString());
-    b.append("]");
     return b.toString();
   }
 

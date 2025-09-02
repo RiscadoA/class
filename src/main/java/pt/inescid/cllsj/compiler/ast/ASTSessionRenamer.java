@@ -218,6 +218,11 @@ public class ASTSessionRenamer extends ASTNodeVisitor {
   public void visit(ASTEmpty node) {}
 
   @Override
+  public void visit(ASTExpr node) {
+    node.accept(new ExprVisitor());
+  }
+
+  @Override
   public void visit(ASTFwd node) {
     node.setCh1(rename(node.getCh1()));
     node.setCh2(rename(node.getCh2()));

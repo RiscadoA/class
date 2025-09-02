@@ -1,7 +1,6 @@
 package pt.inescid.cllsj.compiler.ir;
 
 import java.util.Optional;
-
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.ast.types.ASTIdT;
@@ -13,9 +12,8 @@ import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
 import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
 import pt.inescid.cllsj.compiler.ir.instruction.IRProcess;
 import pt.inescid.cllsj.compiler.ir.slot.IRExponentialS;
-import pt.inescid.cllsj.compiler.ir.slot.IRSlot;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotCombinations;
-import pt.inescid.cllsj.compiler.ir.slot.IRSlotSequence;
+import pt.inescid.cllsj.compiler.ir.slot.IRSlotOffset;
 
 // Maps names to IR ids for types, sessions and local data within a process
 public class IREnvironment {
@@ -51,9 +49,18 @@ public class IREnvironment {
     }
   }
 
+  public IREnvironment addArgSession(String name, IRSlotCombinations combinations) {
+    IRLocalDataId localDataId = process.addLocalData(combinations);
+    return new Session(this, name, process.addArgSession(localDataId), IRSlotOffset.ZERO, Optional.of(localDataId));
+  }
+
   public IREnvironment addSession(String name, IRSlotCombinations combinations) {
     IRLocalDataId localDataId = process.addLocalData(combinations);
-    return new Session(this, name, process.addSession(localDataId), IRSlotSequence.EMPTY);
+    return new Session(this, name, process.addSession(), IRSlotOffset.ZERO, Optional.of(localDataId));
+  }
+
+  public IREnvironment addSession(String name) {
+    return new Session(this, name, process.addSession(), IRSlotOffset.ZERO, Optional.empty());
   }
 
   public Session getSession(String name) {
@@ -71,19 +78,14 @@ public class IREnvironment {
     }
   }
 
-  public IREnvironment advanceSession(String name, IRSlot slot) {
-    return advanceSession(name, IRSlotSequence.of(slot));
-  }
-
-  public IREnvironment advanceSession(String name, IRSlotSequence offset) {
+  public IREnvironment advanceSession(String name, IRSlotOffset offset) {
     Session session = getSession(name);
-    return new Session(
-        this, session.getName(), session.getId(), session.getOffset().suffix(offset));
+    return new Session(this, session.getName(), session.getId(), session.getOffset().advance(offset), session.localDataId);
   }
 
   public IREnvironment resetSession(String name) {
     Session session = getSession(name);
-    return new Session(this, session.getName(), session.getId(), IRSlotSequence.EMPTY);
+    return new Session(this, session.getName(), session.getId(), IRSlotOffset.ZERO, session.localDataId);
   }
 
   public IREnvironment addExponential(String name) {
@@ -135,7 +137,8 @@ public class IREnvironment {
     private boolean isPositive;
     private boolean isValue;
 
-    public Type(IREnvironment parent, String name, IRTypeId id, boolean isPositive, boolean isValue) {
+    public Type(
+        IREnvironment parent, String name, IRTypeId id, boolean isPositive, boolean isValue) {
       super(parent);
       this.name = name;
       this.id = id;
@@ -163,13 +166,15 @@ public class IREnvironment {
   public static class Session extends IREnvironment {
     private String name;
     private IRSessionId id;
-    private IRSlotSequence offset;
+    private IRSlotOffset offset;
+    private Optional<IRLocalDataId> localDataId;
 
-    public Session(IREnvironment parent, String name, IRSessionId id, IRSlotSequence offset) {
+    public Session(IREnvironment parent, String name, IRSessionId id, IRSlotOffset offset, Optional<IRLocalDataId> localDataId) {
       super(parent);
       this.name = name;
       this.id = id;
       this.offset = offset;
+      this.localDataId = localDataId;
     }
 
     public String getName() {
@@ -180,16 +185,16 @@ public class IREnvironment {
       return id;
     }
 
-    public IRSlotSequence getOffset() {
+    public IRSlotOffset getOffset() {
       return offset;
     }
 
     public IRLocalDataId getLocalDataId() {
-      return process.getSessionLocalDataId(id);
+      return localDataId.orElseThrow();
     }
 
     public IRDataLocation getLocalData() {
-      return IRDataLocation.local(getLocalDataId(), offset);
+      return IRDataLocation.local(localDataId.orElseThrow(), offset);
     }
 
     public IRDataLocation getRemoteData() {

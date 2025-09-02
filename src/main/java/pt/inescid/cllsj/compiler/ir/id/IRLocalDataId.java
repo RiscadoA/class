@@ -1,7 +1,5 @@
 package pt.inescid.cllsj.compiler.ir.id;
 
-import pt.inescid.cllsj.compiler.ir.slot.IRSlotSequence;
-
 public class IRLocalDataId {
   private int index;
 
@@ -11,10 +9,6 @@ public class IRLocalDataId {
 
   public int getIndex() {
     return index;
-  }
-
-  public IRDataLocation getLocation() {
-    return IRDataLocation.local(this, IRSlotSequence.EMPTY);
   }
 
   @Override

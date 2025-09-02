@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-CLLSflags=--compile $CLLS_FLAGS
+CLLSflags="--compile $CLLS_FLAGS"
 Cflags="$C_FLAGS -std=c11"
 dumpast=false
 dumpiir=false

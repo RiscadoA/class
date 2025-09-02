@@ -7,8 +7,8 @@ import pt.inescid.cllsj.compiler.ir.id.IRLocalDataId;
 import pt.inescid.cllsj.compiler.ir.id.IRProcessId;
 import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
 import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
-import pt.inescid.cllsj.compiler.ir.slot.IRSlot;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotCombinations;
+import pt.inescid.cllsj.compiler.ir.slot.IRSlotOffset;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotSequence;
 
 public class IRCallProcess extends IRInstruction {
@@ -47,21 +47,13 @@ public class IRCallProcess extends IRInstruction {
     private IRSessionId targetSessionId;
 
     // How much to offset the session's remote data in the target process
-    private IRSlotSequence dataOffset;
-
-    // Slot which will be at the beginning of the data section in the target process
-    // Necessary to align the data offset properly
-    private IRSlot dataSlot;
+    private IRSlotOffset dataOffset;
 
     public SessionArgument(
-        IRSessionId sourceSessionId,
-        IRSessionId targetSessionId,
-        IRSlotSequence dataOffset,
-        IRSlot dataSlot) {
+        IRSessionId sourceSessionId, IRSessionId targetSessionId, IRSlotOffset dataOffset) {
       this.sourceSessionId = sourceSessionId;
       this.targetSessionId = targetSessionId;
       this.dataOffset = dataOffset;
-      this.dataSlot = dataSlot;
     }
 
     public IRSessionId getSourceSessionId() {
@@ -72,12 +64,8 @@ public class IRCallProcess extends IRInstruction {
       return targetSessionId;
     }
 
-    public IRSlotSequence getDataOffset() {
+    public IRSlotOffset getDataOffset() {
       return dataOffset;
-    }
-
-    public IRSlot getDataSlot() {
-      return dataSlot;
     }
 
     public void replaceSessions(Function<IRSessionId, IRSessionId> replacer) {
@@ -86,12 +74,12 @@ public class IRCallProcess extends IRInstruction {
     }
 
     public SessionArgument clone() {
-      return new SessionArgument(sourceSessionId, targetSessionId, dataOffset, dataSlot);
+      return new SessionArgument(sourceSessionId, targetSessionId, dataOffset);
     }
 
     @Override
     public String toString() {
-      return targetSessionId + " <- " + sourceSessionId + "[" + dataOffset + " | " + dataSlot + "]";
+      return targetSessionId + " <- " + sourceSessionId + dataOffset;
     }
   }
 

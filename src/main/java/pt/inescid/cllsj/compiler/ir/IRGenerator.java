@@ -1,13 +1,10 @@
 package pt.inescid.cllsj.compiler.ir;
 
-import java.util.Optional;
 import java.util.Set;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.nodes.*;
-import pt.inescid.cllsj.ast.types.ASTIdT;
-import pt.inescid.cllsj.ast.types.ASTNotT;
 import pt.inescid.cllsj.ast.types.ASTType;
 import pt.inescid.cllsj.compiler.Compiler;
 import pt.inescid.cllsj.compiler.ir.expression.IRExpression;
@@ -15,7 +12,10 @@ import pt.inescid.cllsj.compiler.ir.id.IRProcessId;
 import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
 import pt.inescid.cllsj.compiler.ir.instruction.*;
 import pt.inescid.cllsj.compiler.ir.slot.IRSessionS;
+import pt.inescid.cllsj.compiler.ir.slot.IRSlot;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotCombinations;
+import pt.inescid.cllsj.compiler.ir.slot.IRSlotOffset;
+import pt.inescid.cllsj.compiler.ir.slot.IRSlotSequence;
 
 public class IRGenerator extends ASTNodeVisitor {
   private Compiler compiler;
@@ -61,7 +61,6 @@ public class IRGenerator extends ASTNodeVisitor {
         }
         generate(procDef, tArgPolarities, tArgValues);
       }
-      
     }
   }
 
@@ -131,7 +130,7 @@ public class IRGenerator extends ASTNodeVisitor {
     // Define new session
     IRSlotsFromASTType info = slotsFromType(node.getChType());
     env = env.addSession(node.getCh(), info.combinations());
-    IRSessionId session = env.getSession(node.getCh()).getId();
+    IREnvironment.Session session = env.getSession(node.getCh());
 
     // Find which side is the negative one and create a block for it
     String negLabel;
@@ -148,7 +147,8 @@ public class IRGenerator extends ASTNodeVisitor {
     IRBlock negBlock = process.createBlock(negLabel);
 
     // Initialize the new session with the negative block as its continuation
-    block.add(new IRInitializeSession(session, negBlock.getLocation()));
+    block.add(
+        new IRInitializeSession(session.getId(), negBlock.getLocation(), session.getLocalData()));
 
     // Recurse on both sides
     recurse(block, pos);
@@ -206,19 +206,27 @@ public class IRGenerator extends ASTNodeVisitor {
   public void visit(ASTRecv node) {
     IREnvironment.Session session = env.getSession(node.getChr());
 
-    // TODO: handle send value
-
     // Define new session for the channel being received
     IRSlotsFromASTType info = slotsFromType(node.getChiType());
     env = env.addSession(node.getChi(), info.localCombinations());
-    IRSessionId argId = env.getSession(node.getChi()).getId();
+    IREnvironment.Session argSession = env.getSession(node.getChi());
 
-    // Bind the new session to the value received from the main session
-    block.add(new IRBindSession(session.getLocalData(), argId));
-    env = env.advanceSession(node.getChr(), new IRSessionS());
+    if (compiler.optimizeSendValue.get()
+        && info.slots().isPresent()
+        && isValue(node.getChiType(), false)) {
+      // If the left type is a value, we do the send value optimization
+      block.add(
+          new IRMoveValue(argSession.getLocalData(), session.getLocalData(), info.slots().get()));
+      env = env.advanceSession(node.getChr(), offset(info.slots().get(), node.getRhsType()));
+    } else {
+      // Bind the new session to the value received from the main session
+      block.add(
+          new IRBindSession(session.getLocalData(), argSession.getId(), argSession.getLocalData()));
+      env = env.advanceSession(node.getChr(), offset(new IRSessionS(), node.getRhsType()));
 
-    // If the received session is negative, we must jump to it
-    addContinueIfNegative(argId, node.getChiType());
+      // If the received session is negative, we must jump to it
+      addContinueIfNegative(argSession.getId(), node.getChiType());
+    }
 
     // Recurse on the continuation
     recurse(block, node.getRhs());
@@ -234,56 +242,66 @@ public class IRGenerator extends ASTNodeVisitor {
   public void visit(ASTSend node) {
     IREnvironment.Session session = env.getSession(node.getChs());
     IREnvironment.Session argSession;
-    boolean isSendValue = compiler.optimizeSendValue.get() && isValue(node.getLhsType(), true);
 
-    if (compiler.optimizeSendForward.get() && node.getLhs() instanceof ASTFwd) {
-      // If sending a forward, just send the forwarded session
-      ASTFwd fwd = (ASTFwd) node.getLhs();
-      String argCh = fwd.getCh1().equals(node.getCho()) ? fwd.getCh2() : fwd.getCh1();
-      argSession = env.getSession(argCh);
-    } else {
-      // Define new session for the channel being sent
-      // If we're doing send value optimization, we also need space to store the value in
-      IRSlotsFromASTType info = slotsFromType(node.getLhsType());
-      env = env.addSession(node.getCho(), isSendValue ? info.combinations() : info.localCombinations());
+    IRSlotsFromASTType argInfo = slotsFromType(node.getLhsType());
+    if (compiler.optimizeSendValue.get()
+        && argInfo.slots().isPresent()
+        && isValue(node.getLhsType(), true)) {
+      // We perform the send value optimization:
+      // 1. we define a new session for the sent channel
+      // 2. we initialize it so that it's data pointer points to the main session's data
+      // 3. we jump to it immediately
+
+      env = env.addSession(node.getCho());
       argSession = env.getSession(node.getCho());
 
-      // Initialize the new session with a new closure block for the left-hand-side
-      // as its continuation. Immediately write it to the main session's remote data
-      IRBlock closureBlock = process.createBlock("send_closure");
-      recurse(closureBlock, node.getLhs());
-      block.add(new IRInitializeSession(argSession.getId(), closureBlock.getLocation()));
+      // Create block for the right-hand-side to run after the value has been sent
+      IRBlock rhsBlock = process.createBlock("send_rhs");
 
-      // If we're doing send value optimization, we should immediately run the closure
-      addContinue(argSession.getId());
-    }
+      // Initialize the new session so that its data points to the main session's data
+      block.add(
+          new IRInitializeSession(
+              argSession.getId(), rhsBlock.getLocation(), session.getRemoteData()));
+      recurse(block, node.getLhs());
 
-    // Desired end result:
-    // - send lint; send lint; close being represented as [lint, lint]
-
-    // Other alternative:
-    // - session slots store 
-
-    // TODO: if send value:
-    // - compile closure so that it writes the data to the remote of the main session
-    // - when the closure finishes, it should advance the remote offset to what it has written
-    // - this way, this side can just pick up on that
-
-    if (isSendValue) {
-      // TODO: how to determine the slots
-
-      IRSlotsFromASTType info = slotsFromType(node.getLhsType());
-      block.add(new IRWriteValue(session.getRemoteData(), argSession.getLocalData(), info.combinations()));
+      // Generate the continuation
+      env = env.advanceSession(node.getChs(), offset(argInfo.slots().get(), node.getRhsType()));
+      recurse(
+          rhsBlock,
+          () -> {
+            // If the continuation is negative, we must jump to it
+            addContinueIfNegative(session.getId(), node.getRhsType());
+            node.getRhs().accept(this);
+          });
     } else {
+      if (compiler.optimizeSendForward.get() && node.getLhs() instanceof ASTFwd) {
+        // If sending a forward, just send the forwarded session
+        ASTFwd fwd = (ASTFwd) node.getLhs();
+        String argCh = fwd.getCh1().equals(node.getCho()) ? fwd.getCh2() : fwd.getCh1();
+        argSession = env.getSession(argCh);
+      } else {
+        // Define new session for the channel being sent
+        env = env.addSession(node.getCho(), argInfo.localCombinations());
+        argSession = env.getSession(node.getCho());
+
+        // Initialize the new session with a new closure block for the left-hand-side
+        // as its continuation. Immediately write it to the main session's remote data
+        IRBlock closureBlock = process.createBlock("send_closure");
+        recurse(closureBlock, node.getLhs());
+        block.add(
+            new IRInitializeSession(
+                argSession.getId(), closureBlock.getLocation(), argSession.getLocalData()));
+      }
+
       block.add(new IRWriteSession(session.getRemoteData(), argSession.getId()));
-      env = env.advanceSession(node.getChs(), new IRSessionS());
+      env = env.advanceSession(node.getChs(), offset(new IRSessionS(), node.getRhsType()));
+
+      // If the continuation is negative, we must jump to it
+      addContinueIfNegative(session.getId(), node.getRhsType());
+
+      // Recurse on the continuation
+      recurse(block, node.getRhs());
     }
-
-    // If the continuation is negative, we must jump to it
-    addContinueIfNegative(session.getId(), node.getRhsType());
-
-    // Recurse on the continuation
-    recurse(block, node.getRhs());
   }
 
   @Override
@@ -408,6 +426,12 @@ public class IRGenerator extends ASTNodeVisitor {
     throw new UnsupportedOperationException("Unimplemented method 'visit'");
   }
 
+  @Override
+  public void visit(ASTExpr node) {
+    // TODO Auto-generated method stub
+    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+  }
+
   // ======================================= Helper methods =======================================
 
   private void addContinue(IRSessionId sessionId) {
@@ -455,6 +479,14 @@ public class IRGenerator extends ASTNodeVisitor {
                         new UnsupportedOperationException("Types in expressions must have slots")));
   }
 
+  private IRSlotOffset offset(IRSlot past, ASTType remainder) {
+    return offset(IRSlotSequence.of(past), remainder);
+  }
+
+  private IRSlotOffset offset(IRSlotSequence past, ASTType remainder) {
+    return new IRSlotOffset(past, slotsFromType(remainder).slot);
+  }
+
   private IRSlotsFromASTType slotsFromType(ASTType type) {
     return IRSlotsFromASTType.compute(compiler, ep, env, Set.of(), type);
   }
@@ -464,10 +496,14 @@ public class IRGenerator extends ASTNodeVisitor {
   }
 
   private void recurse(IRBlock block, ASTNode node) {
+    recurse(block, () -> node.accept(this));
+  }
+
+  private void recurse(IRBlock block, Runnable runnable) {
     IRBlock backupBlock = this.block;
     IREnvironment backupEnv = this.env;
     this.block = block;
-    node.accept(this);
+    runnable.run();
     this.block = backupBlock;
     this.env = backupEnv;
   }

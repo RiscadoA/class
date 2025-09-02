@@ -14,9 +14,9 @@ import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
 import pt.inescid.cllsj.compiler.ir.instruction.*;
 import pt.inescid.cllsj.compiler.ir.slot.IRBoolS;
 import pt.inescid.cllsj.compiler.ir.slot.IRIntS;
-import pt.inescid.cllsj.compiler.ir.slot.IRSessionS;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlot;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotCombinations;
+import pt.inescid.cllsj.compiler.ir.slot.IRSlotOffset;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotSequence;
 import pt.inescid.cllsj.compiler.ir.slot.IRStringS;
 
@@ -223,8 +223,8 @@ public class CGenerator extends IRInstructionVisitor {
         () -> {
           putStatement("void* cont");
           putStatement("char* cont_env");
-          putStatement("int cont_data_offset");
-          putStatement("int cont_session_offset");
+          putStatement("char* cont_data");
+          putStatement("char* cont_session");
         });
 
     putStruct(
@@ -649,27 +649,23 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRInitializeSession instr) {
-    IRLocalDataId sessionLocalDataId = currentProcess.getSessionLocalDataId(instr.getSessionId());
-    CSize contDataOffset = currentProcessLayout.dataOffset(sessionLocalDataId);
-    CSize contSessionOffset = currentProcessLayout.sessionOffset(instr.getSessionId());
+    String session = sessionAddress(instr.getSessionId());
+    String contData = data(instr.getContinuationData());
 
     StringBuilder sb = new StringBuilder("(struct session)");
     sb.append("{.cont=").append(codeLocationAddress(instr.getContinuation()));
     sb.append(",.cont_env=").append(ENV);
-    sb.append(",.cont_data_offset=").append(contDataOffset);
-    sb.append(",.cont_session_offset=").append(contSessionOffset);
+    sb.append(",.cont_data=").append(contData);
+    sb.append(",.cont_session=").append(session);
     sb.append("}");
-    putAssign(session(instr.getSessionId()), sb.toString());
+    putAssign(accessSession(session), sb.toString());
   }
 
   @Override
   public void visit(IRContinueSession instr) {
-    // TODO: here we assume that the remote continuation already points to us.
-    // is that always true?
+    String session = accessSession(instr.getSessionId());
 
-    String session = session(instr.getSessionId());
-
-    String remoteSession = remoteSession(instr.getSessionId());
+    String remoteSession = accessRemoteSession(instr.getSessionId());
     String remoteSessionCont = sessionCont(remoteSession);
 
     putAssign(TMP_PTR1, sessionCont(session));
@@ -680,7 +676,7 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRFinishSession instr) {
-    String session = session(instr.getSessionId());
+    String session = accessSession(instr.getSessionId());
 
     putAssign(TMP_PTR1, sessionCont(session));
     if (instr.isEndPoint()) {
@@ -696,25 +692,21 @@ public class CGenerator extends IRInstructionVisitor {
   @Override
   public void visit(IRBindSession instr) {
     // Copy the session into this environment
-    String source = data(instr.getLocation(), new IRSessionS());
-    String target = sessionOffset(currentProcessLayout, instr.getSessionId()).advancePointer(ENV);
+    String source = data(instr.getLocation());
+    String target = sessionAddress(instr.getSessionId());
     putCopy(target, source, compiler.arch.sessionSize());
 
     // Modify the remote session to point to our environment
-    String remoteSession = remoteSession(instr.getSessionId());
+    String remoteSession = accessRemoteSession(instr.getSessionId());
     putAssign(sessionContEnv(remoteSession), ENV);
-    putAssign(
-        sessionContSessionOffset(remoteSession),
-        currentProcessLayout.sessionOffset(instr.getSessionId()));
-    putAssign(
-        sessionContDataOffset(remoteSession),
-        currentProcessLayout.dataOffset(
-            currentProcess.getSessionLocalDataId(instr.getSessionId())));
+    putAssign(sessionContSession(remoteSession), target);
+    putAssign(sessionContSession(remoteSession), target);
+    putAssign(sessionContData(remoteSession), data(instr.getContinuationData()));
   }
 
   @Override
   public void visit(IRWriteExpression instr) {
-    String data = data(instr.getLocation(), instr.getExpression().getSlot());
+    String data = data(instr.getLocation());
     String ref = access(data, cType(instr.getExpression().getSlot()));
     putAssign(ref, expression(instr.getExpression()));
   }
@@ -727,13 +719,13 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRWriteSession instr) {
-    String data = data(instr.getLocation(), new IRSessionS());
+    String data = data(instr.getLocation());
     String ref = access(data, "struct session");
-    putAssign(ref, session(instr.getSessionId()));
+    putAssign(ref, accessSession(instr.getSessionId()));
   }
 
   @Override
-  public void visit(IRWriteValue instr) {
+  public void visit(IRMoveValue instr) {
     putCopy(instr.getLocation(), instr.getSourceLocation(), instr.getSlots());
   }
 
@@ -741,12 +733,10 @@ public class CGenerator extends IRInstructionVisitor {
   public void visit(IRPrint instr) {
     String value = expression(instr.getExpression());
     CPrintGenerator gen = CPrintGenerator.forValue(value, instr.getExpression().getSlot());
-
     if (instr.hasNewLine()) {
       gen.formatString += "\\n";
     }
-
-    putStatement("printf(\"" + gen.formatString + "\", " + gen.argument + ")");
+    putStatement(gen.function + "(\"" + gen.formatString + "\", " + gen.argument + ")");
   }
 
   @Override
@@ -784,6 +774,11 @@ public class CGenerator extends IRInstructionVisitor {
     putAllocEnvironment(TMP_PTR1, calledLayout);
     String newEnv = cast(TMP_PTR1, "char*");
 
+    // Setup the end points for the new environment
+    if (!compiler.optimizeSingleEndpoint.get() || calledProcess.getEndPoints() != 1) {
+      putAssign(endPoints(calledLayout, newEnv), calledProcess.getEndPoints());
+    }
+
     for (IRCallProcess.TypeArgument arg : instr.getTypeArguments()) {
       // Get a reference to the target type in the new environment
       String targetType = type(calledLayout, newEnv, arg.getTargetType());
@@ -801,40 +796,32 @@ public class CGenerator extends IRInstructionVisitor {
 
     for (IRCallProcess.SessionArgument arg : instr.getSessionArguments()) {
       // Get references to the source and target sessions
-      String source = session(arg.getSourceSessionId());
-      String target = session(calledLayout, newEnv, arg.getTargetSessionId());
-
-      // Compute the new continuation data offset for the target session
-      // This is used when the calling process wants the called process to
-      // write to a specific offset within the remote data section.
-      String contDataOffset = sessionContDataOffset(target);
-      CLayout offsetLayout = layout(arg.getDataOffset());
-      CLayout slotLayout = layout(arg.getDataSlot());
-      CSize newContDataOffset =
-          CSize.expression(contDataOffset)
-              .align(offsetLayout.alignment)
-              .add(offsetLayout.size)
-              .align(slotLayout.alignment);
+      String source = accessSession(arg.getSourceSessionId());
+      String target = accessSession(calledLayout, newEnv, arg.getTargetSessionId());
 
       // Copy the session data
       putAssign(target, source);
-      putAssign(contDataOffset, newContDataOffset);
+
+      // We must also compute the new continuation data address for the target session
+      // This is necessary as the caller may apply an offset to the data
+      putAssign(sessionContData(target), offset(sessionContData(target), arg.getDataOffset()));
 
       // Update the remote session's continuation to match the new environment
-      IRLocalDataId calledLocalDataId =
-          calledProcess.getSessionLocalDataId(arg.getTargetSessionId());
-      String remoteSession = remoteSession(arg.getSourceSessionId());
+      IRLocalDataId calledLocalDataId = calledProcess.getArgSessionLocalDataId(arg.getTargetSessionId());
+      String remoteSession = accessRemoteSession(arg.getSourceSessionId());
       putAssign(sessionContEnv(remoteSession), newEnv);
       putAssign(
-          sessionContSessionOffset(remoteSession),
-          calledLayout.sessionOffset(arg.getTargetSessionId()));
-      putAssign(sessionContDataOffset(remoteSession), calledLayout.dataOffset(calledLocalDataId));
+          sessionContData(remoteSession),
+          localData(calledLayout, newEnv, calledLocalDataId, arg.getDataOffset()));
+      putAssign(
+          sessionContSession(remoteSession),
+          sessionAddress(calledLayout, newEnv, arg.getTargetSessionId()));
     }
 
     for (IRCallProcess.DataArgument arg : instr.getDataArguments()) {
       // Here we simply copy data from some location in the current environment to
       // a local data section in the new environment
-      IRDataLocation target = IRDataLocation.local(arg.getTargetDataId(), IRSlotSequence.EMPTY);
+      IRDataLocation target = IRDataLocation.local(arg.getTargetDataId(), IRSlotOffset.ZERO);
       putCopy(calledLayout, newEnv, target, arg.getSourceLocation(), arg.getSlots());
     }
 
@@ -875,7 +862,7 @@ public class CGenerator extends IRInstructionVisitor {
     return CExpressionGenerator.generate(
         expr,
         read -> {
-          String ptr = data(currentProcessLayout, ENV, read.getLocation(), read.getSlot());
+          String ptr = data(currentProcessLayout, ENV, read.getLocation());
           return access(ptr, cType(read.getSlot()));
         });
   }
@@ -885,7 +872,7 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   private String endPoints(CProcessLayout layout, String env) {
-    String ptr = layout.endPointsOffset().advancePointer(ENV);
+    String ptr = layout.endPointsOffset().advancePointer(env);
     return access(ptr, compiler.concurrency.get() ? "atomic_int" : "int");
   }
 
@@ -912,66 +899,62 @@ public class CGenerator extends IRInstructionVisitor {
     return layout.sessionOffset(id);
   }
 
-  private String session(IRSessionId id) {
-    return session(currentProcessLayout, ENV, id);
+  private String accessSession(IRSessionId id) {
+    return accessSession(sessionAddress(id));
   }
 
-  private String session(CProcessLayout layout, String env, IRSessionId id) {
-    return access(sessionOffset(layout, id).advancePointer(env), "struct session");
+  private String accessSession(CProcessLayout layout, String env, IRSessionId id) {
+    return accessSession(sessionAddress(layout, env, id));
   }
 
-  private String remoteSession(IRSessionId id) {
-    return remoteSession(session(id));
+  private String accessSession(String address) {
+    return access(address, "struct session");
   }
 
-  private String remoteSession(String session) {
-    String remoteEnv = sessionContEnv(session);
-    CSize offset = CSize.expression(sessionContSessionOffset(session));
-    return access(offset.advancePointer(remoteEnv), "struct session");
+  private String sessionAddress(IRSessionId id) {
+    return sessionAddress(currentProcessLayout, ENV, id);
+  }
+
+  private String sessionAddress(CProcessLayout layout, String env, IRSessionId id) {
+    return sessionOffset(layout, id).advancePointer(env);
+  }
+
+  private String remoteSessionAddress(IRSessionId id) {
+    return remoteSessionAddress(accessSession(id));
+  }
+
+  private String remoteSessionAddress(String session) {
+    return sessionContSession(session);
+  }
+
+  private String accessRemoteSession(IRSessionId id) {
+    return accessSession(remoteSessionAddress(id));
   }
 
   private String localData(
-      CProcessLayout layout,
-      String env,
-      IRLocalDataId localDataId,
-      IRSlotSequence offset,
-      IRSlot slot) {
-    CLayout offsetLayout = layout(offset);
-    CLayout slotLayout = layout(slot);
-    CSize finalOffset =
-        layout.dataOffset(localDataId).add(offsetLayout.size).align(slotLayout.alignment);
+      CProcessLayout layout, String env, IRLocalDataId localDataId, IRSlotOffset offset) {
+    CSize finalOffset = offset(layout.dataOffset(localDataId), offset);
     return finalOffset.advancePointer(env);
   }
 
-  private String remoteData(IRSessionId sessionId, IRSlotSequence offset, IRSlot slot) {
-    return remoteData(currentProcessLayout, ENV, sessionId, offset, slot);
+  private String remoteData(IRSessionId sessionId, IRSlotOffset offset) {
+    return remoteData(currentProcessLayout, ENV, sessionId, offset);
   }
 
   private String remoteData(
-      CProcessLayout layout,
-      String env,
-      IRSessionId sessionId,
-      IRSlotSequence offset,
-      IRSlot slot) {
-    // Get the pointer to the start of the session's remote data
-    CSize baseOffset = CSize.expression(sessionContDataOffset(session(sessionId)));
-
-    CLayout offsetLayout = layout(offset);
-    CLayout slotLayout = layout(slot);
-
-    CSize finalOffset = baseOffset.add(offsetLayout.size).align(slotLayout.alignment);
-    return finalOffset.advancePointer(sessionContEnv(session(sessionId)));
+      CProcessLayout layout, String env, IRSessionId sessionId, IRSlotOffset offset) {
+    return offset(sessionContData(accessSession(sessionId)), offset);
   }
 
-  private String data(IRDataLocation data, IRSlot slot) {
-    return data(currentProcessLayout, ENV, data, slot);
+  private String data(IRDataLocation data) {
+    return data(currentProcessLayout, ENV, data);
   }
 
-  private String data(CProcessLayout layout, String env, IRDataLocation data, IRSlot slot) {
+  private String data(CProcessLayout layout, String env, IRDataLocation data) {
     if (data.isRemote()) {
-      return remoteData(layout, env, data.getSessionId(), data.getOffset(), slot);
+      return remoteData(layout, env, data.getSessionId(), data.getOffset());
     } else {
-      return localData(layout, env, data.getLocalDataId(), data.getOffset(), slot);
+      return localData(layout, env, data.getLocalDataId(), data.getOffset());
     }
   }
 
@@ -1003,12 +986,30 @@ public class CGenerator extends IRInstructionVisitor {
     return var + ".cont_env";
   }
 
-  private String sessionContDataOffset(String var) {
-    return var + ".cont_data_offset";
+  private String sessionContData(String var) {
+    return var + ".cont_data";
   }
 
-  private String sessionContSessionOffset(String var) {
-    return var + ".cont_session_offset";
+  private String sessionContSession(String var) {
+    return var + ".cont_session";
+  }
+
+  private CSize offset(CSize base, IRSlotOffset offset) {
+    if (offset.isZero()) {
+      return base;
+    } else {
+      CSize pastSize = layout(offset.getPast()).size;
+      if (offset.getAlignTo().isPresent()) {
+        CAlignment alignment = layout(offset.getAlignTo().get()).alignment;
+        return base.add(pastSize).align(alignment);
+      } else {
+        return base.add(pastSize);
+      }
+    }
+  }
+
+  private String offset(String address, IRSlotOffset offset) {
+    return offset(CSize.zero(), offset).advancePointer(address);
   }
 
   private CProcessLayout layout(IRProcess process, Function<IRTypeId, CLayout> typeLayoutProvider) {
@@ -1070,9 +1071,10 @@ public class CGenerator extends IRInstructionVisitor {
     IRSlotSequence offset = IRSlotSequence.EMPTY;
     for (IRSlot slot : slots.list()) {
       putCopy(
-          data(targetLayout, targetEnv, target.advance(offset), slot),
-          data(sourceLayout, sourceEnv, source.advance(offset), slot),
+          data(targetLayout, targetEnv, target.advance(offset, slot)),
+          data(sourceLayout, sourceEnv, source.advance(offset, slot)),
           layout(slot).size);
+      offset = offset.suffix(slot);
     }
   }
 
@@ -1278,7 +1280,7 @@ public class CGenerator extends IRInstructionVisitor {
     }
   }
 
-  private void putAssign(String var, CSize what) {
+  private void putAssign(String var, Object what) {
     putAssign(var, what.toString());
   }
 

@@ -17,6 +17,8 @@ public abstract class ASTNodeVisitor {
 
   public abstract void visit(ASTEmpty node);
 
+  public abstract void visit(ASTExpr node);
+
   public abstract void visit(ASTFwd node);
 
   public abstract void visit(ASTFwdB node);

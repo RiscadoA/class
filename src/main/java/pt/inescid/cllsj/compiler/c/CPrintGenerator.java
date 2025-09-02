@@ -12,6 +12,7 @@ import pt.inescid.cllsj.compiler.ir.slot.IRTypeS;
 import pt.inescid.cllsj.compiler.ir.slot.IRVarS;
 
 public class CPrintGenerator extends IRSlotVisitor {
+  public String function;
   public String formatString;
   public String argument;
   private String value;
@@ -25,18 +26,21 @@ public class CPrintGenerator extends IRSlotVisitor {
 
   @Override
   public void visit(IRIntS slot) {
+    function = "printf";
     formatString = "%d";
     argument = value;
   }
 
   @Override
   public void visit(IRBoolS slot) {
+    function = "printf";
     formatString = "%s";
     argument = "(" + value + " ? \"true\" : \"false\")";
   }
 
   @Override
   public void visit(IRStringS slot) {
+    function = "string_print";
     formatString = "%s";
     argument = value;
   }

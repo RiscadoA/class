@@ -513,4 +513,9 @@ public class ASTPrinter extends ASTNodeVisitor {
     indentLevel--;
     indentPrintln("}");
   }
+
+  @Override
+  public void visit(ASTExpr node) {
+    node.accept(new ASTExprPrinter());
+  }
 }

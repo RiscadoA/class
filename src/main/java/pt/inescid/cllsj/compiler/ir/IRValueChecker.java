@@ -1,7 +1,6 @@
 package pt.inescid.cllsj.compiler.ir;
 
 import java.util.Optional;
-
 import pt.inescid.cllsj.ast.ASTTypeVisitor;
 import pt.inescid.cllsj.ast.types.*;
 

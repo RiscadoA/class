@@ -218,4 +218,7 @@ public class IREndPointCounter extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTProcDef node) {}
+
+  @Override
+  public void visit(ASTExpr node) {}
 }

@@ -65,6 +65,18 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
     return !remoteCombinations().isEmpty();
   }
 
+  // If the type can be represented as a single sequence of slots, returns it.
+  public Optional<IRSlotSequence> slots() {
+    IRSlotCombinations comb = combinations();
+    if (comb.size() > 1) {
+      return Optional.empty();
+    } else if (comb.size() == 0) {
+      return Optional.of(IRSlotSequence.EMPTY);
+    } else {
+      return Optional.of(comb.get(0));
+    }
+  }
+
   public static IRSlotsFromASTType compute(
       Compiler compiler,
       Env<EnvEntry> ep,
@@ -193,7 +205,9 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
   public void visit(ASTRecvT type) {
     // If the left-hand-side is a value, we start by visiting it
     // Otherwise, we just add a session slot
-    if (compiler.optimizeSendValue.get() && IRValueChecker.check(env, type.getlhs(), Optional.of(false))) {
+    if (compiler.optimizeSendValue.get()
+        && IRValueChecker.check(env, type.getlhs(), Optional.of(false))
+        && recurse(type.getlhs()).slots().isPresent()) {
       type.getlhs().accept(this);
     } else {
       localSlot(new IRSessionS());
@@ -210,7 +224,9 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
   public void visit(ASTSendT type) {
     // If the left-hand-side can be a value, we start by visiting it
     // Otherwise, we just add a session slot
-    if (compiler.optimizeSendValue.get() && IRValueChecker.check(env, type.getlhs(), Optional.of(true))) {
+    if (compiler.optimizeSendValue.get()
+        && IRValueChecker.check(env, type.getlhs(), Optional.of(true))
+        && recurse(type.getlhs()).slots().isPresent()) {
       type.getlhs().accept(this);
     } else {
       remoteSlot(new IRSessionS());

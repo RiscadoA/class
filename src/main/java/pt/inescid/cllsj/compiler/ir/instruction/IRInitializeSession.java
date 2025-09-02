@@ -2,15 +2,19 @@ package pt.inescid.cllsj.compiler.ir.instruction;
 
 import java.util.function.Function;
 import pt.inescid.cllsj.compiler.ir.id.IRCodeLocation;
+import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
 import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
 
 public class IRInitializeSession extends IRInstruction {
   private IRSessionId sessionId;
   private IRCodeLocation continuation;
+  private IRDataLocation continuationData;
 
-  public IRInitializeSession(IRSessionId sessionId, IRCodeLocation continuation) {
+  public IRInitializeSession(
+      IRSessionId sessionId, IRCodeLocation continuation, IRDataLocation continuationData) {
     this.sessionId = sessionId;
     this.continuation = continuation;
+    this.continuationData = continuationData;
   }
 
   public IRSessionId getSessionId() {
@@ -21,9 +25,13 @@ public class IRInitializeSession extends IRInstruction {
     return continuation;
   }
 
+  public IRDataLocation getContinuationData() {
+    return continuationData;
+  }
+
   @Override
   public IRInstruction clone() {
-    return new IRInitializeSession(sessionId, continuation);
+    return new IRInitializeSession(sessionId, continuation, continuationData);
   }
 
   @Override
@@ -42,7 +50,12 @@ public class IRInitializeSession extends IRInstruction {
   }
 
   @Override
+  public void replaceDataLocations(Function<IRDataLocation, IRDataLocation> replacer) {
+    continuationData = replacer.apply(continuationData);
+  }
+
+  @Override
   public String toString() {
-    return "initializeSession(" + sessionId + ", " + continuation + ")";
+    return "initializeSession(" + sessionId + ", " + continuation + ", " + continuationData + ")";
   }
 }

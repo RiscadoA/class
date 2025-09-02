@@ -1,7 +1,9 @@
 package pt.inescid.cllsj.compiler.ir.instruction;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Stream;
 import pt.inescid.cllsj.compiler.ir.id.IRCodeLocation;
 import pt.inescid.cllsj.compiler.ir.id.IRLocalDataId;
@@ -14,7 +16,8 @@ public class IRProcess {
   private IRProcessId id;
   private int endPoints;
   private int typeCount = 0;
-  private List<IRLocalDataId> sessionsLocalDataId = new ArrayList<>();
+  private int sessionCount = 0;
+  private Map<IRSessionId, IRLocalDataId> argSessionLocalDataId = new HashMap<>();
   private List<IRSlotCombinations> localData = new ArrayList<>();
   private List<IRBlock> blocks = new ArrayList<>();
 
@@ -37,12 +40,17 @@ public class IRProcess {
   }
 
   public int getSessionCount() {
-    return sessionsLocalDataId.size();
+    return sessionCount;
   }
 
-  public IRSessionId addSession(IRLocalDataId localDataId) {
-    sessionsLocalDataId.add(localDataId);
-    return new IRSessionId(sessionsLocalDataId.size() - 1);
+  public IRSessionId addSession() {
+    return new IRSessionId(sessionCount++);
+  }
+
+  public IRSessionId addArgSession(IRLocalDataId localDataId) {
+    IRSessionId sessionId = new IRSessionId(sessionCount++);
+    argSessionLocalDataId.put(sessionId, localDataId);
+    return sessionId;
   }
 
   public IRTypeId addType() {
@@ -53,12 +61,8 @@ public class IRProcess {
     return typeCount;
   }
 
-  public IRLocalDataId getSessionLocalDataId(IRSessionId sessionId) {
-    return sessionsLocalDataId.get(sessionId.getIndex());
-  }
-
-  public IRSlotCombinations getLocalData(IRSessionId id) {
-    return getLocalData(getSessionLocalDataId(id));
+  public IRLocalDataId getArgSessionLocalDataId(IRSessionId sessionId) {
+    return argSessionLocalDataId.get(sessionId);
   }
 
   public IRSlotCombinations getLocalData(IRLocalDataId id) {
@@ -108,15 +112,16 @@ public class IRProcess {
     b.append(id).append(":\n");
     b.append("    end points: ").append(endPoints).append("\n");
     b.append("    types: ").append(typeCount).append("\n");
-    for (int i = 0; i < sessionsLocalDataId.size(); i++) {
-      b.append("    session ")
-          .append(i)
-          .append(": ")
-          .append(sessionsLocalDataId.get(i))
-          .append("\n");
-    }
+    b.append("    sessions: ").append(sessionCount).append("\n");
     for (int i = 0; i < localData.size(); i++) {
-      b.append("    data ").append(i).append(": ").append(localData.get(i).toString()).append("\n");
+      b.append("    data ").append(i).append(": ").append(localData.get(i).toString());
+      for (Map.Entry<IRSessionId, IRLocalDataId> entry : argSessionLocalDataId.entrySet()) {
+        if (entry.getValue().getIndex() == i) {
+          b.append(" (arg ").append(entry.getKey().toString()).append(")");
+          break;
+        }
+      }
+      b.append("\n");
     }
 
     for (IRBlock block : blocks) {

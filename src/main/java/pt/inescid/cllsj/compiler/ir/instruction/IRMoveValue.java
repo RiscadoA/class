@@ -2,16 +2,15 @@ package pt.inescid.cllsj.compiler.ir.instruction;
 
 import java.util.function.Function;
 import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
-import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
-import pt.inescid.cllsj.compiler.ir.slot.IRSlotCombinations;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotSequence;
 
-public class IRWriteValue extends IRWrite {
+public class IRMoveValue extends IRWrite {
   private IRDataLocation sourceLocation;
-  private IRSlotCombinations slots;
+  private IRSlotSequence slots;
 
-  public IRWriteValue(IRDataLocation location, IRDataLocation sourceLocation, IRSlotCombinations slots) {
-    super(location);
+  public IRMoveValue(
+      IRDataLocation targetLocation, IRDataLocation sourceLocation, IRSlotSequence slots) {
+    super(targetLocation);
     this.sourceLocation = sourceLocation;
     this.slots = slots;
   }
@@ -20,7 +19,7 @@ public class IRWriteValue extends IRWrite {
     return sourceLocation;
   }
 
-  public IRSlotCombinations getSlots() {
+  public IRSlotSequence getSlots() {
     return slots;
   }
 
@@ -31,12 +30,12 @@ public class IRWriteValue extends IRWrite {
 
   @Override
   public IRInstruction clone() {
-    return new IRWriteValue(location, sourceLocation, slots);
+    return new IRMoveValue(location, sourceLocation, slots);
   }
 
   @Override
   public String toString() {
-    return "writeSession(" + location + ", " + sourceLocation + ", " + slots + ")";
+    return "moveValue(" + location + ", " + sourceLocation + ", " + slots + ")";
   }
 
   @Override

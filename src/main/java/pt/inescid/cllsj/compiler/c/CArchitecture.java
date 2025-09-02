@@ -15,7 +15,7 @@ public class CArchitecture {
   public CAlignment pointerAlignment = CAlignment.constant(8);
 
   public CSize sessionSize() {
-    return pointerSize.multiply(3);
+    return pointerSize.multiply(4);
   }
 
   public CAlignment sessionAlignment() {
