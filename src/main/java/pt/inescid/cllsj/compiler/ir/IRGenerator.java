@@ -2,6 +2,7 @@ package pt.inescid.cllsj.compiler.ir;
 
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
+import pt.inescid.cllsj.ast.nodes.ASTNode;
 import pt.inescid.cllsj.ast.nodes.ASTProcDef;
 import pt.inescid.cllsj.ast.nodes.ASTProgram;
 import pt.inescid.cllsj.compiler.Compiler;
@@ -24,11 +25,16 @@ public class IRGenerator {
     gen.compiler = compiler;
     gen.ep = ep;
 
+    // Start by creating an empty process for each definition
     for (ASTProcDef procDef : ast.getProcDefs()) {
       IRProcessId id = new IRProcessId(procDef.getId());
-      // gen.program.add(new IRProcess(id, )
+      gen.program.add(new IRProcess(id, gen.countEndPoints(procDef.getRhs())));
     }
 
     return gen.program;
+  }
+
+  private int countEndPoints(ASTNode node) {
+    return IREndPointCounter.count(compiler, node);
   }
 }
