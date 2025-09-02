@@ -3,158 +3,77 @@ package pt.inescid.cllsj.ast;
 import pt.inescid.cllsj.ast.nodes.*;
 
 public abstract class ASTNodeVisitor {
-  // Catch all for nodes which do not have their own visit method
-  public abstract void visit(ASTNode node);
+  public abstract void visit(ASTBang node);
 
-  public void visit(ASTBang node) {
-    visit((ASTNode) node);
-  }
+  public abstract void visit(ASTCall node);
 
-  public void visit(ASTCall node) {
-    visit((ASTNode) node);
-  }
+  public abstract void visit(ASTCase node);
 
-  public void visit(ASTCase node) {
-    visit((ASTNode) node);
-  }
+  public abstract void visit(ASTClose node);
 
-  public void visit(ASTClose node) {
-    visit((ASTNode) node);
-  }
+  public abstract void visit(ASTCoClose node);
 
-  public void visit(ASTCoClose node) {
-    visit((ASTNode) node);
-  }
+  public abstract void visit(ASTCut node);
 
-  public void visit(ASTCut node) {
-    visit((ASTNode) node);
-  }
+  public abstract void visit(ASTEmpty node);
 
-  public void visit(ASTEmpty node) {
-    visit((ASTNode) node);
-  }
+  public abstract void visit(ASTFwd node);
 
-  public void visit(ASTFwd node) {
-    visit((ASTNode) node);
-  }
+  public abstract void visit(ASTFwdB node);
 
-  public void visit(ASTFwdB node) {
-    visit((ASTNode) node);
-  }
+  public abstract void visit(ASTId node);
 
-  public void visit(ASTId node) {
-    visit((ASTNode) node);
-  }
+  public abstract void visit(ASTMix node);
 
-  public void visit(ASTMix node) {
-    visit((ASTNode) node);
-  }
+  public abstract void visit(ASTPrintLn node);
 
-  public void visit(ASTPrintLn node) {
-    visit((ASTNode) node);
-  }
+  public abstract void visit(ASTProcDef node);
 
-  public void visit(ASTProcDef node) {
-    visit((ASTNode) node);
-  }
+  public abstract void visit(ASTProgram node);
 
-  public void visit(ASTProgram node) {
-    visit((ASTNode) node);
-  }
+  public abstract void visit(ASTRecv node);
 
-  public void visit(ASTRecv node) {
-    visit((ASTNode) node);
-  }
+  public abstract void visit(ASTSelect node);
 
-  public void visit(ASTSelect node) {
-    visit((ASTNode) node);
-  }
+  public abstract void visit(ASTSend node);
 
-  public void visit(ASTSend node) {
-    visit((ASTNode) node);
-  }
+  public abstract void visit(ASTUnfold node);
 
-  public void visit(ASTUnfold node) {
-    visit((ASTNode) node);
-  }
+  public abstract void visit(ASTWhy node);
 
-  public void visit(ASTWhy node) {
-    visit((ASTNode) node);
-  }
+  public abstract void visit(ASTCoExpr node);
 
-  public void visit(ASTCoExpr node) {
-    visit((ASTNode) node);
-  }
+  public abstract void visit(ASTPromoCoExpr node);
 
-  public void visit(ASTPromoCoExpr node) {
-    visit((ASTNode) node);
-  }
+  public abstract void visit(ASTIf node);
 
-  public void visit(ASTIf node) {
-    visit((ASTNode) node);
-  }
+  public abstract void visit(ASTSendTy node);
 
-  public void visit(ASTSendTy node) {
-    visit((ASTNode) node);
-  }
+  public abstract void visit(ASTRecvTy node);
 
-  public void visit(ASTRecvTy node) {
-    visit((ASTNode) node);
-  }
+  public abstract void visit(ASTAffine node);
 
-  public void visit(ASTAffine node) {
-    visit((ASTNode) node);
-  }
+  public abstract void visit(ASTUse node);
 
-  public void visit(ASTUse node) {
-    visit((ASTNode) node);
-  }
+  public abstract void visit(ASTDiscard node);
 
-  public void visit(ASTDiscard node) {
-    visit((ASTNode) node);
-  }
+  public abstract void visit(ASTCell node);
 
-  public void visit(ASTCell node) {
-    visit((ASTNode) node);
-  }
+  public abstract void visit(ASTPut node);
 
-  public void visit(ASTPut node) {
-    visit((ASTNode) node);
-  }
+  public abstract void visit(ASTTake node);
 
-  public void visit(ASTTake node) {
-    visit((ASTNode) node);
-  }
+  public abstract void visit(ASTRelease node);
 
-  public void visit(ASTRelease node) {
-    visit((ASTNode) node);
-  }
+  public abstract void visit(ASTShare node);
 
-  public void visit(ASTShare node) {
-    visit((ASTNode) node);
-  }
+  public abstract void visit(ASTShareL node);
 
-  public void visit(ASTShareL node) {
-    visit((ASTNode) node);
-  }
+  public abstract void visit(ASTShareR node);
 
-  public void visit(ASTShareR node) {
-    visit((ASTNode) node);
-  }
+  public abstract void visit(ASTScan node);
 
-  public void visit(ASTExpr node) {
-    visit((ASTNode) node);
-  }
+  public abstract void visit(ASTSleep node);
 
-  public void visit(ASTScan node) {
-    visit((ASTNode) node);
-  }
-
-  public void visit(ASTSleep node) {
-    visit((ASTNode) node);
-  }
-
-  public void visit(ASTUnreachable node) {
-    visit((ASTNode) node);
-  }
+  public abstract void visit(ASTUnreachable node);
 }

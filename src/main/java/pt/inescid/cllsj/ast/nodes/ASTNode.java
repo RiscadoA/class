@@ -55,7 +55,7 @@ public abstract class ASTNode {
   }
 
   public void accept(ASTNodeVisitor visitor) {
-    visitor.visit(this);
+    throw new UnsupportedOperationException("accept not implemented");
   }
 
   public abstract void typecheck(Env<ASTType> ed, Env<ASTType> eg, Env<EnvEntry> ep)

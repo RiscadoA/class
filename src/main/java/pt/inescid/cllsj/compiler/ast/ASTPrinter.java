@@ -162,12 +162,6 @@ public class ASTPrinter extends ASTNodeVisitor {
   }
 
   @Override
-  public void visit(ASTNode node) {
-    throw new UnsupportedOperationException(
-        "Printing of nodes of type " + node.getClass().getSimpleName() + " is not yet supported");
-  }
-
-  @Override
   public void visit(ASTBang node) {
     indentPrintln("!" + node.getChr() + "(" + node.getChi() + ");");
     node.getRhs().accept(this);
@@ -495,5 +489,27 @@ public class ASTPrinter extends ASTNodeVisitor {
   @Override
   public void visit(ASTUnreachable node) {
     indentPrintln("unreachable " + node.getCh());
+  }
+
+  @Override
+  public void visit(ASTShareL node) {
+    indentPrintln("shareL " + node.getCh() + " {");
+    indentLevel++;
+    node.getLhs().accept(this);
+    indentPrintln("||");
+    node.getRhs().accept(this);
+    indentLevel--;
+    indentPrintln("}");
+  }
+
+  @Override
+  public void visit(ASTShareR node) {
+    indentPrintln("shareR " + node.getCh() + " {");
+    indentLevel++;
+    node.getLhs().accept(this);
+    indentPrintln("||");
+    node.getRhs().accept(this);
+    indentLevel--;
+    indentPrintln("}");
   }
 }

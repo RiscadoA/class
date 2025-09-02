@@ -150,14 +150,6 @@ public class ASTSessionRenamer extends ASTNodeVisitor {
   }
 
   @Override
-  public void visit(ASTNode node) {
-    throw new UnsupportedOperationException(
-        "Renaming of sessions in nodes of type "
-            + node.getClass().getSimpleName()
-            + " is not yet supported");
-  }
-
-  @Override
   public void visit(ASTBang node) {
     String chi = node.getChi();
     node.setChr(rename(node.getChr()));
@@ -205,6 +197,20 @@ public class ASTSessionRenamer extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTShare node) {
+    node.setCh(rename(node.getCh()));
+    node.getLhs().accept(this);
+    node.getRhs().accept(this);
+  }
+
+  @Override
+  public void visit(ASTShareL node) {
+    node.setCh(rename(node.getCh()));
+    node.getLhs().accept(this);
+    node.getRhs().accept(this);
+  }
+
+  @Override
+  public void visit(ASTShareR node) {
     node.setCh(rename(node.getCh()));
     node.getLhs().accept(this);
     node.getRhs().accept(this);
@@ -339,11 +345,6 @@ public class ASTSessionRenamer extends ASTNodeVisitor {
     node.getExpr().accept(new ExprVisitor());
     node.getThen().accept(this);
     node.getElse().accept(this);
-  }
-
-  @Override
-  public void visit(ASTExpr expr) {
-    expr.accept(new ExprVisitor());
   }
 
   @Override

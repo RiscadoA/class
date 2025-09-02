@@ -10,8 +10,7 @@ public class Settings {
   private List<BaseSetting> settings;
   private Map<String, BaseSetting> settingsByName = new HashMap<>();
 
-  public Flag addFlag(
-      Character shortName, String longName, String description, boolean defaultValue) {
+  public Flag addFlag(String shortName, String longName, String description, boolean defaultValue) {
     return addFlag(Optional.of(shortName), longName, description, defaultValue);
   }
 
@@ -20,7 +19,7 @@ public class Settings {
   }
 
   public Flag addFlag(
-      Optional<Character> shortName, String longName, String description, boolean defaultValue) {
+      Optional<String> shortName, String longName, String description, boolean defaultValue) {
     Flag setting = new Flag(shortName, longName, description, defaultValue);
     addSetting(setting);
     return setting;
@@ -31,21 +30,28 @@ public class Settings {
   }
 
   public Int addInt(
-      Optional<Character> shortName, String longName, String description, int defaultValue) {
+      Optional<String> shortName, String longName, String description, int defaultValue) {
     Int setting = new Int(shortName, longName, description, defaultValue);
     addSetting(setting);
     return setting;
   }
 
   public Path addPath(
-      Optional<Character> shortName, String longName, String description, String defaultValue) {
+      String shortName, String longName, String description, java.nio.file.Path defaultValue) {
+    return addPath(Optional.of(shortName), longName, description, defaultValue);
+  }
+
+  public Path addPath(
+      Optional<String> shortName,
+      String longName,
+      String description,
+      java.nio.file.Path defaultValue) {
     Path setting = new Path(shortName, longName, description, defaultValue);
     addSetting(setting);
     return setting;
   }
 
-  public Name addName(
-      Character shortName, String longName, String description, String defaultValue) {
+  public Name addName(String shortName, String longName, String description, String defaultValue) {
     return addName(Optional.of(shortName), longName, description, defaultValue);
   }
 
@@ -54,10 +60,14 @@ public class Settings {
   }
 
   public Name addName(
-      Optional<Character> shortName, String longName, String description, String defaultValue) {
+      Optional<String> shortName, String longName, String description, String defaultValue) {
     Name setting = new Name(shortName, longName, description, defaultValue);
     addSetting(setting);
     return setting;
+  }
+
+  public Mode addMode(String shortName, String longName, String description, Runnable runnable) {
+    return addMode(Optional.of(shortName), longName, description, runnable);
   }
 
   public Mode addMode(String longName, String description, Runnable runnable) {
@@ -65,7 +75,7 @@ public class Settings {
   }
 
   public Mode addMode(
-      Optional<Character> shortName, String longName, String description, Runnable runnable) {
+      Optional<String> shortName, String longName, String description, Runnable runnable) {
     Mode setting = new Mode(shortName, longName, description, runnable);
     addSetting(setting);
     return setting;
@@ -90,7 +100,7 @@ public class Settings {
   }
 
   public void printHelp(PrintStream stream) {
-    stream.println("Usage: CLLSj [OPTS...]");
+    stream.println("Usage: CLLSj -c/--compile [OPTS...]");
 
     for (BaseSetting setting : settings) {
       stream.print("    ");
@@ -130,17 +140,17 @@ public class Settings {
   }
 
   private abstract static class BaseSetting {
-    private Optional<Character> shortName;
+    private Optional<String> shortName;
     private String longName;
     private String description;
 
-    public BaseSetting(Optional<Character> shortName, String longName, String description) {
+    public BaseSetting(Optional<String> shortName, String longName, String description) {
       this.shortName = shortName;
       this.longName = longName;
       this.description = description;
     }
 
-    public Optional<Character> getShortName() {
+    public Optional<String> getShortName() {
       return shortName;
     }
 
@@ -161,7 +171,7 @@ public class Settings {
     private T value;
 
     public ValueSetting(
-        Optional<Character> shortName, String longName, String description, T defaultValue) {
+        Optional<String> shortName, String longName, String description, T defaultValue) {
       super(shortName, longName, description);
       this.value = defaultValue;
     }
@@ -177,7 +187,7 @@ public class Settings {
 
   public static class Flag extends ValueSetting<Boolean> {
     public Flag(
-        Optional<Character> shortName, String longName, String description, boolean defaultValue) {
+        Optional<String> shortName, String longName, String description, boolean defaultValue) {
       super(shortName, longName, description, defaultValue);
     }
 
@@ -199,8 +209,7 @@ public class Settings {
   }
 
   public static class Int extends ValueSetting<Integer> {
-    public Int(
-        Optional<Character> shortName, String longName, String description, int defaultValue) {
+    public Int(Optional<String> shortName, String longName, String description, int defaultValue) {
       super(shortName, longName, description, defaultValue);
     }
 
@@ -220,9 +229,12 @@ public class Settings {
     }
   }
 
-  public static class Path extends ValueSetting<String> {
+  public static class Path extends ValueSetting<java.nio.file.Path> {
     public Path(
-        Optional<Character> shortName, String longName, String description, String defaultValue) {
+        Optional<String> shortName,
+        String longName,
+        String description,
+        java.nio.file.Path defaultValue) {
       super(shortName, longName, description, defaultValue);
     }
 
@@ -234,16 +246,17 @@ public class Settings {
     @Override
     public void parse(Optional<String> value) {
       set(
-          value.orElseThrow(
-              () ->
-                  new IllegalArgumentException(
-                      "Expected a value for path option " + getLongName())));
+          java.nio.file.Path.of(
+              value.orElseThrow(
+                  () ->
+                      new IllegalArgumentException(
+                          "Expected a value for path option " + getLongName()))));
     }
   }
 
   public static class Name extends ValueSetting<String> {
     public Name(
-        Optional<Character> shortName, String longName, String description, String defaultValue) {
+        Optional<String> shortName, String longName, String description, String defaultValue) {
       super(shortName, longName, description, defaultValue);
     }
 
@@ -266,7 +279,7 @@ public class Settings {
     private Runnable runnable;
 
     public Mode(
-        Optional<Character> shortName, String longName, String description, Runnable runnable) {
+        Optional<String> shortName, String longName, String description, Runnable runnable) {
       super(shortName, longName, description);
       this.runnable = runnable;
     }

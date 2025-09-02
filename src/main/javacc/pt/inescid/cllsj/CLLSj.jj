@@ -9,7 +9,7 @@ import java.util.concurrent.*;
 
 import pt.inescid.cllsj.ast.nodes.*;
 import pt.inescid.cllsj.ast.types.*;
-import pt.inescid.cllsj.compiler.old.Compiler;
+import pt.inescid.cllsj.compiler.Compiler;
 
 public class CLLSj {
 
@@ -90,133 +90,13 @@ public static void main(String args[]) {
     eg = new Env<ASTType>();
     ep = new Env<EnvEntry>();
 
-    if (args.length > 0) {
+    if (args.length > 0 && (args[0] == "-c" || args[0] == "--compile")) {
       Compiler compiler = new Compiler();
-      String input = null;
-      boolean failed = false;
-
-      for (int i = 0; i < args.length; i++) {
-        if (args[i].equals("-c")) {
-          if (i + 1 >= args.length) {
-            failed = true;
-            break;
-          }
-
-          input = args[i + 1];
-          i += 1;
-        } else if (args[i].equals("-t")) {
-          compiler.trace = true;
-        } else if (args[i].equals("-P")) {
-          compiler.profile = true;
-        } else if (args[i].equals("-i")) {
-          compiler.onlyIR = true;
-        } else if (args[i].equals("-a")) {
-          compiler.onlyAST = true;
-        } else if (args[i].equals("-A")) {
-          compiler.onlyAnalyze = true;
-        } else if (args[i].equals("--debug")) {
-          compiler.debug = true;
-        } else if (args[i].equals("--no-concurrency")) {
-          compiler.disableConcurrency = true;
-        } else if (args[i].equals("--no-custom-allocator")) {
-          compiler.customAllocatorLevels = 0;
-        } else if (args[i].equals("--custom-allocator-levels")) {
-          if (i + 1 >= args.length) {
-            failed = true;
-            break;
-          }
-
-          compiler.customAllocatorLevels = Integer.parseInt(args[i + 1]);
-          i += 1;
-        } else if (args[i].equals("--custom-allocator-size-divisor")) {
-          if (i + 1 >= args.length) {
-            failed = true;
-            break;
-          }
-
-          compiler.customAllocatorSizeDivisor = Integer.parseInt(args[i + 1]);
-          i += 1;
-        } else if (args[i].equals("--no-inlining")) {
-          compiler.inliningComplexity = -1;
-        } else if (args[i].equals("--inlining-complexity")) {
-          if (i + 1 >= args.length) {
-            failed = true;
-            break;
-          }
-
-          compiler.inliningComplexity = Integer.parseInt(args[i + 1]);
-          i += 1;
-        } else if (args[i].equals("--no-inlining-recursive-processes")) {
-          compiler.inlineRecursiveProcesses = false;
-        } else if (args[i].equals("--no-optimize-ir-with-analysis")) {
-          compiler.optimizeIRWithAnalysis = false;
-        } else if (args[i].equals("--no-optimize-primitive-exponentials")) {
-          compiler.optimizePrimitiveExponentials = false;
-        } else if (args[i].equals("--no-optimize-exponential-expression-to-forward")) {
-          compiler.optimizeExponentialExpressionToForward = false;
-        } else if (args[i].equals("--no-optimize-send-forward")) {
-          compiler.optimizeSendForward = false;
-        } else if (args[i].equals("--no-optimize-tail-calls")) {
-          compiler.optimizeTailCalls = false;
-        } else if (args[i].equals("--no-optimize-flip-forward")) {
-          compiler.optimizeFlipForward = false;
-        } else if (args[i].equals("--no-optimize-send-value")) {
-          compiler.optimizeSendValue = false;
-        } else if (args[i].equals("--no-optimize-known-jumps")) {
-          compiler.optimizeKnownJumps = false;
-        } else if (args[i].equals("--no-optimize-known-slots")) {
-          compiler.optimizeKnownSlots = false;
-        } else if (args[i].equals("--no-optimize-known-end-points")) {
-          compiler.optimizeKnownEndPoints = false;
-        } else if (args[i].equals("--no-optimize-single-end-point")) {
-          compiler.optimizeSingleEndpoint = false;
-        } else if (args[i].equals("-p")) {
-          if (i + 1 >= args.length) {
-            failed = true;
-            break;
-          }
-
-          compiler.entryProcess = args[i + 1];
-          i += 1;
-        } else {
-          failed = true;
-          break;
-        }
-      }
-
-      if (failed || input == null) {
-        System.err.println("Usage: CLLSj [OPTS...]");
-        System.err.println("    -c <input-file>: Uses the given file as input, instead of STDIN");
-        System.err.println("    -p <entry-process>: Specify the name of the entry process (default: main)");
-        System.err.println("    -t: Enable trace logs on generated programs");
-        System.err.println("    -P: Enable memory profiling on generated programs");
-        System.err.println("    -i: Generate only IR code instead of C code");
-        System.err.println("    -a: Generate only an AST instead of C code");
-        System.err.println("    -A: Generate only an IR analysis instead of C code");
-        System.err.println("    --debug: Prints a lot of state information during execution");
-        System.err.println("    --custom-allocator-levels <levels>: Sets the number of levels in the custom allocator");
-        System.err.println("    --custom-allocator-size-divisor <divisor>: Sets the divisor in the custom allocator");
-        System.err.println("    --no-concurrency: Prevents generation of thread-aware code");
-        System.err.println("    --no-custom-allocator: Uses malloc/free directly instead of the custom allocator");
-        System.err.println("    --no-inlining: Disables inlining of processes");
-        System.err.println("    --inlining-complexity <complexity>: Sets the maximum complexity allowed for a process to be inlined");
-        System.err.println("    --no-inlining-recursive-processes: Disables inlining of recursive processes");
-        System.err.println("    --no-optimize-ir-with-analysis: Disables IR optimization through flow analysis");
-        System.err.println("    --no-optimize-primitive-exponentials: Disables primitive exponential optimization");
-        System.err.println("    --no-optimize-exponential-expression-to-forward: Disables exponential expression variable optimization to forward");
-        System.err.println("    --no-optimize-send-forward: Disables send forward optimization");
-        System.err.println("    --no-optimize-tail-calls: Disables tail call optimization");
-        System.err.println("    --no-optimize-flip-forward: Disables flip forward optimization");
-        System.err.println("    --no-optimize-send-value: Disables send value optimization");
-        System.err.println("    --no-optimize-known-jumps: Disables optimization of known jumps");
-        System.err.println("    --no-optimize-known-slots: Disables optimization of known slots");
-        System.err.println("    --no-optimize-known-end-points: Disables optimization of known endpoints");
-        System.err.println("    --no-optimize-single-end-point: Disables optimization of single endpoint processes");
-
-        System.exit(1);
-      }
-
-      System.exit(compiler.compile(input));
+      String newArgs[] = new String[args.length - 1];
+      for (int i = 0; i < newArgs.length; ++i) {
+        newArgs[i] = args[i + 1];
+      } 
+      System.exit(compiler.compile(newArgs));
     }
 
     //System.out.println("maximum pool size = " + ((ThreadPoolExecutor) threadPool).getMaximumPoolSize() );

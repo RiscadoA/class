@@ -10,7 +10,6 @@ import pt.inescid.cllsj.Session;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.Value;
 import pt.inescid.cllsj.ast.ASTExprVisitor;
-import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.types.ASTType;
 
 public abstract class ASTExpr extends ASTNode {
@@ -45,11 +44,6 @@ public abstract class ASTExpr extends ASTNode {
   }
 
   public void accept(ASTExprVisitor visitor) {
-    visitor.visit(this);
-  }
-
-  @Override
-  public void accept(ASTNodeVisitor visitor) {
     visitor.visit(this);
   }
 }

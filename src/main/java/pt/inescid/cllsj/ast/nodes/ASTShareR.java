@@ -28,6 +28,22 @@ public class ASTShareR extends ASTNode {
     rhs = _rhs;
   }
 
+  public String getCh() {
+    return sh;
+  }
+
+  public ASTNode getLhs() {
+    return lhs;
+  }
+
+  public ASTNode getRhs() {
+    return rhs;
+  }
+
+  public void setCh(String s) {
+    sh = s;
+  }
+
   public void ASTInsertPipe(Function<ASTNode, ASTNode> f, ASTNode from) throws Exception {
     if (from == lhs) {
       ASTNode nnode = f.apply(from);
