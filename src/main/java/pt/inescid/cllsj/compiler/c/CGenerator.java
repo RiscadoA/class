@@ -18,6 +18,7 @@ import pt.inescid.cllsj.compiler.ir.slot.IRSlot;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotCombinations;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotOffset;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotSequence;
+import pt.inescid.cllsj.compiler.ir.slot.IRSlotTree;
 import pt.inescid.cllsj.compiler.ir.slot.IRStringS;
 
 public class CGenerator extends IRInstructionVisitor {
@@ -740,6 +741,14 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   @Override
+  public void visit(IRForward instr) {
+    String sourceSession = accessSession(instr.getSource());
+    String targetSession = accessSession(instr.getTarget());
+    String sourceData = data(instr.getSourceData());
+    String targetData = data(instr.getTargetData());
+  }
+
+  @Override
   public void visit(IRCallProcess instr) {
     IRProcessId calledProcessId = instr.getProcessId();
     IRProcess calledProcess = program.get(calledProcessId);
@@ -1042,7 +1051,7 @@ public class CGenerator extends IRInstructionVisitor {
 
   // ============================ Structure statement building helpers ============================
 
-  private void putCopy(IRDataLocation target, IRDataLocation source, IRSlotSequence slots) {
+  private void putCopy(IRDataLocation target, IRDataLocation source, IRSlotTree slots) {
     putCopy(currentProcessLayout, ENV, target, source, slots);
   }
 
@@ -1051,7 +1060,7 @@ public class CGenerator extends IRInstructionVisitor {
       String targetEnv,
       IRDataLocation target,
       IRDataLocation source,
-      IRSlotSequence slots) {
+      IRSlotTree slots) {
     putCopy(targetLayout, targetEnv, target, currentProcessLayout, ENV, source, slots);
   }
 
@@ -1062,7 +1071,7 @@ public class CGenerator extends IRInstructionVisitor {
       CProcessLayout sourceLayout,
       String sourceEnv,
       IRDataLocation source,
-      IRSlotSequence slots) {
+      IRSlotTree slots) {
     // The difficulty here lies in that the source and target may have different layouts.
     // This is due to the fact that they might start in offsets with different alignments,
     // and thus, have different paddings between slots.
@@ -1070,6 +1079,7 @@ public class CGenerator extends IRInstructionVisitor {
     // The simple way to solve this, which is what we do here, is to copy slot by slot.
     IRSlotSequence offset = IRSlotSequence.EMPTY;
     for (IRSlot slot : slots.list()) {
+      // TODO: go down the tree (no longer iterate a list)
       putCopy(
           data(targetLayout, targetEnv, target.advance(offset, slot)),
           data(sourceLayout, sourceEnv, source.advance(offset, slot)),

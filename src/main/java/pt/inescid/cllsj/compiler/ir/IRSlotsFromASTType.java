@@ -1,5 +1,7 @@
 package pt.inescid.cllsj.compiler.ir;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import pt.inescid.cllsj.Env;
@@ -25,11 +27,11 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
   // Possible slot combinations for the current negative segment of the type
   // I.e., what data is currently being read from the local side
   // This must be a IRSlotsCombinations as we may have choice types
-  public IRSlotCombinations activeLocalCombinations = IRSlotCombinations.EMPTY;
+  public IRSlotTree activeLocalTree = IRSlotTree.LEAF;
 
   // Similar to above, but for the remote side (positive segment)
   // I.e., what data is currently being written to the remote side
-  public IRSlotCombinations activeRemoteCombinations = IRSlotCombinations.EMPTY;
+  public IRSlotTree activeRemoteTree = IRSlotTree.LEAF;
 
   // Possible slot combinations for all remaining negative segments of the type,
   // excluding the current one.
@@ -42,12 +44,12 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
 
   // Returns all local slot combinations, both active and remainder
   public IRSlotCombinations localCombinations() {
-    return activeLocalCombinations.merge(remainderLocalCombinations);
+    return activeLocalTree.combinations().merge(remainderLocalCombinations);
   }
 
   // Returns all remote slot combinations, both active and remainder
   public IRSlotCombinations remoteCombinations() {
-    return activeRemoteCombinations.merge(remainderRemoteCombinations);
+    return activeRemoteTree.combinations().merge(remainderRemoteCombinations);
   }
 
   // Returns all slot combinations, both local and remote, active and remainder
@@ -63,18 +65,6 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
   // Checks if the type has any remote data requirements
   public boolean hasRemoteData() {
     return !remoteCombinations().isEmpty();
-  }
-
-  // If the type can be represented as a single sequence of slots, returns it.
-  public Optional<IRSlotSequence> slots() {
-    IRSlotCombinations comb = combinations();
-    if (comb.size() > 1) {
-      return Optional.empty();
-    } else if (comb.size() == 0) {
-      return Optional.of(IRSlotSequence.EMPTY);
-    } else {
-      return Optional.of(comb.get(0));
-    }
   }
 
   public static IRSlotsFromASTType compute(
@@ -96,12 +86,12 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
 
   private void localSlot(IRSlot slot) {
     this.slot = Optional.of(slot);
-    activeLocalCombinations = IRSlotCombinations.of(slot);
+    activeLocalTree = IRSlotTree.of(slot);
   }
 
   private void remoteSlot(IRSlot slot) {
     this.slot = Optional.of(slot);
-    activeRemoteCombinations = IRSlotCombinations.of(slot);
+    activeRemoteTree = IRSlotTree.of(slot);
   }
 
   @Override
@@ -116,15 +106,16 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
   public void visit(ASTCaseT type) {
     slot = Optional.of(new IRTagS());
 
+    List<IRSlotTree> cases = new ArrayList<>();
     for (ASTType choice : type.getcases().values()) {
       IRSlotsFromASTType result = recurse(choice);
 
-      activeRemoteCombinations =
-          activeRemoteCombinations.merge(result.activeRemoteCombinations).prefix(slot.get());
+      cases.add(result.activeRemoteTree);
       remainderLocalCombinations = remainderLocalCombinations.merge(result.localCombinations());
       remainderRemoteCombinations =
           remainderRemoteCombinations.merge(result.remainderRemoteCombinations);
     }
+    activeRemoteTree = new IRSlotTree.Tag(cases);
   }
 
   @Override
@@ -159,9 +150,9 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
     IREnvironment.Type envType = env.getType(type.getid());
     slot = Optional.of(new IRVarS(envType.getId()));
     if (envType.isPositive()) {
-      activeRemoteCombinations = IRSlotCombinations.of(slot.get());
+      activeRemoteTree = IRSlotTree.of(slot.get());
     } else {
-      activeLocalCombinations = IRSlotCombinations.of(slot.get());
+      activeLocalTree = IRSlotTree.of(slot.get());
     }
   }
 
@@ -169,11 +160,11 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
   public void visit(ASTNotT type) {
     type.getin().accept(this);
 
-    IRSlotCombinations swapActive = activeLocalCombinations;
+    IRSlotTree swapActive = activeLocalTree;
     IRSlotCombinations swapRemainder = remainderLocalCombinations;
-    activeLocalCombinations = activeRemoteCombinations;
+    activeLocalTree = activeRemoteTree;
     remainderLocalCombinations = remainderRemoteCombinations;
-    activeRemoteCombinations = swapActive;
+    activeRemoteTree = swapActive;
     remainderRemoteCombinations = swapRemainder;
   }
 
@@ -181,15 +172,16 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
   public void visit(ASTOfferT type) {
     slot = Optional.of(new IRTagS());
 
+    List<IRSlotTree> cases = new ArrayList<>();
     for (ASTType choice : type.getcases().values()) {
       IRSlotsFromASTType result = recurse(choice);
 
-      activeLocalCombinations =
-          activeLocalCombinations.merge(result.activeLocalCombinations).prefix(slot.get());
+      cases.add(result.activeLocalTree);
       remainderLocalCombinations =
           remainderLocalCombinations.merge(result.remainderLocalCombinations);
       remainderRemoteCombinations = remainderRemoteCombinations.merge(result.remoteCombinations());
     }
+    activeLocalTree = new IRSlotTree.Tag(cases);
   }
 
   @Override
@@ -206,8 +198,7 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
     // If the left-hand-side is a value, we start by visiting it
     // Otherwise, we just add a session slot
     if (compiler.optimizeSendValue.get()
-        && IRValueChecker.check(env, type.getlhs(), Optional.of(false))
-        && recurse(type.getlhs()).slots().isPresent()) {
+        && IRValueChecker.check(env, type.getlhs(), Optional.of(false))) {
       type.getlhs().accept(this);
     } else {
       localSlot(new IRSessionS());
@@ -215,7 +206,7 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
 
     // Merge with the right-hand-side
     IRSlotsFromASTType rhsResult = recurse(type.getrhs());
-    activeLocalCombinations = rhsResult.activeLocalCombinations.prefix(activeLocalCombinations);
+    activeLocalTree = activeLocalTree.suffix(rhsResult.activeLocalTree);
     remainderLocalCombinations = rhsResult.remainderLocalCombinations;
     remainderRemoteCombinations = rhsResult.remoteCombinations();
   }
@@ -225,8 +216,7 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
     // If the left-hand-side can be a value, we start by visiting it
     // Otherwise, we just add a session slot
     if (compiler.optimizeSendValue.get()
-        && IRValueChecker.check(env, type.getlhs(), Optional.of(true))
-        && recurse(type.getlhs()).slots().isPresent()) {
+        && IRValueChecker.check(env, type.getlhs(), Optional.of(true))) {
       type.getlhs().accept(this);
     } else {
       remoteSlot(new IRSessionS());
@@ -234,7 +224,7 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
 
     // Merge with the right-hand-side
     IRSlotsFromASTType rhsResult = recurse(type.getrhs());
-    activeRemoteCombinations = rhsResult.activeRemoteCombinations.prefix(activeRemoteCombinations);
+    activeRemoteTree = activeRemoteTree.suffix(rhsResult.activeRemoteTree);
     remainderLocalCombinations = rhsResult.localCombinations();
     remainderRemoteCombinations = rhsResult.remainderRemoteCombinations;
   }

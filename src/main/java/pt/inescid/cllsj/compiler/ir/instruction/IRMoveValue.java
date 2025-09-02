@@ -3,13 +3,14 @@ package pt.inescid.cllsj.compiler.ir.instruction;
 import java.util.function.Function;
 import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotSequence;
+import pt.inescid.cllsj.compiler.ir.slot.IRSlotTree;
 
 public class IRMoveValue extends IRWrite {
   private IRDataLocation sourceLocation;
-  private IRSlotSequence slots;
+  private IRSlotTree slots;
 
   public IRMoveValue(
-      IRDataLocation targetLocation, IRDataLocation sourceLocation, IRSlotSequence slots) {
+      IRDataLocation targetLocation, IRDataLocation sourceLocation, IRSlotTree slots) {
     super(targetLocation);
     this.sourceLocation = sourceLocation;
     this.slots = slots;
@@ -19,7 +20,7 @@ public class IRMoveValue extends IRWrite {
     return sourceLocation;
   }
 
-  public IRSlotSequence getSlots() {
+  public IRSlotTree getSlots() {
     return slots;
   }
 

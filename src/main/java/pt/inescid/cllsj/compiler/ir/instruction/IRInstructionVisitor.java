@@ -32,4 +32,6 @@ public abstract class IRInstructionVisitor {
   public abstract void visit(IRIncreaseExponentialReferences instr);
 
   public abstract void visit(IRDecreaseExponentialReferences instr);
+
+  public abstract void visit(IRForward instr);
 }
