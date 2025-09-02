@@ -13,8 +13,8 @@ import pt.inescid.cllsj.compiler.ir.slot.IRSlotCombinations;
 public class IRProcess {
   private IRProcessId id;
   private int endPoints;
-  private int sessionCount = 0;
   private int typeCount = 0;
+  private List<IRLocalDataId> sessionsLocalDataId = new ArrayList<>();
   private List<IRSlotCombinations> localData = new ArrayList<>();
   private List<IRBlock> blocks = new ArrayList<>();
 
@@ -37,16 +37,12 @@ public class IRProcess {
   }
 
   public int getSessionCount() {
-    return sessionCount;
+    return sessionsLocalDataId.size();
   }
 
-  public IRSessionId addSession(IRSlotCombinations localDataCombinations) {
-    if (localData.size() != sessionCount) {
-      throw new IllegalStateException("Sessions must be added before independent local data");
-    }
-    sessionCount++;
-    localData.add(localDataCombinations);
-    return new IRSessionId(sessionCount - 1);
+  public IRSessionId addSession(IRLocalDataId localDataId) {
+    sessionsLocalDataId.add(localDataId);
+    return new IRSessionId(sessionsLocalDataId.size() - 1);
   }
 
   public IRTypeId addType() {
@@ -55,6 +51,14 @@ public class IRProcess {
 
   public int getTypeCount() {
     return typeCount;
+  }
+
+  public IRLocalDataId getSessionLocalDataId(IRSessionId sessionId) {
+    return sessionsLocalDataId.get(sessionId.getIndex());
+  }
+
+  public IRSlotCombinations getLocalData(IRSessionId id) {
+    return getLocalData(getSessionLocalDataId(id));
   }
 
   public IRSlotCombinations getLocalData(IRLocalDataId id) {
@@ -103,8 +107,14 @@ public class IRProcess {
 
     b.append(id).append(":\n");
     b.append("    end points: ").append(endPoints).append("\n");
-    b.append("    sessions: ").append(sessionCount).append("\n");
     b.append("    types: ").append(typeCount).append("\n");
+    for (int i = 0; i < sessionsLocalDataId.size(); i++) {
+      b.append("    session ")
+          .append(i)
+          .append(": ")
+          .append(sessionsLocalDataId.get(i))
+          .append("\n");
+    }
     for (int i = 0; i < localData.size(); i++) {
       b.append("    data ").append(i).append(": ").append(localData.get(i).toString());
     }

@@ -52,6 +52,10 @@ public class IRSlotCombinations {
     return new IRSlotCombinations(newSequences);
   }
 
+  public boolean isEmpty() {
+    return sequences.isEmpty();
+  }
+
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();

@@ -634,7 +634,8 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRInitializeSession instr) {
-    CSize contDataOffset = currentProcessLayout.dataOffset(instr.getSessionId().getLocalData());
+    IRLocalDataId sessionLocalDataId = currentProcess.getSessionLocalDataId(instr.getSessionId());
+    CSize contDataOffset = currentProcessLayout.dataOffset(sessionLocalDataId);
     CSize contSessionOffset = currentProcessLayout.sessionOffset(instr.getSessionId());
 
     StringBuilder sb = new StringBuilder("(struct session)");
@@ -800,14 +801,14 @@ public class CGenerator extends IRInstructionVisitor {
       putAssign(contDataOffset, newContDataOffset);
 
       // Update the remote session's continuation to match the new environment
+      IRLocalDataId calledLocalDataId =
+          calledProcess.getSessionLocalDataId(arg.getTargetSessionId());
       String remoteSession = remoteSession(arg.getSourceSessionId());
       putAssign(sessionContEnv(remoteSession), newEnv);
       putAssign(
           sessionContSessionOffset(remoteSession),
           calledLayout.sessionOffset(arg.getTargetSessionId()));
-      putAssign(
-          sessionContDataOffset(remoteSession),
-          calledLayout.dataOffset(arg.getTargetSessionId().getLocalData()));
+      putAssign(sessionContDataOffset(remoteSession), calledLayout.dataOffset(calledLocalDataId));
     }
 
     for (IRCallProcess.DataArgument arg : instr.getDataArguments()) {
@@ -905,42 +906,6 @@ public class CGenerator extends IRInstructionVisitor {
     return offset.advancePointer(remoteEnv);
   }
 
-  private CSize localDataOffset(IRSessionId sessionId) {
-    return localDataOffset(currentProcessLayout, sessionId);
-  }
-
-  private CSize localDataOffset(IRLocalDataId localDataId) {
-    return localDataOffset(currentProcessLayout, localDataId);
-  }
-
-  private CSize localDataOffset(CProcessLayout layout, IRSessionId sessionId) {
-    return localDataOffset(layout, sessionId.getLocalData());
-  }
-
-  private CSize localDataOffset(CProcessLayout layout, IRLocalDataId localDataId) {
-    return layout.dataOffset(localDataId);
-  }
-
-  private String localData(IRLocalDataId localDataId) {
-    return localData(currentProcessLayout, ENV, localDataId);
-  }
-
-  private String localData(IRSessionId sessionId) {
-    return localData(currentProcessLayout, ENV, sessionId);
-  }
-
-  private String localData(CProcessLayout layout, String env, IRSessionId sessionId) {
-    return localData(layout, env, sessionId.getLocalData());
-  }
-
-  private String localData(CProcessLayout layout, String env, IRLocalDataId localDataId) {
-    return localDataOffset(layout, localDataId).advancePointer(env);
-  }
-
-  private String localData(IRLocalDataId localDataId, IRSlotSequence offset, IRSlot slot) {
-    return localData(currentProcessLayout, ENV, localDataId, offset, slot);
-  }
-
   private String localData(
       CProcessLayout layout,
       String env,
@@ -950,7 +915,7 @@ public class CGenerator extends IRInstructionVisitor {
     CLayout offsetLayout = layout(offset);
     CLayout slotLayout = layout(slot);
     CSize finalOffset =
-        localDataOffset(layout, localDataId).add(offsetLayout.size).align(slotLayout.alignment);
+        layout.dataOffset(localDataId).add(offsetLayout.size).align(slotLayout.alignment);
     return finalOffset.advancePointer(env);
   }
 

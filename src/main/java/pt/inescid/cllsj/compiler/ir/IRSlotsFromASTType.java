@@ -1,6 +1,10 @@
 package pt.inescid.cllsj.compiler.ir;
 
 import java.util.Optional;
+import java.util.Set;
+import pt.inescid.cllsj.Env;
+import pt.inescid.cllsj.EnvEntry;
+import pt.inescid.cllsj.TypeEntry;
 import pt.inescid.cllsj.ast.ASTTypeVisitor;
 import pt.inescid.cllsj.ast.types.*;
 import pt.inescid.cllsj.compiler.Compiler;
@@ -11,6 +15,9 @@ import pt.inescid.cllsj.compiler.ir.slot.*;
 // and a IRSlotCombinations corresponding to all the remote data requirements.
 public class IRSlotsFromASTType extends ASTTypeVisitor {
   private Compiler compiler;
+  private Env<EnvEntry> ep;
+  private IREnvironment env;
+  private Set<String> recursionTypes;
 
   // Slot corresponding to the root type
   public Optional<IRSlot> slot = Optional.empty();
@@ -48,15 +55,31 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
     return localCombinations().merge(remoteCombinations());
   }
 
-  public static IRSlotsFromASTType compute(Compiler compiler, ASTType type) {
+  // Checks if the type has any local data requirements
+  public boolean hasLocalData() {
+    return !localCombinations().isEmpty();
+  }
+
+  // Checks if the type has any remote data requirements
+  public boolean hasRemoteData() {
+    return !remoteCombinations().isEmpty();
+  }
+
+  public static IRSlotsFromASTType compute(
+      Compiler compiler,
+      Env<EnvEntry> ep,
+      IREnvironment env,
+      Set<String> recursionTypes,
+      ASTType type) {
     IRSlotsFromASTType visitor = new IRSlotsFromASTType();
     visitor.compiler = compiler;
+    visitor.ep = ep;
     type.accept(visitor);
     return visitor;
   }
 
   private IRSlotsFromASTType recurse(ASTType type) {
-    return compute(compiler, type);
+    return compute(compiler, ep, env, recursionTypes, type);
   }
 
   private void localSlot(IRSlot slot) {
@@ -99,10 +122,35 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTIdT type) {
-    // TODO:
-    // 1. if it is a recursion variable, stop here
-    // 2. if it is not, generate a var slot
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    // Unfold the type to check if its definition is known
+    ASTType unfolded;
+    try {
+      unfolded = type.unfoldType(ep);
+    } catch (Exception e) {
+      throw new IllegalArgumentException("Error unfolding type: " + e.getMessage());
+    }
+    if (!(unfolded instanceof ASTIdT)) {
+      // We have a type definition, just recurse on the unfolded type
+      unfolded.accept(this);
+      return;
+    }
+
+    // We still have a type identifier
+    type = (ASTIdT) unfolded;
+
+    // If it is a recursion variable, then stop here
+    if (recursionTypes.contains(type.getid())) {
+      return;
+    }
+
+    // Otherwise, use the type slot
+    IREnvironment.Type envType = env.getType(type.getid());
+    slot = Optional.of(new IRVarS(envType.getId()));
+    if (envType.isPositive()) {
+      activeRemoteCombinations = IRSlotCombinations.of(slot.get());
+    } else {
+      activeLocalCombinations = IRSlotCombinations.of(slot.get());
+    }
   }
 
   @Override
@@ -137,6 +185,7 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTRecT type) {
+    ep = ep.assoc(type.getid(), new TypeEntry(new ASTIdT(type.getid())));
     type.getin().accept(this);
   }
 

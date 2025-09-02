@@ -1,15 +1,17 @@
 package pt.inescid.cllsj.compiler.ir;
 
 import java.util.Optional;
+import pt.inescid.cllsj.compiler.ir.id.IRLocalDataId;
 import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
 import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
 import pt.inescid.cllsj.compiler.ir.instruction.IRProcess;
+import pt.inescid.cllsj.compiler.ir.slot.IRExponentialS;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotCombinations;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotSequence;
 
 // Maps names to IR ids for types, sessions and local data within a process
 public class IREnvironment {
-  private IRProcess process;
+  protected IRProcess process;
   private Optional<IREnvironment> parent;
 
   public IREnvironment(IRProcess process) {
@@ -22,8 +24,8 @@ public class IREnvironment {
     this.parent = Optional.of(parent);
   }
 
-  public IREnvironment addType(String name) {
-    return new Type(this, name, process.addType());
+  public IREnvironment addType(String name, boolean isPositive) {
+    return new Type(this, name, process.addType(), isPositive);
   }
 
   public Type getType(String name) {
@@ -42,7 +44,8 @@ public class IREnvironment {
   }
 
   public IREnvironment addSession(String name, IRSlotCombinations combinations) {
-    return new Session(this, name, process.addSession(combinations), IRSlotSequence.EMPTY);
+    IRLocalDataId localDataId = process.addLocalData(combinations);
+    return new Session(this, name, process.addSession(localDataId), IRSlotSequence.EMPTY);
   }
 
   public Session getSession(String name) {
@@ -71,11 +74,32 @@ public class IREnvironment {
     return new Session(this, session.getName(), session.getId(), IRSlotSequence.EMPTY);
   }
 
+  public IREnvironment addExponential(String name) {
+    return new Exponential(
+        this, name, process.addLocalData(IRSlotCombinations.of(new IRExponentialS())));
+  }
+
+  public Exponential getExponential(String name) {
+    if (this instanceof Exponential) {
+      Exponential expEnv = (Exponential) this;
+      if (expEnv.getName().equals(name)) {
+        return expEnv;
+      }
+    }
+
+    if (parent.isPresent()) {
+      return parent.get().getExponential(name);
+    } else {
+      throw new IllegalArgumentException("Exponential " + name + " not found");
+    }
+  }
+
   public static class Type extends IREnvironment {
     private String name;
     private IRTypeId id;
+    private boolean isPositive;
 
-    public Type(IREnvironment parent, String name, IRTypeId id) {
+    public Type(IREnvironment parent, String name, IRTypeId id, boolean isPositive) {
       super(parent);
       this.name = name;
       this.id = id;
@@ -87,6 +111,10 @@ public class IREnvironment {
 
     public IRTypeId getId() {
       return id;
+    }
+
+    public boolean isPositive() {
+      return isPositive;
     }
   }
 
@@ -112,6 +140,29 @@ public class IREnvironment {
 
     public IRSlotSequence getOffset() {
       return offset;
+    }
+
+    public IRLocalDataId getDataId() {
+      return process.getSessionLocalDataId(id);
+    }
+  }
+
+  public static class Exponential extends IREnvironment {
+    private String name;
+    private IRLocalDataId dataId;
+
+    public Exponential(IREnvironment parent, String name, IRLocalDataId dataId) {
+      super(parent);
+      this.name = name;
+      this.dataId = dataId;
+    }
+
+    public String getName() {
+      return name;
+    }
+
+    public IRLocalDataId getDataId() {
+      return dataId;
     }
   }
 }

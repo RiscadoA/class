@@ -11,10 +11,6 @@ public class IRSessionId {
     return index;
   }
 
-  public IRLocalDataId getLocalData() {
-    return new IRLocalDataId(index);
-  }
-
   @Override
   public String toString() {
     return "s" + index;
