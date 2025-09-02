@@ -10,10 +10,7 @@ import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
 import java.util.function.Function;
-import pt.inescid.cllsj.compiler.ir.old.IRBlockOld;
-import pt.inescid.cllsj.compiler.ir.old.IRProcessOld;
-import pt.inescid.cllsj.compiler.ir.old.IRProgramOld;
-import pt.inescid.cllsj.compiler.ir.old.IRTypeVisitor;
+
 import pt.inescid.cllsj.compiler.ir.old.flow.IRFlow;
 import pt.inescid.cllsj.compiler.ir.old.flow.IRFlowContinuation;
 import pt.inescid.cllsj.compiler.ir.old.flow.IRFlowState;
@@ -30,6 +27,10 @@ import pt.inescid.cllsj.compiler.ir.old.type.IRTagT;
 import pt.inescid.cllsj.compiler.ir.old.type.IRType;
 import pt.inescid.cllsj.compiler.ir.old.type.IRTypeT;
 import pt.inescid.cllsj.compiler.ir.old.type.IRVarT;
+import pt.inescid.cllsj.compiler.old.ir.IRBlockOld;
+import pt.inescid.cllsj.compiler.old.ir.IRProcessOld;
+import pt.inescid.cllsj.compiler.old.ir.IRProgramOld;
+import pt.inescid.cllsj.compiler.old.ir.IRTypeVisitor;
 
 public class IROptimizer {
   private Map<String, Map<IRBlockOld, IRFlow>> processFlows = new HashMap<>();

@@ -16,7 +16,7 @@ import pt.inescid.cllsj.ast.nodes.ASTProgram;
 import pt.inescid.cllsj.ast.nodes.ASTProgramWithIncludes;
 import pt.inescid.cllsj.compiler.ast.ASTPrinter;
 import pt.inescid.cllsj.compiler.ast.ASTSessionRenamer;
-import pt.inescid.cllsj.compiler.ir.old.IRProgramOld;
+import pt.inescid.cllsj.compiler.old.ir.IRProgramOld;
 
 public class Compiler {
   public String entryProcess = "main";

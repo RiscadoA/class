@@ -4,10 +4,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import pt.inescid.cllsj.compiler.ir.old.IRBlockOld;
-import pt.inescid.cllsj.compiler.ir.old.IRExpressionVisitor;
-import pt.inescid.cllsj.compiler.ir.old.IRInstructionVisitorOld;
-import pt.inescid.cllsj.compiler.ir.old.IRProcessOld;
+
 import pt.inescid.cllsj.compiler.ir.old.expressions.IRAdd;
 import pt.inescid.cllsj.compiler.ir.old.expressions.IRAnd;
 import pt.inescid.cllsj.compiler.ir.old.expressions.IRBool;
@@ -27,6 +24,10 @@ import pt.inescid.cllsj.compiler.ir.old.expressions.IRVar;
 import pt.inescid.cllsj.compiler.ir.old.flow.*;
 import pt.inescid.cllsj.compiler.ir.old.instructions_old.*;
 import pt.inescid.cllsj.compiler.ir.old.type.*;
+import pt.inescid.cllsj.compiler.old.ir.IRBlockOld;
+import pt.inescid.cllsj.compiler.old.ir.IRExpressionVisitor;
+import pt.inescid.cllsj.compiler.old.ir.IRInstructionVisitorOld;
+import pt.inescid.cllsj.compiler.old.ir.IRProcessOld;
 
 // Visitor which analyses the IR of a given process and generates a control and data flow graph.
 public class IRAnalyzer extends IRInstructionVisitorOld {

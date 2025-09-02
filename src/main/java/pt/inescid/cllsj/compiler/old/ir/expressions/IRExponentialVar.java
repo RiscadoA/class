@@ -1,0 +1,47 @@
+package pt.inescid.cllsj.compiler.ir.old.expressions;
+
+import java.util.function.Function;
+
+import pt.inescid.cllsj.compiler.ir.old.type.IRType;
+import pt.inescid.cllsj.compiler.old.ir.IRExpressionVisitor;
+
+public class IRExponentialVar extends IRExpression {
+  private int exponential;
+  private final IRType type;
+
+  public IRExponentialVar(int exponential, IRType type) {
+    this.exponential = exponential;
+    this.type = type;
+  }
+
+  public int getExponential() {
+    return exponential;
+  }
+
+  @Override
+  public void accept(IRExpressionVisitor visitor) {
+    visitor.visit(this);
+  }
+
+  @Override
+  public IRType getType() {
+    return type;
+  }
+
+  @Override
+  public String toString() {
+    return "E" + exponential + "[" + type + "]";
+  }
+
+  @Override
+  public IRExpression clone() {
+    return new IRExponentialVar(exponential, type);
+  }
+
+  public void renameRecords(Function<Integer, Integer> renamer) {}
+
+  @Override
+  public void renameExponentials(Function<Integer, Integer> renamer) {
+    exponential = renamer.apply(exponential);
+  }
+}

@@ -16,9 +16,6 @@ import pt.inescid.cllsj.ast.ASTExprVisitor;
 import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.nodes.*;
 import pt.inescid.cllsj.ast.types.*;
-import pt.inescid.cllsj.compiler.ir.old.IRBlockOld;
-import pt.inescid.cllsj.compiler.ir.old.IRProcessOld;
-import pt.inescid.cllsj.compiler.ir.old.IRProgramOld;
 import pt.inescid.cllsj.compiler.ir.old.expressions.*;
 import pt.inescid.cllsj.compiler.ir.old.instructions_old.*;
 import pt.inescid.cllsj.compiler.ir.old.instructions_old.IRCallProcess.ExponentialArgument;
@@ -31,6 +28,9 @@ import pt.inescid.cllsj.compiler.ir.old.type.IRSessionT;
 import pt.inescid.cllsj.compiler.ir.old.type.IRType;
 import pt.inescid.cllsj.compiler.ir.old.type.IRTypeT;
 import pt.inescid.cllsj.compiler.ir.old.type.IRVarT;
+import pt.inescid.cllsj.compiler.old.ir.IRBlockOld;
+import pt.inescid.cllsj.compiler.old.ir.IRProcessOld;
+import pt.inescid.cllsj.compiler.old.ir.IRProgramOld;
 
 public class IRGenerator extends ASTNodeVisitor {
   private IRProgramOld program = new IRProgramOld();

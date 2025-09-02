@@ -10,18 +10,18 @@ import java.util.Set;
 import pt.inescid.cllsj.compiler.c.CAlignment;
 import pt.inescid.cllsj.compiler.c.CArchitecture;
 import pt.inescid.cllsj.compiler.c.CSize;
-import pt.inescid.cllsj.compiler.ir.old.IRBlockOld;
-import pt.inescid.cllsj.compiler.ir.old.IRExpressionVisitor;
-import pt.inescid.cllsj.compiler.ir.old.IRInstructionVisitorOld;
-import pt.inescid.cllsj.compiler.ir.old.IRProcessOld;
-import pt.inescid.cllsj.compiler.ir.old.IRProgramOld;
-import pt.inescid.cllsj.compiler.ir.old.IRTypeVisitor;
 import pt.inescid.cllsj.compiler.ir.old.expressions.*;
 import pt.inescid.cllsj.compiler.ir.old.instructions_old.*;
 import pt.inescid.cllsj.compiler.ir.old.instructions_old.IRCallProcess.ExponentialArgument;
 import pt.inescid.cllsj.compiler.ir.old.instructions_old.IRCallProcess.LinearArgument;
 import pt.inescid.cllsj.compiler.ir.old.instructions_old.IRCallProcess.TypeArgument;
 import pt.inescid.cllsj.compiler.ir.old.type.*;
+import pt.inescid.cllsj.compiler.old.ir.IRBlockOld;
+import pt.inescid.cllsj.compiler.old.ir.IRExpressionVisitor;
+import pt.inescid.cllsj.compiler.old.ir.IRInstructionVisitorOld;
+import pt.inescid.cllsj.compiler.old.ir.IRProcessOld;
+import pt.inescid.cllsj.compiler.old.ir.IRProgramOld;
+import pt.inescid.cllsj.compiler.old.ir.IRTypeVisitor;
 
 public class CGenerator extends IRInstructionVisitorOld {
   private static final String TMP_TASK = "tmp_task";
