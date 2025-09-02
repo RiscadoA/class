@@ -59,15 +59,15 @@ public class IRSlotCombinations {
 
   @Override
   public String toString() {
-    if (sequences.isEmpty()) {
-      return "empty";      
-    }
-
     StringBuilder sb = new StringBuilder();
-    sb.append(sequences.get(0).toString());
+    sb.append("<");
+    if (!sequences.isEmpty()) {
+      sb.append(sequences.get(0).toString());
+    }
     for (int i = 1; i < sequences.size(); i++) {
       sb.append(" + ").append(sequences.get(i).toString());
     }
+    sb.append(">");
     return sb.toString();
   }
 }

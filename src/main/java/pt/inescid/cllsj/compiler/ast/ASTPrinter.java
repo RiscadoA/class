@@ -33,14 +33,6 @@ public class ASTPrinter extends ASTNodeVisitor {
 
   private class ASTExprPrinter extends ASTExprVisitor {
     @Override
-    public void visit(ASTExpr expr) {
-      throw new UnsupportedOperationException(
-          "Printing of expressions of type "
-              + expr.getClass().getSimpleName()
-              + " is not yet supported");
-    }
-
-    @Override
     public void visit(ASTInt node) {
       out.print(node.getValue());
     }
@@ -92,6 +84,15 @@ public class ASTPrinter extends ASTNodeVisitor {
       out.print("(");
       expr.getLhs().accept(this);
       out.print(" / ");
+      expr.getRhs().accept(this);
+      out.print(")");
+    }
+
+    @Override
+    public void visit(ASTMod expr) {
+      out.print("(");
+      expr.getLhs().accept(this);
+      out.print(" % ");
       expr.getRhs().accept(this);
       out.print(")");
     }

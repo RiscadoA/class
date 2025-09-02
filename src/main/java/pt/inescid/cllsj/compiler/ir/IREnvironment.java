@@ -95,16 +95,6 @@ public class IREnvironment {
     }
   }
 
-  public IRDataLocation dataLocation(String name) {
-    if (this instanceof Session && ((Session) this).getName().equals(name)) {
-      return IRDataLocation.local(((Session) this).getDataId(), ((Session) this).getOffset());
-    } else if (parent.isPresent()) {
-      return parent.get().dataLocation(name);
-    } else {
-      throw new IllegalArgumentException("Data " + name + " not found");
-    }
-  }
-
   public static class Type extends IREnvironment {
     private String name;
     private IRTypeId id;
@@ -153,8 +143,16 @@ public class IREnvironment {
       return offset;
     }
 
-    public IRLocalDataId getDataId() {
+    public IRLocalDataId getLocalDataId() {
       return process.getSessionLocalDataId(id);
+    }
+
+    public IRDataLocation getLocalData() {
+      return IRDataLocation.local(getLocalDataId(), offset);
+    }
+
+    public IRDataLocation getRemoteData() {
+      return IRDataLocation.remote(id, offset);
     }
   }
 

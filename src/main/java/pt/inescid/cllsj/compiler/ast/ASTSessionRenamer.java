@@ -15,14 +15,6 @@ public class ASTSessionRenamer extends ASTNodeVisitor {
 
   private class ExprVisitor extends ASTExprVisitor {
     @Override
-    public void visit(ASTExpr expr) {
-      throw new UnsupportedOperationException(
-          "Renaming of sessions in expressions of type "
-              + expr.getClass().getSimpleName()
-              + " is not yet supported");
-    }
-
-    @Override
     public void visit(ASTInt node) {
       // Do nothing
     }
@@ -105,6 +97,12 @@ public class ASTSessionRenamer extends ASTNodeVisitor {
     @Override
     public void visit(ASTNot expr) {
       expr.getExpr().accept(this);
+    }
+
+    @Override
+    public void visit(ASTMod expr) {
+      expr.getLhs().accept(this);
+      expr.getRhs().accept(this);
     }
   }
 

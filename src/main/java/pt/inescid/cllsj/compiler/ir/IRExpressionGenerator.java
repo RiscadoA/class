@@ -8,7 +8,6 @@ import pt.inescid.cllsj.compiler.ir.expression.*;
 import pt.inescid.cllsj.compiler.ir.expression.arithmetic.*;
 import pt.inescid.cllsj.compiler.ir.expression.bool.*;
 import pt.inescid.cllsj.compiler.ir.expression.literal.*;
-import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlot;
 
 public class IRExpressionGenerator extends ASTExprVisitor {
@@ -46,9 +45,9 @@ public class IRExpressionGenerator extends ASTExprVisitor {
 
   @Override
   public void visit(ASTVId expr) {
-    IRDataLocation location = env.dataLocation(expr.getCh());
+    IREnvironment.Session session = env.getSession(expr.getCh());
     IRSlot slot = slotFromType.apply(expr.getType());
-    ir = new IRRead(location, slot);
+    ir = new IRRead(session.getLocalData(), slot);
   }
 
   @Override

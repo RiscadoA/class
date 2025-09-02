@@ -74,15 +74,15 @@ public class IRSlotSequence {
 
   @Override
   public String toString() {
-    if (slots.isEmpty()) {
-      return "empty";      
-    }
-
     StringBuilder sb = new StringBuilder();
-    sb.append(slots.getFirst().toString());
+    sb.append("[");
+    if (!slots.isEmpty()) {
+      sb.append(slots.getFirst().toString());
+    }
     for (int i = 1; i < slots.size(); i++) {
       sb.append("; ").append(slots.get(i).toString());
     }
+    sb.append("]");
     return sb.toString();
   }
 }

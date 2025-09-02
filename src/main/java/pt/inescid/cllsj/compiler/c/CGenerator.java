@@ -12,10 +12,13 @@ import pt.inescid.cllsj.compiler.ir.id.IRProcessId;
 import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
 import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
 import pt.inescid.cllsj.compiler.ir.instruction.*;
+import pt.inescid.cllsj.compiler.ir.slot.IRBoolS;
+import pt.inescid.cllsj.compiler.ir.slot.IRIntS;
 import pt.inescid.cllsj.compiler.ir.slot.IRSessionS;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlot;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotCombinations;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotSequence;
+import pt.inescid.cllsj.compiler.ir.slot.IRStringS;
 
 public class CGenerator extends IRInstructionVisitor {
   // Auxiliary registers used in the execution of a single instruction
@@ -713,8 +716,9 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRWriteExpression instr) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    String data = data(instr.getLocation(), instr.getExpression().getSlot());
+    String ref = access(data, cType(instr.getExpression().getSlot()));
+    putAssign(ref, expression(instr.getExpression()));
   }
 
   @Override
@@ -865,7 +869,10 @@ public class CGenerator extends IRInstructionVisitor {
 
   private String expression(IRExpression expr) {
     return CExpressionGenerator.generate(
-        expr, read -> data(currentProcessLayout, ENV, read.getLocation(), read.getSlot()));
+        expr, read -> {
+          String ptr = data(currentProcessLayout, ENV, read.getLocation(), read.getSlot());
+          return access(ptr, cType(read.getSlot()));
+        });
   }
 
   private String endPoints() {
@@ -1015,6 +1022,20 @@ public class CGenerator extends IRInstructionVisitor {
     return CLayout.compute(slot, compiler.arch, typeId -> typeLayout(typeId));
   }
 
+  private String cType(IRSlot slot) {
+    if (slot instanceof IRIntS) {
+      return "int";
+    } else if (slot instanceof IRBoolS) {
+      return "unsigned char";
+    } else if (slot instanceof IRStringS) {
+      return "char*";
+    } else {
+      throw new UnsupportedOperationException("Other slot types not supported yet");
+    }
+  }
+
+  // ============================ Structure statement building helpers ============================
+
   private void putCopy(IRDataLocation target, IRDataLocation source, IRSlotSequence slots) {
     putCopy(currentProcessLayout, ENV, target, source, slots);
   }
@@ -1049,8 +1070,6 @@ public class CGenerator extends IRInstructionVisitor {
           layout(slot).size);
     }
   }
-
-  // ============================ Structure statement building helpers ============================
 
   private void putAllocTask(String var) {
     putAlloc(var, CSize.sizeOf("struct task"));

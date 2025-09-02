@@ -13,7 +13,6 @@ import pt.inescid.cllsj.compiler.ir.expression.IRExpression;
 import pt.inescid.cllsj.compiler.ir.id.IRProcessId;
 import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
 import pt.inescid.cllsj.compiler.ir.instruction.*;
-import pt.inescid.cllsj.compiler.ir.slot.*;
 
 public class IRGenerator extends ASTNodeVisitor {
   private Compiler compiler;
@@ -217,8 +216,10 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTCoExpr node) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    IREnvironment.Session session = env.getSession(node.getCh());
+    IRExpression expression = expression(node.getExpr());
+    block.add(new IRWriteExpression(session.getRemoteData(), expression));
+    block.add(new IRFinishSession(session.getId(), true));
   }
 
   @Override

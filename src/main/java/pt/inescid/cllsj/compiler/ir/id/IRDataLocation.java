@@ -60,9 +60,7 @@ public class IRDataLocation {
     } else {
       b.append(new IRLocalDataId(index).toString());
     }
-    b.append("[");
     b.append(offset.toString());
-    b.append("]");
     return b.toString();
   }
 

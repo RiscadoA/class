@@ -32,11 +32,8 @@ else
     echo "Found $count test files"
 fi
 
-if [ -z "$CLLS_FLAGS" ]; then
-    echo "Using default flags"
-else
-    echo "Using flags: $CLLS_FLAGS"
-fi
+CLLS_FLAGS="$CLLS_FLAGS --profiling"
+echo "Using flags: $CLLS_FLAGS"
 
 success=0
 failed=0
@@ -52,13 +49,12 @@ do
     errfile=$(dirname $file)/$basename.err
 
     baseout=bin/$(dirname $file)/$basename
-    flags="-P -o $baseout"
     mkdir -p $(dirname $baseout)
 
     echo -n "($processed/$count) Compiling $file... "
 
     # Compile the file
-    ./compile.sh $flags $file &> $baseout.err
+    ./compile.sh -o $baseout $file &> $baseout.err
     if [ $? -ne 0 ]; then
         error "compilation failed! See $baseout.err"
         failed=$((failed + 1))
