@@ -45,11 +45,11 @@ public class IRDataLocation {
   }
 
   public IRDataLocation advance(IRSlot slot) {
-    return new IRDataLocation(index, remote, offset.suffix(slot));
+    return new IRDataLocation(index, remote, offset.merge(slot));
   }
 
   public IRDataLocation advance(IRSlotSequence offset) {
-    return new IRDataLocation(index, remote, this.offset.suffix(offset));
+    return new IRDataLocation(index, remote, this.offset.merge(offset));
   }
 
   @Override
@@ -60,7 +60,9 @@ public class IRDataLocation {
     } else {
       b.append(new IRLocalDataId(index).toString());
     }
+    b.append("[");
     b.append(offset.toString());
+    b.append("]");
     return b.toString();
   }
 

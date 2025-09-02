@@ -33,17 +33,50 @@ public class IRSlotCombinations {
   }
 
   public IRSlotCombinations prefix(IRSlot slot) {
+    if (sequences.isEmpty()) {
+      return of(slot);
+    }
     return new IRSlotCombinations(sequences.stream().map(seq -> seq.prefix(slot)).toList());
   }
 
   public IRSlotCombinations prefix(IRSlotSequence sequence) {
+    if (sequences.isEmpty()) {
+      return of(sequence);
+    }
     return new IRSlotCombinations(sequences.stream().map(seq -> sequence.prefix(seq)).toList());
   }
 
   public IRSlotCombinations prefix(IRSlotCombinations combinations) {
+    if (sequences.isEmpty()) {
+      return combinations;
+    }
     return new IRSlotCombinations(
         combinations.sequences.stream()
             .flatMap(seq1 -> sequences.stream().map(seq2 -> seq1.prefix(seq2)))
+            .toList());
+  }
+
+  public IRSlotCombinations suffix(IRSlot slot) {
+    if (sequences.isEmpty()) {
+      return of(slot);
+    }
+    return new IRSlotCombinations(sequences.stream().map(seq -> seq.suffix(slot)).toList());
+  }
+
+  public IRSlotCombinations suffix(IRSlotSequence sequence) {
+    if (sequences.isEmpty()) {
+      return of(sequence);
+    }
+    return new IRSlotCombinations(sequences.stream().map(seq -> seq.suffix(sequence)).toList());
+  }
+
+  public IRSlotCombinations suffix(IRSlotCombinations combinations) {
+    if (sequences.isEmpty()) {
+      return combinations;
+    }
+    return new IRSlotCombinations(
+        combinations.sequences.stream()
+            .flatMap(seq1 -> sequences.stream().map(seq2 -> seq2.suffix(seq1)))
             .toList());
   }
 

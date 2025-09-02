@@ -1,0 +1,195 @@
+package pt.inescid.cllsj.compiler.ir;
+
+import java.util.Optional;
+
+import pt.inescid.cllsj.ast.ASTTypeVisitor;
+import pt.inescid.cllsj.ast.types.*;
+
+public class IRValueChecker extends ASTTypeVisitor {
+  private IREnvironment env;
+  private boolean isValue = true;
+  private Optional<Boolean> polarity;
+
+  public static boolean check(IREnvironment env, ASTType type, boolean requiredPolarity) {
+    return check(env, type, Optional.of(requiredPolarity));
+  }
+
+  public static boolean check(IREnvironment env, ASTType type, Optional<Boolean> requiredPolarity) {
+    IRValueChecker req = new IRValueChecker();
+    req.env = env;
+    req.polarity = requiredPolarity;
+    type.accept(req);
+    return req.isValue;
+  }
+
+  private void expectPolarity(boolean polarity) {
+    if (this.polarity.isPresent() && this.polarity.get() != polarity) {
+      isValue = false;
+    }
+    this.polarity = Optional.of(polarity);
+  }
+
+  private void recurse(ASTType type) {
+    if (isValue) {
+      Optional<Boolean> savedPolarity = polarity;
+      type.accept(this);
+      polarity = savedPolarity;
+    }
+  }
+
+  @Override
+  public void visit(ASTBangT type) {
+    expectPolarity(true);
+  }
+
+  @Override
+  public void visit(ASTBotT type) {
+    expectPolarity(false);
+  }
+
+  @Override
+  public void visit(ASTCaseT type) {
+    expectPolarity(true);
+    for (ASTType c : type.getcases().values()) {
+      recurse(c);
+    }
+  }
+
+  @Override
+  public void visit(ASTCoRecT type) {
+    isValue = false;
+  }
+
+  @Override
+  public void visit(ASTIdT type) {
+    IREnvironment.Type envType = env.getType(type.getid());
+    if (!envType.isValue()) {
+      isValue = false;
+    } else {
+      expectPolarity(envType.isPositive());
+    }
+  }
+
+  @Override
+  public void visit(ASTNotT type) {
+    if (polarity.isPresent()) {
+      polarity = Optional.of(!polarity.get());
+    }
+    recurse(type.getin());
+  }
+
+  @Override
+  public void visit(ASTOfferT type) {
+    expectPolarity(false);
+    for (ASTType c : type.getcases().values()) {
+      recurse(c);
+    }
+  }
+
+  @Override
+  public void visit(ASTOneT type) {
+    expectPolarity(true);
+  }
+
+  @Override
+  public void visit(ASTRecT type) {
+    isValue = false;
+  }
+
+  @Override
+  public void visit(ASTRecvT type) {
+    expectPolarity(false);
+    recurse(type.getrhs());
+  }
+
+  @Override
+  public void visit(ASTSendT type) {
+    expectPolarity(true);
+    recurse(type.getrhs());
+  }
+
+  @Override
+  public void visit(ASTWhyT type) {
+    expectPolarity(false);
+  }
+
+  @Override
+  public void visit(ASTintT type) {
+    expectPolarity(true);
+  }
+
+  @Override
+  public void visit(ASTCointT type) {
+    expectPolarity(false);
+  }
+
+  @Override
+  public void visit(ASTLintT type) {
+    expectPolarity(true);
+  }
+
+  @Override
+  public void visit(ASTLCointT type) {
+    expectPolarity(false);
+  }
+
+  @Override
+  public void visit(ASTLboolT type) {
+    expectPolarity(true);
+  }
+
+  @Override
+  public void visit(ASTCoLboolT type) {
+    expectPolarity(false);
+  }
+
+  @Override
+  public void visit(ASTLstringT type) {
+    expectPolarity(true);
+  }
+
+  @Override
+  public void visit(ASTCoLstringT type) {
+    expectPolarity(false);
+  }
+
+  @Override
+  public void visit(ASTSendTT type) {
+    expectPolarity(true);
+  }
+
+  @Override
+  public void visit(ASTRecvTT type) {
+    expectPolarity(false);
+  }
+
+  @Override
+  public void visit(ASTAffineT type) {
+    throw new UnsupportedOperationException("Affine types should no longer exist at this stage");
+  }
+
+  @Override
+  public void visit(ASTCoAffineT type) {
+    throw new UnsupportedOperationException("Affine types should no longer exist at this stage");
+  }
+
+  @Override
+  public void visit(ASTCellT type) {
+    isValue = false;
+  }
+
+  @Override
+  public void visit(ASTUsageT type) {
+    isValue = false;
+  }
+
+  @Override
+  public void visit(ASTCellLT type) {
+    isValue = false;
+  }
+
+  @Override
+  public void visit(ASTUsageLT type) {
+    isValue = false;
+  }
+}

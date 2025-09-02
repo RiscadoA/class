@@ -695,10 +695,9 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRBindSession instr) {
-    String source = data(instr.getLocation(), new IRSessionS());
-    String target = session(instr.getSessionId());
-
     // Copy the session into this environment
+    String source = data(instr.getLocation(), new IRSessionS());
+    String target = sessionOffset(currentProcessLayout, instr.getSessionId()).advancePointer(ENV);
     putCopy(target, source, compiler.arch.sessionSize());
 
     // Modify the remote session to point to our environment
@@ -709,9 +708,8 @@ public class CGenerator extends IRInstructionVisitor {
         currentProcessLayout.sessionOffset(instr.getSessionId()));
     putAssign(
         sessionContDataOffset(remoteSession),
-        currentProcessLayout.dataOffset(instr.getLocation().getLocalDataId()));
-
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+        currentProcessLayout.dataOffset(
+            currentProcess.getSessionLocalDataId(instr.getSessionId())));
   }
 
   @Override
@@ -729,8 +727,14 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRWriteSession instr) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    String data = data(instr.getLocation(), new IRSessionS());
+    String ref = access(data, "struct session");
+    putAssign(ref, session(instr.getSessionId()));
+  }
+
+  @Override
+  public void visit(IRWriteValue instr) {
+    putCopy(instr.getLocation(), instr.getSourceLocation(), instr.getSlots());
   }
 
   @Override
@@ -869,7 +873,8 @@ public class CGenerator extends IRInstructionVisitor {
 
   private String expression(IRExpression expr) {
     return CExpressionGenerator.generate(
-        expr, read -> {
+        expr,
+        read -> {
           String ptr = data(currentProcessLayout, ENV, read.getLocation(), read.getSlot());
           return access(ptr, cType(read.getSlot()));
         });
@@ -922,7 +927,7 @@ public class CGenerator extends IRInstructionVisitor {
   private String remoteSession(String session) {
     String remoteEnv = sessionContEnv(session);
     CSize offset = CSize.expression(sessionContSessionOffset(session));
-    return offset.advancePointer(remoteEnv);
+    return access(offset.advancePointer(remoteEnv), "struct session");
   }
 
   private String localData(

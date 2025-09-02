@@ -1,6 +1,5 @@
 package pt.inescid.cllsj.compiler.ir.id;
 
-import java.util.List;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotSequence;
 
 public class IRLocalDataId {
@@ -15,7 +14,7 @@ public class IRLocalDataId {
   }
 
   public IRDataLocation getLocation() {
-    return IRDataLocation.local(this, new IRSlotSequence(List.of()));
+    return IRDataLocation.local(this, IRSlotSequence.EMPTY);
   }
 
   @Override

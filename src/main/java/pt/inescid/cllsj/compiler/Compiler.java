@@ -56,6 +56,7 @@ public class Compiler {
 
   public Settings.Flag optimizeSingleEndpoint;
   public Settings.Flag optimizeSendForward;
+  public Settings.Flag optimizeSendValue;
 
   public Compiler() {
     // Compiler operation settings
@@ -124,6 +125,11 @@ public class Compiler {
         settings.addFlag(
             "optimize-send-forward",
             "Optimizes away reference counting for processes with a single end point",
+            true);
+    optimizeSendValue =
+        settings.addFlag(
+            "optimize-send-value",
+            "Optimizes sends of closures into sends of values where possible",
             true);
 
     settings.addMode(

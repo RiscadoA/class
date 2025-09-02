@@ -1,5 +1,6 @@
 package pt.inescid.cllsj.compiler.ir;
 
+import java.util.Optional;
 import java.util.Set;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
@@ -13,6 +14,8 @@ import pt.inescid.cllsj.compiler.ir.expression.IRExpression;
 import pt.inescid.cllsj.compiler.ir.id.IRProcessId;
 import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
 import pt.inescid.cllsj.compiler.ir.instruction.*;
+import pt.inescid.cllsj.compiler.ir.slot.IRSessionS;
+import pt.inescid.cllsj.compiler.ir.slot.IRSlotCombinations;
 
 public class IRGenerator extends ASTNodeVisitor {
   private Compiler compiler;
@@ -38,19 +41,33 @@ public class IRGenerator extends ASTNodeVisitor {
   }
 
   private void generate(ASTProcDef procDef) {
-    // Generate every possible combination of type argument polarities
+    // Generate every possible combination of type argument polarities and values
     boolean tArgPolarities[] = new boolean[procDef.getTArgs().size()];
+    boolean tArgValues[] = new boolean[procDef.getTArgs().size()];
     for (int i = 0; i < (1 << procDef.getTArgs().size()); ++i) {
       for (int j = 0; j < tArgPolarities.length; ++j) {
         tArgPolarities[j] = (i & (1 << j)) != 0;
       }
-      generate(procDef, tArgPolarities);
+      if (compiler.optimizeSendValue.get()) {
+        for (int n = 0; n < (1 << procDef.getTArgs().size()); ++n) {
+          for (int m = 0; m < tArgValues.length; ++m) {
+            tArgValues[m] = (n & (1 << m)) != 0;
+          }
+          generate(procDef, tArgPolarities, tArgValues);
+        }
+      } else {
+        for (int m = 0; m < tArgValues.length; ++m) {
+          tArgValues[m] = false;
+        }
+        generate(procDef, tArgPolarities, tArgValues);
+      }
+      
     }
   }
 
-  private void generate(ASTProcDef procDef, boolean tArgPolarities[]) {
+  private void generate(ASTProcDef procDef, boolean tArgPolarities[], boolean tArgValues[]) {
     // Create empty process
-    IRProcessId id = processId(procDef.getId(), tArgPolarities);
+    IRProcessId id = processId(procDef.getId(), tArgPolarities, tArgValues);
     process = new IRProcess(id, countEndPoints(procDef.getRhs()));
     program.add(process);
 
@@ -60,7 +77,8 @@ public class IRGenerator extends ASTNodeVisitor {
     for (int i = 0; i < procDef.getTArgs().size(); ++i) {
       String name = procDef.getTArgs().get(i);
       boolean isPositive = tArgPolarities[i];
-      env = env.addType(name, isPositive);
+      boolean isValue = tArgValues[i];
+      env = env.addType(name, isPositive, isValue);
     }
 
     for (int i = 0; i < procDef.getArgs().size(); ++i) {
@@ -186,8 +204,24 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTRecv node) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    IREnvironment.Session session = env.getSession(node.getChr());
+
+    // TODO: handle send value
+
+    // Define new session for the channel being received
+    IRSlotsFromASTType info = slotsFromType(node.getChiType());
+    env = env.addSession(node.getChi(), info.localCombinations());
+    IRSessionId argId = env.getSession(node.getChi()).getId();
+
+    // Bind the new session to the value received from the main session
+    block.add(new IRBindSession(session.getLocalData(), argId));
+    env = env.advanceSession(node.getChr(), new IRSessionS());
+
+    // If the received session is negative, we must jump to it
+    addContinueIfNegative(argId, node.getChiType());
+
+    // Recurse on the continuation
+    recurse(block, node.getRhs());
   }
 
   @Override
@@ -198,8 +232,58 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTSend node) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    IREnvironment.Session session = env.getSession(node.getChs());
+    IREnvironment.Session argSession;
+    boolean isSendValue = compiler.optimizeSendValue.get() && isValue(node.getLhsType(), true);
+
+    if (compiler.optimizeSendForward.get() && node.getLhs() instanceof ASTFwd) {
+      // If sending a forward, just send the forwarded session
+      ASTFwd fwd = (ASTFwd) node.getLhs();
+      String argCh = fwd.getCh1().equals(node.getCho()) ? fwd.getCh2() : fwd.getCh1();
+      argSession = env.getSession(argCh);
+    } else {
+      // Define new session for the channel being sent
+      // If we're doing send value optimization, we also need space to store the value in
+      IRSlotsFromASTType info = slotsFromType(node.getLhsType());
+      env = env.addSession(node.getCho(), isSendValue ? info.combinations() : info.localCombinations());
+      argSession = env.getSession(node.getCho());
+
+      // Initialize the new session with a new closure block for the left-hand-side
+      // as its continuation. Immediately write it to the main session's remote data
+      IRBlock closureBlock = process.createBlock("send_closure");
+      recurse(closureBlock, node.getLhs());
+      block.add(new IRInitializeSession(argSession.getId(), closureBlock.getLocation()));
+
+      // If we're doing send value optimization, we should immediately run the closure
+      addContinue(argSession.getId());
+    }
+
+    // Desired end result:
+    // - send lint; send lint; close being represented as [lint, lint]
+
+    // Other alternative:
+    // - session slots store 
+
+    // TODO: if send value:
+    // - compile closure so that it writes the data to the remote of the main session
+    // - when the closure finishes, it should advance the remote offset to what it has written
+    // - this way, this side can just pick up on that
+
+    if (isSendValue) {
+      // TODO: how to determine the slots
+
+      IRSlotsFromASTType info = slotsFromType(node.getLhsType());
+      block.add(new IRWriteValue(session.getRemoteData(), argSession.getLocalData(), info.combinations()));
+    } else {
+      block.add(new IRWriteSession(session.getRemoteData(), argSession.getId()));
+      env = env.advanceSession(node.getChs(), new IRSessionS());
+    }
+
+    // If the continuation is negative, we must jump to it
+    addContinueIfNegative(session.getId(), node.getRhsType());
+
+    // Recurse on the continuation
+    recurse(block, node.getRhs());
   }
 
   @Override
@@ -326,36 +410,34 @@ public class IRGenerator extends ASTNodeVisitor {
 
   // ======================================= Helper methods =======================================
 
-  private boolean isPositive(ASTType type) {
-    boolean dual = false;
-    if (type instanceof ASTNotT) {
-      type = ((ASTNotT) type).getin();
-      dual = true;
-    }
+  private void addContinue(IRSessionId sessionId) {
+    IRBlock contBlock = process.createBlock("continue");
+    block.add(new IRContinueSession(sessionId, contBlock.getLocation()));
+    block = contBlock;
+  }
 
-    if (type instanceof ASTIdT) {
-      try {
-        type = type.unfoldType(ep);
-      } catch (Exception e) {
-        e.printStackTrace(System.err);
-        System.exit(1);
-      }
-    }
-
-    if (type instanceof ASTIdT) {
-      return dual ^ env.getType(((ASTIdT) type).getid()).isPositive();
-    } else {
-      return dual ^ type.getPolarityForCompilerCatch(ep).get();
+  private void addContinueIfNegative(IRSessionId sessionId, ASTType type) {
+    if (!isPositive(type)) {
+      addContinue(sessionId);
     }
   }
 
-  private IRProcessId processId(String id, boolean tArgPolarities[]) {
+  private boolean isPositive(ASTType type) {
+    return env.isPositive(ep, type);
+  }
+
+  private boolean isValue(ASTType type, boolean requiredPolarity) {
+    return IRValueChecker.check(env, type, requiredPolarity);
+  }
+
+  private IRProcessId processId(String id, boolean tArgPolarities[], boolean tArgValues[]) {
     StringBuilder sb = new StringBuilder();
     sb.append(id);
     if (tArgPolarities.length > 0) {
       sb.append("_");
-      for (Boolean polarity : tArgPolarities) {
-        sb.append(polarity ? "p" : "n");
+      for (int i = 0; i < tArgPolarities.length; ++i) {
+        sb.append(tArgPolarities[i] ? "p" : "n");
+        sb.append(tArgValues[i] ? "v" : "s");
       }
     }
     return new IRProcessId(sb.toString());

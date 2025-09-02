@@ -15,6 +15,8 @@ public abstract class IRInstructionVisitor {
 
   public abstract void visit(IRWriteSession instr);
 
+  public abstract void visit(IRWriteValue instr);
+
   public abstract void visit(IRPrint instr);
 
   public abstract void visit(IRPushTask instr);

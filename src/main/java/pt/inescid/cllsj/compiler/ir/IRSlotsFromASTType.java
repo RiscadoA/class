@@ -191,12 +191,15 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTRecvT type) {
-    slot = Optional.of(new IRSessionS());
+    // If the left-hand-side is a value, we start by visiting it
+    // Otherwise, we just add a session slot
+    if (compiler.optimizeSendValue.get() && IRValueChecker.check(env, type.getlhs(), Optional.of(false))) {
+      type.getlhs().accept(this);
+    } else {
+      localSlot(new IRSessionS());
+    }
 
-    // Only the active segment is sent through the session
-    IRSlotsFromASTType lhsResult = recurse(type.getlhs());
-    activeLocalCombinations = lhsResult.activeLocalCombinations.prefix(slot.get());
-
+    // Merge with the right-hand-side
     IRSlotsFromASTType rhsResult = recurse(type.getrhs());
     activeLocalCombinations = rhsResult.activeLocalCombinations.prefix(activeLocalCombinations);
     remainderLocalCombinations = rhsResult.remainderLocalCombinations;
@@ -205,12 +208,15 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTSendT type) {
-    slot = Optional.of(new IRSessionS());
+    // If the left-hand-side can be a value, we start by visiting it
+    // Otherwise, we just add a session slot
+    if (compiler.optimizeSendValue.get() && IRValueChecker.check(env, type.getlhs(), Optional.of(true))) {
+      type.getlhs().accept(this);
+    } else {
+      remoteSlot(new IRSessionS());
+    }
 
-    // Only the active segment is sent through the session
-    IRSlotsFromASTType lhsResult = recurse(type.getlhs());
-    activeRemoteCombinations = lhsResult.activeRemoteCombinations.prefix(slot.get());
-
+    // Merge with the right-hand-side
     IRSlotsFromASTType rhsResult = recurse(type.getrhs());
     activeRemoteCombinations = rhsResult.activeRemoteCombinations.prefix(activeRemoteCombinations);
     remainderLocalCombinations = rhsResult.localCombinations();
