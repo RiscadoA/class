@@ -1,5 +1,6 @@
 package pt.inescid.cllsj.compiler.ir.slot;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class IRSlotCombinations {
@@ -47,7 +48,7 @@ public class IRSlotCombinations {
   }
 
   public IRSlotCombinations merge(IRSlotCombinations other) {
-    List<IRSlotSequence> newSequences = sequences.stream().toList();
+    List<IRSlotSequence> newSequences = new ArrayList<>(sequences);
     newSequences.addAll(other.sequences);
     return new IRSlotCombinations(newSequences);
   }
@@ -58,10 +59,12 @@ public class IRSlotCombinations {
 
   @Override
   public String toString() {
-    StringBuilder sb = new StringBuilder();
-    if (!sequences.isEmpty()) {
-      sb.append(sequences.get(0).toString());
+    if (sequences.isEmpty()) {
+      return "empty";      
     }
+
+    StringBuilder sb = new StringBuilder();
+    sb.append(sequences.get(0).toString());
     for (int i = 1; i < sequences.size(); i++) {
       sb.append(" + ").append(sequences.get(i).toString());
     }

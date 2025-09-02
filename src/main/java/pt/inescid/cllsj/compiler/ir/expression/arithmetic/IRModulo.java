@@ -4,8 +4,8 @@ import pt.inescid.cllsj.compiler.ir.expression.IRArithmeticBinaryOp;
 import pt.inescid.cllsj.compiler.ir.expression.IRExpression;
 import pt.inescid.cllsj.compiler.ir.expression.IRExpressionVisitor;
 
-public class IRModulus extends IRArithmeticBinaryOp {
-  public IRModulus(IRExpression lhs, IRExpression rhs) {
+public class IRModulo extends IRArithmeticBinaryOp {
+  public IRModulo(IRExpression lhs, IRExpression rhs) {
     super(lhs, rhs);
   }
 
@@ -16,7 +16,7 @@ public class IRModulus extends IRArithmeticBinaryOp {
 
   @Override
   public IRExpression clone() {
-    return new IRModulus(lhs.clone(), rhs.clone());
+    return new IRModulo(lhs.clone(), rhs.clone());
   }
 
   @Override

@@ -3,70 +3,35 @@ package pt.inescid.cllsj.ast;
 import pt.inescid.cllsj.ast.nodes.*;
 
 public abstract class ASTExprVisitor {
-  // Catch all for expressions which do not have their own visit method
-  public abstract void visit(ASTExpr expr);
+  public abstract void visit(ASTInt expr);
 
-  public void visit(ASTInt expr) {
-    visit((ASTExpr) expr);
-  }
+  public abstract void visit(ASTBool expr);
 
-  public void visit(ASTBool expr) {
-    visit((ASTExpr) expr);
-  }
+  public abstract void visit(ASTString expr);
 
-  public void visit(ASTString expr) {
-    visit((ASTExpr) expr);
-  }
+  public abstract void visit(ASTVId expr);
 
-  public void visit(ASTVId expr) {
-    visit((ASTExpr) expr);
-  }
+  public abstract void visit(ASTAdd expr);
 
-  public void visit(ASTAdd expr) {
-    visit((ASTExpr) expr);
-  }
+  public abstract void visit(ASTSub expr);
 
-  public void visit(ASTSub expr) {
-    visit((ASTExpr) expr);
-  }
+  public abstract void visit(ASTMul expr);
 
-  public void visit(ASTMul expr) {
-    visit((ASTExpr) expr);
-  }
+  public abstract void visit(ASTDiv expr);
 
-  public void visit(ASTDiv expr) {
-    visit((ASTExpr) expr);
-  }
+  public abstract void visit(ASTMod expr);
 
-  public void visit(ASTMod expr) {
-    visit((ASTExpr) expr);
-  }
+  public abstract void visit(ASTEq expr);
 
-  public void visit(ASTEq expr) {
-    visit((ASTExpr) expr);
-  }
+  public abstract void visit(ASTNEq expr);
 
-  public void visit(ASTNEq expr) {
-    visit((ASTExpr) expr);
-  }
+  public abstract void visit(ASTLt expr);
 
-  public void visit(ASTLt expr) {
-    visit((ASTExpr) expr);
-  }
+  public abstract void visit(ASTGt expr);
 
-  public void visit(ASTGt expr) {
-    visit((ASTExpr) expr);
-  }
+  public abstract void visit(ASTAnd expr);
 
-  public void visit(ASTAnd expr) {
-    visit((ASTExpr) expr);
-  }
+  public abstract void visit(ASTOr expr);
 
-  public void visit(ASTOr expr) {
-    visit((ASTExpr) expr);
-  }
-
-  public void visit(ASTNot expr) {
-    visit((ASTExpr) expr);
-  }
+  public abstract void visit(ASTNot expr);
 }

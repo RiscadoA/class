@@ -1,13 +1,14 @@
 package pt.inescid.cllsj.compiler;
 
 import java.io.PrintStream;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 public class Settings {
-  private List<BaseSetting> settings;
+  private List<BaseSetting> settings = new ArrayList<>();
   private Map<String, BaseSetting> settingsByName = new HashMap<>();
 
   public Flag addFlag(String shortName, String longName, String description, boolean defaultValue) {
@@ -89,7 +90,7 @@ public class Settings {
       }
 
       String name = split[0];
-      Optional<String> value = split.length > 1 ? Optional.of(args[1]) : Optional.empty();
+      Optional<String> value = split.length > 1 ? Optional.of(split[1]) : Optional.empty();
 
       if (!settingsByName.containsKey(name)) {
         throw new IllegalArgumentException("Unknown argument " + name);
@@ -104,10 +105,11 @@ public class Settings {
 
     for (BaseSetting setting : settings) {
       stream.print("    ");
+      stream.print("--" + setting.getLongName());
       if (setting.getShortName().isPresent()) {
-        stream.print("-" + setting.getShortName().get());
+        stream.print("/-");
+        stream.print(setting.getShortName().get());
       }
-      stream.print("/--" + setting.getLongName());
 
       if (setting.getValueDescription().isPresent()) {
         stream.print("=<" + setting.getValueDescription().get() + ">");

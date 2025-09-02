@@ -116,13 +116,11 @@ public class IRProcess {
           .append("\n");
     }
     for (int i = 0; i < localData.size(); i++) {
-      b.append("    data ").append(i).append(": ").append(localData.get(i).toString());
+      b.append("    data ").append(i).append(": ").append(localData.get(i).toString()).append("\n");
     }
 
     for (IRBlock block : blocks) {
-      if (!block.getLocation().equals(IRCodeLocation.entry())) {
-        b.append(block.toString());
-      }
+      b.append(block.toString());
     }
 
     return b.toString();

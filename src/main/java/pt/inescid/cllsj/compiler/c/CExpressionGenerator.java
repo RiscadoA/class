@@ -6,7 +6,7 @@ import pt.inescid.cllsj.compiler.ir.expression.IRExpressionVisitor;
 import pt.inescid.cllsj.compiler.ir.expression.IRRead;
 import pt.inescid.cllsj.compiler.ir.expression.arithmetic.IRAdd;
 import pt.inescid.cllsj.compiler.ir.expression.arithmetic.IRDivide;
-import pt.inescid.cllsj.compiler.ir.expression.arithmetic.IRModulus;
+import pt.inescid.cllsj.compiler.ir.expression.arithmetic.IRModulo;
 import pt.inescid.cllsj.compiler.ir.expression.arithmetic.IRMultiply;
 import pt.inescid.cllsj.compiler.ir.expression.arithmetic.IRSubtract;
 import pt.inescid.cllsj.compiler.ir.expression.bool.IRAnd;
@@ -105,7 +105,7 @@ public class CExpressionGenerator extends IRExpressionVisitor {
   }
 
   @Override
-  public void visit(IRModulus mod) {
+  public void visit(IRModulo mod) {
     binary("%", mod.getLhs(), mod.getRhs());
   }
 

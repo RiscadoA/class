@@ -24,7 +24,7 @@ public class IRProgram {
   public String toString() {
     StringBuilder b = new StringBuilder();
     for (IRProcess proc : processes.values()) {
-      if (b.isEmpty()) {
+      if (!b.isEmpty()) {
         b.append("\n");
       }
       b.append(proc.toString());

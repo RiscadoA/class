@@ -21,7 +21,7 @@ public class IRProcessId {
     if (this == obj) return true;
     if (obj == null || getClass() != obj.getClass()) return false;
     IRProcessId other = (IRProcessId) obj;
-    return name == other.name;
+    return name.equals(other.name);
   }
 
   @Override

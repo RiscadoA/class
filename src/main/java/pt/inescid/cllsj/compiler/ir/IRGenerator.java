@@ -9,6 +9,7 @@ import pt.inescid.cllsj.ast.types.ASTIdT;
 import pt.inescid.cllsj.ast.types.ASTNotT;
 import pt.inescid.cllsj.ast.types.ASTType;
 import pt.inescid.cllsj.compiler.Compiler;
+import pt.inescid.cllsj.compiler.ir.expression.IRExpression;
 import pt.inescid.cllsj.compiler.ir.id.IRProcessId;
 import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
 import pt.inescid.cllsj.compiler.ir.instruction.*;
@@ -139,8 +140,7 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTEmpty node) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    block.add(new IRPopTask(true));
   }
 
   @Override
@@ -169,8 +169,8 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTPrintLn node) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    block.add(new IRPrint(expression(node.getExpr()), true));
+    recurse(block, node.getRhs());
   }
 
   @Override
@@ -350,17 +350,26 @@ public class IRGenerator extends ASTNodeVisitor {
 
   private IRProcessId processId(String id, boolean tArgPolarities[]) {
     StringBuilder sb = new StringBuilder();
-    if (tArgPolarities.length == 0) {
-      sb.append("mono");
-    } else {
-      sb.append("poly_");
+    sb.append(id);
+    if (tArgPolarities.length > 0) {
+      sb.append("_");
       for (Boolean polarity : tArgPolarities) {
         sb.append(polarity ? "p" : "n");
       }
     }
-    sb.append("_");
-    sb.append(id);
     return new IRProcessId(sb.toString());
+  }
+
+  private IRExpression expression(ASTExpr expr) {
+    return IRExpressionGenerator.generate(
+        env,
+        expr,
+        type ->
+            slotsFromType(type)
+                .slot
+                .orElseThrow(
+                    () ->
+                        new UnsupportedOperationException("Types in expressions must have slots")));
   }
 
   private IRSlotsFromASTType slotsFromType(ASTType type) {

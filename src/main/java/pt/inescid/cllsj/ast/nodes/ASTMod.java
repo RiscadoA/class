@@ -21,6 +21,14 @@ public class ASTMod extends ASTExpr {
     rhs = _rhs;
   }
 
+  public ASTExpr getLhs() {
+    return lhs;
+  }
+
+  public ASTExpr getRhs() {
+    return rhs;
+  }
+
   public void ASTupdCont(ASTNode newCont, ASTNode caller) throws Exception {
     if (caller == lhs) lhs = (ASTExpr) newCont;
     else rhs = (ASTExpr) newCont;

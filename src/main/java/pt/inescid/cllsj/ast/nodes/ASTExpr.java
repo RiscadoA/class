@@ -44,6 +44,7 @@ public abstract class ASTExpr extends ASTNode {
   }
 
   public void accept(ASTExprVisitor visitor) {
-    visitor.visit(this);
+    throw new UnsupportedOperationException(
+        "Visiting expression of type " + this.getClass().getSimpleName() + " is not yet supported");
   }
 }

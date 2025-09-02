@@ -1,6 +1,7 @@
 package pt.inescid.cllsj.compiler.ir;
 
 import java.util.Optional;
+import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
 import pt.inescid.cllsj.compiler.ir.id.IRLocalDataId;
 import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
 import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
@@ -91,6 +92,16 @@ public class IREnvironment {
       return parent.get().getExponential(name);
     } else {
       throw new IllegalArgumentException("Exponential " + name + " not found");
+    }
+  }
+
+  public IRDataLocation dataLocation(String name) {
+    if (this instanceof Session && ((Session) this).getName().equals(name)) {
+      return IRDataLocation.local(((Session) this).getDataId(), ((Session) this).getOffset());
+    } else if (parent.isPresent()) {
+      return parent.get().dataLocation(name);
+    } else {
+      throw new IllegalArgumentException("Data " + name + " not found");
     }
   }
 

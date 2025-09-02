@@ -42,6 +42,7 @@ public class CGenerator extends IRInstructionVisitor {
     CGenerator gen = new CGenerator();
     gen.compiler = compiler;
     gen.program = program;
+    gen.output = output;
     gen.generate();
   }
 
@@ -438,9 +439,19 @@ public class CGenerator extends IRInstructionVisitor {
           program.stream()
               .forEach(
                   p -> {
-                    putBlankLine();
                     generate(p);
+                    putBlankLine();
                   });
+
+          // Generate the end label, where the thread jumps to when it finishes execution
+          // If concurrency is enabled, we must notify the main thread that we are stopping
+          putLabel("end");
+          if (compiler.concurrency.get()) {
+            putMutexLock("thread_stops_mutex");
+            putIncrementAtomic("thread_stops");
+            putCondVarSignal("thread_stops_cond_var");
+            putMutexUnlock("thread_stops_mutex");
+          }
         });
     putBlankLine();
 
@@ -594,7 +605,6 @@ public class CGenerator extends IRInstructionVisitor {
             id -> {
               throw new UnsupportedOperationException("Polymorphic types not supported yet");
             });
-    putBlankLine();
     process.streamBlocks().forEach(block -> generate(block));
   }
 
@@ -606,6 +616,8 @@ public class CGenerator extends IRInstructionVisitor {
   private void generate(IRInstruction instr) {
     if (compiler.tracing.get()) {
       putDebugLn(instr.toString());
+    } else {
+      putLine("/* " + instr.toString() + " */");
     }
     instr.accept(this);
   }
@@ -639,10 +651,10 @@ public class CGenerator extends IRInstructionVisitor {
     CSize contSessionOffset = currentProcessLayout.sessionOffset(instr.getSessionId());
 
     StringBuilder sb = new StringBuilder("(struct session)");
-    sb.append("{cont=").append(codeLocationAddress(instr.getContinuation()));
-    sb.append(",cont_env=").append(ENV);
-    sb.append(",cont_data_offset=").append(contDataOffset);
-    sb.append(",cont_session_offset=").append(contSessionOffset);
+    sb.append("{.cont=").append(codeLocationAddress(instr.getContinuation()));
+    sb.append(",.cont_env=").append(ENV);
+    sb.append(",.cont_data_offset=").append(contDataOffset);
+    sb.append(",.cont_session_offset=").append(contSessionOffset);
     sb.append("}");
     putAssign(session(instr.getSessionId()), sb.toString());
   }
@@ -773,8 +785,8 @@ public class CGenerator extends IRInstructionVisitor {
 
       // Store the type information
       StringBuilder sb = new StringBuilder("(struct type)");
-      sb.append("{size=").append(sourceLayout.size);
-      sb.append(",alignment=").append(sourceLayout.alignment);
+      sb.append("{.size=").append(sourceLayout.size);
+      sb.append(",.alignment=").append(sourceLayout.alignment);
       sb.append("}");
       putAssign(targetType, sb.toString());
     }
@@ -1165,7 +1177,7 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   private void putCondVarWait(String var, String mutex) {
-    putStatement("pthread_cond_destroy(&(" + var + "), &(" + mutex + "))");
+    putStatement("pthread_cond_wait(&(" + var + "), &(" + mutex + "))");
   }
 
   private void putCondVarSignal(String var) {
@@ -1278,7 +1290,7 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   private void putBlock(String begin, Runnable indented) {
-    put(begin + " {");
+    putLine(begin + " {");
     putIndented(indented);
     putLine("}");
   }

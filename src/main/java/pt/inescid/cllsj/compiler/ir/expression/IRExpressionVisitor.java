@@ -17,7 +17,7 @@ public abstract class IRExpressionVisitor {
 
   public abstract void visit(IRDivide div);
 
-  public abstract void visit(IRModulus mod);
+  public abstract void visit(IRModulo mod);
 
   public abstract void visit(IRAnd and);
 
