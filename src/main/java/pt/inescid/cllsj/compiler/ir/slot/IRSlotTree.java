@@ -68,6 +68,7 @@ public abstract class IRSlotTree {
     public IRSlotTree suffix(IRSlotTree other) {
       return other;
     }
+
     @Override
     protected void toStringHelper(StringBuilder sb) {
       if (sb.isEmpty()) {
@@ -83,6 +84,10 @@ public abstract class IRSlotTree {
     public Unary(IRSlot slot, IRSlotTree child) {
       this.slot = slot;
       this.child = child;
+    }
+
+    public IRSlotTree child() {
+      return child;
     }
 
     @Override
@@ -123,6 +128,10 @@ public abstract class IRSlotTree {
 
     public Tag(List<IRSlotTree> cases) {
       this.cases = cases;
+    }
+
+    public List<IRSlotTree> cases() {
+      return cases;
     }
 
     @Override

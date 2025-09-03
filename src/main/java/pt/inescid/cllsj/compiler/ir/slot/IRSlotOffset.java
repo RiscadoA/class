@@ -5,20 +5,30 @@ import java.util.Optional;
 public class IRSlotOffset {
   public static final IRSlotOffset ZERO = new IRSlotOffset();
 
-  private IRSlotTree past;
+  private IRSlotCombinations past;
   private Optional<IRSlot> alignTo;
 
   public IRSlotOffset() {
-    this.past = IRSlotTree.LEAF;
+    this.past = IRSlotCombinations.EMPTY;
     this.alignTo = Optional.empty();
   }
 
-  public IRSlotOffset(IRSlotTree past, IRSlot alignTo) {
+  public IRSlotOffset(IRSlotSequence past, IRSlot alignTo) {
+    this.past = IRSlotCombinations.of(past);
+    this.alignTo = Optional.of(alignTo);
+  }
+
+  public IRSlotOffset(IRSlotSequence past, Optional<IRSlot> alignTo) {
+    this.past = IRSlotCombinations.of(past);
+    this.alignTo = alignTo;
+  }
+
+  public IRSlotOffset(IRSlotCombinations past, IRSlot alignTo) {
     this.past = past;
     this.alignTo = Optional.of(alignTo);
   }
 
-  public IRSlotOffset(IRSlotTree past, Optional<IRSlot> alignTo) {
+  public IRSlotOffset(IRSlotCombinations past, Optional<IRSlot> alignTo) {
     this.past = past;
     this.alignTo = alignTo;
   }
@@ -27,7 +37,7 @@ public class IRSlotOffset {
     return this.equals(ZERO);
   }
 
-  public IRSlotTree getPast() {
+  public IRSlotCombinations getPast() {
     return past;
   }
 
@@ -36,11 +46,11 @@ public class IRSlotOffset {
   }
 
   public IRSlotOffset advance(IRSlot slot, IRSlot alignTo) {
-    return new IRSlotOffset(past.suffix(IRSlotTree.of(slot)), alignTo);
+    return new IRSlotOffset(past.suffix(slot), alignTo);
   }
 
   public IRSlotOffset advance(IRSlotSequence slots, IRSlot alignTo) {
-    return new IRSlotOffset(past.suffix(IRSlotTree.of(slots)), alignTo);
+    return new IRSlotOffset(past.suffix(slots), alignTo);
   }
 
   public IRSlotOffset advance(IRSlotOffset offset) {

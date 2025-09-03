@@ -1,8 +1,8 @@
 package pt.inescid.cllsj.compiler.c;
 
 import java.io.PrintStream;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.function.Function;
 import pt.inescid.cllsj.compiler.Compiler;
 import pt.inescid.cllsj.compiler.ir.expression.IRExpression;
 import pt.inescid.cllsj.compiler.ir.id.IRCodeLocation;
@@ -216,7 +216,7 @@ public class CGenerator extends IRInstructionVisitor {
         "type",
         () -> {
           putStatement("int size");
-          putStatement("int alignment;");
+          putStatement("int first_alignment;");
         });
 
     putStruct(
@@ -632,7 +632,7 @@ public class CGenerator extends IRInstructionVisitor {
   public void visit(IRPushTask instr) {
     putAssign(TMP_PTR1, TASK);
     putAllocTask(TASK);
-    putAssign(taskNext(TASK), cast(TMP_PTR1, "(struct task*)"));
+    putAssign(taskNext(TASK), cast(TMP_PTR1, "struct task*"));
     putAssign(taskCont(TASK), codeLocationAddress(instr.getLocation()));
     putAssign(taskContEnv(TASK), ENV);
   }
@@ -741,11 +741,9 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   @Override
-  public void visit(IRForward instr) {
-    String sourceSession = accessSession(instr.getSource());
-    String targetSession = accessSession(instr.getTarget());
-    String sourceData = data(instr.getSourceData());
-    String targetData = data(instr.getTargetData());
+  public void visit(IRTieSessions instr) {
+    putAssign(accessRemoteSession(instr.getLhsId()), accessSession(instr.getRhsId()));
+    putAssign(accessRemoteSession(instr.getRhsId()), accessSession(instr.getLhsId()));
   }
 
   @Override
@@ -776,7 +774,7 @@ public class CGenerator extends IRInstructionVisitor {
                                       + calledProcessId));
 
               // Now we can just compute the layout of the source type in the current process
-              return layout(arg.getSourceCombinations());
+              return layout(arg.getSourceTree().combinations());
             });
 
     // Allocate a new environment for the called process
@@ -793,12 +791,18 @@ public class CGenerator extends IRInstructionVisitor {
       String targetType = type(calledLayout, newEnv, arg.getTargetType());
 
       // Compute the layout of the source type in the current environment
-      CLayout sourceLayout = layout(arg.getSourceCombinations());
+      // Notice that we use only the first slot to determine alignment
+      // This is because that is the alignment we need to align offsets to
+      CSize size = layout(arg.getSourceTree().combinations()).size;
+      CAlignment firstAlignment = CAlignment.one();
+      if (arg.getSourceTree().slot().isPresent()) {
+        firstAlignment = layout(arg.getSourceTree().slot().get()).alignment;
+      }
 
       // Store the type information
       StringBuilder sb = new StringBuilder("(struct type)");
-      sb.append("{.size=").append(sourceLayout.size);
-      sb.append(",.alignment=").append(sourceLayout.alignment);
+      sb.append("{.size=").append(size);
+      sb.append(",.first_alignment=").append(firstAlignment);
       sb.append("}");
       putAssign(targetType, sb.toString());
     }
@@ -816,7 +820,8 @@ public class CGenerator extends IRInstructionVisitor {
       putAssign(sessionContData(target), offset(sessionContData(target), arg.getDataOffset()));
 
       // Update the remote session's continuation to match the new environment
-      IRLocalDataId calledLocalDataId = calledProcess.getArgSessionLocalDataId(arg.getTargetSessionId());
+      IRLocalDataId calledLocalDataId =
+          calledProcess.getArgSessionLocalDataId(arg.getTargetSessionId());
       String remoteSession = accessRemoteSession(arg.getSourceSessionId());
       putAssign(sessionContEnv(remoteSession), newEnv);
       putAssign(
@@ -831,7 +836,7 @@ public class CGenerator extends IRInstructionVisitor {
       // Here we simply copy data from some location in the current environment to
       // a local data section in the new environment
       IRDataLocation target = IRDataLocation.local(arg.getTargetDataId(), IRSlotOffset.ZERO);
-      putCopy(calledLayout, newEnv, target, arg.getSourceLocation(), arg.getSlots());
+      putCopy(calledLayout, newEnv, target, arg.getSourceLocation(), IRSlotTree.of(arg.getSlots()));
     }
 
     // Decrement the end points of the current process, if applicable
@@ -1021,10 +1026,6 @@ public class CGenerator extends IRInstructionVisitor {
     return offset(CSize.zero(), offset).advancePointer(address);
   }
 
-  private CProcessLayout layout(IRProcess process, Function<IRTypeId, CLayout> typeLayoutProvider) {
-    return CProcessLayout.compute(compiler, process, typeLayoutProvider);
-  }
-
   private CLayout layout(IRSlotCombinations combinations) {
     return CLayout.compute(combinations, compiler.arch, typeId -> typeLayout(typeId));
   }
@@ -1072,19 +1073,72 @@ public class CGenerator extends IRInstructionVisitor {
       String sourceEnv,
       IRDataLocation source,
       IRSlotTree slots) {
+    putCopy(
+        targetLayout,
+        targetEnv,
+        target,
+        sourceLayout,
+        sourceEnv,
+        source,
+        slots,
+        IRSlotSequence.EMPTY);
+  }
+
+  private void putCopy(
+      CProcessLayout targetLayout,
+      String targetEnv,
+      IRDataLocation target,
+      CProcessLayout sourceLayout,
+      String sourceEnv,
+      IRDataLocation source,
+      IRSlotTree slots,
+      IRSlotSequence past) {
     // The difficulty here lies in that the source and target may have different layouts.
     // This is due to the fact that they might start in offsets with different alignments,
     // and thus, have different paddings between slots.
     //
+    // Additionally, there may be branching in the slots we're copying (e.g., a choice type)
+    // which means that we might also need to copy different slots depending on the value of a tag.
+    //
     // The simple way to solve this, which is what we do here, is to copy slot by slot.
-    IRSlotSequence offset = IRSlotSequence.EMPTY;
-    for (IRSlot slot : slots.list()) {
-      // TODO: go down the tree (no longer iterate a list)
+
+    if (slots.slot().isPresent()) {
       putCopy(
-          data(targetLayout, targetEnv, target.advance(offset, slot)),
-          data(sourceLayout, sourceEnv, source.advance(offset, slot)),
-          layout(slot).size);
-      offset = offset.suffix(slot);
+          data(targetLayout, targetEnv, target.advance(past, slots.slot().get())),
+          data(sourceLayout, sourceEnv, source.advance(past, slots.slot().get())),
+          layout(slots.slot().get()).size);
+    }
+
+    if (slots.isUnary()) {
+      putCopy(
+          targetLayout,
+          targetEnv,
+          target,
+          sourceLayout,
+          sourceEnv,
+          source,
+          ((IRSlotTree.Unary) slots).child(),
+          past.suffix(slots.slot().get()));
+    } else if (slots.isTag()) {
+      IRSlotTree.Tag tag = (IRSlotTree.Tag) slots;
+      IRDataLocation sourceTagLocation = source.advance(past, tag.slot().get());
+      List<Runnable> cases = new ArrayList<>();
+
+      for (IRSlotTree child : tag.cases()) {
+        cases.add(
+            () ->
+                putCopy(
+                    targetLayout,
+                    targetEnv,
+                    target,
+                    sourceLayout,
+                    sourceEnv,
+                    source,
+                    child,
+                    past.suffix(slots.slot().get())));
+      }
+
+      putSwitch(access(data(sourceTagLocation), "unsigned char"), cases);
     }
   }
 
@@ -1267,6 +1321,18 @@ public class CGenerator extends IRInstructionVisitor {
     putLine("}");
   }
 
+  private void putSwitch(String value, List<Runnable> cases) {
+    putBlock(
+        "switch (" + value + ")",
+        () -> {
+          for (int i = 0; i < cases.size(); ++i) {
+            putLine("case " + i + ":");
+            putIndented(cases.get(i));
+            putStatement("break");
+          }
+        });
+  }
+
   private void putWhile(String condition, Runnable body) {
     putBlock("while (" + condition + ")", body);
   }
@@ -1319,7 +1385,7 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   private void putStruct(String name, Runnable fields) {
-    put("struct " + name + " {");
+    putLine("struct " + name + " {");
     putIndented(fields);
     putLine("};");
     putBlankLine();

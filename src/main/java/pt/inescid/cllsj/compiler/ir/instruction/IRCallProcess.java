@@ -7,22 +7,22 @@ import pt.inescid.cllsj.compiler.ir.id.IRLocalDataId;
 import pt.inescid.cllsj.compiler.ir.id.IRProcessId;
 import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
 import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
-import pt.inescid.cllsj.compiler.ir.slot.IRSlotCombinations;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotOffset;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotSequence;
+import pt.inescid.cllsj.compiler.ir.slot.IRSlotTree;
 
 public class IRCallProcess extends IRInstruction {
   public static class TypeArgument {
-    private IRSlotCombinations sourceCombinations;
+    private IRSlotTree sourceTree;
     private IRTypeId targetType;
 
-    public TypeArgument(IRSlotCombinations sourceCombinations, IRTypeId targetType) {
-      this.sourceCombinations = sourceCombinations;
+    public TypeArgument(IRSlotTree sourceTree, IRTypeId targetType) {
+      this.sourceTree = sourceTree;
       this.targetType = targetType;
     }
 
-    public IRSlotCombinations getSourceCombinations() {
-      return sourceCombinations;
+    public IRSlotTree getSourceTree() {
+      return sourceTree;
     }
 
     public IRTypeId getTargetType() {
@@ -30,12 +30,12 @@ public class IRCallProcess extends IRInstruction {
     }
 
     public TypeArgument clone() {
-      return new TypeArgument(sourceCombinations, targetType);
+      return new TypeArgument(sourceTree, targetType);
     }
 
     @Override
     public String toString() {
-      return targetType + " <- [" + sourceCombinations + "]";
+      return targetType + " <- " + sourceTree;
     }
   }
 

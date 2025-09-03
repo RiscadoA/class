@@ -2,7 +2,6 @@ package pt.inescid.cllsj.compiler.ir.instruction;
 
 import java.util.function.Function;
 import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
-import pt.inescid.cllsj.compiler.ir.slot.IRSlotSequence;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotTree;
 
 public class IRMoveValue extends IRWrite {

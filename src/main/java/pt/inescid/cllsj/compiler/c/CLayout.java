@@ -5,14 +5,18 @@ import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
 import pt.inescid.cllsj.compiler.ir.slot.*;
 
 public class CLayout {
+  public static final CLayout ZERO = new CLayout(CSize.zero(), CAlignment.one());
+
   public CSize size;
   public CAlignment alignment;
 
   public CLayout(CSize size, CAlignment alignment) {
     this.size = size;
     this.alignment = alignment;
+    this.alignment = alignment;
   }
 
+  // Computes the maximum size the given slot combinations can take
   public static CLayout compute(
       IRSlotCombinations combinations,
       CArchitecture arch,
@@ -40,6 +44,17 @@ public class CLayout {
     Visitor visitor = new Visitor(arch, typeLayoutProvider);
     slot.accept(visitor);
     return visitor.layout;
+  }
+
+  // Computes the layout of a slot tree at a given address.
+  // The address is needed to compute the actual current layout.
+  public static CLayout compute(
+      CAddress address,
+      IRSlotTree tree,
+      CArchitecture arch,
+      Function<IRTypeId, CLayout> typeLayoutProvider) {
+    // TODO
+    throw new UnsupportedOperationException("Not implemented yet");
   }
 
   private static class Visitor extends IRSlotVisitor {
@@ -88,7 +103,7 @@ public class CLayout {
 
     @Override
     public void visit(IRTypeS slot) {
-      visit(CSize.sizeOf("struct type_slot"), arch.pointerAlignment);
+      visit(arch.typeSize(), arch.typeAlignment());
     }
 
     @Override

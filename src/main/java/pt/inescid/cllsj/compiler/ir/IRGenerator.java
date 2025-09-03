@@ -16,8 +16,6 @@ import pt.inescid.cllsj.compiler.ir.slot.IRSessionS;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlot;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotCombinations;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotOffset;
-import pt.inescid.cllsj.compiler.ir.slot.IRSlotSequence;
-import pt.inescid.cllsj.compiler.ir.slot.IRSlotTree;
 
 public class IRGenerator extends ASTNodeVisitor {
   private Compiler compiler;
@@ -166,29 +164,31 @@ public class IRGenerator extends ASTNodeVisitor {
   public void visit(ASTFwd node) {
     // Get the negative and positive sessions
     String negCh, posCh;
-    ASTType posChType;
+    ASTType negChType;
     if (isPositive(node.getCh2Type())) {
       negCh = node.getCh1();
       posCh = node.getCh2();
-      posChType = node.getCh2Type();
+      negChType = new ASTNotT(node.getCh2Type());
     } else {
       negCh = node.getCh2();
       posCh = node.getCh1();
-      posChType = new ASTNotT(node.getCh2Type());
+      negChType = node.getCh2Type();
     }
     IREnvironment.Session neg = env.getSession(negCh);
     IREnvironment.Session pos = env.getSession(posCh);
 
-    IRSlotsFromASTType info = slotsFromType(posChType);
+    IRSlotsFromASTType info = slotsFromType(negChType);
 
-    // The negative session holds data locally that should be written to the positive session's remote
+    // Move data stored on the negative session's local data to the positive session's remote data
+    block.add(new IRMoveValue(pos.getRemoteData(), neg.getLocalData(), info.activeLocalTree));
 
-    block.add(new IRMoveValue(pos.getRemoteData(), neg.getLocalData(), info.activeRemoteTree));
+    // If the type still has a continuation, we must tie the two sessions together
+    if (!isValue(negChType, false)) {
+      block.add(new IRTieSessions(pos.getId(), neg.getId()));
+    }
 
-    // We need to forward sessions
-
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    // Jump to the positive session's continuation
+    block.add(new IRFinishSession(pos.getId(), true));
   }
 
   @Override
@@ -205,8 +205,10 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTMix node) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    IRBlock rhsBlock = process.createBlock("mix_rhs");
+    block.add(new IRPushTask(rhsBlock.getLocation()));
+    recurse(block, node.getLhs());
+    recurse(rhsBlock, node.getRhs());
   }
 
   @Override
@@ -236,12 +238,13 @@ public class IRGenerator extends ASTNodeVisitor {
     env = env.addSession(node.getChi(), info.localCombinations());
     IREnvironment.Session argSession = env.getSession(node.getChi());
 
-    if (compiler.optimizeSendValue.get()
-        && isValue(node.getChiType(), false)) {
+    if (compiler.optimizeSendValue.get() && isValue(node.getChiType(), false)) {
       // If the left type is a value, we do the send value optimization
       block.add(
           new IRMoveValue(argSession.getLocalData(), session.getLocalData(), info.activeLocalTree));
-      env = env.advanceSession(node.getChr(), offset(info.activeLocalTree, node.getRhsType()));
+      env =
+          env.advanceSession(
+              node.getChr(), offset(info.activeLocalTree.combinations(), node.getRhsType()));
     } else {
       // Bind the new session to the value received from the main session
       block.add(
@@ -268,8 +271,7 @@ public class IRGenerator extends ASTNodeVisitor {
     IREnvironment.Session argSession;
 
     IRSlotsFromASTType argInfo = slotsFromType(node.getLhsType());
-    if (compiler.optimizeSendValue.get()
-        && isValue(node.getLhsType(), true)) {
+    if (compiler.optimizeSendValue.get() && isValue(node.getLhsType(), true)) {
       // We perform the send value optimization:
       // 1. we define a new session for the sent channel
       // 2. we initialize it so that it's data pointer points to the main session's data
@@ -288,7 +290,9 @@ public class IRGenerator extends ASTNodeVisitor {
       recurse(block, node.getLhs());
 
       // Generate the continuation
-      env = env.advanceSession(node.getChs(), offset(argInfo.activeRemoteTree, node.getRhsType()));
+      env =
+          env.advanceSession(
+              node.getChs(), offset(argInfo.activeRemoteTree.combinations(), node.getRhsType()));
       recurse(
           rhsBlock,
           () -> {
@@ -503,10 +507,10 @@ public class IRGenerator extends ASTNodeVisitor {
   }
 
   private IRSlotOffset offset(IRSlot past, ASTType remainder) {
-    return offset(IRSlotTree.of(past), remainder);
+    return offset(IRSlotCombinations.of(past), remainder);
   }
 
-  private IRSlotOffset offset(IRSlotTree past, ASTType remainder) {
+  private IRSlotOffset offset(IRSlotCombinations past, ASTType remainder) {
     return new IRSlotOffset(past, slotsFromType(remainder).slot);
   }
 

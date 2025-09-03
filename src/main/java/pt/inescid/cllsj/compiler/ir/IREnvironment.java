@@ -51,12 +51,18 @@ public class IREnvironment {
 
   public IREnvironment addArgSession(String name, IRSlotCombinations combinations) {
     IRLocalDataId localDataId = process.addLocalData(combinations);
-    return new Session(this, name, process.addArgSession(localDataId), IRSlotOffset.ZERO, Optional.of(localDataId));
+    return new Session(
+        this,
+        name,
+        process.addArgSession(localDataId),
+        IRSlotOffset.ZERO,
+        Optional.of(localDataId));
   }
 
   public IREnvironment addSession(String name, IRSlotCombinations combinations) {
     IRLocalDataId localDataId = process.addLocalData(combinations);
-    return new Session(this, name, process.addSession(), IRSlotOffset.ZERO, Optional.of(localDataId));
+    return new Session(
+        this, name, process.addSession(), IRSlotOffset.ZERO, Optional.of(localDataId));
   }
 
   public IREnvironment addSession(String name) {
@@ -80,12 +86,18 @@ public class IREnvironment {
 
   public IREnvironment advanceSession(String name, IRSlotOffset offset) {
     Session session = getSession(name);
-    return new Session(this, session.getName(), session.getId(), session.getOffset().advance(offset), session.localDataId);
+    return new Session(
+        this,
+        session.getName(),
+        session.getId(),
+        session.getOffset().advance(offset),
+        session.localDataId);
   }
 
   public IREnvironment resetSession(String name) {
     Session session = getSession(name);
-    return new Session(this, session.getName(), session.getId(), IRSlotOffset.ZERO, session.localDataId);
+    return new Session(
+        this, session.getName(), session.getId(), IRSlotOffset.ZERO, session.localDataId);
   }
 
   public IREnvironment addExponential(String name) {
@@ -169,7 +181,12 @@ public class IREnvironment {
     private IRSlotOffset offset;
     private Optional<IRLocalDataId> localDataId;
 
-    public Session(IREnvironment parent, String name, IRSessionId id, IRSlotOffset offset, Optional<IRLocalDataId> localDataId) {
+    public Session(
+        IREnvironment parent,
+        String name,
+        IRSessionId id,
+        IRSlotOffset offset,
+        Optional<IRLocalDataId> localDataId) {
       super(parent);
       this.name = name;
       this.id = id;
