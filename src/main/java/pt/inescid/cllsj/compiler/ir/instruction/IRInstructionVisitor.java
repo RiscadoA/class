@@ -15,6 +15,8 @@ public abstract class IRInstructionVisitor {
 
   public abstract void visit(IRWriteSession instr);
 
+  public abstract void visit(IRWriteTag instr);
+
   public abstract void visit(IRMoveValue instr);
 
   public abstract void visit(IRPrint instr);
@@ -34,4 +36,8 @@ public abstract class IRInstructionVisitor {
   public abstract void visit(IRDecreaseExponentialReferences instr);
 
   public abstract void visit(IRTieSessions instr);
+
+  public abstract void visit(IRBranchTag instr);
+
+  public abstract void visit(IRBranchExpression instr);
 }

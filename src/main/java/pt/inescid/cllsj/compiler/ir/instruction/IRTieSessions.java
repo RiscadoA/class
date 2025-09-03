@@ -7,9 +7,7 @@ public class IRTieSessions extends IRInstruction {
   private IRSessionId lhsId;
   private IRSessionId rhsId;
 
-  public IRTieSessions(
-      IRSessionId lhsId, IRSessionId rhsId
-  ) {
+  public IRTieSessions(IRSessionId lhsId, IRSessionId rhsId) {
     this.lhsId = lhsId;
     this.rhsId = rhsId;
   }
@@ -40,10 +38,6 @@ public class IRTieSessions extends IRInstruction {
 
   @Override
   public String toString() {
-    return "tieSessions("
-        + lhsId
-        + ", "
-        + rhsId
-        + ")";
+    return "tieSessions(" + lhsId + ", " + rhsId + ")";
   }
 }

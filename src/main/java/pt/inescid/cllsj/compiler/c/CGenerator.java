@@ -720,9 +720,14 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRWriteSession instr) {
-    String data = data(instr.getLocation());
-    String ref = access(data, "struct session");
+    String ref = access(data(instr.getLocation()), "struct session");
     putAssign(ref, accessSession(instr.getSessionId()));
+  }
+
+  @Override
+  public void visit(IRWriteTag instr) {
+    String ref = access(data(instr.getLocation()), "unsigned char");
+    putAssign(ref, instr.getTag());
   }
 
   @Override
@@ -868,6 +873,35 @@ public class CGenerator extends IRInstructionVisitor {
   public void visit(IRDecreaseExponentialReferences instr) {
     // TODO Auto-generated method stub
     throw new UnsupportedOperationException("Unimplemented method 'visit'");
+  }
+
+  @Override
+  public void visit(IRBranchTag instr) {
+    List<Runnable> cases = new ArrayList<>();
+    for (IRBranchTag.Case c : instr.getCases()) {
+      cases.add(
+          () -> {
+            putSubtractAtomic(endPoints(), instr.getMaxEndPoints() - c.getEndPoints());
+            putConstantGoto(codeLocationLabel(c.getLocation()));
+          });
+    }
+
+    putSwitch(access(data(instr.getLocation()), "unsigned char"), cases);
+  }
+
+  @Override
+  public void visit(IRBranchExpression instr) {
+    putIfElse(
+        expression(instr.getExpression()),
+        () -> {
+          putSubtractAtomic(endPoints(), instr.getMaxEndPoints() - instr.getThen().getEndPoints());
+          putConstantGoto(codeLocationLabel(instr.getThen().getLocation()));
+        },
+        () -> {
+          putSubtractAtomic(
+              endPoints(), instr.getMaxEndPoints() - instr.getOtherwise().getEndPoints());
+          putConstantGoto(codeLocationLabel(instr.getOtherwise().getLocation()));
+        });
   }
 
   // ============================ Structure expression building helpers ===========================
@@ -1182,7 +1216,7 @@ public class CGenerator extends IRInstructionVisitor {
     if (compiler.optimizeSingleEndpoint.get() && currentProcess.getEndPoints() == 1) {
       free.run();
     } else {
-      putIf(decrementAtomic(endPoints()) + " == 0", free);
+      putIf(decrementAtomic(endPoints()) + " == 1", free);
     }
   }
 
@@ -1218,17 +1252,17 @@ public class CGenerator extends IRInstructionVisitor {
 
   private String incrementAtomic(String var) {
     if (compiler.concurrency.get()) {
-      return "atomic_fetch_add(&" + var + ", 1) + 1";
+      return "atomic_fetch_add(&" + var + ", 1)";
     } else {
-      return "++" + var;
+      return var + "++";
     }
   }
 
   private String decrementAtomic(String var) {
     if (compiler.concurrency.get()) {
-      return "atomic_fetch_sub(&" + var + ", 1) - 1";
+      return "atomic_fetch_sub(&" + var + ", 1)";
     } else {
-      return "--" + var;
+      return var + "--";
     }
   }
 
@@ -1280,6 +1314,16 @@ public class CGenerator extends IRInstructionVisitor {
 
   private void putDecrementAtomic(String var) {
     putStatement(decrementAtomic(var));
+  }
+
+  private void putSubtractAtomic(String var, int value) {
+    if (value != 0) {
+      if (compiler.concurrency.get()) {
+        putStatement("atomic_fetch_sub(&" + var + ", " + value + ")");
+      } else {
+        putStatement(var + " -= " + value);
+      }
+    }
   }
 
   private void putAssignMaxAtomic(String var, String value) {

@@ -1,5 +1,7 @@
 package pt.inescid.cllsj.compiler.ir;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
@@ -12,10 +14,7 @@ import pt.inescid.cllsj.compiler.ir.expression.IRExpression;
 import pt.inescid.cllsj.compiler.ir.id.IRProcessId;
 import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
 import pt.inescid.cllsj.compiler.ir.instruction.*;
-import pt.inescid.cllsj.compiler.ir.slot.IRSessionS;
-import pt.inescid.cllsj.compiler.ir.slot.IRSlot;
-import pt.inescid.cllsj.compiler.ir.slot.IRSlotCombinations;
-import pt.inescid.cllsj.compiler.ir.slot.IRSlotOffset;
+import pt.inescid.cllsj.compiler.ir.slot.*;
 
 public class IRGenerator extends ASTNodeVisitor {
   private Compiler compiler;
@@ -110,8 +109,24 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTCase node) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    IREnvironment.Session session = env.getSession(node.getCh());
+
+    // Generate a block for each case
+    List<IRBranch.Case> cases = new ArrayList<>();
+    for (int i = 0; i < node.getCaseCount(); ++i) {
+      String label = node.getCaseLabelFromIndex(i);
+      ASTNode c = node.getCase(label);
+      IRBlock caseBlock = process.createBlock("case_" + label.substring(1).toLowerCase());
+      cases.add(new IRBranch.Case(caseBlock.getLocation(), countEndPoints(c)));
+
+      // Recurse on the case
+      recurse(caseBlock, () -> {
+        env = env.advanceSession(node.getCh(), offset(new IRTagS(), node.getCaseType(label)));
+        c.accept(this);
+      });
+    }
+
+    block.add(new IRBranchTag(session.getLocalData(), cases));
   }
 
   @Override
@@ -261,8 +276,17 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTSelect node) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    IREnvironment.Session session = env.getSession(node.getCh());
+    
+    // Write the tag to the session's remote data
+    block.add(new IRWriteTag(session.getRemoteData(), node.getLabelIndex()));
+    env = env.advanceSession(node.getCh(), offset(new IRTagS(), node.getRhsType()));
+
+    // If the continuation is negative, we must jump to it
+    addContinueIfNegative(session.getId(), node.getRhsType());
+
+    // Recurse on the continuation
+    recurse(block, node.getRhs());
   }
 
   @Override
@@ -359,8 +383,17 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTIf node) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    IRBlock thenBlock = process.createBlock("if_then");
+    IRBlock elseBlock = process.createBlock("if_else");
+    IRExpression condition = expression(node.getExpr());
+
+    IRBranch.Case then = new IRBranch.Case(thenBlock.getLocation(), countEndPoints(node.getThen()));
+    IRBranch.Case otherwise = new IRBranch.Case(elseBlock.getLocation(), countEndPoints(node.getElse()));
+
+    block.add(new IRBranchExpression(condition, then, otherwise));
+
+    recurse(thenBlock, node.getThen());
+    recurse(elseBlock, node.getElse());
   }
 
   @Override
