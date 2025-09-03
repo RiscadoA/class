@@ -74,13 +74,19 @@ public class IREnvironment {
         name,
         Optional.of(process.addArgSession(localDataId)),
         IRSlotOffset.ZERO,
-        Optional.of(localDataId), false);
+        Optional.of(localDataId),
+        false);
   }
 
   public IREnvironment addSession(String name, IRSlotCombinations combinations) {
     IRLocalDataId localDataId = process.addLocalData(combinations);
     return new Channel(
-        this, name, Optional.of(process.addSession()), IRSlotOffset.ZERO, Optional.of(localDataId), false);
+        this,
+        name,
+        Optional.of(process.addSession()),
+        IRSlotOffset.ZERO,
+        Optional.of(localDataId),
+        false);
   }
 
   public IREnvironment addSession(String name) {
@@ -88,7 +94,8 @@ public class IREnvironment {
         this, name, Optional.of(process.addSession()), IRSlotOffset.ZERO, Optional.empty(), false);
   }
 
-  public IREnvironment addValue(String name, IRSlotCombinations combinations, boolean isExponential) {
+  public IREnvironment addValue(
+      String name, IRSlotCombinations combinations, boolean isExponential) {
     return new Channel(
         this,
         name,
@@ -127,18 +134,18 @@ public class IREnvironment {
   public IREnvironment resetChannel(String name) {
     Channel channel = getChannel(name);
     return new Channel(
-        this, channel.getName(), channel.sessionId, IRSlotOffset.ZERO, channel.localDataId, channel.isExponential());
+        this,
+        channel.getName(),
+        channel.sessionId,
+        IRSlotOffset.ZERO,
+        channel.localDataId,
+        channel.isExponential());
   }
 
   public IREnvironment makeChannelExponential(String name) {
     Channel channel = getChannel(name);
     return new Channel(
-        this,
-        channel.getName(),
-        channel.sessionId,
-        channel.getOffset(),
-        channel.localDataId,
-        true);
+        this, channel.getName(), channel.sessionId, channel.getOffset(), channel.localDataId, true);
   }
 
   public boolean isPositive(Env<EnvEntry> ep, ASTType type) {

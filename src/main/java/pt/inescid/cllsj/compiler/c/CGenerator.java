@@ -639,52 +639,62 @@ public class CGenerator extends IRInstructionVisitor {
     CProcessLayout layout = layout(program.get(processId));
     Function<IRTypeId, CLayout> typeLayoutProvider = id -> typeLayout(layout, "exp_env", id);
 
-    putBlock("void " + managerName(processId) + "(char* exp_env, int mode)", ( ) -> {
-      putIfElse(
-          "mode == 0",
-          () -> {
-            putComment("Clone mode");
-            for (IRWriteExponentialFromProcess.DataArgument arg : instr.getDataArguments()) {
-              IRLocalDataId dataId = arg.getTargetDataId();
-              putSlotTraversal(
-                  arg.getSlots(),
-                  past ->
-                      localData(
-                          typeLayoutProvider,
-                          layout,
-                          "exp_env",
-                          dataId,
-                          IRSlotOffset.of(past, new IRTagS())),
-                  (past, slot) -> {
-                    CAddress target =
-                        localData(
-                            typeLayoutProvider, layout, "exp_env", dataId, IRSlotOffset.of(past, slot));
-                    putCloneSlot(target, slot);
-                  });
-            }
-          },
-          () -> {
-            putComment("Drop mode");
-            for (IRWriteExponentialFromProcess.DataArgument arg : instr.getDataArguments()) {
-              IRLocalDataId dataId = arg.getTargetDataId();
-              putSlotTraversal(
-                  arg.getSlots(),
-                  past ->
-                      localData(
-                          typeLayoutProvider,
-                          layout,
-                          "exp_env",
-                          dataId,
-                          IRSlotOffset.of(past, new IRTagS())),
-                  (past, slot) -> {
-                    CAddress target =
-                        localData(
-                            typeLayoutProvider, layout, "exp_env", dataId, IRSlotOffset.of(past, slot));
-                    putDropSlot(target, slot);
-                  });
-            }
-          });
-    });
+    putBlock(
+        "void " + managerName(processId) + "(char* exp_env, int mode)",
+        () -> {
+          putIfElse(
+              "mode == 0",
+              () -> {
+                putComment("Clone mode");
+                for (IRWriteExponentialFromProcess.DataArgument arg : instr.getDataArguments()) {
+                  IRLocalDataId dataId = arg.getTargetDataId();
+                  putSlotTraversal(
+                      arg.getSlots(),
+                      past ->
+                          localData(
+                              typeLayoutProvider,
+                              layout,
+                              "exp_env",
+                              dataId,
+                              IRSlotOffset.of(past, new IRTagS())),
+                      (past, slot) -> {
+                        CAddress target =
+                            localData(
+                                typeLayoutProvider,
+                                layout,
+                                "exp_env",
+                                dataId,
+                                IRSlotOffset.of(past, slot));
+                        putCloneSlot(target, slot);
+                      });
+                }
+              },
+              () -> {
+                putComment("Drop mode");
+                for (IRWriteExponentialFromProcess.DataArgument arg : instr.getDataArguments()) {
+                  IRLocalDataId dataId = arg.getTargetDataId();
+                  putSlotTraversal(
+                      arg.getSlots(),
+                      past ->
+                          localData(
+                              typeLayoutProvider,
+                              layout,
+                              "exp_env",
+                              dataId,
+                              IRSlotOffset.of(past, new IRTagS())),
+                      (past, slot) -> {
+                        CAddress target =
+                            localData(
+                                typeLayoutProvider,
+                                layout,
+                                "exp_env",
+                                dataId,
+                                IRSlotOffset.of(past, slot));
+                        putDropSlot(target, slot);
+                      });
+                }
+              });
+        });
   }
 
   // ============================ Instruction generation visit methods ============================
@@ -990,7 +1000,8 @@ public class CGenerator extends IRInstructionVisitor {
         exponentialEntryDataOffset(exp),
         expProcessLayout.dataOffset(typeLayoutProvider, new IRLocalDataId(0)));
     putAssign(exponentialEnvSize(exp), expProcessLayout.size(typeLayoutProvider));
-    putStatement("void " + managerName(expProcessId) + "(char* env, int mode)"); // Forward declare function
+    putStatement(
+        "void " + managerName(expProcessId) + "(char* env, int mode)"); // Forward declare function
     putAssign(exponentialManager(exp), managerName(expProcessId));
     putAssign(TMP_PTR1, exponentialEnv(exp));
     String newEnv = cast(TMP_PTR1, "char*");
@@ -1001,9 +1012,12 @@ public class CGenerator extends IRInstructionVisitor {
     }
 
     // Setup the continuation of the entry session
-    CAddress entrySessionAddress = CAddress.of(newEnv, expProcessLayout.sessionOffset(new IRSessionId(0)));
+    CAddress entrySessionAddress =
+        CAddress.of(newEnv, expProcessLayout.sessionOffset(new IRSessionId(0)));
     String entrySession = entrySessionAddress.deref("struct session");
-    putAssign(sessionCont(entrySession), labelAddress(codeLocationLabel(expProcess, IRCodeLocation.entry())));
+    putAssign(
+        sessionCont(entrySession),
+        labelAddress(codeLocationLabel(expProcess, IRCodeLocation.entry())));
 
     // Write the type arguments to the exponential's environment
     for (IRWriteExponentialFromProcess.TypeArgument arg : instr.getTypeArguments()) {
@@ -1054,7 +1068,11 @@ public class CGenerator extends IRInstructionVisitor {
     Runnable clone =
         () -> {
           // Call the exponential manager to clone the slots
-          putStatement(exponentialManager(exponential) + "(" + cast(TMP_PTR1, "char*") + ", 0)"); // 0 = Clone
+          putStatement(
+              exponentialManager(exponential)
+                  + "("
+                  + cast(TMP_PTR1, "char*")
+                  + ", 0)"); // 0 = Clone
         };
     if (instr.shouldDecrementExponential()) {
       putIncrementExponential(exponential);

@@ -13,8 +13,7 @@ import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.nodes.*;
-import pt.inescid.cllsj.ast.types.ASTNotT;
-import pt.inescid.cllsj.ast.types.ASTType;
+import pt.inescid.cllsj.ast.types.*;
 import pt.inescid.cllsj.compiler.Compiler;
 import pt.inescid.cllsj.compiler.ir.expression.IRExpression;
 import pt.inescid.cllsj.compiler.ir.id.IRProcessId;
@@ -349,8 +348,13 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTFwdB node) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    IREnvironment.Channel channel = env.getChannel(node.getCh1());
+    IREnvironment.Channel exponential = env.getChannel(node.getCh2());
+
+    IRSlotsFromASTType info = slotsFromType(new ASTWhyT(node.getType()));
+    block.add(
+        new IRMoveValue(channel.getRemoteData(), exponential.getLocalData(), info.activeLocalTree));
+    block.add(new IRFinishSession(channel.getSessionId(), true));
   }
 
   @Override
@@ -597,14 +601,18 @@ public class IRGenerator extends ASTNodeVisitor {
 
     block.add(new IRBranchExpression(condition, then, otherwise));
 
-    recurse(thenBlock, () -> {
-      addDecrementExponentialIfUnusedAndUsedBefore(node, node.getThen());
-      node.getThen().accept(this);
-    });
-    recurse(elseBlock, () -> {
-      addDecrementExponentialIfUnusedAndUsedBefore(node, node.getElse());
-      node.getElse().accept(this);
-    });
+    recurse(
+        thenBlock,
+        () -> {
+          addDecrementExponentialIfUnusedAndUsedBefore(node, node.getThen());
+          node.getThen().accept(this);
+        });
+    recurse(
+        elseBlock,
+        () -> {
+          addDecrementExponentialIfUnusedAndUsedBefore(node, node.getElse());
+          node.getElse().accept(this);
+        });
   }
 
   @Override
