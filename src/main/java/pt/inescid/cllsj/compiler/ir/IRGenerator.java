@@ -579,8 +579,10 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTScan node) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    IREnvironment.Channel channel = env.getChannel(node.getCh());
+    IRSlotsFromASTType info = slotsFromType(node.getType());
+    block.add(new IRWriteScan(channel.getRemoteData(), info.slot.orElseThrow()));
+    block.add(new IRFinishSession(channel.getSessionId(), true));
   }
 
   @Override

@@ -716,8 +716,21 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRWriteScan instr) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    String cType = cType(instr.getSlot());
+    String cValue;
+    String ref = access(data(instr.getLocation()), cType);
+    
+    if (instr.getSlot() instanceof IRIntS) {
+      cValue = "int_scan()";
+    } else if (instr.getSlot() instanceof IRBoolS) {
+      cValue = "bool_scan()";
+    } else if (instr.getSlot() instanceof IRStringS) {
+      cValue = "string_scan()";
+    } else {
+      throw new IllegalArgumentException("Cannot scan slot of type " + instr.getSlot());
+    }
+
+    putAssign(ref, cValue);
   }
 
   @Override
