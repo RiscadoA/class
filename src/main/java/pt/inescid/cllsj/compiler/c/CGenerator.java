@@ -3,6 +3,8 @@ package pt.inescid.cllsj.compiler.c;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+
 import pt.inescid.cllsj.compiler.Compiler;
 import pt.inescid.cllsj.compiler.ir.expression.IRExpression;
 import pt.inescid.cllsj.compiler.ir.id.IRCodeLocation;
@@ -825,13 +827,15 @@ public class CGenerator extends IRInstructionVisitor {
       putAssign(sessionContData(target), offset(sessionContData(target), arg.getDataOffset()));
 
       // Update the remote session's continuation to match the new environment
-      IRLocalDataId calledLocalDataId =
+      Optional<IRLocalDataId> calledLocalDataId =
           calledProcess.getArgSessionLocalDataId(arg.getTargetSessionId());
       String remoteSession = accessRemoteSession(arg.getSourceSessionId());
       putAssign(sessionContEnv(remoteSession), newEnv);
-      putAssign(
+      if (calledLocalDataId.isPresent()) {
+        putAssign(
           sessionContData(remoteSession),
-          localData(calledLayout, newEnv, calledLocalDataId, arg.getDataOffset()));
+          localData(calledLayout, newEnv, calledLocalDataId.get(), arg.getDataOffset()));
+      }
       putAssign(
           sessionContSession(remoteSession),
           sessionAddress(calledLayout, newEnv, arg.getTargetSessionId()));
@@ -841,7 +845,7 @@ public class CGenerator extends IRInstructionVisitor {
       // Here we simply copy data from some location in the current environment to
       // a local data section in the new environment
       IRDataLocation target = IRDataLocation.local(arg.getTargetDataId(), IRSlotOffset.ZERO);
-      putCopy(calledLayout, newEnv, target, arg.getSourceLocation(), IRSlotTree.of(arg.getSlots()));
+      putCopy(calledLayout, newEnv, target, arg.getSourceLocation(), arg.getSlots());
     }
 
     // Decrement the end points of the current process, if applicable

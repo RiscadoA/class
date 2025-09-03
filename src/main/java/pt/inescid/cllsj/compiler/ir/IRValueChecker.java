@@ -1,24 +1,29 @@
 package pt.inescid.cllsj.compiler.ir;
 
 import java.util.Optional;
+
+import pt.inescid.cllsj.Env;
+import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.ast.ASTTypeVisitor;
 import pt.inescid.cllsj.ast.types.*;
 
 public class IRValueChecker extends ASTTypeVisitor {
+  private Env<EnvEntry> ep;
   private IREnvironment env;
   private boolean isValue = true;
   private Optional<Boolean> polarity;
 
-  public static boolean check(IREnvironment env, ASTType type, boolean requiredPolarity) {
-    return check(env, type, Optional.of(requiredPolarity));
+  public static boolean check(Env<EnvEntry> ep, IREnvironment env, ASTType type, boolean requiredPolarity) {
+    return check(ep, env, type, Optional.of(requiredPolarity));
   }
 
-  public static boolean check(IREnvironment env, ASTType type, Optional<Boolean> requiredPolarity) {
-    IRValueChecker req = new IRValueChecker();
-    req.env = env;
-    req.polarity = requiredPolarity;
-    type.accept(req);
-    return req.isValue;
+  public static boolean check(Env<EnvEntry> ep, IREnvironment env, ASTType type, Optional<Boolean> requiredPolarity) {
+    IRValueChecker visitor = new IRValueChecker();
+    visitor.ep = ep;
+    visitor.env = env;
+    visitor.polarity = requiredPolarity;
+    type.accept(visitor);
+    return visitor.isValue;
   }
 
   private void expectPolarity(boolean polarity) {
@@ -61,6 +66,23 @@ public class IRValueChecker extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTIdT type) {
+    // Unfold the type to check if its definition is known
+    ASTType unfolded;
+    try {
+      unfolded = type.unfoldType(ep);
+    } catch (Exception e) {
+      throw new IllegalArgumentException("Error unfolding type: " + e.getMessage());
+    }
+    if (!(unfolded instanceof ASTIdT)) {
+      // We have a type definition, just recurse on the unfolded type
+      unfolded.accept(this);
+      return;
+    }
+
+    // We still have a type identifier
+    type = (ASTIdT) unfolded;
+
+    // Use the environment to check if the type is a value type
     IREnvironment.Type envType = env.getType(type.getid());
     if (!envType.isValue()) {
       isValue = false;

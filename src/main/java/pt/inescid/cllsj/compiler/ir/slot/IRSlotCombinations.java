@@ -87,7 +87,7 @@ public class IRSlotCombinations {
   }
 
   public boolean isEmpty() {
-    return sequences.isEmpty();
+    return sequences.isEmpty() || (sequences.size() == 1 && sequences.get(0).size() == 0);
   }
 
   @Override

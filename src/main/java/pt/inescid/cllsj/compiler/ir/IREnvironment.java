@@ -30,6 +30,10 @@ public class IREnvironment {
     this.parent = Optional.of(parent);
   }
 
+  public IRProcess getProcess() {
+    return process;
+  }
+
   public IREnvironment addType(String name, boolean isPositive, boolean isValue) {
     return new Type(this, name, process.addType(), isPositive, isValue);
   }
@@ -51,53 +55,61 @@ public class IREnvironment {
 
   public IREnvironment addArgSession(String name, IRSlotCombinations combinations) {
     IRLocalDataId localDataId = process.addLocalData(combinations);
-    return new Session(
+    return new Channel(
         this,
         name,
-        process.addArgSession(localDataId),
+        Optional.of(process.addArgSession(localDataId)),
         IRSlotOffset.ZERO,
         Optional.of(localDataId));
   }
 
   public IREnvironment addSession(String name, IRSlotCombinations combinations) {
     IRLocalDataId localDataId = process.addLocalData(combinations);
-    return new Session(
-        this, name, process.addSession(), IRSlotOffset.ZERO, Optional.of(localDataId));
+    return new Channel(
+        this, name, Optional.of(process.addSession()), IRSlotOffset.ZERO, Optional.of(localDataId));
   }
 
   public IREnvironment addSession(String name) {
-    return new Session(this, name, process.addSession(), IRSlotOffset.ZERO, Optional.empty());
+    return new Channel(this, name, Optional.of(process.addSession()), IRSlotOffset.ZERO, Optional.empty());
   }
 
-  public Session getSession(String name) {
-    if (this instanceof Session) {
-      Session sessionEnv = (Session) this;
+  public IREnvironment addValue(String name, IRSlotCombinations combinations) {
+    return new Channel(
+        this,
+        name,
+        Optional.empty(),
+        IRSlotOffset.ZERO,
+        Optional.of(process.addLocalData(combinations)));
+  }
+
+  public Channel getChannel(String name) {
+    if (this instanceof Channel) {
+      Channel sessionEnv = (Channel) this;
       if (sessionEnv.getName().equals(name)) {
         return sessionEnv;
       }
     }
 
     if (parent.isPresent()) {
-      return parent.get().getSession(name);
+      return parent.get().getChannel(name);
     } else {
-      throw new IllegalArgumentException("Session " + name + " not found");
+      throw new IllegalArgumentException("Channel " + name + " not found");
     }
   }
 
-  public IREnvironment advanceSession(String name, IRSlotOffset offset) {
-    Session session = getSession(name);
-    return new Session(
+  public IREnvironment advanceChannel(String name, IRSlotOffset offset) {
+    Channel channel = getChannel(name);
+    return new Channel(
         this,
-        session.getName(),
-        session.getId(),
-        session.getOffset().advance(offset),
-        session.localDataId);
+        channel.getName(),
+        channel.sessionId,
+        channel.getOffset().advance(offset),
+        channel.localDataId);
   }
 
-  public IREnvironment resetSession(String name) {
-    Session session = getSession(name);
-    return new Session(
-        this, session.getName(), session.getId(), IRSlotOffset.ZERO, session.localDataId);
+  public IREnvironment resetChannel(String name) {
+    Channel channel = getChannel(name);
+    return new Channel(this, channel.getName(), channel.sessionId, IRSlotOffset.ZERO, channel.localDataId);
   }
 
   public IREnvironment addExponential(String name) {
@@ -175,21 +187,21 @@ public class IREnvironment {
     }
   }
 
-  public static class Session extends IREnvironment {
+  public static class Channel extends IREnvironment {
     private String name;
-    private IRSessionId id;
+    private Optional<IRSessionId> sessionId;
     private IRSlotOffset offset;
     private Optional<IRLocalDataId> localDataId;
 
-    public Session(
+    public Channel(
         IREnvironment parent,
         String name,
-        IRSessionId id,
+        Optional<IRSessionId> sessionId,
         IRSlotOffset offset,
         Optional<IRLocalDataId> localDataId) {
       super(parent);
       this.name = name;
-      this.id = id;
+      this.sessionId = sessionId;
       this.offset = offset;
       this.localDataId = localDataId;
     }
@@ -198,8 +210,8 @@ public class IREnvironment {
       return name;
     }
 
-    public IRSessionId getId() {
-      return id;
+    public IRSessionId getSessionId() {
+      return sessionId.orElseThrow();
     }
 
     public IRSlotOffset getOffset() {
@@ -211,11 +223,11 @@ public class IREnvironment {
     }
 
     public IRDataLocation getLocalData() {
-      return IRDataLocation.local(localDataId.orElseThrow(), offset);
+      return IRDataLocation.local(getLocalDataId(), offset);
     }
 
     public IRDataLocation getRemoteData() {
-      return IRDataLocation.remote(id, offset);
+      return IRDataLocation.remote(getSessionId(), offset);
     }
   }
 

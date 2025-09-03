@@ -8,7 +8,6 @@ import pt.inescid.cllsj.compiler.ir.id.IRProcessId;
 import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
 import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotOffset;
-import pt.inescid.cllsj.compiler.ir.slot.IRSlotSequence;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotTree;
 
 public class IRCallProcess extends IRInstruction {
@@ -91,10 +90,10 @@ public class IRCallProcess extends IRInstruction {
     private IRLocalDataId targetDataId;
 
     // Slots to move from the source to the target
-    private IRSlotSequence slots;
+    private IRSlotTree slots;
 
     public DataArgument(
-        IRDataLocation sourceLocation, IRLocalDataId targetDataId, IRSlotSequence slots) {
+        IRDataLocation sourceLocation, IRLocalDataId targetDataId, IRSlotTree slots) {
       this.sourceLocation = sourceLocation;
       this.targetDataId = targetDataId;
       this.slots = slots;
@@ -108,7 +107,7 @@ public class IRCallProcess extends IRInstruction {
       return targetDataId;
     }
 
-    public IRSlotSequence getSlots() {
+    public IRSlotTree getSlots() {
       return slots;
     }
 
@@ -118,7 +117,7 @@ public class IRCallProcess extends IRInstruction {
 
     @Override
     public String toString() {
-      return targetDataId + " <- " + sourceLocation + "[" + slots + "]";
+      return targetDataId + " <-" + slots + " " + sourceLocation;
     }
   }
 

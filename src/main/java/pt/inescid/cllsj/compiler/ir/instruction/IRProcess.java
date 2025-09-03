@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Stream;
 import pt.inescid.cllsj.compiler.ir.id.IRCodeLocation;
 import pt.inescid.cllsj.compiler.ir.id.IRLocalDataId;
@@ -61,8 +62,8 @@ public class IRProcess {
     return typeCount;
   }
 
-  public IRLocalDataId getArgSessionLocalDataId(IRSessionId sessionId) {
-    return argSessionLocalDataId.get(sessionId);
+  public Optional<IRLocalDataId> getArgSessionLocalDataId(IRSessionId sessionId) {
+    return Optional.ofNullable(argSessionLocalDataId.get(sessionId));
   }
 
   public IRSlotCombinations getLocalData(IRLocalDataId id) {
