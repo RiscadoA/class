@@ -11,20 +11,26 @@ import pt.inescid.cllsj.compiler.ir.instruction.IRProcess;
 
 // Stores the offsets of the various sections in a process layout
 // A process layout is as follows:
-// - end point (optional integer)
+// - end point counter (optional integer)
 // - type section (struct type[])
 // - session section (struct session[])
 // - data section (arbitrary data based on local data slot combinations)
 public class CProcessLayout {
+  private Compiler compiler;
+  private IRProcess process;
+
+  private CAlignment alignment;
   private CSize endPointsOffset;
   private Map<IRTypeId, CSize> typeOffsets = new HashMap<>();
   private Map<IRSessionId, CSize> sessionOffsets = new HashMap<>();
-  private Map<IRLocalDataId, CSize> dataOffsets = new HashMap<>();
-  private CSize size;
+  private CSize sessionsEnd;
 
-  public static CProcessLayout compute(
-      Compiler compiler, IRProcess process, Function<IRTypeId, CLayout> typeLayoutProvider) {
+  public static CProcessLayout compute(Compiler compiler, IRProcess process) {
     CProcessLayout result = new CProcessLayout();
+    result.compiler = compiler;
+    result.process = process;
+
+    result.alignment = compiler.arch.pointerAlignment;
 
     result.endPointsOffset = CSize.zero();
     CSize endPointsEnd;
@@ -41,25 +47,18 @@ public class CProcessLayout {
     }
 
     CSize sessionsStart = typesEnd.align(compiler.arch.sessionAlignment());
-    CSize sessionsEnd =
+    result.sessionsEnd =
         sessionsStart.add(compiler.arch.sessionSize().multiply(process.getSessionCount()));
     for (int i = 0; i < process.getSessionCount(); ++i) {
       result.sessionOffsets.put(
           new IRSessionId(i), sessionsStart.add(compiler.arch.sessionSize().multiply(i)));
     }
 
-    CSize dataEnd = sessionsEnd;
-    for (int i = 0; i < process.getLocalDataCount(); ++i) {
-      IRLocalDataId id = new IRLocalDataId(i);
-      CLayout layout = CLayout.compute(process.getLocalData(id), compiler.arch, typeLayoutProvider);
-      dataEnd = dataEnd.align(layout.alignment);
-      result.dataOffsets.put(id, dataEnd);
-      dataEnd = dataEnd.add(layout.size);
-    }
-
-    result.size = dataEnd;
-
     return result;
+  }
+
+  public CAlignment alignment() {
+    return alignment;
   }
 
   public CSize endPointsOffset() {
@@ -74,11 +73,29 @@ public class CProcessLayout {
     return sessionOffsets.get(id);
   }
 
-  public CSize dataOffset(IRLocalDataId id) {
-    return dataOffsets.get(id);
+  public CSize dataOffset(Function<IRTypeId, CLayout> typeLayoutProvider, IRLocalDataId id) {
+    CSize dataEnd = sessionsEnd;
+    for (int i = 0; i < id.getIndex(); ++i) {
+      CLayout layout =
+          CLayout.compute(
+              process.getLocalData(new IRLocalDataId(i)), compiler.arch, typeLayoutProvider);
+      dataEnd = dataEnd.align(layout.alignment);
+      dataEnd = dataEnd.add(layout.size);
+    }
+
+    CLayout layout = CLayout.compute(process.getLocalData(id), compiler.arch, typeLayoutProvider);
+    return dataEnd.align(layout.alignment);
   }
 
-  public CSize size() {
-    return size;
+  public CSize size(Function<IRTypeId, CLayout> typeLayoutProvider) {
+    CSize dataEnd = sessionsEnd;
+    for (int i = 0; i < process.getLocalDataCount(); ++i) {
+      CLayout layout =
+          CLayout.compute(
+              process.getLocalData(new IRLocalDataId(i)), compiler.arch, typeLayoutProvider);
+      dataEnd = dataEnd.align(layout.alignment);
+      dataEnd = dataEnd.add(layout.size);
+    }
+    return dataEnd;
   }
 }

@@ -92,11 +92,18 @@ public class IRCallProcess extends IRInstruction {
     // Slots to move from the source to the target
     private IRSlotTree slots;
 
+    // Whether the data should be cloned (otherwise moved)
+    private boolean clone;
+
     public DataArgument(
-        IRDataLocation sourceLocation, IRLocalDataId targetDataId, IRSlotTree slots) {
+        IRDataLocation sourceLocation,
+        IRLocalDataId targetDataId,
+        IRSlotTree slots,
+        boolean clone) {
       this.sourceLocation = sourceLocation;
       this.targetDataId = targetDataId;
       this.slots = slots;
+      this.clone = clone;
     }
 
     public IRDataLocation getSourceLocation() {
@@ -111,13 +118,22 @@ public class IRCallProcess extends IRInstruction {
       return slots;
     }
 
+    public boolean isClone() {
+      return clone;
+    }
+
     public DataArgument clone() {
-      return new DataArgument(sourceLocation, targetDataId, slots);
+      return new DataArgument(sourceLocation, targetDataId, slots, clone);
     }
 
     @Override
     public String toString() {
-      return targetDataId + " <-" + slots + " " + sourceLocation;
+      StringBuilder sb = new StringBuilder();
+      sb.append(targetDataId);
+      sb.append(clone ? " =" : " <-");
+      sb.append(slots);
+      sb.append(" ").append(sourceLocation);
+      return sb.toString();
     }
   }
 

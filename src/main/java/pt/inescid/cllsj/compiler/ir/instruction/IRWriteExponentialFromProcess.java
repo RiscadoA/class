@@ -5,12 +5,34 @@ import java.util.function.Function;
 import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
 import pt.inescid.cllsj.compiler.ir.id.IRLocalDataId;
 import pt.inescid.cllsj.compiler.ir.id.IRProcessId;
-import pt.inescid.cllsj.compiler.ir.slot.IRSlotSequence;
+import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
+import pt.inescid.cllsj.compiler.ir.slot.IRSlotTree;
 
 public class IRWriteExponentialFromProcess extends IRWrite {
   public static class TypeArgument {
+    private IRSlotTree sourceTree;
+    private IRTypeId targetType;
+
+    public TypeArgument(IRSlotTree sourceTree, IRTypeId targetType) {
+      this.sourceTree = sourceTree;
+      this.targetType = targetType;
+    }
+
+    public IRSlotTree getSourceTree() {
+      return sourceTree;
+    }
+
+    public IRTypeId getTargetType() {
+      return targetType;
+    }
+
     public TypeArgument clone() {
-      return new TypeArgument();
+      return new TypeArgument(sourceTree, targetType);
+    }
+
+    @Override
+    public String toString() {
+      return targetType + " <- " + sourceTree;
     }
   }
 
@@ -22,13 +44,20 @@ public class IRWriteExponentialFromProcess extends IRWrite {
     private IRLocalDataId targetDataId;
 
     // Slots to move from the source to the target
-    private IRSlotSequence slots;
+    private IRSlotTree slots;
+
+    // Whether the data should be cloned (otherwise moved)
+    private boolean clone;
 
     public DataArgument(
-        IRDataLocation sourceLocation, IRLocalDataId targetDataId, IRSlotSequence slots) {
+        IRDataLocation sourceLocation,
+        IRLocalDataId targetDataId,
+        IRSlotTree slots,
+        boolean clone) {
       this.sourceLocation = sourceLocation;
       this.targetDataId = targetDataId;
       this.slots = slots;
+      this.clone = clone;
     }
 
     public IRDataLocation getSourceLocation() {
@@ -39,12 +68,26 @@ public class IRWriteExponentialFromProcess extends IRWrite {
       return targetDataId;
     }
 
-    public IRSlotSequence getSlots() {
+    public IRSlotTree getSlots() {
       return slots;
     }
 
+    public boolean isClone() {
+      return clone;
+    }
+
     public DataArgument clone() {
-      return new DataArgument(sourceLocation, targetDataId, slots);
+      return new DataArgument(sourceLocation, targetDataId, slots, clone);
+    }
+
+    @Override
+    public String toString() {
+      StringBuilder sb = new StringBuilder();
+      sb.append(targetDataId);
+      sb.append(clone ? " =" : " <-");
+      sb.append(slots);
+      sb.append(" ").append(sourceLocation);
+      return sb.toString();
     }
   }
 
@@ -100,7 +143,9 @@ public class IRWriteExponentialFromProcess extends IRWrite {
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("writeExponentialFromProcess(").append(processId);
+    sb.append("writeExponentialFromProcess(");
+    sb.append(location).append(", ");
+    sb.append(processId);
     for (TypeArgument arg : typeArguments) {
       sb.append(", ").append(arg.toString());
     }

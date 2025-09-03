@@ -2,14 +2,14 @@ package pt.inescid.cllsj.compiler.ir.instruction;
 
 import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
 
-public class IRDecreaseExponentialReferences extends IRAccess {
-  public IRDecreaseExponentialReferences(IRDataLocation location) {
+public class IRIncrementExponential extends IRAccess {
+  public IRIncrementExponential(IRDataLocation location) {
     super(location);
   }
 
   @Override
   public String toString() {
-    return "decreaseExponentialReferences(" + location + ")";
+    return "incrementExponential(" + location + ")";
   }
 
   @Override
@@ -19,6 +19,6 @@ public class IRDecreaseExponentialReferences extends IRAccess {
 
   @Override
   public IRInstruction clone() {
-    return new IRDecreaseExponentialReferences(location);
+    return new IRIncrementExponential(location);
   }
 }

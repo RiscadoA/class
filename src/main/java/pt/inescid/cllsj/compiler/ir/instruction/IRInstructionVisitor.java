@@ -31,9 +31,9 @@ public abstract class IRInstructionVisitor {
 
   public abstract void visit(IRCallExponential instr);
 
-  public abstract void visit(IRIncreaseExponentialReferences instr);
+  public abstract void visit(IRIncrementExponential instr);
 
-  public abstract void visit(IRDecreaseExponentialReferences instr);
+  public abstract void visit(IRDecrementExponential instr);
 
   public abstract void visit(IRTieSessions instr);
 

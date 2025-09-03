@@ -32,7 +32,7 @@ else
     echo "Found $count test files"
 fi
 
-CLLS_FLAGS="$CLLS_FLAGS --profiling"
+export CLLS_FLAGS="$CLLS_FLAGS --profiling"
 echo "Using flags: $CLLS_FLAGS"
 
 success=0

@@ -39,7 +39,7 @@ public class CExpressionGenerator extends IRExpressionVisitor {
     if (expr.getSlot() instanceof IRIntS) {
       return "string_from_int(" + result + ")";
     } else if (expr.getSlot() instanceof IRBoolS) {
-      return "string_create(" + result + " ? \"true\" : \"false\")";
+      return "string_clone(" + result + " ? \"true\" : \"false\")";
     } else if (expr.getSlot() instanceof IRStringS) {
       return result;
     } else {
@@ -68,7 +68,7 @@ public class CExpressionGenerator extends IRExpressionVisitor {
 
   @Override
   public void visit(IRStringLiteral lit) {
-    code.append("string_create(\"").append(CStringEscape.escape(lit.getValue())).append("\")");
+    code.append("string_clone(\"").append(CStringEscape.escape(lit.getValue())).append("\")");
   }
 
   @Override

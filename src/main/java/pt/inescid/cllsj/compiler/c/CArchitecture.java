@@ -22,6 +22,14 @@ public class CArchitecture {
     return pointerAlignment;
   }
 
+  public CSize exponentialSize(CSize envSize) {
+    return pointerSize.multiply(3).add(envSize);
+  }
+
+  public CAlignment exponentialAlignment() {
+    return pointerAlignment;
+  }
+
   public CSize typeSize() {
     return intSize.multiply(2);
   }

@@ -8,6 +8,10 @@ public class IRSlotOffset {
   private IRSlotCombinations past;
   private Optional<IRSlot> alignTo;
 
+  public static IRSlotOffset of(IRSlotSequence past, IRSlot alignTo) {
+    return new IRSlotOffset(past, alignTo);
+  }
+
   public IRSlotOffset() {
     this.past = IRSlotCombinations.EMPTY;
     this.alignTo = Optional.empty();

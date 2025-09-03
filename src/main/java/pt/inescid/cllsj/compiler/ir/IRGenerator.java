@@ -2,13 +2,13 @@ package pt.inescid.cllsj.compiler.ir;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.function.BiConsumer;
-
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.ast.ASTNodeVisitor;
@@ -28,11 +28,13 @@ public class IRGenerator extends ASTNodeVisitor {
 
   private IRProgram program = new IRProgram();
   private Map<IRProcessId, ASTProcDef> procDefs = new HashMap<>();
+  private Map<IRProcessId, ASTNode> procBodies = new HashMap<>();
   private Map<IRProcessId, IREnvironment> procEnvs = new HashMap<>();
   private Queue<IRProcessId> procUsed = new LinkedList<>();
 
   private IRProcess process;
   private IRBlock block;
+  private int nextExponentialId = 0;
 
   private Env<EnvEntry> ep;
   private IREnvironment env;
@@ -58,18 +60,22 @@ public class IRGenerator extends ASTNodeVisitor {
         gen.procUsed.add(gen.processId(procDef.getId(), new boolean[0], new boolean[0]));
       }
 
-      gen.forEachCombination(procDef, (tArgPolarities, tArgValues) -> {
-        IRProcessId id = gen.processId(procDef.getId(), tArgPolarities, tArgValues);
-        IRProcess process = new IRProcess(id, gen.countEndPoints(procDef.getRhs()));
-        IREnvironment env = gen.environment(procDef, process, tArgPolarities, tArgValues);
-        gen.procDefs.put(id, procDef);
-        gen.procEnvs.put(id, env);
-      });
+      gen.forEachCombination(
+          procDef,
+          (tArgPolarities, tArgValues) -> {
+            IRProcessId id = gen.processId(procDef.getId(), tArgPolarities, tArgValues);
+            IRProcess process = new IRProcess(id, gen.countEndPoints(procDef.getRhs()));
+            IREnvironment env = gen.environment(procDef, process, tArgPolarities, tArgValues);
+            gen.procDefs.put(id, procDef);
+            gen.procBodies.put(id, procDef.getRhs());
+            gen.procEnvs.put(id, env);
+          });
     }
 
     // Check that the entry process was found
     if (gen.procUsed.isEmpty()) {
-      throw new IllegalArgumentException("Entry process " + compiler.entryProcess.get() + " not found");
+      throw new IllegalArgumentException(
+          "Entry process " + compiler.entryProcess.get() + " not found");
     }
 
     // Until all used processes have been generated, generate them
@@ -80,13 +86,13 @@ public class IRGenerator extends ASTNodeVisitor {
       }
 
       // Create empty process
-      ASTProcDef procDef = gen.procDefs.get(id);
+      ASTNode body = gen.procBodies.get(id);
       gen.env = gen.procEnvs.get(id);
       gen.process = gen.env.getProcess();
       gen.program.add(gen.process);
 
       // Visit process body
-      gen.recurse(gen.process.getEntry(), procDef.getRhs());
+      gen.recurse(gen.process.getEntry(), body);
     }
 
     return gen.program;
@@ -116,7 +122,8 @@ public class IRGenerator extends ASTNodeVisitor {
     }
   }
 
-  private IREnvironment environment(ASTProcDef procDef, IRProcess process, boolean tArgPolarities[], boolean tArgValues[]) {
+  private IREnvironment environment(
+      ASTProcDef procDef, IRProcess process, boolean tArgPolarities[], boolean tArgValues[]) {
     IREnvironment env = new IREnvironment(process);
 
     // Start by collecting type arguments
@@ -141,7 +148,7 @@ public class IRGenerator extends ASTNodeVisitor {
         env = env.addSession(name);
       } else if (!isPositive && isValue) {
         // Negative value: no need for a session, just store the data
-        env = env.addValue(name, info.localCombinations());
+        env = env.addValue(name, info.localCombinations(), false);
       } else {
         env = env.addArgSession(name, info.localCombinations());
       }
@@ -149,7 +156,9 @@ public class IRGenerator extends ASTNodeVisitor {
 
     // Define the exponential arguments
     for (int i = 0; i < procDef.getGArgs().size(); ++i) {
-      env = env.addExponential(procDef.getGArgs().get(i));
+      String name = procDef.getGArgs().get(i);
+      // ASTType type = procDef.getGArgTypes().get(i);
+      env = env.addValue(name, IRSlotCombinations.of(new IRExponentialS()), true);
     }
 
     return env;
@@ -159,14 +168,79 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTBang node) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    IREnvironment.Channel channel = env.getChannel(node.getChr());
+    IRSlotsFromASTType info = slotsFromType(node.getType());
+
+    // Create a new process for the exponential
+    IRProcessId expProcessId = new IRProcessId(process.getId() + "_exp" + nextExponentialId++);
+    IRProcess expProcess = new IRProcess(expProcessId, countEndPoints(node.getRhs()));
+    IREnvironment expEnv = new IREnvironment(expProcess);
+
+    // Define the argument session for the exponential
+    expEnv = expEnv.addSession(node.getChi(), info.localCombinations());
+
+    // Pass all types in the current environment to the exponential process
+    List<IRWriteExponentialFromProcess.TypeArgument> typeArguments = new ArrayList<>();
+    for (int i = 0; i < process.getTypeCount(); ++i) {
+      IRTypeId id = new IRTypeId(i);
+      IREnvironment.Type envType = env.getType(id);
+      typeArguments.add(
+          new IRWriteExponentialFromProcess.TypeArgument(IRSlotTree.of(new IRVarS(id)), id));
+      expEnv = expEnv.addType(envType.getName(), envType.isPositive(), envType.isValue());
+    }
+
+    // Pass captured exponentials to the exponential process as data arguments
+    List<IRWriteExponentialFromProcess.DataArgument> dataArguments = new ArrayList<>();
+    for (String name : node.getRhs().fn(new HashSet<>())) {
+      if (name.equals(node.getChi())) {
+        continue;
+      }
+
+      IRSlotTree valueSlots = IRSlotTree.of(new IRExponentialS());
+
+      expEnv = expEnv.addValue(name, valueSlots.combinations(), true);
+
+      IREnvironment.Channel captured = env.getChannel(name);
+      dataArguments.add(
+          new IRWriteExponentialFromProcess.DataArgument(
+              captured.getLocalData(),
+              expEnv.getChannel(name).getLocalDataId(),
+              valueSlots,
+              false));
+    }
+
+    // Store the process we just defined so that it gets generated later
+    procBodies.put(expProcessId, node.getRhs());
+    procEnvs.put(expProcessId, expEnv);
+    procUsed.add(expProcessId);
+
+    block.add(
+        new IRWriteExponentialFromProcess(
+            channel.getRemoteData(), expProcessId, typeArguments, dataArguments));
+    block.add(new IRFinishSession(channel.getSessionId(), true));
   }
 
   @Override
   public void visit(ASTCall node) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    IREnvironment.Channel channel = env.getChannel(node.getChr());
+
+    // Define new channel
+    IRSlotsFromASTType info = slotsFromType(node.getType());
+    env = env.addSession(node.getChi(), info.localCombinations());
+    IREnvironment.Channel argChannel = env.getChannel(node.getChi());
+
+    block.add(
+        new IRCallExponential(
+            channel.getLocalData(),
+            argChannel.getSessionId(),
+            argChannel.getLocalDataId(),
+            !nameFreeIn(node.getChr(), node.getRhs())));
+
+    // If the called session is negative, we must jump to it
+    addContinueIfNegative(argChannel.getSessionId(), node.getType());
+
+    // Recurse on the continuation
+    recurse(block, node.getRhs());
   }
 
   @Override
@@ -182,10 +256,13 @@ public class IRGenerator extends ASTNodeVisitor {
       cases.add(new IRBranch.Case(caseBlock.getLocation(), countEndPoints(c)));
 
       // Recurse on the case
-      recurse(caseBlock, () -> {
-        env = env.advanceChannel(node.getCh(), offset(new IRTagS(), node.getCaseType(label)));
-        c.accept(this);
-      });
+      recurse(
+          caseBlock,
+          () -> {
+            env = env.advanceChannel(node.getCh(), offset(new IRTagS(), node.getCaseType(label)));
+            addDecrementExponentialIfUnusedAndUsedBefore(node, c);
+            c.accept(this);
+          });
     }
 
     block.add(new IRBranchTag(channel.getLocalData(), cases));
@@ -208,6 +285,7 @@ public class IRGenerator extends ASTNodeVisitor {
     IRSlotsFromASTType info = slotsFromType(node.getChType());
     env = env.addSession(node.getCh(), info.combinations());
     IREnvironment.Channel channel = env.getChannel(node.getCh());
+    addIncrementExponentialIfUsedInBoth(node.getLhs(), node.getRhs());
 
     // Find which side is the negative one and create a block for it
     String negLabel;
@@ -225,7 +303,8 @@ public class IRGenerator extends ASTNodeVisitor {
 
     // Initialize the new session with the negative block as its continuation
     block.add(
-        new IRInitializeSession(channel.getSessionId(), negBlock.getLocation(), channel.getLocalData()));
+        new IRInitializeSession(
+            channel.getSessionId(), negBlock.getLocation(), channel.getLocalData()));
 
     // Recurse on both sides
     recurse(block, pos);
@@ -288,7 +367,7 @@ public class IRGenerator extends ASTNodeVisitor {
 
       tArgPolarities[i] = isPositive(type);
       tArgValues[i] = isValue(type, tArgPolarities[i]);
-      
+
       IRSlotTree tree = tArgPolarities[i] ? info.activeRemoteTree : info.activeLocalTree;
       typeArguments.add(new IRCallProcess.TypeArgument(tree, new IRTypeId(i)));
     }
@@ -316,12 +395,19 @@ public class IRGenerator extends ASTNodeVisitor {
 
       if (!isValue || isPositive) {
         // If the type is not a value, or if it's a positive value, we must pass the session
-        sessionArguments.add(new IRCallProcess.SessionArgument(channel.getSessionId(), targetChannel.getSessionId(), channel.getOffset()));
+        sessionArguments.add(
+            new IRCallProcess.SessionArgument(
+                channel.getSessionId(), targetChannel.getSessionId(), channel.getOffset()));
       }
 
       if ((!isValue || !isPositive) && !info.activeLocalTree.isLeaf()) {
         // If the type is not a value, or if it's a negative value, we must pass the data
-        dataArguments.add(new IRCallProcess.DataArgument(channel.getLocalData(), targetChannel.getLocalDataId(), info.activeLocalTree));
+        dataArguments.add(
+            new IRCallProcess.DataArgument(
+                channel.getLocalData(),
+                targetChannel.getLocalDataId(),
+                info.activeLocalTree,
+                false));
       }
     }
 
@@ -335,6 +421,8 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTMix node) {
+    addIncrementExponentialIfUsedInBoth(node.getLhs(), node.getRhs());
+
     IRBlock rhsBlock = process.createBlock("mix_rhs");
     block.add(new IRPushTask(rhsBlock.getLocation()));
     recurse(block, node.getLhs());
@@ -372,7 +460,8 @@ public class IRGenerator extends ASTNodeVisitor {
     } else {
       // Bind the new session to the value received from the main session
       block.add(
-          new IRBindSession(channel.getLocalData(), argChannel.getSessionId(), argChannel.getLocalData()));
+          new IRBindSession(
+              channel.getLocalData(), argChannel.getSessionId(), argChannel.getLocalData()));
       env = env.advanceChannel(node.getChr(), offset(new IRSessionS(), node.getRhsType()));
 
       // If the received session is negative, we must jump to it
@@ -386,7 +475,7 @@ public class IRGenerator extends ASTNodeVisitor {
   @Override
   public void visit(ASTSelect node) {
     IREnvironment.Channel channel = env.getChannel(node.getCh());
-    
+
     // Write the tag to the session's remote data
     block.add(new IRWriteTag(channel.getRemoteData(), node.getLabelIndex()));
     env = env.advanceChannel(node.getCh(), offset(new IRTagS(), node.getRhsType()));
@@ -412,6 +501,7 @@ public class IRGenerator extends ASTNodeVisitor {
 
       env = env.addSession(node.getCho());
       argSession = env.getChannel(node.getCho());
+      addIncrementExponentialIfUsedInBoth(node.getLhs(), node.getRhs());
 
       // Create block for the right-hand-side to run after the value has been sent
       IRBlock rhsBlock = process.createBlock("send_rhs");
@@ -443,6 +533,7 @@ public class IRGenerator extends ASTNodeVisitor {
         // Define new session for the channel being sent
         env = env.addSession(node.getCho(), argInfo.localCombinations());
         argSession = env.getChannel(node.getCho());
+        addIncrementExponentialIfUsedInBoth(node.getLhs(), node.getRhs());
 
         // Initialize the new session with a new closure block for the left-hand-side
         // as its continuation. Immediately write it to the main session's remote data
@@ -472,8 +563,12 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTWhy node) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    // We do nothing here other than decrementing the exponential if necessary
+    // The channel holds the exponential at the current offset
+    // Whenever we need to access the exponential, we just read it from the channel's local data
+    env = env.makeChannelExponential(node.getCh());
+    addDecrementExponentialIfUnused(node.getCh(), node.getRhs());
+    recurse(block, node.getRhs());
   }
 
   @Override
@@ -497,12 +592,19 @@ public class IRGenerator extends ASTNodeVisitor {
     IRExpression condition = expression(node.getExpr());
 
     IRBranch.Case then = new IRBranch.Case(thenBlock.getLocation(), countEndPoints(node.getThen()));
-    IRBranch.Case otherwise = new IRBranch.Case(elseBlock.getLocation(), countEndPoints(node.getElse()));
+    IRBranch.Case otherwise =
+        new IRBranch.Case(elseBlock.getLocation(), countEndPoints(node.getElse()));
 
     block.add(new IRBranchExpression(condition, then, otherwise));
 
-    recurse(thenBlock, node.getThen());
-    recurse(elseBlock, node.getElse());
+    recurse(thenBlock, () -> {
+      addDecrementExponentialIfUnusedAndUsedBefore(node, node.getThen());
+      node.getThen().accept(this);
+    });
+    recurse(elseBlock, () -> {
+      addDecrementExponentialIfUnusedAndUsedBefore(node, node.getElse());
+      node.getElse().accept(this);
+    });
   }
 
   @Override
@@ -604,6 +706,41 @@ public class IRGenerator extends ASTNodeVisitor {
   }
 
   // ======================================= Helper methods =======================================
+
+  private boolean nameFreeIn(String name, ASTNode node) {
+    return node.fn(new HashSet<>()).contains(name);
+  }
+
+  private void addDecrementExponentialIfUnused(String name, ASTNode node) {
+    if (!nameFreeIn(name, node)) {
+      IREnvironment.Channel channel = env.getChannel(name);
+      block.add(new IRDecrementExponential(channel.getLocalData()));
+    }
+  }
+
+  private void addDecrementExponentialIfUnusedAndUsedBefore(ASTNode before, ASTNode now) {
+    Set<String> fn = before.fn(new HashSet<>());
+    for (String name : fn) {
+      if (!nameFreeIn(name, now)) {
+        IREnvironment.Channel channel = env.getChannel(name);
+        if (channel.isExponential()) {
+          block.add(new IRDecrementExponential(channel.getLocalData()));
+        }
+      }
+    }
+  }
+
+  private void addIncrementExponentialIfUsedInBoth(ASTNode n1, ASTNode n2) {
+    Set<String> fn = n1.fn(new HashSet<>());
+    for (String name : fn) {
+      if (nameFreeIn(name, n2)) {
+        IREnvironment.Channel channel = env.getChannel(name);
+        if (channel.isExponential()) {
+          block.add(new IRIncrementExponential(channel.getLocalData()));
+        }
+      }
+    }
+  }
 
   private void addContinue(IRSessionId sessionId) {
     IRBlock contBlock = process.createBlock("continue");

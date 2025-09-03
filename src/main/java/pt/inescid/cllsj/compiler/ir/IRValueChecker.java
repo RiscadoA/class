@@ -1,7 +1,6 @@
 package pt.inescid.cllsj.compiler.ir;
 
 import java.util.Optional;
-
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.ast.ASTTypeVisitor;
@@ -13,11 +12,13 @@ public class IRValueChecker extends ASTTypeVisitor {
   private boolean isValue = true;
   private Optional<Boolean> polarity;
 
-  public static boolean check(Env<EnvEntry> ep, IREnvironment env, ASTType type, boolean requiredPolarity) {
+  public static boolean check(
+      Env<EnvEntry> ep, IREnvironment env, ASTType type, boolean requiredPolarity) {
     return check(ep, env, type, Optional.of(requiredPolarity));
   }
 
-  public static boolean check(Env<EnvEntry> ep, IREnvironment env, ASTType type, Optional<Boolean> requiredPolarity) {
+  public static boolean check(
+      Env<EnvEntry> ep, IREnvironment env, ASTType type, Optional<Boolean> requiredPolarity) {
     IRValueChecker visitor = new IRValueChecker();
     visitor.ep = ep;
     visitor.env = env;
