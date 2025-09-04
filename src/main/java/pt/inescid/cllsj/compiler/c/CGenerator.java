@@ -1145,8 +1145,15 @@ public class CGenerator extends IRInstructionVisitor {
   private String expression(IRExpression expr) {
     return CExpressionGenerator.generate(
         expr,
-        read -> {
-          return data(read.getLocation()).deref(cType(read.getSlot()));
+        move -> {
+          return data(move.getLocation()).deref(cType(move.getSlot()));
+        },
+        clone -> {
+          String value = data(clone.getLocation()).deref(cType(clone.getSlot()));
+          if (clone.getSlot() instanceof IRStringS) {
+            value = "string_clone(" + value + ")";
+          }
+          return value;
         });
   }
 

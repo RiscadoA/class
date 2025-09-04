@@ -4,11 +4,11 @@ import java.util.function.Function;
 import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlot;
 
-public class IRRead extends IRExpression {
+public class IRClone extends IRExpression {
   private IRDataLocation location;
   private IRSlot slot;
 
-  public IRRead(IRDataLocation location, IRSlot slot) {
+  public IRClone(IRDataLocation location, IRSlot slot) {
     this.location = location;
     this.slot = slot;
   }
@@ -29,7 +29,7 @@ public class IRRead extends IRExpression {
 
   @Override
   public IRExpression clone() {
-    return new IRRead(location, slot);
+    return new IRClone(location, slot);
   }
 
   @Override
@@ -39,6 +39,6 @@ public class IRRead extends IRExpression {
 
   @Override
   public String toString() {
-    return "read(" + location + ", " + slot + ")";
+    return "clone(" + location + ", " + slot + ")";
   }
 }

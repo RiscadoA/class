@@ -1,9 +1,11 @@
 package pt.inescid.cllsj.compiler.c;
 
 import java.util.function.Function;
+
+import pt.inescid.cllsj.compiler.ir.expression.IRClone;
 import pt.inescid.cllsj.compiler.ir.expression.IRExpression;
 import pt.inescid.cllsj.compiler.ir.expression.IRExpressionVisitor;
-import pt.inescid.cllsj.compiler.ir.expression.IRRead;
+import pt.inescid.cllsj.compiler.ir.expression.IRMove;
 import pt.inescid.cllsj.compiler.ir.expression.arithmetic.IRAdd;
 import pt.inescid.cllsj.compiler.ir.expression.arithmetic.IRDivide;
 import pt.inescid.cllsj.compiler.ir.expression.arithmetic.IRModulo;
@@ -23,18 +25,20 @@ import pt.inescid.cllsj.compiler.ir.slot.IRIntS;
 import pt.inescid.cllsj.compiler.ir.slot.IRStringS;
 
 public class CExpressionGenerator extends IRExpressionVisitor {
-  private Function<IRRead, String> readGenerator;
+  private Function<IRMove, String> moveGenerator;
+  private Function<IRClone, String> cloneGenerator;
   private StringBuilder code = new StringBuilder("");
 
-  public static String generate(IRExpression expression, Function<IRRead, String> readGenerator) {
+  public static String generate(IRExpression expression, Function<IRMove, String> moveGenerator, Function<IRClone, String> cloneGenerator) {
     CExpressionGenerator gen = new CExpressionGenerator();
-    gen.readGenerator = readGenerator;
+    gen.moveGenerator = moveGenerator;
+    gen.cloneGenerator = cloneGenerator;
     expression.accept(gen);
     return gen.code.toString();
   }
 
-  public static String generateToString(IRExpression expr, Function<IRRead, String> readGenerator) {
-    String result = generate(expr, readGenerator);
+  public static String generateToString(IRExpression expr, Function<IRMove, String> moveGenerator, Function<IRClone, String> cloneGenerator) {
+    String result = generate(expr, moveGenerator, cloneGenerator);
 
     if (expr.getSlot() instanceof IRIntS) {
       return "string_from_int(" + result + ")";
@@ -46,6 +50,10 @@ public class CExpressionGenerator extends IRExpressionVisitor {
       throw new UnsupportedOperationException(
           "Unsupported expression slot: " + expr.getSlot().getClass().getName());
     }
+  }
+
+  private String recurseToString(IRExpression expr) {
+    return generateToString(expr, moveGenerator, cloneGenerator);
   }
 
   private void binary(String op, IRExpression lhs, IRExpression rhs) {
@@ -72,17 +80,22 @@ public class CExpressionGenerator extends IRExpressionVisitor {
   }
 
   @Override
-  public void visit(IRRead read) {
-    code.append(readGenerator.apply(read));
+  public void visit(IRMove move) {
+    code.append(moveGenerator.apply(move));
+  }
+
+  @Override
+  public void visit(IRClone clone) {
+    code.append(cloneGenerator.apply(clone));
   }
 
   @Override
   public void visit(IRAdd add) {
     if (add.getSlot() instanceof IRStringS) {
       code.append("string_concat(");
-      code.append(generateToString(add.getLhs(), readGenerator));
+      code.append(recurseToString(add.getLhs()));
       code.append(", ");
-      code.append(generateToString(add.getRhs(), readGenerator));
+      code.append(recurseToString(add.getRhs()));
       code.append(")");
     } else {
       binary("+", add.getLhs(), add.getRhs());
@@ -113,9 +126,9 @@ public class CExpressionGenerator extends IRExpressionVisitor {
   public void visit(IREqual eq) {
     if (eq.getLhs().getSlot() instanceof IRStringS || eq.getRhs().getSlot() instanceof IRStringS) {
       code.append("string_equal(");
-      code.append(generateToString(eq.getLhs(), readGenerator));
+      code.append(recurseToString(eq.getLhs()));
       code.append(", ");
-      code.append(generateToString(eq.getRhs(), readGenerator));
+      code.append(recurseToString(eq.getRhs()));
       code.append(")");
     } else {
       binary("==", eq.getLhs(), eq.getRhs());

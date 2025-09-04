@@ -47,7 +47,11 @@ public class IRExpressionGenerator extends ASTExprVisitor {
   public void visit(ASTVId expr) {
     IREnvironment.Channel session = env.getChannel(expr.getCh());
     IRSlot slot = slotFromType.apply(expr.getType());
-    ir = new IRRead(session.getLocalData(), slot);
+    if (expr.isLinear()) {
+      ir = new IRMove(session.getLocalData(), slot);
+    } else {
+      ir = new IRClone(session.getLocalData(), slot);
+    }
   }
 
   @Override

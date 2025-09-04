@@ -7,7 +7,9 @@ import pt.inescid.cllsj.compiler.ir.expression.literal.IRIntLiteral;
 import pt.inescid.cllsj.compiler.ir.expression.literal.IRStringLiteral;
 
 public abstract class IRExpressionVisitor {
-  public abstract void visit(IRRead read);
+  public abstract void visit(IRMove move);
+
+  public abstract void visit(IRClone clone);
 
   public abstract void visit(IRAdd add);
 
