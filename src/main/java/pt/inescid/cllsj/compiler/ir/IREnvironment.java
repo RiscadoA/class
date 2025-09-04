@@ -21,19 +21,30 @@ import pt.inescid.cllsj.compiler.ir.slot.IRSlotTree;
 public class IREnvironment {
   protected IRProcess process;
   private Optional<IREnvironment> parent;
+  private Env<EnvEntry> ep;
 
-  public IREnvironment(IRProcess process) {
+  public IREnvironment(IRProcess process, Env<EnvEntry> ep) {
     this.process = process;
     this.parent = Optional.empty();
+    this.ep = ep;
   }
 
-  public IREnvironment(IREnvironment parent) {
+  public IREnvironment(IREnvironment parent, Env<EnvEntry> ep) {
     this.process = parent.process;
     this.parent = Optional.of(parent);
+    this.ep = ep;
   }
 
   public IRProcess getProcess() {
     return process;
+  }
+
+  public Env<EnvEntry> getEp() {
+    return ep;
+  }
+
+  public IREnvironment changeEp(Env<EnvEntry> ep) {
+    return new IREnvironment(this, ep);
   }
 
   public IREnvironment addType(String name, boolean isPositive, boolean isValue) {
@@ -176,7 +187,7 @@ public class IREnvironment {
         channel.exponentialType);
   }
 
-  public boolean isPositive(Env<EnvEntry> ep, ASTType type) {
+  public boolean isPositive(ASTType type) {
     boolean dual = false;
     if (type instanceof ASTNotT) {
       type = ((ASTNotT) type).getin();
@@ -207,7 +218,7 @@ public class IREnvironment {
 
     public Type(
         IREnvironment parent, String name, IRTypeId id, boolean isPositive, boolean isValue) {
-      super(parent);
+      super(parent, parent.ep);
       this.name = name;
       this.id = id;
       this.isPositive = isPositive;
@@ -245,7 +256,7 @@ public class IREnvironment {
         IRSlotOffset offset,
         Optional<IRLocalDataId> localDataId,
         Optional<IRSlotTree> exponentialType) {
-      super(parent);
+      super(parent, parent.ep);
       this.name = name;
       this.sessionId = sessionId;
       this.offset = offset;

@@ -1,37 +1,25 @@
 package pt.inescid.cllsj.compiler.ir;
 
 import java.util.Optional;
-import pt.inescid.cllsj.Env;
-import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.ast.ASTTypeVisitor;
 import pt.inescid.cllsj.ast.types.*;
 import pt.inescid.cllsj.compiler.Compiler;
 
 public class IRValueChecker extends ASTTypeVisitor {
   private Compiler compiler;
-  private Env<EnvEntry> ep;
   private IREnvironment env;
   private boolean isValue = true;
   private Optional<Boolean> polarity;
 
   public static boolean check(
-      Compiler compiler,
-      Env<EnvEntry> ep,
-      IREnvironment env,
-      ASTType type,
-      boolean requiredPolarity) {
-    return check(compiler, ep, env, type, Optional.of(requiredPolarity));
+      Compiler compiler, IREnvironment env, ASTType type, boolean requiredPolarity) {
+    return check(compiler, env, type, Optional.of(requiredPolarity));
   }
 
   public static boolean check(
-      Compiler compiler,
-      Env<EnvEntry> ep,
-      IREnvironment env,
-      ASTType type,
-      Optional<Boolean> requiredPolarity) {
+      Compiler compiler, IREnvironment env, ASTType type, Optional<Boolean> requiredPolarity) {
     IRValueChecker visitor = new IRValueChecker();
     visitor.compiler = compiler;
-    visitor.ep = ep;
     visitor.env = env;
     visitor.polarity = requiredPolarity;
     type.accept(visitor);
@@ -81,7 +69,7 @@ public class IRValueChecker extends ASTTypeVisitor {
     // Unfold the type to check if its definition is known
     ASTType unfolded;
     try {
-      unfolded = type.unfoldType(ep);
+      unfolded = type.unfoldType(env.getEp());
     } catch (Exception e) {
       throw new IllegalArgumentException("Error unfolding type: " + e.getMessage());
     }

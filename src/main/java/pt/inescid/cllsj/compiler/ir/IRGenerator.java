@@ -36,13 +36,11 @@ public class IRGenerator extends ASTNodeVisitor {
   private IRBlock block;
   private int nextExponentialId = 0;
 
-  private Env<EnvEntry> ep;
   private IREnvironment env;
 
   public static IRProgram generate(Compiler compiler, Env<EnvEntry> ep, ASTProgram ast) {
     IRGenerator gen = new IRGenerator();
     gen.compiler = compiler;
-    gen.ep = ep;
 
     // Visit each of the processes and generate its environment
     for (ASTProcDef procDef : ast.getProcDefs()) {
@@ -65,7 +63,7 @@ public class IRGenerator extends ASTNodeVisitor {
           (tArgPolarities, tArgValues) -> {
             IRProcessId id = gen.processId(procDef.getId(), tArgPolarities, tArgValues);
             IRProcess process = new IRProcess(id);
-            gen.env = gen.environment(procDef, process, tArgPolarities, tArgValues);
+            gen.env = gen.environment(procDef, ep, process, tArgPolarities, tArgValues);
             process.setEndPoints(gen.countEndPoints(procDef.getRhs()));
             gen.procDefs.put(id, procDef);
             gen.procBodies.put(id, procDef.getRhs());
@@ -124,8 +122,12 @@ public class IRGenerator extends ASTNodeVisitor {
   }
 
   private IREnvironment environment(
-      ASTProcDef procDef, IRProcess process, boolean tArgPolarities[], boolean tArgValues[]) {
-    env = new IREnvironment(process);
+      ASTProcDef procDef,
+      Env<EnvEntry> globalEp,
+      IRProcess process,
+      boolean tArgPolarities[],
+      boolean tArgValues[]) {
+    env = new IREnvironment(process, globalEp);
 
     // Start by collecting type arguments
     for (int i = 0; i < procDef.getTArgs().size(); ++i) {
@@ -141,8 +143,8 @@ public class IRGenerator extends ASTNodeVisitor {
       ASTType type = procDef.getArgTypes().get(i);
 
       IRSlotsFromASTType info = slotsFromType(type);
-      boolean isPositive = env.isPositive(ep, type);
-      boolean isValue = IRValueChecker.check(compiler, ep, env, type, isPositive);
+      boolean isPositive = env.isPositive(type);
+      boolean isValue = IRValueChecker.check(compiler, env, type, isPositive);
 
       if (isPositive && isValue) {
         // Positive value: no need to store local data
@@ -183,7 +185,7 @@ public class IRGenerator extends ASTNodeVisitor {
       IRProcessId expProcessId = new IRProcessId(process.getId() + "_exp" + nextExponentialId++);
       IRProcess expProcess = new IRProcess(expProcessId);
       expProcess.setEndPoints(countEndPoints(node.getRhs()));
-      IREnvironment expEnv = new IREnvironment(expProcess);
+      IREnvironment expEnv = new IREnvironment(expProcess, env.getEp());
 
       // Define the argument session for the exponential
       expEnv = expEnv.addSession(node.getChi(), info.localCombinations());
@@ -736,10 +738,6 @@ public class IRGenerator extends ASTNodeVisitor {
 
   // ======================================= Helper methods =======================================
 
-  private boolean nameFreeIn(String name, ASTNode node) {
-    return node.fn(new HashSet<>()).contains(name);
-  }
-
   private void addContinue(IRSessionId sessionId) {
     IRBlock contBlock = process.createBlock("continue");
     block.add(new IRContinueSession(sessionId, contBlock.getLocation()));
@@ -773,11 +771,11 @@ public class IRGenerator extends ASTNodeVisitor {
   }
 
   private boolean isPositive(ASTType type) {
-    return env.isPositive(ep, type);
+    return env.isPositive(type);
   }
 
   private boolean isValue(ASTType type, boolean requiredPolarity) {
-    return IRValueChecker.check(compiler, ep, env, type, requiredPolarity);
+    return IRValueChecker.check(compiler, env, type, requiredPolarity);
   }
 
   private IRProcessId processId(String id, boolean tArgPolarities[], boolean tArgValues[]) {
@@ -814,11 +812,11 @@ public class IRGenerator extends ASTNodeVisitor {
   }
 
   private IRSlotsFromASTType slotsFromType(ASTType type) {
-    return IRSlotsFromASTType.compute(compiler, ep, env, Set.of(), type);
+    return IRSlotsFromASTType.compute(compiler, env, Set.of(), type);
   }
 
   private int countEndPoints(ASTNode node) {
-    return IREndPointCounter.count(compiler, ep, env, node);
+    return IREndPointCounter.count(compiler, env, node);
   }
 
   private void recurse(IRBlock block, ASTNode node) {

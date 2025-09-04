@@ -1,21 +1,17 @@
 package pt.inescid.cllsj.compiler.ir;
 
-import pt.inescid.cllsj.Env;
-import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.nodes.*;
 import pt.inescid.cllsj.compiler.Compiler;
 
 public class IREndPointCounter extends ASTNodeVisitor {
   private Compiler compiler;
-  private Env<EnvEntry> ep;
   private IREnvironment env;
   private int count = 0;
 
-  public static int count(Compiler compiler, Env<EnvEntry> ep, IREnvironment env, ASTNode node) {
+  public static int count(Compiler compiler, IREnvironment env, ASTNode node) {
     IREndPointCounter counter = new IREndPointCounter();
     counter.compiler = compiler;
-    counter.ep = ep;
     counter.env = env;
     node.accept(counter);
     return counter.count;
@@ -131,7 +127,7 @@ public class IREndPointCounter extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTBang node) {
-    if (IRValueChecker.check(compiler, ep, env, node.getType(), true)) {
+    if (IRValueChecker.check(compiler, env, node.getType(), true)) {
       node.getRhs().accept(this);
     } else {
       count += 1;

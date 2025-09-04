@@ -5,8 +5,6 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
-import pt.inescid.cllsj.Env;
-import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.TypeEntry;
 import pt.inescid.cllsj.ast.ASTTypeVisitor;
 import pt.inescid.cllsj.ast.types.*;
@@ -18,7 +16,6 @@ import pt.inescid.cllsj.compiler.ir.slot.*;
 // and a IRSlotCombinations corresponding to all the remote data requirements.
 public class IRSlotsFromASTType extends ASTTypeVisitor {
   private Compiler compiler;
-  private Env<EnvEntry> ep;
   private IREnvironment env;
   private Set<String> recursionTypes;
 
@@ -69,14 +66,9 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
   }
 
   public static IRSlotsFromASTType compute(
-      Compiler compiler,
-      Env<EnvEntry> ep,
-      IREnvironment env,
-      Set<String> recursionTypes,
-      ASTType type) {
+      Compiler compiler, IREnvironment env, Set<String> recursionTypes, ASTType type) {
     IRSlotsFromASTType visitor = new IRSlotsFromASTType();
     visitor.compiler = compiler;
-    visitor.ep = ep;
     visitor.env = env;
     visitor.recursionTypes = recursionTypes;
     type.accept(visitor);
@@ -84,7 +76,7 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
   }
 
   private IRSlotsFromASTType recurse(ASTType type) {
-    return compute(compiler, ep, env, recursionTypes, type);
+    return compute(compiler, env, recursionTypes, type);
   }
 
   private void localSlot(IRSlot slot) {
@@ -99,7 +91,7 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTBangT type) {
-    if (IRValueChecker.check(compiler, ep, env, type.getin(), Optional.of(true))) {
+    if (IRValueChecker.check(compiler, env, type.getin(), Optional.of(true))) {
       type.getin().accept(this);
     } else {
       remoteSlot(new IRExponentialS());
@@ -127,12 +119,18 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTCoRecT type) {
-    ep = ep.assoc(type.getid(), new TypeEntry(new ASTIdT(type.getid())));
+    IREnvironment env = this.env;
     Set<String> recursionTypes = this.recursionTypes;
+
+    this.env =
+        env.changeEp(env.getEp().assoc(type.getid(), new TypeEntry(new ASTIdT(type.getid()))));
     this.recursionTypes = new HashSet<>(recursionTypes);
     this.recursionTypes.add(type.getid());
+
     type.getin().accept(this);
+
     this.recursionTypes = recursionTypes;
+    this.env = env;
   }
 
   @Override
@@ -140,7 +138,7 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
     // Unfold the type to check if its definition is known
     ASTType unfolded;
     try {
-      unfolded = type.unfoldType(ep);
+      unfolded = type.unfoldType(env.getEp());
     } catch (Exception e) {
       throw new IllegalArgumentException("Error unfolding type: " + e.getMessage());
     }
@@ -205,12 +203,18 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTRecT type) {
-    ep = ep.assoc(type.getid(), new TypeEntry(new ASTIdT(type.getid())));
+    IREnvironment env = this.env;
     Set<String> recursionTypes = this.recursionTypes;
+
+    this.env =
+        env.changeEp(env.getEp().assoc(type.getid(), new TypeEntry(new ASTIdT(type.getid()))));
     this.recursionTypes = new HashSet<>(recursionTypes);
     this.recursionTypes.add(type.getid());
+
     type.getin().accept(this);
+
     this.recursionTypes = recursionTypes;
+    this.env = env;
   }
 
   @Override
@@ -218,7 +222,7 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
     // If the left-hand-side is a value, we start by visiting it
     // Otherwise, we just add a session slot
     if (compiler.optimizeSendValue.get()
-        && IRValueChecker.check(compiler, ep, env, type.getlhs(), Optional.of(false))) {
+        && IRValueChecker.check(compiler, env, type.getlhs(), Optional.of(false))) {
       type.getlhs().accept(this);
     } else {
       localSlot(new IRSessionS());
@@ -236,7 +240,7 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
     // If the left-hand-side can be a value, we start by visiting it
     // Otherwise, we just add a session slot
     if (compiler.optimizeSendValue.get()
-        && IRValueChecker.check(compiler, ep, env, type.getlhs(), Optional.of(true))) {
+        && IRValueChecker.check(compiler, env, type.getlhs(), Optional.of(true))) {
       type.getlhs().accept(this);
     } else {
       remoteSlot(new IRSessionS());
@@ -251,7 +255,7 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTWhyT type) {
-    if (IRValueChecker.check(compiler, ep, env, type.getin(), Optional.of(false))) {
+    if (IRValueChecker.check(compiler, env, type.getin(), Optional.of(false))) {
       type.getin().accept(this);
     } else {
       localSlot(new IRExponentialS());
