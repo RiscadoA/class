@@ -278,7 +278,7 @@ public class IRGenerator extends ASTNodeVisitor {
       recurse(
           caseBlock,
           () -> {
-            env = env.advanceChannel(node.getCh(), offset(new IRTagS(), node.getCaseType(label)));
+            advanceOrReset(node.getCh(), new IRTagS(), node.getCaseType(label), false);
             c.accept(this);
           });
     }
@@ -481,15 +481,13 @@ public class IRGenerator extends ASTNodeVisitor {
       // If the left type is a value, we do the send value optimization
       block.add(
           new IRMoveValue(argChannel.getLocalData(), channel.getLocalData(), info.activeLocalTree));
-      env =
-          env.advanceChannel(
-              node.getChr(), offset(info.activeLocalTree.combinations(), node.getRhsType()));
+      advanceOrReset(node.getChr(), info.activeLocalTree.combinations(), node.getRhsType(), false);
     } else {
       // Bind the new session to the value received from the main session
       block.add(
           new IRBindSession(
               channel.getLocalData(), argChannel.getSessionId(), argChannel.getLocalData()));
-      env = env.advanceChannel(node.getChr(), offset(new IRSessionS(), node.getRhsType()));
+      advanceOrReset(node.getChr(), new IRSessionS(), node.getRhsType(), false);
 
       // If the received session is negative, we must jump to it
       addContinueIfNegative(argChannel.getSessionId(), node.getChiType());
@@ -505,7 +503,7 @@ public class IRGenerator extends ASTNodeVisitor {
 
     // Write the tag to the session's remote data
     block.add(new IRWriteTag(channel.getRemoteData(), node.getLabelIndex()));
-    env = env.advanceChannel(node.getCh(), offset(new IRTagS(), node.getRhsType()));
+    advanceOrReset(node.getCh(), new IRTagS(), node.getRhsType(), true);
 
     // If the continuation is negative, we must jump to it
     addContinueIfNegative(channel.getSessionId(), node.getRhsType());
@@ -539,9 +537,7 @@ public class IRGenerator extends ASTNodeVisitor {
       recurse(block, node.getLhs());
 
       // Generate the continuation
-      env =
-          env.advanceChannel(
-              node.getChs(), offset(argInfo.activeRemoteTree.combinations(), node.getRhsType()));
+      advanceOrReset(node.getChs(), argInfo.activeRemoteTree.combinations(), node.getRhsType(), true);
       recurse(
           rhsBlock,
           () -> {
@@ -570,7 +566,7 @@ public class IRGenerator extends ASTNodeVisitor {
       }
 
       block.add(new IRWriteSession(channel.getRemoteData(), argSession.getSessionId()));
-      env = env.advanceChannel(node.getChs(), offset(new IRSessionS(), node.getRhsType()));
+      advanceOrReset(node.getChs(), new IRSessionS(), node.getRhsType(), true);
 
       // If the continuation is negative, we must jump to it
       addContinueIfNegative(channel.getSessionId(), node.getRhsType());
@@ -750,6 +746,22 @@ public class IRGenerator extends ASTNodeVisitor {
   private void addContinueIfNegative(IRSessionId sessionId, ASTType type) {
     if (!isPositive(type)) {
       addContinue(sessionId);
+    }
+  }
+
+  private void advanceOrReset(String ch, IRSlot slot, ASTType cont, boolean advancePolarity) {
+    advanceOrReset(ch, offset(slot, cont), cont, advancePolarity);
+  }
+
+  private void advanceOrReset(String ch, IRSlotCombinations slot, ASTType cont, boolean advancePolarity) {
+    advanceOrReset(ch, offset(slot, cont), cont, advancePolarity);
+  }
+
+  private void advanceOrReset(String ch, IRSlotOffset offset, ASTType cont, boolean advancePolarity) {
+    if (isPositive(cont) == advancePolarity) {
+      env = env.advanceChannel(ch, offset);
+    } else {
+      env.resetChannel(ch);
     }
   }
 
