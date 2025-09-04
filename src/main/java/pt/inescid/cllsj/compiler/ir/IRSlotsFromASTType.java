@@ -155,10 +155,6 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
     if (recursionTypes.contains(type.getid())) {
       return;
     }
-    System.err.println(type.getid());
-    for (String t : recursionTypes) {
-      System.err.println("r: " + t);
-    }
 
     // Otherwise, use the type slot
     IREnvironment.Type envType = env.getType(type.getid());
