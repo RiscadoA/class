@@ -125,7 +125,7 @@ public class IRGenerator extends ASTNodeVisitor {
 
   private IREnvironment environment(
       ASTProcDef procDef, IRProcess process, boolean tArgPolarities[], boolean tArgValues[]) {
-    IREnvironment env = new IREnvironment(process);
+    env = new IREnvironment(process);
 
     // Start by collecting type arguments
     for (int i = 0; i < procDef.getTArgs().size(); ++i) {
@@ -578,8 +578,15 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTUnfold node) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    IREnvironment.Channel channel = env.getChannel(node.getCh());
+
+    addContinue(channel.getSessionId());
+    if (node.isPos()) {
+      addContinueIfNegative(channel.getSessionId(), node.getRhsType());
+    }
+    env = env.resetChannel(node.getCh());
+
+    recurse(block, node.getRhs());
   }
 
   @Override
@@ -758,10 +765,10 @@ public class IRGenerator extends ASTNodeVisitor {
   }
 
   private void advanceOrReset(String ch, IRSlotOffset offset, ASTType cont, boolean advancePolarity) {
-    if (isPositive(cont) == advancePolarity) {
-      env = env.advanceChannel(ch, offset);
+    if (cont instanceof ASTRecT || cont instanceof ASTCoRecT || isPositive(cont) != advancePolarity) {
+      env = env.resetChannel(ch);
     } else {
-      env.resetChannel(ch);
+      env = env.advanceChannel(ch, offset);
     }
   }
 

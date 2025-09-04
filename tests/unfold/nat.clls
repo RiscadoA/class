@@ -9,7 +9,7 @@ proc rec nat_to_int(n: ~Nat, x: lint) {
     println("unfold r"); unfold n;
     println("case"); case n of {
         |#Z: println("#Z r"); wait n; println("let 0"); let x 0
-        |#S:  cut {
+        |#S: cut {
             nat_to_int(n, y)
             |y: ~lint|
             println("let +1");

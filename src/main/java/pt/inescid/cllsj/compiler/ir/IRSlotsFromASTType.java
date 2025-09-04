@@ -1,6 +1,7 @@
 package pt.inescid.cllsj.compiler.ir;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -76,6 +77,8 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
     IRSlotsFromASTType visitor = new IRSlotsFromASTType();
     visitor.compiler = compiler;
     visitor.ep = ep;
+    visitor.env = env;
+    visitor.recursionTypes = recursionTypes;
     type.accept(visitor);
     return visitor;
   }
@@ -124,7 +127,12 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTCoRecT type) {
+    ep = ep.assoc(type.getid(), new TypeEntry(new ASTIdT(type.getid())));
+    Set<String> recursionTypes = this.recursionTypes;
+    this.recursionTypes = new HashSet<>(recursionTypes);
+    this.recursionTypes.add(type.getid());
     type.getin().accept(this);
+    this.recursionTypes = recursionTypes;
   }
 
   @Override
@@ -148,6 +156,10 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
     // If it is a recursion variable, then stop here
     if (recursionTypes.contains(type.getid())) {
       return;
+    }
+    System.err.println(type.getid());
+    for (String t : recursionTypes) {
+      System.err.println("r: " + t);
     }
 
     // Otherwise, use the type slot
@@ -194,7 +206,11 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
   @Override
   public void visit(ASTRecT type) {
     ep = ep.assoc(type.getid(), new TypeEntry(new ASTIdT(type.getid())));
+    Set<String> recursionTypes = this.recursionTypes;
+    this.recursionTypes = new HashSet<>(recursionTypes);
+    this.recursionTypes.add(type.getid());
     type.getin().accept(this);
+    this.recursionTypes = recursionTypes;
   }
 
   @Override
