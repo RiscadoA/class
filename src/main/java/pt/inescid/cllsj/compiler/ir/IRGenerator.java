@@ -142,7 +142,7 @@ public class IRGenerator extends ASTNodeVisitor {
 
       IRSlotsFromASTType info = slotsFromType(type);
       boolean isPositive = env.isPositive(ep, type);
-      boolean isValue = IRValueChecker.check(ep, env, type, isPositive);
+      boolean isValue = IRValueChecker.check(compiler, ep, env, type, isPositive);
 
       if (isPositive && isValue) {
         // Positive value: no need to store local data
@@ -758,7 +758,7 @@ public class IRGenerator extends ASTNodeVisitor {
   }
 
   private boolean isValue(ASTType type, boolean requiredPolarity) {
-    return IRValueChecker.check(ep, env, type, requiredPolarity);
+    return IRValueChecker.check(compiler, ep, env, type, requiredPolarity);
   }
 
   private IRProcessId processId(String id, boolean tArgPolarities[], boolean tArgValues[]) {

@@ -5,21 +5,24 @@ import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.ast.ASTTypeVisitor;
 import pt.inescid.cllsj.ast.types.*;
+import pt.inescid.cllsj.compiler.Compiler;
 
 public class IRValueChecker extends ASTTypeVisitor {
+  private Compiler compiler;
   private Env<EnvEntry> ep;
   private IREnvironment env;
   private boolean isValue = true;
   private Optional<Boolean> polarity;
 
   public static boolean check(
-      Env<EnvEntry> ep, IREnvironment env, ASTType type, boolean requiredPolarity) {
-    return check(ep, env, type, Optional.of(requiredPolarity));
+      Compiler compiler, Env<EnvEntry> ep, IREnvironment env, ASTType type, boolean requiredPolarity) {
+    return check(compiler, ep, env, type, Optional.of(requiredPolarity));
   }
 
   public static boolean check(
-      Env<EnvEntry> ep, IREnvironment env, ASTType type, Optional<Boolean> requiredPolarity) {
+      Compiler compiler, Env<EnvEntry> ep, IREnvironment env, ASTType type, Optional<Boolean> requiredPolarity) {
     IRValueChecker visitor = new IRValueChecker();
+    visitor.compiler = compiler;
     visitor.ep = ep;
     visitor.env = env;
     visitor.polarity = requiredPolarity;
@@ -120,16 +123,24 @@ public class IRValueChecker extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTRecvT type) {
-    expectPolarity(false);
-    recurse(type.getlhs());
-    recurse(type.getrhs());
+    if (!compiler.optimizeSendValue.get()) {
+      isValue = false;
+    } else {
+      expectPolarity(false);
+      recurse(type.getlhs());
+      recurse(type.getrhs());
+    }
   }
 
   @Override
   public void visit(ASTSendT type) {
-    expectPolarity(true);
-    recurse(type.getlhs());
-    recurse(type.getrhs());
+    if (!compiler.optimizeSendValue.get()) {
+      isValue = false;
+    } else {
+      expectPolarity(true);
+      recurse(type.getlhs());
+      recurse(type.getrhs());
+    }
   }
 
   @Override

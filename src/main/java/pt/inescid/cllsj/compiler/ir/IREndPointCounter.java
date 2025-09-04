@@ -131,7 +131,7 @@ public class IREndPointCounter extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTBang node) {
-    if (IRValueChecker.check(ep, env, node.getType(), true)) {
+    if (IRValueChecker.check(compiler, ep, env, node.getType(), true)) {
       node.getRhs().accept(this);
     } else {
       count += 1;

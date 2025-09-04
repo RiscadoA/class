@@ -96,7 +96,7 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTBangT type) {
-    if (IRValueChecker.check(ep, env, type.getin(), Optional.of(true))) {
+    if (IRValueChecker.check(compiler, ep, env, type.getin(), Optional.of(true))) {
       type.getin().accept(this);
     } else {
       remoteSlot(new IRExponentialS());
@@ -202,7 +202,7 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
     // If the left-hand-side is a value, we start by visiting it
     // Otherwise, we just add a session slot
     if (compiler.optimizeSendValue.get()
-        && IRValueChecker.check(ep, env, type.getlhs(), Optional.of(false))) {
+        && IRValueChecker.check(compiler, ep, env, type.getlhs(), Optional.of(false))) {
       type.getlhs().accept(this);
     } else {
       localSlot(new IRSessionS());
@@ -220,7 +220,7 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
     // If the left-hand-side can be a value, we start by visiting it
     // Otherwise, we just add a session slot
     if (compiler.optimizeSendValue.get()
-        && IRValueChecker.check(ep, env, type.getlhs(), Optional.of(true))) {
+        && IRValueChecker.check(compiler, ep, env, type.getlhs(), Optional.of(true))) {
       type.getlhs().accept(this);
     } else {
       remoteSlot(new IRSessionS());
@@ -235,7 +235,7 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTWhyT type) {
-    if (IRValueChecker.check(ep, env, type.getin(), Optional.of(false))) {
+    if (IRValueChecker.check(compiler, ep, env, type.getin(), Optional.of(false))) {
       type.getin().accept(this);
     } else {
       localSlot(new IRExponentialS());
