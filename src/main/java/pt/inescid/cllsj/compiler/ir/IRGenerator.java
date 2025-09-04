@@ -458,7 +458,7 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTPrintLn node) {
-    block.add(new IRPrint(expression(node.getExpr()), true));
+    block.add(new IRPrint(expression(node.getExpr()), node.withNewLine()));
     recurse(block, node.getRhs());
   }
 

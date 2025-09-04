@@ -76,7 +76,7 @@ public class CExpressionGenerator extends IRExpressionVisitor {
 
   @Override
   public void visit(IRStringLiteral lit) {
-    code.append("string_clone(\"").append(CStringEscape.escape(lit.getValue())).append("\")");
+    code.append("string_clone(\"").append(lit.getValue()).append("\")");
   }
 
   @Override
