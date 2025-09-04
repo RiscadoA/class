@@ -11,7 +11,7 @@ proc clone_int(out: lint; cloned: recv lint; ~lint) {
 proc main() {
     cut {
         !x(i: send ~lint; lint);
-        send i(j. println("exp: " + j); ());
+        send i(j. println(j); ());
         let i 42
         |x: ~!send ~lint; lint|
         ?x;
