@@ -731,8 +731,7 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTExpr node) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    throw new UnsupportedOperationException("Expressions should not appear here");
   }
 
   // ======================================= Helper methods =======================================
