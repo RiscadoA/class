@@ -59,7 +59,7 @@ public class IRProcess {
 
     @Override
     public String toString() {
-      StringBuilder b = new StringBuilder(); 
+      StringBuilder b = new StringBuilder();
       b.append(slots).append(" at ");
       b.append(localDataId);
       b.append(offset);

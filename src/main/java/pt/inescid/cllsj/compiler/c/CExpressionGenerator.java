@@ -1,7 +1,6 @@
 package pt.inescid.cllsj.compiler.c;
 
 import java.util.function.Function;
-
 import pt.inescid.cllsj.compiler.ir.expression.IRClone;
 import pt.inescid.cllsj.compiler.ir.expression.IRExpression;
 import pt.inescid.cllsj.compiler.ir.expression.IRExpressionVisitor;
@@ -29,7 +28,10 @@ public class CExpressionGenerator extends IRExpressionVisitor {
   private Function<IRClone, String> cloneGenerator;
   private StringBuilder code = new StringBuilder("");
 
-  public static String generate(IRExpression expression, Function<IRMove, String> moveGenerator, Function<IRClone, String> cloneGenerator) {
+  public static String generate(
+      IRExpression expression,
+      Function<IRMove, String> moveGenerator,
+      Function<IRClone, String> cloneGenerator) {
     CExpressionGenerator gen = new CExpressionGenerator();
     gen.moveGenerator = moveGenerator;
     gen.cloneGenerator = cloneGenerator;
@@ -37,7 +39,10 @@ public class CExpressionGenerator extends IRExpressionVisitor {
     return gen.code.toString();
   }
 
-  public static String generateToString(IRExpression expr, Function<IRMove, String> moveGenerator, Function<IRClone, String> cloneGenerator) {
+  public static String generateToString(
+      IRExpression expr,
+      Function<IRMove, String> moveGenerator,
+      Function<IRClone, String> cloneGenerator) {
     String result = generate(expr, moveGenerator, cloneGenerator);
 
     if (expr.getSlot() instanceof IRIntS) {

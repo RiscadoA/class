@@ -15,12 +15,20 @@ public class IRValueChecker extends ASTTypeVisitor {
   private Optional<Boolean> polarity;
 
   public static boolean check(
-      Compiler compiler, Env<EnvEntry> ep, IREnvironment env, ASTType type, boolean requiredPolarity) {
+      Compiler compiler,
+      Env<EnvEntry> ep,
+      IREnvironment env,
+      ASTType type,
+      boolean requiredPolarity) {
     return check(compiler, ep, env, type, Optional.of(requiredPolarity));
   }
 
   public static boolean check(
-      Compiler compiler, Env<EnvEntry> ep, IREnvironment env, ASTType type, Optional<Boolean> requiredPolarity) {
+      Compiler compiler,
+      Env<EnvEntry> ep,
+      IREnvironment env,
+      ASTType type,
+      Optional<Boolean> requiredPolarity) {
     IRValueChecker visitor = new IRValueChecker();
     visitor.compiler = compiler;
     visitor.ep = ep;

@@ -52,8 +52,7 @@ public class CGenerator extends IRInstructionVisitor {
 
   private int nextLabelId = 0;
 
-  private Map<IRProcessId, IRWriteExponential> pendingExponentialManagers =
-      new HashMap<>();
+  private Map<IRProcessId, IRWriteExponential> pendingExponentialManagers = new HashMap<>();
 
   public static void generate(Compiler compiler, IRProgram program, PrintStream output) {
     CGenerator gen = new CGenerator();
@@ -631,8 +630,7 @@ public class CGenerator extends IRInstructionVisitor {
     instr.accept(this);
   }
 
-  private void generateExponentialManager(
-      IRProcessId processId, IRWriteExponential instr) {
+  private void generateExponentialManager(IRProcessId processId, IRWriteExponential instr) {
     // The purpose of this section is described in a comment in the IRWriteExponential visit method
 
     // Set up the layout and the function used to get layouts from types
@@ -1074,10 +1072,7 @@ public class CGenerator extends IRInstructionVisitor {
 
     // Call the exponential manager to clone the slots
     putStatement(
-        exponentialManager(exponential)
-            + "("
-            + cast(TMP_PTR1, "char*")
-            + ", 0)"); // 0 = Clone
+        exponentialManager(exponential) + "(" + cast(TMP_PTR1, "char*") + ", 0)"); // 0 = Clone
 
     // Setup the new session and tie it to the exponential's entry session
     CAddress localSessionAddress = sessionAddress(instr.getSessionId());
@@ -1137,6 +1132,17 @@ public class CGenerator extends IRInstructionVisitor {
     CAddress dropByteAddress = CAddress.of(ENV, dropBitOffset.getSize());
     String dropByte = dropByteAddress.deref("unsigned char");
     putAssign(dropByte, dropByte + " | (1 << " + dropBitOffset.getBits() + ")");
+  }
+
+  @Override
+  public void visit(IRSleep instr) {
+    putStatement("sleep_msecs(" + instr.getMsecs() + ")");
+  }
+
+  @Override
+  public void visit(IRPanic instr) {
+    putDebugLn("Panic: " + instr.getMessage());
+    putStatement("exit(1);");
   }
 
   // ============================ Structure expression building helpers ===========================

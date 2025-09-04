@@ -193,8 +193,7 @@ public class IRGenerator extends ASTNodeVisitor {
       for (int i = 0; i < process.getTypeCount(); ++i) {
         IRTypeId id = new IRTypeId(i);
         IREnvironment.Type envType = env.getType(id);
-        typeArguments.add(
-            new IRWriteExponential.TypeArgument(IRSlotTree.of(new IRVarS(id)), id));
+        typeArguments.add(new IRWriteExponential.TypeArgument(IRSlotTree.of(new IRVarS(id)), id));
         expEnv = expEnv.addType(envType.getName(), envType.isPositive(), envType.isValue());
       }
 
@@ -250,9 +249,7 @@ public class IRGenerator extends ASTNodeVisitor {
     } else {
       block.add(
           new IRCallExponential(
-              channel.getLocalData(),
-              argChannel.getSessionId(),
-              argChannel.getLocalDataId()));
+              channel.getLocalData(), argChannel.getSessionId(), argChannel.getLocalDataId()));
 
       // If the called session is negative, we must jump to it
       addContinueIfNegative(argChannel.getSessionId(), node.getType());
@@ -537,7 +534,8 @@ public class IRGenerator extends ASTNodeVisitor {
       recurse(block, node.getLhs());
 
       // Generate the continuation
-      advanceOrReset(node.getChs(), argInfo.activeRemoteTree.combinations(), node.getRhsType(), true);
+      advanceOrReset(
+          node.getChs(), argInfo.activeRemoteTree.combinations(), node.getRhsType(), true);
       recurse(
           rhsBlock,
           () -> {
@@ -722,14 +720,13 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTSleep node) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    block.add(new IRSleep(node.getMsecs()));
+    recurse(block, node.getRhs());
   }
 
   @Override
   public void visit(ASTUnreachable node) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    block.add(new IRPanic("Unreachable code reached at line " + node.lineno));
   }
 
   @Override
@@ -760,12 +757,16 @@ public class IRGenerator extends ASTNodeVisitor {
     advanceOrReset(ch, offset(slot, cont), cont, advancePolarity);
   }
 
-  private void advanceOrReset(String ch, IRSlotCombinations slot, ASTType cont, boolean advancePolarity) {
+  private void advanceOrReset(
+      String ch, IRSlotCombinations slot, ASTType cont, boolean advancePolarity) {
     advanceOrReset(ch, offset(slot, cont), cont, advancePolarity);
   }
 
-  private void advanceOrReset(String ch, IRSlotOffset offset, ASTType cont, boolean advancePolarity) {
-    if (cont instanceof ASTRecT || cont instanceof ASTCoRecT || isPositive(cont) != advancePolarity) {
+  private void advanceOrReset(
+      String ch, IRSlotOffset offset, ASTType cont, boolean advancePolarity) {
+    if (cont instanceof ASTRecT
+        || cont instanceof ASTCoRecT
+        || isPositive(cont) != advancePolarity) {
       env = env.resetChannel(ch);
     } else {
       env = env.advanceChannel(ch, offset);

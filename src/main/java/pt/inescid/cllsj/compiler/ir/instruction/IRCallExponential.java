@@ -10,9 +10,7 @@ public class IRCallExponential extends IRAccess {
   private IRLocalDataId localDataId;
 
   public IRCallExponential(
-      IRDataLocation location,
-      IRSessionId sessionId,
-      IRLocalDataId localDataId) {
+      IRDataLocation location, IRSessionId sessionId, IRLocalDataId localDataId) {
     super(location);
     this.sessionId = sessionId;
     this.localDataId = localDataId;
