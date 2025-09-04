@@ -1,0 +1,26 @@
+proc clone_int(out: lint; cloned: recv lint; ~lint) {
+    call cloned(i);
+    recv i(x);
+    par {
+        let x 17
+        ||
+        fwd i out
+    }
+};;
+
+proc main() {
+    cut {
+        !x(i: send ~lint; lint);
+        send i(j. println("exp: " + j); ());
+        let i 42
+        |x: ~!send ~lint; lint|
+        ?x;
+        send ch(i. clone_int(i; x));
+        send ch(i. clone_int(i; x));
+        close ch
+        |ch: recv ~lint; recv ~lint; wait|
+        recv ch(i); println(i);
+        recv ch(i); println(i);
+        wait ch; ()
+    }
+};;
