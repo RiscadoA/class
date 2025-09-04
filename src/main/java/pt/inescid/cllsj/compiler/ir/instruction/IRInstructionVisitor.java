@@ -19,6 +19,8 @@ public abstract class IRInstructionVisitor {
 
   public abstract void visit(IRMoveValue instr);
 
+  public abstract void visit(IRCloneValue instr);
+
   public abstract void visit(IRPrint instr);
 
   public abstract void visit(IRPushTask instr);
@@ -31,13 +33,11 @@ public abstract class IRInstructionVisitor {
 
   public abstract void visit(IRCallExponential instr);
 
-  public abstract void visit(IRIncrementExponential instr);
-
-  public abstract void visit(IRDecrementExponential instr);
-
   public abstract void visit(IRTieSessions instr);
 
   public abstract void visit(IRBranchTag instr);
 
   public abstract void visit(IRBranchExpression instr);
+
+  public abstract void visit(IRDeferDrop instr);
 }

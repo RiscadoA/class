@@ -13,6 +13,7 @@ import pt.inescid.cllsj.compiler.Compiler;
 import pt.inescid.cllsj.compiler.ir.expression.IRExpression;
 import pt.inescid.cllsj.compiler.ir.id.IRCodeLocation;
 import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
+import pt.inescid.cllsj.compiler.ir.id.IRDropId;
 import pt.inescid.cllsj.compiler.ir.id.IRLocalDataId;
 import pt.inescid.cllsj.compiler.ir.id.IRProcessId;
 import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
@@ -819,6 +820,11 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   @Override
+  public void visit(IRCloneValue instr) {
+    putMoveSlots(instr.getSlots(), true, instr.getLocation(), instr.getSourceLocation());
+  }
+
+  @Override
   public void visit(IRPrint instr) {
     String value = expression(instr.getExpression());
     CPrintGenerator gen = CPrintGenerator.forValue(value, instr.getExpression().getSlot());
@@ -872,6 +878,9 @@ public class CGenerator extends IRInstructionVisitor {
     if (!compiler.optimizeSingleEndpoint.get() || calledProcess.getEndPoints() != 1) {
       putAssign(endPoints(calledLayout, newEnv), calledProcess.getEndPoints());
     }
+
+    // Zero out any drop bits
+    putZeroEnvironmentDropBits(calledLayout, newEnv);
 
     for (IRCallProcess.TypeArgument arg : instr.getTypeArguments()) {
       // Get a reference to the target type in the new environment
@@ -1064,22 +1073,12 @@ public class CGenerator extends IRInstructionVisitor {
     CAddress newEnv = castToAddress(TMP_PTR1);
     putCopyMemory(newEnv, oldEnv, CSize.expression(exponentialEnvSize(exponential)));
 
-    // Clone the environment if necessary
-    Runnable clone =
-        () -> {
-          // Call the exponential manager to clone the slots
-          putStatement(
-              exponentialManager(exponential)
-                  + "("
-                  + cast(TMP_PTR1, "char*")
-                  + ", 0)"); // 0 = Clone
-        };
-    if (instr.shouldDecrementExponential()) {
-      putIncrementExponential(exponential);
-      putIf(decrementAtomic(exponentialRefCount(exponential)) + " > 2", clone);
-    } else {
-      clone.run();
-    }
+    // Call the exponential manager to clone the slots
+    putStatement(
+        exponentialManager(exponential)
+            + "("
+            + cast(TMP_PTR1, "char*")
+            + ", 0)"); // 0 = Clone
 
     // Setup the new session and tie it to the exponential's entry session
     CAddress localSessionAddress = sessionAddress(instr.getSessionId());
@@ -1101,21 +1100,7 @@ public class CGenerator extends IRInstructionVisitor {
     // Initialize remote session (the one stored in the exponential)
     putAssign(sessionContEnv(remoteSession), ENV);
     putAssign(sessionContData(remoteSession), localData(instr.getLocalDataId()));
-    putAssign(sessionContSession(remoteSession), remoteSessionAddress);
-
-    if (instr.shouldDecrementExponential()) {
-      putDecrementExponential(exponential);
-    }
-  }
-
-  @Override
-  public void visit(IRIncrementExponential instr) {
-    putIncrementExponential(data(instr.getLocation()).deref("struct exponential*"));
-  }
-
-  @Override
-  public void visit(IRDecrementExponential instr) {
-    putDecrementExponential(data(instr.getLocation()).deref("struct exponential*"));
+    putAssign(sessionContSession(remoteSession), localSessionAddress);
   }
 
   @Override
@@ -1145,6 +1130,14 @@ public class CGenerator extends IRInstructionVisitor {
               endPoints(), instr.getMaxEndPoints() - instr.getOtherwise().getEndPoints());
           putConstantGoto(codeLocationLabel(instr.getOtherwise().getLocation()));
         });
+  }
+
+  @Override
+  public void visit(IRDeferDrop instr) {
+    CSizeBits dropBitOffset = currentProcessLayout.dropBitOffset(instr.getDropId());
+    CAddress dropByteAddress = CAddress.of(ENV, dropBitOffset.getSize());
+    String dropByte = dropByteAddress.deref("unsigned char");
+    putAssign(dropByte, dropByte + " | (1 << " + dropBitOffset.getBits() + ")");
   }
 
   // ============================ Structure expression building helpers ===========================
@@ -1223,6 +1216,10 @@ public class CGenerator extends IRInstructionVisitor {
 
   private CAddress localData(IRLocalDataId localDataId) {
     return localData(this::typeLayout, currentProcessLayout, ENV, localDataId, IRSlotOffset.ZERO);
+  }
+
+  private CAddress localData(IRLocalDataId localDataId, IRSlotOffset offset) {
+    return localData(this::typeLayout, currentProcessLayout, ENV, localDataId, offset);
   }
 
   private CAddress localData(
@@ -1407,6 +1404,14 @@ public class CGenerator extends IRInstructionVisitor {
     CSlotCloner.clone(this, address, slot);
   }
 
+  // Drops each slot on the tree
+  void putDropSlots(IRSlotTree slots, BiFunction<IRSlotSequence, IRSlot, CAddress> addresser) {
+    putSlotTraversal(
+        slots,
+        past -> addresser.apply(past, new IRTagS()),
+        (past, slot) -> putDropSlot(addresser.apply(past, slot), slot));
+  }
+
   // Drops a slot, e.g., decrementing reference counts if necessary
   void putDropSlot(CAddress address, IRSlot slot) {
     CSlotDropper.drop(this, address, slot);
@@ -1502,15 +1507,43 @@ public class CGenerator extends IRInstructionVisitor {
     }
   }
 
-  void putFreeEnvironment(String var) {
+  void putFreeEnvironment(IRProcess process, CProcessLayout processLayout, String var) {
+    putDoDeferredEnvironmentDrops(process, processLayout, var);
     putFree(var);
     if (compiler.profiling.get()) {
       putIncrementAtomic("env_frees");
     }
   }
 
+  void putZeroEnvironmentDropBits(CProcessLayout processLayout, String var) {
+    putZeroMemory(CAddress.of(var, processLayout.dropByteStart()), processLayout.dropByteCount());
+  }
+
+  void putDoDeferredEnvironmentDrops(IRProcess process, CProcessLayout processLayout, String var) {
+    for (int i = 0; i < process.getDropOnEnd().size(); ++i) {
+      IRDropId dropId = new IRDropId(i);
+      IRProcess.DropOnEnd drop = process.getDropOnEnd(dropId);
+      Runnable putDrop =
+          () ->
+              putDropSlots(
+                  drop.getSlots(),
+                  (past, slot) ->
+                      localData(drop.getLocalDataId(), drop.getOffset().advance(past, slot)));
+
+      if (drop.isAlways()) {
+        putDrop.run();
+      } else {
+        CSizeBits dropBitOffset = processLayout.dropBitOffset(dropId);
+        CAddress dropByteAddress = CAddress.of(var, dropBitOffset.getSize());
+        String dropByte = dropByteAddress.deref("unsigned char");
+        putIf(dropByte + " & (1 << " + dropBitOffset.getBits() + ")", putDrop);
+      }
+    }
+  }
+
   void putDecrementEndPoints(boolean isEndPoint) {
-    putDecrementEndPoints(isEndPoint, () -> putFreeEnvironment(ENV));
+    putDecrementEndPoints(
+        isEndPoint, () -> putFreeEnvironment(currentProcess, currentProcessLayout, ENV));
   }
 
   void putDecrementEndPoints(boolean isEndPoint, Runnable free) {
@@ -1714,6 +1747,12 @@ public class CGenerator extends IRInstructionVisitor {
   void putCopyMemory(CAddress dst, CAddress src, CSize size) {
     if (!size.equals(CSize.zero())) {
       putStatement("memcpy(" + dst + ", " + src + ", " + size + ")");
+    }
+  }
+
+  void putZeroMemory(CAddress dst, CSize size) {
+    if (!size.equals(CSize.zero())) {
+      putStatement("memset(" + dst + ", 0, " + size + ")");
     }
   }
 

@@ -8,17 +8,14 @@ import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
 public class IRCallExponential extends IRAccess {
   private IRSessionId sessionId;
   private IRLocalDataId localDataId;
-  private boolean decrementExponential;
 
   public IRCallExponential(
       IRDataLocation location,
       IRSessionId sessionId,
-      IRLocalDataId localDataId,
-      boolean decrementExponential) {
+      IRLocalDataId localDataId) {
     super(location);
     this.sessionId = sessionId;
     this.localDataId = localDataId;
-    this.decrementExponential = decrementExponential;
   }
 
   public IRSessionId getSessionId() {
@@ -29,13 +26,9 @@ public class IRCallExponential extends IRAccess {
     return localDataId;
   }
 
-  public boolean shouldDecrementExponential() {
-    return decrementExponential;
-  }
-
   @Override
   public IRInstruction clone() {
-    return new IRCallExponential(location, sessionId, localDataId, decrementExponential);
+    return new IRCallExponential(location, sessionId, localDataId);
   }
 
   @Override
@@ -51,11 +44,8 @@ public class IRCallExponential extends IRAccess {
         .append(", ")
         .append(sessionId)
         .append(", ")
-        .append(localDataId);
-    if (decrementExponential) {
-      sb.append(", decrement");
-    }
-    sb.append(")");
+        .append(localDataId)
+        .append(")");
     return sb.toString();
   }
 

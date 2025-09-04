@@ -121,12 +121,14 @@ public class IRValueChecker extends ASTTypeVisitor {
   @Override
   public void visit(ASTRecvT type) {
     expectPolarity(false);
+    recurse(type.getlhs());
     recurse(type.getrhs());
   }
 
   @Override
   public void visit(ASTSendT type) {
     expectPolarity(true);
+    recurse(type.getlhs());
     recurse(type.getrhs());
   }
 

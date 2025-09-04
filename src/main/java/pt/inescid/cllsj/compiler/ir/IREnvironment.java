@@ -1,18 +1,21 @@
 package pt.inescid.cllsj.compiler.ir;
 
 import java.util.Optional;
+import java.util.function.Consumer;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.ast.types.ASTIdT;
 import pt.inescid.cllsj.ast.types.ASTNotT;
 import pt.inescid.cllsj.ast.types.ASTType;
 import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
+import pt.inescid.cllsj.compiler.ir.id.IRDropId;
 import pt.inescid.cllsj.compiler.ir.id.IRLocalDataId;
 import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
 import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
 import pt.inescid.cllsj.compiler.ir.instruction.IRProcess;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotCombinations;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotOffset;
+import pt.inescid.cllsj.compiler.ir.slot.IRSlotTree;
 
 // Maps names to IR ids for types, sessions and local data within a process
 public class IREnvironment {
@@ -75,7 +78,7 @@ public class IREnvironment {
         Optional.of(process.addArgSession(localDataId)),
         IRSlotOffset.ZERO,
         Optional.of(localDataId),
-        false);
+        Optional.empty());
   }
 
   public IREnvironment addSession(String name, IRSlotCombinations combinations) {
@@ -86,23 +89,28 @@ public class IREnvironment {
         Optional.of(process.addSession()),
         IRSlotOffset.ZERO,
         Optional.of(localDataId),
-        false);
+        Optional.empty());
   }
 
   public IREnvironment addSession(String name) {
     return new Channel(
-        this, name, Optional.of(process.addSession()), IRSlotOffset.ZERO, Optional.empty(), false);
+        this,
+        name,
+        Optional.of(process.addSession()),
+        IRSlotOffset.ZERO,
+        Optional.empty(),
+        Optional.empty());
   }
 
   public IREnvironment addValue(
-      String name, IRSlotCombinations combinations, boolean isExponential) {
+      String name, IRSlotCombinations combinations, Optional<IRSlotTree> exponentialType) {
     return new Channel(
         this,
         name,
         Optional.empty(),
         IRSlotOffset.ZERO,
         Optional.of(process.addLocalData(combinations)),
-        isExponential);
+        exponentialType);
   }
 
   public Channel getChannel(String name) {
@@ -128,7 +136,7 @@ public class IREnvironment {
         channel.sessionId,
         channel.getOffset().advance(offset),
         channel.localDataId,
-        channel.isExponential());
+        channel.exponentialType);
   }
 
   public IREnvironment resetChannel(String name) {
@@ -139,13 +147,33 @@ public class IREnvironment {
         channel.sessionId,
         IRSlotOffset.ZERO,
         channel.localDataId,
-        channel.isExponential());
+        channel.exponentialType);
   }
 
-  public IREnvironment makeChannelExponential(String name) {
+  public IREnvironment makeChannelExponential(
+      String name, IRSlotTree slots, boolean always, Consumer<IRDropId> dropId) {
     Channel channel = getChannel(name);
+    IRDropId id =
+        process.addDropOnEnd(channel.getLocalDataId(), channel.getOffset(), slots, always);
+    dropId.accept(id);
     return new Channel(
-        this, channel.getName(), channel.sessionId, channel.getOffset(), channel.localDataId, true);
+        this,
+        channel.getName(),
+        channel.sessionId,
+        channel.getOffset(),
+        channel.localDataId,
+        channel.exponentialType);
+  }
+
+  public IREnvironment alias(String oldName, String newName) {
+    Channel channel = getChannel(oldName);
+    return new Channel(
+        this,
+        newName,
+        channel.sessionId,
+        channel.getOffset(),
+        channel.localDataId,
+        channel.exponentialType);
   }
 
   public boolean isPositive(Env<EnvEntry> ep, ASTType type) {
@@ -208,7 +236,7 @@ public class IREnvironment {
     private Optional<IRSessionId> sessionId;
     private IRSlotOffset offset;
     private Optional<IRLocalDataId> localDataId;
-    private boolean isExponential;
+    private Optional<IRSlotTree> exponentialType;
 
     public Channel(
         IREnvironment parent,
@@ -216,13 +244,13 @@ public class IREnvironment {
         Optional<IRSessionId> sessionId,
         IRSlotOffset offset,
         Optional<IRLocalDataId> localDataId,
-        boolean isExponential) {
+        Optional<IRSlotTree> exponentialType) {
       super(parent);
       this.name = name;
       this.sessionId = sessionId;
       this.offset = offset;
       this.localDataId = localDataId;
-      this.isExponential = isExponential;
+      this.exponentialType = exponentialType;
     }
 
     public String getName() {
@@ -250,7 +278,11 @@ public class IREnvironment {
     }
 
     public boolean isExponential() {
-      return isExponential;
+      return exponentialType.isPresent();
+    }
+
+    public IRSlotTree getExponentialType() {
+      return exponentialType.orElseThrow();
     }
   }
 }

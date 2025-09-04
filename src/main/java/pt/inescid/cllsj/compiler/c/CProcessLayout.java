@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
 import pt.inescid.cllsj.compiler.Compiler;
+import pt.inescid.cllsj.compiler.ir.id.IRDropId;
 import pt.inescid.cllsj.compiler.ir.id.IRLocalDataId;
 import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
 import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
@@ -12,6 +13,7 @@ import pt.inescid.cllsj.compiler.ir.instruction.IRProcess;
 // Stores the offsets of the various sections in a process layout
 // A process layout is as follows:
 // - end point counter (optional integer)
+// - drop bits (optional byte[])
 // - type section (struct type[])
 // - session section (struct session[])
 // - data section (arbitrary data based on local data slot combinations)
@@ -21,6 +23,9 @@ public class CProcessLayout {
 
   private CAlignment alignment;
   private CSize endPointsOffset;
+  private CSize dropByteStart;
+  private CSize dropByteCount;
+  private Map<IRDropId, CSizeBits> dropBitOffsets = new HashMap<>();
   private Map<IRTypeId, CSize> typeOffsets = new HashMap<>();
   private Map<IRSessionId, CSize> sessionOffsets = new HashMap<>();
   private CSize sessionsEnd;
@@ -40,7 +45,29 @@ public class CProcessLayout {
       endPointsEnd = result.endPointsOffset.add(compiler.arch.intSize);
     }
 
-    CSize typesStart = endPointsEnd.align(compiler.arch.typeAlignment());
+    result.dropByteStart = endPointsEnd;
+    result.dropByteCount = CSize.zero();
+    CSizeBits dropBitNext = CSizeBits.of(result.dropByteStart, 0);
+    for (int i = 0; i < process.getDropOnEnd().size(); ++i) {
+      IRDropId dropId = new IRDropId(i);
+      IRProcess.DropOnEnd drop = process.getDropOnEnd(dropId);
+      if (drop.isAlways()) {
+        continue; // No need to store a bit if it will always be dropped anyway
+      }
+
+      if (dropBitNext.getBits() == 0) {
+        result.dropByteCount = result.dropByteCount.add(CSize.constant(1));
+      }
+      result.dropBitOffsets.put(dropId, dropBitNext);
+      if (dropBitNext.getBits() >= 7) {
+        dropBitNext = CSizeBits.of(dropBitNext.getSize().add(CSize.constant(1)));
+      } else {
+        dropBitNext = CSizeBits.of(dropBitNext.getSize(), dropBitNext.getBits() + 1);
+      }
+    }
+    CSize dropBitEnds = result.dropByteStart.add(result.dropByteCount);
+
+    CSize typesStart = dropBitEnds.align(compiler.arch.typeAlignment());
     CSize typesEnd = typesStart.add(compiler.arch.typeSize().multiply(process.getTypeCount()));
     for (int i = 0; i < process.getTypeCount(); ++i) {
       result.typeOffsets.put(new IRTypeId(i), typesStart.add(compiler.arch.typeSize().multiply(i)));
@@ -63,6 +90,18 @@ public class CProcessLayout {
 
   public CSize endPointsOffset() {
     return endPointsOffset;
+  }
+
+  public CSize dropByteStart() {
+    return dropByteStart;
+  }
+
+  public CSize dropByteCount() {
+    return dropByteCount;
+  }
+
+  public CSizeBits dropBitOffset(IRDropId dropId) {
+    return dropBitOffsets.get(dropId);
   }
 
   public CSize typeOffset(IRTypeId id) {

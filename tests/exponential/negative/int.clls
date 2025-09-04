@@ -6,7 +6,7 @@ proc main() {
         par {
             println("call 1"); call a(y); let y 1
             ||
-            println("call 2"); call a(z); let z 1
+            println("call 2"); call a(z); let z 2
         }
     }
 };;

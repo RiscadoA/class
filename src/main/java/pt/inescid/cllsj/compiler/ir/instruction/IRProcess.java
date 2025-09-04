@@ -7,11 +7,14 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Stream;
 import pt.inescid.cllsj.compiler.ir.id.IRCodeLocation;
+import pt.inescid.cllsj.compiler.ir.id.IRDropId;
 import pt.inescid.cllsj.compiler.ir.id.IRLocalDataId;
 import pt.inescid.cllsj.compiler.ir.id.IRProcessId;
 import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
 import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotCombinations;
+import pt.inescid.cllsj.compiler.ir.slot.IRSlotOffset;
+import pt.inescid.cllsj.compiler.ir.slot.IRSlotTree;
 
 public class IRProcess {
   private IRProcessId id;
@@ -19,12 +22,57 @@ public class IRProcess {
   private int typeCount = 0;
   private int sessionCount = 0;
   private Map<IRSessionId, IRLocalDataId> argSessionLocalDataId = new HashMap<>();
+  private List<DropOnEnd> dropOnEnd = new ArrayList<>();
   private List<IRSlotCombinations> localData = new ArrayList<>();
   private List<IRBlock> blocks = new ArrayList<>();
 
-  public IRProcess(IRProcessId id, int endPoints) {
+  // Identifies a memory location to be dropped when the process ends
+  public static class DropOnEnd {
+    private IRLocalDataId localDataId; // Local data entry id
+    private IRSlotOffset offset; // Offset from the start of the local data entry
+    private IRSlotTree slots; // Slots to drop
+    private boolean always; // If false, we must store data on whether the slot needs to be dropped
+
+    public DropOnEnd(
+        IRLocalDataId localDataId, IRSlotOffset offset, IRSlotTree slots, boolean always) {
+      this.localDataId = localDataId;
+      this.offset = offset;
+      this.slots = slots;
+      this.always = always;
+    }
+
+    public IRLocalDataId getLocalDataId() {
+      return localDataId;
+    }
+
+    public IRSlotOffset getOffset() {
+      return offset;
+    }
+
+    public IRSlotTree getSlots() {
+      return slots;
+    }
+
+    public boolean isAlways() {
+      return always;
+    }
+
+    @Override
+    public String toString() {
+      StringBuilder b = new StringBuilder(); 
+      b.append(slots).append(" at ");
+      b.append(localDataId);
+      b.append(offset);
+      if (always) {
+        b.append(" (always)");
+      }
+      return b.toString();
+    }
+  }
+
+  public IRProcess(IRProcessId id) {
     this.id = id;
-    this.endPoints = endPoints;
+    this.endPoints = 1;
     blocks.add(new IRBlock(IRCodeLocation.entry()));
   }
 
@@ -83,6 +131,20 @@ public class IRProcess {
     return localData.stream();
   }
 
+  public IRDropId addDropOnEnd(
+      IRLocalDataId localDataId, IRSlotOffset offset, IRSlotTree slots, boolean always) {
+    dropOnEnd.add(new DropOnEnd(localDataId, offset, slots, always));
+    return new IRDropId(dropOnEnd.size() - 1);
+  }
+
+  public List<DropOnEnd> getDropOnEnd() {
+    return dropOnEnd;
+  }
+
+  public DropOnEnd getDropOnEnd(IRDropId id) {
+    return dropOnEnd.get(id.getIndex());
+  }
+
   public IRBlock getEntry() {
     return blocks.getFirst();
   }
@@ -115,7 +177,10 @@ public class IRProcess {
     b.append("    types: ").append(typeCount).append("\n");
     b.append("    sessions: ").append(sessionCount).append("\n");
     for (int i = 0; i < localData.size(); i++) {
-      b.append("    data ").append(i).append(": ").append(localData.get(i).toString());
+      b.append("    data ")
+          .append(new IRLocalDataId(i))
+          .append(": ")
+          .append(localData.get(i).toString());
       for (Map.Entry<IRSessionId, IRLocalDataId> entry : argSessionLocalDataId.entrySet()) {
         if (entry.getValue().getIndex() == i) {
           b.append(" (arg ").append(entry.getKey().toString()).append(")");
@@ -123,6 +188,10 @@ public class IRProcess {
         }
       }
       b.append("\n");
+    }
+    for (int i = 0; i < dropOnEnd.size(); ++i) {
+      b.append("    drop ").append(new IRDropId(i)).append(": ");
+      b.append(dropOnEnd.get(i)).append("\n");
     }
 
     for (IRBlock block : blocks) {

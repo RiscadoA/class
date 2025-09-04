@@ -1,10 +1,12 @@
 !
-#A
-close
 ?
 call 1
+#A
+close
 case of 1
 wait 1
 call 2
+#A
+close
 case of 2
 wait 2

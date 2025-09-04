@@ -96,7 +96,11 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTBangT type) {
-    remoteSlot(new IRExponentialS());
+    if (IRValueChecker.check(ep, env, type.getin(), Optional.of(true))) {
+      type.getin().accept(this);
+    } else {
+      remoteSlot(new IRExponentialS());
+    }
   }
 
   @Override
@@ -231,7 +235,11 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTWhyT type) {
-    localSlot(new IRExponentialS());
+    if (IRValueChecker.check(ep, env, type.getin(), Optional.of(false))) {
+      type.getin().accept(this);
+    } else {
+      localSlot(new IRExponentialS());
+    }
   }
 
   @Override

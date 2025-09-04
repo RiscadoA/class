@@ -56,6 +56,7 @@ public class CArchitecture {
         new Test("unsigned char", unsignedCharSize),
         new Test("void*", pointerSize),
         new Test("struct session", sessionSize()),
-        new Test("struct type", typeSize()));
+        new Test("struct type", typeSize()),
+        new Test("struct exponential", exponentialSize(CSize.zero())));
   }
 }
