@@ -109,14 +109,13 @@ do
             success " $suffix"
         fi
     done
-    success " passed"
 
     # If any of the passes above failed
     if [ $just_failed -ne 0 ]; then
         failed=$((failed + 1))
     else
         success=$((success + 1))
-        success "\n"
+        success " passed\n"
     fi
 done
 
