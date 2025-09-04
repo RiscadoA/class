@@ -189,17 +189,17 @@ public class IRGenerator extends ASTNodeVisitor {
       expEnv = expEnv.addSession(node.getChi(), info.localCombinations());
 
       // Pass all types in the current environment to the exponential process
-      List<IRWriteExponentialFromProcess.TypeArgument> typeArguments = new ArrayList<>();
+      List<IRWriteExponential.TypeArgument> typeArguments = new ArrayList<>();
       for (int i = 0; i < process.getTypeCount(); ++i) {
         IRTypeId id = new IRTypeId(i);
         IREnvironment.Type envType = env.getType(id);
         typeArguments.add(
-            new IRWriteExponentialFromProcess.TypeArgument(IRSlotTree.of(new IRVarS(id)), id));
+            new IRWriteExponential.TypeArgument(IRSlotTree.of(new IRVarS(id)), id));
         expEnv = expEnv.addType(envType.getName(), envType.isPositive(), envType.isValue());
       }
 
       // Pass captured exponentials to the exponential process as data arguments
-      List<IRWriteExponentialFromProcess.DataArgument> dataArguments = new ArrayList<>();
+      List<IRWriteExponential.DataArgument> dataArguments = new ArrayList<>();
       for (String name : node.getRhs().fn(new HashSet<>())) {
         if (name.equals(node.getChi())) {
           continue;
@@ -211,7 +211,7 @@ public class IRGenerator extends ASTNodeVisitor {
         expEnv = expEnv.addValue(name, valueSlots.combinations(), Optional.of(valueSlots));
 
         dataArguments.add(
-            new IRWriteExponentialFromProcess.DataArgument(
+            new IRWriteExponential.DataArgument(
                 captured.getLocalData(),
                 expEnv.getChannel(name).getLocalDataId(),
                 valueSlots,
@@ -224,7 +224,7 @@ public class IRGenerator extends ASTNodeVisitor {
       procUsed.add(expProcessId);
 
       block.add(
-          new IRWriteExponentialFromProcess(
+          new IRWriteExponential(
               channel.getRemoteData(), expProcessId, typeArguments, dataArguments));
       block.add(new IRFinishSession(channel.getSessionId(), true));
     }

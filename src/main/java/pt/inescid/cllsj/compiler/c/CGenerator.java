@@ -52,7 +52,7 @@ public class CGenerator extends IRInstructionVisitor {
 
   private int nextLabelId = 0;
 
-  private Map<IRProcessId, IRWriteExponentialFromProcess> pendingExponentialManagers =
+  private Map<IRProcessId, IRWriteExponential> pendingExponentialManagers =
       new HashMap<>();
 
   public static void generate(Compiler compiler, IRProgram program, PrintStream output) {
@@ -632,9 +632,8 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   private void generateExponentialManager(
-      IRProcessId processId, IRWriteExponentialFromProcess instr) {
-    // The purpose of this section is described in a comment in the
-    // IRWriteExponentialFromProcess visit method
+      IRProcessId processId, IRWriteExponential instr) {
+    // The purpose of this section is described in a comment in the IRWriteExponential visit method
 
     // Set up the layout and the function used to get layouts from types
     CProcessLayout layout = layout(program.get(processId));
@@ -647,7 +646,7 @@ public class CGenerator extends IRInstructionVisitor {
               "mode == 0",
               () -> {
                 putComment("Clone mode");
-                for (IRWriteExponentialFromProcess.DataArgument arg : instr.getDataArguments()) {
+                for (IRWriteExponential.DataArgument arg : instr.getDataArguments()) {
                   IRLocalDataId dataId = arg.getTargetDataId();
                   putSlotTraversal(
                       arg.getSlots(),
@@ -672,7 +671,7 @@ public class CGenerator extends IRInstructionVisitor {
               },
               () -> {
                 putComment("Drop mode");
-                for (IRWriteExponentialFromProcess.DataArgument arg : instr.getDataArguments()) {
+                for (IRWriteExponential.DataArgument arg : instr.getDataArguments()) {
                   IRLocalDataId dataId = arg.getTargetDataId();
                   putSlotTraversal(
                       arg.getSlots(),
@@ -955,7 +954,7 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   @Override
-  public void visit(IRWriteExponentialFromProcess instr) {
+  public void visit(IRWriteExponential instr) {
     IRProcessId expProcessId = instr.getProcessId();
     IRProcess expProcess = program.get(expProcessId);
     if (expProcess == null) {
@@ -966,7 +965,7 @@ public class CGenerator extends IRInstructionVisitor {
         typeId -> {
           // We need to find the type layout for given type identifier in the called process
           // This type was passed as an argument, so we search for it
-          IRWriteExponentialFromProcess.TypeArgument arg =
+          IRWriteExponential.TypeArgument arg =
               instr.getTypeArguments().stream()
                   .filter(a -> a.getTargetType().equals(typeId))
                   .findFirst()
@@ -1029,7 +1028,7 @@ public class CGenerator extends IRInstructionVisitor {
         labelAddress(codeLocationLabel(expProcess, IRCodeLocation.entry())));
 
     // Write the type arguments to the exponential's environment
-    for (IRWriteExponentialFromProcess.TypeArgument arg : instr.getTypeArguments()) {
+    for (IRWriteExponential.TypeArgument arg : instr.getTypeArguments()) {
       // Get a reference to the target type in the new environment
       String targetType = type(expProcessLayout, newEnv, arg.getTargetType());
 
@@ -1050,7 +1049,7 @@ public class CGenerator extends IRInstructionVisitor {
       putAssign(targetType, sb.toString());
     }
 
-    for (IRWriteExponentialFromProcess.DataArgument arg : instr.getDataArguments()) {
+    for (IRWriteExponential.DataArgument arg : instr.getDataArguments()) {
       // Here we simply copy data from some location in the current environment to
       // a local data section in the new environment
       IRDataLocation target = IRDataLocation.local(arg.getTargetDataId(), IRSlotOffset.ZERO);

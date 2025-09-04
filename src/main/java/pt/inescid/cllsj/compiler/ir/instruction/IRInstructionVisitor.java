@@ -29,7 +29,7 @@ public abstract class IRInstructionVisitor {
 
   public abstract void visit(IRCallProcess instr);
 
-  public abstract void visit(IRWriteExponentialFromProcess instr);
+  public abstract void visit(IRWriteExponential instr);
 
   public abstract void visit(IRCallExponential instr);
 

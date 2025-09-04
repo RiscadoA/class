@@ -8,7 +8,7 @@ import pt.inescid.cllsj.compiler.ir.id.IRProcessId;
 import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotTree;
 
-public class IRWriteExponentialFromProcess extends IRWrite {
+public class IRWriteExponential extends IRWrite {
   public static class TypeArgument {
     private IRSlotTree sourceTree;
     private IRTypeId targetType;
@@ -95,7 +95,7 @@ public class IRWriteExponentialFromProcess extends IRWrite {
   private List<TypeArgument> typeArguments;
   private List<DataArgument> dataArguments;
 
-  public IRWriteExponentialFromProcess(
+  public IRWriteExponential(
       IRDataLocation location,
       IRProcessId processId,
       List<TypeArgument> typeArguments,
@@ -133,7 +133,7 @@ public class IRWriteExponentialFromProcess extends IRWrite {
 
   @Override
   public IRInstruction clone() {
-    return new IRWriteExponentialFromProcess(
+    return new IRWriteExponential(
         location,
         processId,
         typeArguments.stream().map(TypeArgument::clone).toList(),
@@ -143,7 +143,7 @@ public class IRWriteExponentialFromProcess extends IRWrite {
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
-    sb.append("writeExponentialFromProcess(");
+    sb.append("writeExponential(");
     sb.append(location).append(", ");
     sb.append(processId);
     for (TypeArgument arg : typeArguments) {
