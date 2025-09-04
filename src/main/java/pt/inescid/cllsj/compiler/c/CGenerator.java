@@ -1178,7 +1178,7 @@ public class CGenerator extends IRInstructionVisitor {
   private CLayout typeLayout(CProcessLayout layout, String env, IRTypeId typeId) {
     String type = type(layout, env, typeId);
     return new CLayout(
-        CSize.expression(typeSize(type)), CAlignment.expression(typeAlignment(type)));
+        CSize.expression(typeSize(type)), CAlignment.expression(typeFirstAlignment(type)));
   }
 
   private String type(CProcessLayout layout, String env, IRTypeId id) {
@@ -1273,8 +1273,8 @@ public class CGenerator extends IRInstructionVisitor {
     return var + ".size";
   }
 
-  private String typeAlignment(String var) {
-    return var + ".alignment";
+  private String typeFirstAlignment(String var) {
+    return var + ".first_alignment";
   }
 
   private String taskNext(String var) {

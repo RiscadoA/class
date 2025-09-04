@@ -94,7 +94,9 @@ public class IREndPointCounter extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTSend node) {
-    if (!compiler.optimizeSendForward.get() || !(node.getLhs() instanceof ASTFwd)) {
+    boolean isValue = IRValueChecker.check(compiler, env, node.getLhsType(), true);
+    if ((!compiler.optimizeSendForward.get() || !(node.getLhs() instanceof ASTFwd)) ||
+        (compiler.optimizeSendValue.get() && isValue)) {
       node.getLhs().accept(this);
     }
     node.getRhs().accept(this);

@@ -174,8 +174,21 @@ public class IRProcess {
 
     b.append(id).append(":\n");
     b.append("    end points: ").append(endPoints).append("\n");
-    b.append("    types: ").append(typeCount).append("\n");
-    b.append("    sessions: ").append(sessionCount).append("\n");
+    b.append("    types:");
+    if (typeCount == 0) {
+      b.append(" none");
+    } else {
+      for (int i = 0; i < typeCount; i++) {
+        b.append(" ").append(new IRTypeId(i));
+      }
+    }
+    b.append("\n");
+    b.append("    sessions:");
+    for (int i = 0; i < sessionCount; i++) {
+      IRSessionId sessionId = new IRSessionId(i);
+      b.append(" ").append(sessionId);
+    }
+    b.append("\n");
     for (int i = 0; i < localData.size(); i++) {
       b.append("    data ")
           .append(new IRLocalDataId(i))

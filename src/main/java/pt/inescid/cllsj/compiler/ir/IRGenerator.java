@@ -12,6 +12,7 @@ import java.util.Set;
 import java.util.function.BiConsumer;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
+import pt.inescid.cllsj.TypeEntry;
 import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.nodes.*;
 import pt.inescid.cllsj.ast.types.*;
@@ -135,6 +136,12 @@ public class IRGenerator extends ASTNodeVisitor {
       boolean isPositive = tArgPolarities[i];
       boolean isValue = tArgValues[i];
       env = env.addType(name, isPositive, isValue);
+
+      TypeEntry typeEntry = new TypeEntry(new ASTIdT(name));
+      Env<EnvEntry> ep = env.getEp();
+      ep = ep.assoc(name, typeEntry);
+      ep = ep.assoc(procDef.getTArgsGen().get(i), typeEntry);
+      env = env.changeEp(ep);
     }
 
     // Define sessions and data for each of the linear arguments
