@@ -584,6 +584,14 @@ public class IRPolyTranslator extends ASTTypeVisitor {
     if (!(type instanceof ASTIdT)) {
       return gen.env.isPositive(type);
     }
+    try {
+      type = type.unfoldType(gen.env.getEp());
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+    if (!(type instanceof ASTIdT)) {
+      return gen.env.isPositive(type);
+    }
     ASTIdT idType = (ASTIdT) type;
 
     if (recursionLabels.containsKey(idType.getid())) {

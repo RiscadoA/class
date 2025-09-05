@@ -1,0 +1,22 @@
+proc foo<C>(x: offer of {|#a: recv ~C; C |#b: close}) {
+  case x of {
+    |#a:
+      recv x(y);
+      fwd x y
+    |#b:
+      println("close");
+      close x
+  }
+};;
+
+proc main() {
+  cut {
+    sendty x(lint);
+    #b x;
+    println("wait");
+    wait x; ()
+    |x: recvty A; offer of {|#a: recv ~A; A |#b: close}|
+    recvty x(B);
+    foo<B>(x)
+  }  
+};;

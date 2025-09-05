@@ -1,0 +1,20 @@
+proc foo<C>(x: choice of {|#a: recv ~C; C |#b: close}) {
+  #b x;
+  println("close"); close x
+};;
+
+proc main() {
+  cut {
+    sendty x(lint);
+    case x of {
+      |#a:
+        send x(4);
+        println(x); ()
+      |#b:
+        println("wait"); wait x; ()
+    }
+    |x: recvty A; choice of {|#a: recv ~A; A |#b: close}|
+    recvty x(B);
+    foo<B>(x)
+  }  
+};;

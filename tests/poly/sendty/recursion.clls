@@ -1,0 +1,28 @@
+type rec Rec {
+  choice of {
+    |#next: sendty A; send A; recv ~A; Rec
+    |#done: wait
+  }
+};;
+
+proc rec foo(x: ~Rec) {
+  case x of {
+    |#next:
+      recvty x(B);
+      recv x(v);
+      send x(v);
+      foo(x)
+    |#done: close x
+  }
+};;
+
+proc main() {
+  cut {
+    foo(x)
+    |x: Rec|
+    #next x; sendty x(lint); send x(42); recv x(y); println(y);
+    #next x; sendty x(close); send x(x. close x); recv x(y); wait y;
+    #next x; sendty x(wait); send x(x. wait x; ()); recv x(y);
+    #done x; wait x; close y
+  }
+};;
