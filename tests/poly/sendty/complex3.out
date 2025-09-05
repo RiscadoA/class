@@ -5,8 +5,8 @@ recvty
 rhs recv
 fwd 1
 rhs send
-fwd 2
 close
+fwd 2
 lhs recv
 wait
 7

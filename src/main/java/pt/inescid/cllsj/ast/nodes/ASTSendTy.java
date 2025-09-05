@@ -23,6 +23,8 @@ import pt.inescid.cllsj.ast.types.ASTType;
 public class ASTSendTy extends ASTNode {
   String chs;
   ASTType type;
+  String type_id;
+  ASTType type_rhs_no_subst;
   ASTType type_rhs;
   ASTNode rhs;
 
@@ -44,8 +46,16 @@ public class ASTSendTy extends ASTNode {
     return type;
   }
 
+  public String getTypeId() {
+    return type_id;
+  }
+
   public ASTType getTypeRhs() {
     return type_rhs;
+  }
+
+  public ASTType getTypeRhsNoSubst() {
+    return type_rhs_no_subst;
   }
 
   public ASTNode getRhs() {
@@ -116,7 +126,9 @@ public class ASTSendTy extends ASTNode {
 
       Env<ASTType> ee = new Env<ASTType>().assoc(tys.getid(), type);
 
-      type_rhs = tys.getrhs().unfoldType(ep).subst(ee);
+      type_id = tys.getid();
+      type_rhs_no_subst = tys.getrhs().unfoldType(ep);
+      type_rhs = type_rhs_no_subst.subst(ee);
       ed.upd(chs, type_rhs);
       rhs.typecheck(ed, eg, ep);
       rhs.linclose(ed, ep);

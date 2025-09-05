@@ -911,7 +911,12 @@ public class CGenerator extends IRInstructionVisitor {
 
     for (IRCallProcess.SessionArgument arg : instr.getSessionArguments()) {
       // Get references to the source and target sessions
-      String source = accessSession(arg.getSourceSessionId());
+      String source;
+      if (arg.isFromLocation()) {
+        source = data(arg.getSourceSessionLocation()).deref("struct session");
+      } else {
+        source = accessSession(arg.getSourceSessionId());
+      }
       String target = accessSession(calledLayout, newEnv, arg.getTargetSessionId());
 
       // Copy the session data
@@ -924,7 +929,7 @@ public class CGenerator extends IRInstructionVisitor {
       // Update the remote session's continuation to match the new environment
       Optional<IRLocalDataId> calledLocalDataId =
           calledProcess.getArgSessionLocalDataId(arg.getTargetSessionId());
-      String remoteSession = accessRemoteSession(arg.getSourceSessionId());
+      String remoteSession = accessRemoteSession(source);
       putAssign(sessionContEnv(remoteSession), newEnv);
       if (calledLocalDataId.isPresent()) {
         putAssign(
@@ -1185,9 +1190,8 @@ public class CGenerator extends IRInstructionVisitor {
 
   private String typeInitializer(IRSlotTree slots) {
     CSize size = layout(slots.combinations()).size;
-    CAlignment firstAlignment = slots.slot().isPresent()
-        ? layout(slots.slot().get()).alignment
-        : CAlignment.one();
+    CAlignment firstAlignment =
+        slots.slot().isPresent() ? layout(slots.slot().get()).alignment : CAlignment.one();
 
     StringBuilder sb = new StringBuilder("(struct type)");
     sb.append("{.size=").append(size);
@@ -1239,6 +1243,10 @@ public class CGenerator extends IRInstructionVisitor {
 
   private String accessRemoteSession(IRSessionId id) {
     return accessSession(remoteSessionAddress(id));
+  }
+
+  private String accessRemoteSession(String session) {
+    return accessSession(remoteSessionAddress(session));
   }
 
   private CAddress localData(IRLocalDataId localDataId) {

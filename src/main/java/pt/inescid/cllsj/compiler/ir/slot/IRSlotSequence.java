@@ -13,8 +13,8 @@ public class IRSlotSequence {
     this.slots = slots;
   }
 
-  public static IRSlotSequence of(IRSlot slot) {
-    return new IRSlotSequence(List.of(slot));
+  public static IRSlotSequence of(IRSlot... slots) {
+    return new IRSlotSequence(List.of(slots));
   }
 
   public List<IRSlot> list() {

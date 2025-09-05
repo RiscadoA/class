@@ -9,7 +9,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
-import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.TypeEntry;
@@ -18,6 +18,7 @@ import pt.inescid.cllsj.ast.nodes.*;
 import pt.inescid.cllsj.ast.types.*;
 import pt.inescid.cllsj.compiler.Compiler;
 import pt.inescid.cllsj.compiler.ir.expression.IRExpression;
+import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
 import pt.inescid.cllsj.compiler.ir.id.IRProcessId;
 import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
 import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
@@ -29,13 +30,13 @@ public class IRGenerator extends ASTNodeVisitor {
 
   private IRProgram program = new IRProgram();
   private Map<IRProcessId, ASTProcDef> procDefs = new HashMap<>();
-  private Map<IRProcessId, ASTNode> procBodies = new HashMap<>();
+  private Map<IRProcessId, Runnable> procGens = new HashMap<>();
   private Map<IRProcessId, IREnvironment> procEnvs = new HashMap<>();
   private Queue<IRProcessId> procUsed = new LinkedList<>();
 
   IRProcess process;
   IRBlock block;
-  private int nextExponentialId = 0;
+  private int nextProcessGenId = 0;
 
   IREnvironment env;
 
@@ -56,18 +57,18 @@ public class IRGenerator extends ASTNodeVisitor {
         if (procDef.getArgs().size() > 0) {
           throw new IllegalArgumentException("Entry process cannot have linear arguments");
         }
-        gen.procUsed.add(gen.processId(procDef.getId(), new boolean[0], new boolean[0]));
+        gen.procUsed.add(gen.processId(procDef.getId(), new boolean[0]));
       }
 
       gen.forEachCombination(
           procDef,
-          (tArgPolarities, tArgValues) -> {
-            IRProcessId id = gen.processId(procDef.getId(), tArgPolarities, tArgValues);
+          tArgPolarities -> {
+            IRProcessId id = gen.processId(procDef.getId(), tArgPolarities);
             IRProcess process = new IRProcess(id);
-            gen.env = gen.environment(procDef, ep, process, tArgPolarities, tArgValues);
+            gen.env = gen.environment(procDef, ep, process, tArgPolarities);
             process.setEndPoints(gen.countEndPoints(procDef.getRhs()));
             gen.procDefs.put(id, procDef);
-            gen.procBodies.put(id, procDef.getRhs());
+            gen.procGens.put(id, () -> procDef.getRhs().accept(gen));
             gen.procEnvs.put(id, gen.env);
           });
     }
@@ -86,56 +87,37 @@ public class IRGenerator extends ASTNodeVisitor {
       }
 
       // Create empty process
-      ASTNode body = gen.procBodies.get(id);
       gen.env = gen.procEnvs.get(id);
       gen.process = gen.env.getProcess();
       gen.program.add(gen.process);
 
-      // Visit process body
-      gen.recurse(gen.process.getEntry(), body);
+      // Generate process
+      gen.recurse(gen.process.getEntry(), gen.procGens.get(id));
     }
 
     return gen.program;
   }
 
-  private void forEachCombination(ASTProcDef procDef, BiConsumer<boolean[], boolean[]> consumer) {
+  private void forEachCombination(ASTProcDef procDef, Consumer<boolean[]> consumer) {
     // Generate every possible combination of type argument polarities and values
     boolean tArgPolarities[] = new boolean[procDef.getTArgs().size()];
-    boolean tArgValues[] = new boolean[procDef.getTArgs().size()];
     for (int i = 0; i < (1 << procDef.getTArgs().size()); ++i) {
       for (int j = 0; j < tArgPolarities.length; ++j) {
         tArgPolarities[j] = (i & (1 << j)) != 0;
       }
-      if (compiler.optimizeSendValue.get()) {
-        for (int n = 0; n < (1 << procDef.getTArgs().size()); ++n) {
-          for (int m = 0; m < tArgValues.length; ++m) {
-            tArgValues[m] = (n & (1 << m)) != 0;
-          }
-          consumer.accept(tArgPolarities, tArgValues);
-        }
-      } else {
-        for (int m = 0; m < tArgValues.length; ++m) {
-          tArgValues[m] = false;
-        }
-        consumer.accept(tArgPolarities, tArgValues);
-      }
+      consumer.accept(tArgPolarities);
     }
   }
 
   private IREnvironment environment(
-      ASTProcDef procDef,
-      Env<EnvEntry> globalEp,
-      IRProcess process,
-      boolean tArgPolarities[],
-      boolean tArgValues[]) {
+      ASTProcDef procDef, Env<EnvEntry> globalEp, IRProcess process, boolean tArgPolarities[]) {
     env = new IREnvironment(process, globalEp);
 
     // Start by collecting type arguments
     for (int i = 0; i < procDef.getTArgs().size(); ++i) {
       String name = procDef.getTArgs().get(i);
       boolean isPositive = tArgPolarities[i];
-      boolean isValue = tArgValues[i];
-      env = env.addType(name, isPositive, isValue);
+      env = env.addType(name, isPositive);
 
       TypeEntry typeEntry = new TypeEntry(new ASTIdT(name));
       Env<EnvEntry> ep = env.getEp();
@@ -189,13 +171,13 @@ public class IRGenerator extends ASTNodeVisitor {
       recurse(block, node.getRhs());
     } else {
       // Create a new process for the exponential
-      IRProcessId expProcessId = new IRProcessId(process.getId() + "_exp" + nextExponentialId++);
+      IRProcessId expProcessId = new IRProcessId(process.getId() + "_exp" + nextProcessGenId++);
       IRProcess expProcess = new IRProcess(expProcessId);
       expProcess.setEndPoints(countEndPoints(node.getRhs()));
       IREnvironment expEnv = new IREnvironment(expProcess, env.getEp());
 
       // Define the argument session for the exponential
-      expEnv = expEnv.addSession(node.getChi(), info.localCombinations());
+      expEnv = expEnv.addArgSession(node.getChi(), info.localCombinations());
 
       // Pass all types in the current environment to the exponential process
       List<IRWriteExponential.TypeArgument> typeArguments = new ArrayList<>();
@@ -203,7 +185,7 @@ public class IRGenerator extends ASTNodeVisitor {
         IRTypeId id = new IRTypeId(i);
         IREnvironment.Type envType = env.getType(id);
         typeArguments.add(new IRWriteExponential.TypeArgument(IRSlotTree.of(new IRVarS(id)), id));
-        expEnv = expEnv.addType(envType.getName(), envType.isPositive(), envType.isValue());
+        expEnv = expEnv.addType(envType.getName(), envType.isPositive());
       }
 
       // Pass captured exponentials to the exponential process as data arguments
@@ -227,7 +209,7 @@ public class IRGenerator extends ASTNodeVisitor {
       }
 
       // Store the process we just defined so that it gets generated later
-      procBodies.put(expProcessId, node.getRhs());
+      procGens.put(expProcessId, () -> node.getRhs().accept(this));
       procEnvs.put(expProcessId, expEnv);
       procUsed.add(expProcessId);
 
@@ -387,21 +369,19 @@ public class IRGenerator extends ASTNodeVisitor {
     // Figure out the type argument properties to decide which process to call
     // Additionally, collect the type arguments we'll be passing to it
     boolean tArgPolarities[] = new boolean[node.getTPars().size()];
-    boolean tArgValues[] = new boolean[node.getTPars().size()];
     List<IRCallProcess.TypeArgument> typeArguments = new ArrayList<>();
 
     for (int i = 0; i < node.getTPars().size(); ++i) {
       ASTType type = node.getTPars().get(i);
       IRSlotsFromASTType info = slotsFromType(type);
       tArgPolarities[i] = isPositive(type);
-      tArgValues[i] = compiler.optimizeSendValue.get() && isValue(type, tArgPolarities[i]);
 
       IRSlotTree tree = tArgPolarities[i] ? info.activeRemoteTree : info.activeLocalTree;
       typeArguments.add(new IRCallProcess.TypeArgument(tree, new IRTypeId(i)));
     }
 
     // Find the process id, and mark it as used so that it gets generated
-    IRProcessId processId = processId(node.getId(), tArgPolarities, tArgValues);
+    IRProcessId processId = processId(node.getId(), tArgPolarities);
     procUsed.add(processId);
     IREnvironment processEnv = procEnvs.get(processId);
     ASTProcDef processDef = procDefs.get(processId);
@@ -439,6 +419,7 @@ public class IRGenerator extends ASTNodeVisitor {
       if (IRUsesTypeVar.check(type, typeArgs.keySet())) {
         // Create a new channel with the polymorphic type
         channel = IRPolyTranslator.translate(this, typeArgs, type, argChannel.getName());
+        addContinueIfNegative(channel.getSessionId(), type);
       } else {
         channel = argChannel;
       }
@@ -663,26 +644,167 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTSendTy node) {
-    // TODO:
-    // - define new session through which the right hand side will communicate
-    // - setup a polymorphic translator session for the new session
-    // - write type and translator session to the session's remote data
+    IREnvironment.Channel channel = env.getChannel(node.getChs());
 
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    // Get the locations where we'll be writing the necessary data
+    IRDataLocation typeLoc = env.getChannel(node.getChs()).getRemoteData();
+    env = env.advanceChannel(node.getChs(), IRSlotOffset.of(new IRTypeS(), new IRSessionS()));
+    IRDataLocation sessionLoc = env.getChannel(node.getChs()).getRemoteData();
+    env = env.advanceChannel(node.getChs(), IRSlotOffset.of(new IRSessionS(), new IRTagS()));
+    IRDataLocation polarityLoc = env.getChannel(node.getChs()).getRemoteData();
+
+    // Overwrite the previous session with a new session of the new type
+    IRBlock rhsBlock = process.createBlock("sendty_rhs");
+    IRSlotsFromASTType info = slotsFromType(node.getTypeRhs());
+    env = env.addSession(node.getChs(), info.localCombinations());
+    IREnvironment.Channel instChannel = env.getChannel(node.getChs());
+    block.add(new IRInitializeSession(instChannel.getSessionId(), rhsBlock.getLocation(), instChannel.getLocalData()));
+
+    // Create the polymorphic translator session that we'll be sending through the main channel
+    Map<String, ASTType> varTypes = Map.of(node.getTypeId(), node.getType());
+    env = env.withKnownTypes(varTypes);
+    IREnvironment.Channel polyChannel = IRPolyTranslator.translate(this, varTypes, node.getTypeRhsNoSubst().dualCatch(env.getEp()), node.getChs());
+
+    addContinueIfPositive(instChannel.getSessionId(), node.getTypeRhs());
+
+    // Write the type, the translator session and the type's polarity to the main channel
+    block.add(new IRWriteType(typeLoc, info.activeRemoteTree));
+    block.add(new IRWriteSession(sessionLoc, polyChannel.getSessionId()));
+    block.add(new IRWriteTag(polarityLoc, isPositive(node.getType()) ? 1 : 0));
+    block.add(new IRFinishSession(channel.getSessionId(), true));
+
+    // Generate the continuation
+    recurse(rhsBlock, node.getRhs());
   }
 
   @Override
   public void visit(ASTRecvTy node) {
-    // TODO:
-    // - define new process which will inherit types, sessions and data
-    // - the main session of the new process will be the received session
-    //
-    // Maybe this can all be done through IRCallProcess
-    
+    // Get the locations where we'll be reading from the type and the new session
+    IRDataLocation typeLoc = env.getChannel(node.getChs()).getLocalData();
+    env =
+        env.advanceChannel(
+            node.getChs(), IRSlotOffset.of(IRSlotSequence.of(new IRTypeS()), new IRSessionS()));
+    IRDataLocation sessionLoc = env.getChannel(node.getChs()).getLocalData();
+    env = env.advanceChannel(node.getChs(), IRSlotOffset.of(new IRSessionS(), new IRTagS()));
+    IRDataLocation polarityLoc = env.getChannel(node.getChs()).getLocalData();
 
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    int processGenId = nextProcessGenId++;
+
+    Consumer<Boolean> forPolarity =
+        polarity -> {
+          // Create a new process which will handle the new type variable
+          IRProcessId polyProcessId = processId(process.getId() + "_poly" + processGenId, new boolean[] {polarity});
+          IRProcess polyProcess = new IRProcess(polyProcessId);
+          polyProcess.setEndPoints(countEndPoints(node.getRhs()));
+          IREnvironment polyEnv = new IREnvironment(polyProcess, env.getEp());
+
+          // Prepare lists of arguments to pass to the polymorphic process
+          List<IRCallProcess.TypeArgument> typeArguments = new ArrayList<>();
+          List<IRCallProcess.SessionArgument> sessionArguments = new ArrayList<>();
+          List<IRCallProcess.DataArgument> dataArguments = new ArrayList<>();
+
+          // Pass all types in the current environment to the polymorphic process
+          for (int i = 0; i < process.getTypeCount(); ++i) {
+            IRTypeId id = new IRTypeId(i);
+            IREnvironment.Type envType = env.getType(id);
+            polyEnv = polyEnv.addType(envType.getName(), envType.isPositive());
+            IRTypeId newId = polyEnv.getType(envType.getName()).getId();
+            typeArguments.add(new IRCallProcess.TypeArgument(IRSlotTree.of(new IRVarS(id)), newId));
+          }
+
+          // Pass the type variable received to the polymorphic process
+          polyEnv = polyEnv.addType(node.getTyid(), polarity);
+          Env<EnvEntry> polyEp = polyEnv.getEp();
+          polyEp = polyEp.assoc(node.getTyid(), new TypeEntry(new ASTIdT(node.getTyid())));
+          polyEp = polyEp.assoc(node.getTyidGen(), new TypeEntry(new ASTIdT(node.getTyid())));
+          polyEp = polyEp.assoc(node.getTyidPar(), new TypeEntry(new ASTIdT(node.getTyid())));
+          polyEnv = polyEnv.changeEp(polyEp);
+          typeArguments.add(
+              new IRCallProcess.TypeArgument(typeLoc, polyEnv.getType(node.getTyid()).getId()));
+
+          // Define the argument session for the process
+          IRSlotsFromASTType rhsInfo = IRSlotsFromASTType.compute(compiler, polyEnv, Set.of(), node.getTypeRhs());
+          polyEnv = polyEnv.addArgSession(node.getChs(), rhsInfo.localCombinations());
+          sessionArguments.add(
+              new IRCallProcess.SessionArgument(
+                  sessionLoc, polyEnv.getChannel(node.getChs()).getSessionId(), IRSlotOffset.ZERO));
+
+          // Pass captured sessions and exponentials to the polymorphic process
+          // as session and data arguments
+          for (String name : node.getRhs().fn(new HashSet<>())) {
+            if (name.equals(node.getChs())) {
+              continue;
+            }
+
+            IREnvironment.Channel captured = env.getChannel(name);
+            if (captured.isExponential()) {
+              // We captured an exponential channel, we pass it as a data argument
+              IRSlotTree valueSlots = captured.getExponentialType();
+              polyEnv = polyEnv.addValue(name, valueSlots.combinations(), Optional.of(valueSlots));
+              dataArguments.add(
+                  new IRCallProcess.DataArgument(
+                      captured.getLocalData(),
+                      polyEnv.getChannel(name).getLocalDataId(),
+                      valueSlots,
+                      false));
+            } else {
+              // We captured a channel, we pass it as a session argument along with its data
+              ASTType type = node.getFreeNameType(name);
+              IRSlotsFromASTType info = IRSlotsFromASTType.compute(compiler, polyEnv, Set.of(), type);
+              boolean isPositive = polyEnv.isPositive(type);
+              boolean isValue = IRValueChecker.check(compiler, polyEnv, type, Optional.empty());
+
+              polyEnv = polyEnv.addArgSession(name, info.localCombinations());
+              IREnvironment.Channel sourceChannel = env.getChannel(name);
+              IREnvironment.Channel targetChannel = polyEnv.getChannel(name);
+
+              if (!isValue || isPositive) {
+                // If the type is not a value, or if it's a positive value, we must pass the session
+                sessionArguments.add(
+                    new IRCallProcess.SessionArgument(
+                        sourceChannel.getSessionId(),
+                        targetChannel.getSessionId(),
+                        sourceChannel.getOffset()));
+              }
+
+              if ((!isValue || !isPositive) && !info.activeLocalTree.isLeaf()) {
+                // If the type is not a value, or if it's a negative value, we must pass the data
+                dataArguments.add(
+                    new IRCallProcess.DataArgument(
+                        sourceChannel.getLocalData(),
+                        targetChannel.getLocalDataId(),
+                        info.activeLocalTree,
+                        false));
+              }
+            }
+          }
+
+          // Store the process we just defined so that it gets generated later
+          procGens.put(polyProcessId, () -> {
+            // We need to immediately continue the received session if it's negative
+            addContinueIfNegative(env.getChannel(node.getChs()).getSessionId(), node.getTypeRhs());
+
+            node.getRhs().accept(this);
+          });
+          procEnvs.put(polyProcessId, polyEnv);
+          procUsed.add(polyProcessId);
+
+          // Call the polymorphic process
+          block.add(
+              new IRCallProcess(
+                  polyProcessId, typeArguments, sessionArguments, dataArguments, true));
+        };
+
+    // Branch on the polarity tag we received, calling forPolarity with the correct value
+    IRBlock positiveBlock = process.createBlock("recvty_pos");
+    IRBlock negativeBlock = process.createBlock("recvty_neg");
+    IRBranch.Case positiveCase = new IRBranch.Case(positiveBlock.getLocation(), 1);
+    IRBranch.Case negativeCase = new IRBranch.Case(negativeBlock.getLocation(), 1);
+    block.add(new IRBranchTag(polarityLoc, List.of(negativeCase, positiveCase)));
+
+    // Generate the branches
+    recurse(positiveBlock, () -> forPolarity.accept(true));
+    recurse(negativeBlock, () -> forPolarity.accept(false));
   }
 
   @Override
@@ -815,14 +937,13 @@ public class IRGenerator extends ASTNodeVisitor {
     return IRValueChecker.check(compiler, env, type, requiredPolarity);
   }
 
-  private IRProcessId processId(String id, boolean tArgPolarities[], boolean tArgValues[]) {
+  private IRProcessId processId(String id, boolean tArgPolarities[]) {
     StringBuilder sb = new StringBuilder();
     sb.append(id);
     if (tArgPolarities.length > 0) {
       sb.append("_");
       for (int i = 0; i < tArgPolarities.length; ++i) {
         sb.append(tArgPolarities[i] ? "p" : "n");
-        sb.append(tArgValues[i] ? "v" : "s");
       }
     }
     return new IRProcessId(sb.toString());

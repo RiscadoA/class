@@ -39,7 +39,6 @@ public class IRPolyTranslator extends ASTTypeVisitor {
 
     gen.env = gen.env.addSession(poly, gen.slotsFromType(polyType).combinations());
 
-    IREnvironment.Channel instChannel = gen.env.getChannel(inst);
     IREnvironment.Channel polyChannel = gen.env.getChannel(poly);
     IRBlock contBlock = gen.process.createBlock("poly_cont");
 
@@ -47,13 +46,6 @@ public class IRPolyTranslator extends ASTTypeVisitor {
         new IRInitializeSession(
             polyChannel.getSessionId(), contBlock.getLocation(), polyChannel.getLocalData()));
 
-    // We must copy any already written data from the instantiated channel to the
-    // polymorphic channel
-
-    // If polyType is negative, then the instantiated channel has already written
-    // data to its remote,
-
-    gen.addContinueIfNegative(polyChannel.getSessionId(), polyType);
     gen.recurse(
         contBlock,
         () -> {

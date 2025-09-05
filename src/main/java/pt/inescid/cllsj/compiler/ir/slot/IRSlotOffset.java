@@ -12,6 +12,10 @@ public class IRSlotOffset {
     return new IRSlotOffset(past, alignTo);
   }
 
+  public static IRSlotOffset of(IRSlot past, IRSlot alignTo) {
+    return new IRSlotOffset(IRSlotSequence.of(past), alignTo);
+  }
+
   public IRSlotOffset() {
     this.past = IRSlotCombinations.EMPTY;
     this.alignTo = Optional.empty();

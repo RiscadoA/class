@@ -4,9 +4,9 @@ let y
 recvty
 rhs recv
 rhs send
+close
 fwd 1
 fwd 2
-close
 lhs recv
 wait
 7

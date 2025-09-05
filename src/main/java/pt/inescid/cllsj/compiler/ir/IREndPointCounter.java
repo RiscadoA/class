@@ -158,7 +158,9 @@ public class IREndPointCounter extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTSendTy node) {
+    count += IRPolyEndPointCounter.count(node.getTypeRhsNoSubst().dualCatch(env.getEp()));
     count += 1;
+    node.getRhs().accept(this);
   }
 
   @Override

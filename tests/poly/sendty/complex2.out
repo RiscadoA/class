@@ -4,8 +4,8 @@ let y
 recvty
 rhs recv
 rhs send
-fwd
 rhs close
+fwd
 lhs recv
 lhs wait
 7

@@ -324,12 +324,16 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTSendTT type) {
-    remoteSlot(new IRTypeS());
+    this.slot = Optional.of(new IRTypeS());
+    activeRemoteTree =
+        IRSlotTree.of(IRSlotSequence.of(new IRTypeS(), new IRSessionS(), new IRTagS()));
   }
 
   @Override
   public void visit(ASTRecvTT type) {
-    localSlot(new IRTypeS());
+    this.slot = Optional.of(new IRTypeS());
+    activeLocalTree =
+        IRSlotTree.of(IRSlotSequence.of(new IRTypeS(), new IRSessionS(), new IRTagS()));
   }
 
   @Override

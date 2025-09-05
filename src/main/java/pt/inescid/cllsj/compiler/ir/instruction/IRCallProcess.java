@@ -24,6 +24,7 @@ public class IRCallProcess extends IRInstruction {
     }
 
     public TypeArgument(IRSlotTree sourceTree, IRTypeId targetType) {
+      this.sourceLocation = Optional.empty();
       this.sourceTree = Optional.of(sourceTree);
       this.targetType = targetType;
     }
@@ -54,13 +55,18 @@ public class IRCallProcess extends IRInstruction {
 
     @Override
     public String toString() {
-      return targetType + " <- " + (sourceLocation.isPresent() ? sourceLocation.get() : sourceTree.get());
+      return targetType
+          + " <- "
+          + (sourceLocation.isPresent() ? sourceLocation.get() : sourceTree.get());
     }
   }
 
   public static class SessionArgument {
+    // Data location to fetch the session from in the source process
+    private Optional<IRDataLocation> sourceSessionLocation;
+
     // Which session in the source process to bind from
-    private IRSessionId sourceSessionId;
+    private Optional<IRSessionId> sourceSessionId;
 
     // Which session in the target process to bind to
     private IRSessionId targetSessionId;
@@ -70,13 +76,32 @@ public class IRCallProcess extends IRInstruction {
 
     public SessionArgument(
         IRSessionId sourceSessionId, IRSessionId targetSessionId, IRSlotOffset dataOffset) {
-      this.sourceSessionId = sourceSessionId;
+      this.sourceSessionLocation = Optional.empty();
+      this.sourceSessionId = Optional.of(sourceSessionId);
       this.targetSessionId = targetSessionId;
       this.dataOffset = dataOffset;
     }
 
+    public SessionArgument(
+        IRDataLocation sourceSessionLocation,
+        IRSessionId targetSessionId,
+        IRSlotOffset dataOffset) {
+      this.sourceSessionLocation = Optional.of(sourceSessionLocation);
+      this.sourceSessionId = Optional.empty();
+      this.targetSessionId = targetSessionId;
+      this.dataOffset = dataOffset;
+    }
+
+    public boolean isFromLocation() {
+      return sourceSessionLocation.isPresent();
+    }
+
+    public IRDataLocation getSourceSessionLocation() {
+      return sourceSessionLocation.orElseThrow();
+    }
+
     public IRSessionId getSourceSessionId() {
-      return sourceSessionId;
+      return sourceSessionId.orElseThrow();
     }
 
     public IRSessionId getTargetSessionId() {
@@ -87,18 +112,30 @@ public class IRCallProcess extends IRInstruction {
       return dataOffset;
     }
 
+    public void replaceDataLocations(Function<IRDataLocation, IRDataLocation> replacer) {
+      sourceSessionLocation = sourceSessionLocation.map(replacer);
+    }
+
     public void replaceSessions(Function<IRSessionId, IRSessionId> replacer) {
-      sourceSessionId = replacer.apply(sourceSessionId);
+      sourceSessionId = sourceSessionId.map(replacer);
       targetSessionId = replacer.apply(targetSessionId);
     }
 
     public SessionArgument clone() {
-      return new SessionArgument(sourceSessionId, targetSessionId, dataOffset);
+      if (sourceSessionLocation.isPresent()) {
+        return new SessionArgument(sourceSessionLocation.get(), targetSessionId, dataOffset);
+      } else {
+        return new SessionArgument(sourceSessionId.get(), targetSessionId, dataOffset);
+      }
     }
 
     @Override
     public String toString() {
-      return targetSessionId + " <- " + sourceSessionId + dataOffset;
+      if (sourceSessionLocation.isPresent()) {
+        return targetSessionId + " <- " + sourceSessionLocation.get() + dataOffset;
+      } else {
+        return targetSessionId + " <- " + sourceSessionId.get() + dataOffset;
+      }
     }
   }
 
@@ -210,8 +247,14 @@ public class IRCallProcess extends IRInstruction {
 
   @Override
   public void replaceDataLocations(Function<IRDataLocation, IRDataLocation> replacer) {
+    for (TypeArgument arg : typeArguments) {
+      arg.sourceLocation = arg.sourceLocation.map(replacer);
+    }
     for (DataArgument arg : dataArguments) {
       arg.sourceLocation = replacer.apply(arg.sourceLocation);
+    }
+    for (SessionArgument arg : sessionArguments) {
+      arg.replaceDataLocations(replacer);
     }
   }
 

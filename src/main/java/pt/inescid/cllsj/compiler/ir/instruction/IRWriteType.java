@@ -5,7 +5,7 @@ import pt.inescid.cllsj.compiler.ir.slot.IRSlotTree;
 
 public class IRWriteType extends IRWrite {
   private IRSlotTree slots;
-  
+
   public IRWriteType(IRDataLocation location, IRSlotTree typeSlots) {
     super(location);
     this.slots = typeSlots;

@@ -31,6 +31,7 @@ public class ASTRecvTy extends ASTNode {
   String tyidPar;
   ASTNode rhs;
   ASTType tyrhs;
+  Map<String, ASTType> freeNameTypes;
 
   public ASTRecvTy(String _chs, String _tyid, ASTNode _rhs) {
     chs = _chs;
@@ -60,6 +61,10 @@ public class ASTRecvTy extends ASTNode {
 
   public ASTType getTypeRhs() {
     return tyrhs;
+  }
+
+  public ASTType getFreeNameType(String name) {
+    return freeNameTypes.get(name);
   }
 
   public ASTNode getRhs() {
@@ -127,6 +132,14 @@ public class ASTRecvTy extends ASTNode {
     // System.out.println("UF TC");
 
     if (ty instanceof ASTRecvTT) {
+
+      freeNameTypes = new HashMap<>();
+      for (String name : fn(new HashSet<>())) {
+        if (name.equals(chs)) continue;
+        ASTType t = ed.find(name);
+        t = t.unfoldType(ep);
+        freeNameTypes.put(name, t);
+      }
 
       ASTRecvTT tys = (ASTRecvTT) ty;
 

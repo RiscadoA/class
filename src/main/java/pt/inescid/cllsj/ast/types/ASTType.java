@@ -21,6 +21,14 @@ public abstract class ASTType {
 
   public abstract ASTType dual(Env<EnvEntry> e) throws Exception;
 
+  public ASTType dualCatch(Env<EnvEntry> e) {
+    try {
+      return dual(e);
+    } catch (Exception ex) {
+      throw new RuntimeException(ex);
+    }
+  }
+
   public abstract ASTType unfoldType(Env<EnvEntry> e) throws Exception;
 
   public abstract void kindcheck(Env<EnvEntry> e) throws Exception;

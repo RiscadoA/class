@@ -1,0 +1,10 @@
+sendty
+send
+close x
+id recvty
+id recv
+id send
+id close
+recv
+wait id
+wait x
