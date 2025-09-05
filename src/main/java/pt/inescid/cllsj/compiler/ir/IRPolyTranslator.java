@@ -2,9 +2,11 @@ package pt.inescid.cllsj.compiler.ir;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.TypeEntry;
@@ -72,12 +74,39 @@ public class IRPolyTranslator extends ASTTypeVisitor {
     }
     translator.poly = poly;
     translator.inst = inst;
-    polyType.accept(translator);
+    translator.recurse(polyType);
   }
 
   private void recurse(ASTType polyType) {
-    // TODO: if not polymorphic, just forward
-    polyType.accept(this);
+    if (isPolymorphic(polyType)) {
+      polyType.accept(this);
+    } else {
+      // If the type is not polymorphic, we just forward the sessions
+      String neg, pos;
+      ASTType negChType;
+      if (isPositive(polyType)) {
+        pos = inst;
+        neg = poly;
+        negChType = new ASTNotT(polyType);
+      } else {
+        pos = poly;
+        neg = inst;
+        negChType = polyType;
+      }
+
+      IRSlotsFromASTType info = polySlotsFromType(negChType);
+
+      // Move data stored on the negative session's local data to the positive session's remote data
+      gen.block.add(new IRMoveValue(remoteData(pos), localData(neg), info.activeRemoteTree));
+
+      // If the type still has a continuation, we must forward two sessions to each other
+      if (!isValuePoly(negChType, false)) {
+        gen.block.add(new IRForwardSessions(sessionId(neg), sessionId(pos), true));
+      } else {
+        // Jump to the positive session's continuation
+        gen.block.add(new IRFinishSession(sessionId(pos), true));
+      }
+    }
   }
 
   private void recurse(String polyChannel, String instChannel, ASTType polyType) {
@@ -92,52 +121,62 @@ public class IRPolyTranslator extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTOneT type) {
-    addFinish(inst);
+    throw new UnsupportedOperationException(
+        "Not polymorphic, should be caught by the recurse method");
   }
 
   @Override
   public void visit(ASTBotT type) {
-    addFinish(poly);
+    throw new UnsupportedOperationException(
+        "Not polymorphic, should be caught by the recurse method");
   }
 
   @Override
   public void visit(ASTintT type) {
-    addLet(inst, poly, new IRIntS());
+    throw new UnsupportedOperationException(
+        "Not polymorphic, should be caught by the recurse method");
   }
 
   @Override
   public void visit(ASTCointT type) {
-    addLet(poly, inst, new IRIntS());
+    throw new UnsupportedOperationException(
+        "Not polymorphic, should be caught by the recurse method");
   }
 
   @Override
   public void visit(ASTLintT type) {
-    addLet(inst, poly, new IRIntS());
+    throw new UnsupportedOperationException(
+        "Not polymorphic, should be caught by the recurse method");
   }
 
   @Override
   public void visit(ASTLCointT type) {
-    addLet(poly, inst, new IRIntS());
+    throw new UnsupportedOperationException(
+        "Not polymorphic, should be caught by the recurse method");
   }
 
   @Override
   public void visit(ASTLboolT type) {
-    addLet(inst, poly, new IRBoolS());
+    throw new UnsupportedOperationException(
+        "Not polymorphic, should be caught by the recurse method");
   }
 
   @Override
   public void visit(ASTCoLboolT type) {
-    addLet(poly, inst, new IRBoolS());
+    throw new UnsupportedOperationException(
+        "Not polymorphic, should be caught by the recurse method");
   }
 
   @Override
   public void visit(ASTLstringT type) {
-    addLet(inst, poly, new IRStringS());
+    throw new UnsupportedOperationException(
+        "Not polymorphic, should be caught by the recurse method");
   }
 
   @Override
   public void visit(ASTCoLstringT type) {
-    addLet(poly, inst, new IRStringS());
+    throw new UnsupportedOperationException(
+        "Not polymorphic, should be caught by the recurse method");
   }
 
   @Override
@@ -448,13 +487,15 @@ public class IRPolyTranslator extends ASTTypeVisitor {
     }
 
     if (varTypes.containsKey(type.getid())) {
-      addMoveAndFinish(target, source, varSlots.get(type.getid()).activeTree());
+      addMove(target, source, varSlots.get(type.getid()).activeTree());
+      gen.block.add(new IRFinishSession(sessionId(target), true));
     } else if (recursionLabels.containsKey(type.getid())) {
       gen.block.add(new IRJump(recursionLabels.get(type.getid())));
     } else if (coRecursionLabels.containsKey(type.getid())) {
       gen.block.add(new IRJump(coRecursionLabels.get(type.getid())));
     } else {
-      addLet(target, source, new IRVarS(gen.env.getType(type.getid()).getId()));
+      throw new UnsupportedOperationException(
+          "Not polymorphic, should be caught by the recurse method");
     }
   }
 
@@ -476,13 +517,15 @@ public class IRPolyTranslator extends ASTTypeVisitor {
     }
 
     if (varTypes.containsKey(type.getid())) {
-      addMoveAndFinish(target, source, varSlots.get(type.getid()).activeTree());
+      addMove(target, source, varSlots.get(type.getid()).activeTree());
+      gen.block.add(new IRFinishSession(sessionId(target), true));
     } else if (recursionLabels.containsKey(type.getid())) {
       gen.block.add(new IRJump(recursionLabels.get(type.getid())));
     } else if (coRecursionLabels.containsKey(type.getid())) {
       gen.block.add(new IRJump(coRecursionLabels.get(type.getid())));
     } else {
-      addLet(target, source, new IRVarS(gen.env.getType(type.getid()).getId()));
+      throw new UnsupportedOperationException(
+          "Not polymorphic, should be caught by the recurse method");
     }
   }
 
@@ -540,19 +583,6 @@ public class IRPolyTranslator extends ASTTypeVisitor {
 
   private void addMove(String targetChannel, String fromChannel, IRSlot slot) {
     addMove(targetChannel, fromChannel, IRSlotTree.of(slot));
-  }
-
-  private void addFinish(String targetChannel) {
-    gen.block.add(new IRFinishSession(sessionId(targetChannel), true));
-  }
-
-  private void addMoveAndFinish(String targetChannel, String fromChannel, IRSlotTree slots) {
-    addMove(targetChannel, fromChannel, slots);
-    addFinish(targetChannel);
-  }
-
-  private void addLet(String targetChannel, String fromChannel, IRSlot slot) {
-    addMoveAndFinish(targetChannel, fromChannel, IRSlotTree.of(slot));
   }
 
   private boolean isPositive(ASTType type) {
@@ -634,6 +664,9 @@ public class IRPolyTranslator extends ASTTypeVisitor {
   }
 
   private boolean isPolymorphic(ASTType type) {
-    return IRUsesTypeVar.check(type, varTypes.keySet());
+    Set<String> vars = new HashSet<>(varTypes.keySet());
+    vars.addAll(recursionLabels.keySet());
+    vars.addAll(coRecursionLabels.keySet());
+    return IRUsesTypeVar.check(type, vars);
   }
 }
