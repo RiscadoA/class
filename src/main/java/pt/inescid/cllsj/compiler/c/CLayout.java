@@ -46,17 +46,6 @@ public class CLayout {
     return visitor.layout;
   }
 
-  // Computes the layout of a slot tree at a given address.
-  // The address is needed to compute the actual current layout.
-  public static CLayout compute(
-      CAddress address,
-      IRSlotTree tree,
-      CArchitecture arch,
-      Function<IRTypeId, CLayout> typeLayoutProvider) {
-    // TODO
-    throw new UnsupportedOperationException("Not implemented yet");
-  }
-
   private static class Visitor extends IRSlotVisitor {
     private CLayout layout = new CLayout(CSize.zero(), CAlignment.one());
     private CArchitecture arch;
@@ -114,6 +103,16 @@ public class CLayout {
     @Override
     public void visit(IRVarS slot) {
       visit(typeLayoutProvider.apply(slot.getTypeId()));
+    }
+
+    @Override
+    public void visit(IRKnownVarS slot) {
+      CLayout full = CLayout.compute(slot.getSlots().combinations(), arch, typeLayoutProvider);
+      layout.size = full.size;
+      if (slot.getSlots().slot().isPresent()) {
+        layout.alignment =
+            CLayout.compute(slot.getSlots().slot().get(), arch, typeLayoutProvider).alignment;
+      }
     }
   }
 }

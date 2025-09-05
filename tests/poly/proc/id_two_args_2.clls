@@ -1,0 +1,14 @@
+proc id<T>(x: ~T, y: T) {
+  fwd x y
+};;
+
+proc main() {
+  cut {
+    println(x);
+    ()
+    |x: lint|
+    id<~lint>(x, y)
+    |y: lint|
+    let y 2
+  }
+};;

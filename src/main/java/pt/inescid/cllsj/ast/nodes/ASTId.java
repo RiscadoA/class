@@ -22,6 +22,7 @@ import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.types.ASTBangT;
 import pt.inescid.cllsj.ast.types.ASTCoAffineT;
 import pt.inescid.cllsj.ast.types.ASTCoRecT;
+import pt.inescid.cllsj.ast.types.ASTIdT;
 import pt.inescid.cllsj.ast.types.ASTType;
 import pt.inescid.cllsj.ast.types.ASTUsageT;
 import pt.inescid.cllsj.ast.types.ASTWhyT;
@@ -40,6 +41,9 @@ public class ASTId extends ASTNode {
   List<ASTType> gparTypes;
   List<ASTType> tpars;
   List<ASTType> tparsGen;
+
+  List<String> procTParIds;
+  List<ASTType> procParTypes;
 
   public ASTId(String _id) {
 
@@ -80,6 +84,14 @@ public class ASTId extends ASTNode {
 
   public List<ASTType> getTPars() {
     return tpars;
+  }
+
+  public List<String> getProcTParIds() {
+    return procTParIds;
+  }
+
+  public List<ASTType> getProcParTypes() {
+    return procParTypes;
   }
 
   public String getId() {
@@ -185,13 +197,17 @@ public class ASTId extends ASTNode {
     // System.out.println("TC ID " + id + " S 1");
 
     tparsGen = new ArrayList<ASTType>();
+    procTParIds = new ArrayList<String>();
 
     Iterator<String> itt = pe.targs.iterator();
+    Env<EnvEntry> keepIdsEp = ep;
     for (ASTType param : tpars) {
       ASTType actual = param.unfoldType(ep);
       tparsGen.add(actual);
       String formal = itt.next();
+      procTParIds.add(formal);
       ep = ep.assoc(formal, new TypeEntry(actual));
+      keepIdsEp = ep.assoc(formal, new TypeEntry(new ASTIdT(formal)));
       // System.out.println("type bindings = " + formal + "->" + actual.toStr(ep));
 
     }
@@ -211,9 +227,12 @@ public class ASTId extends ASTNode {
 
     // elaboration phase from argument expressions !!!! ATTN INFER InferRec !!!!
 
+    procParTypes = new ArrayList<ASTType>();
+
     Iterator<ASTType> itargt = pe.argtypes.iterator();
     for (ASTExpr expr : exprs) {
       ASTType formal = itargt.next();
+      procParTypes.add(formal.unfoldType(keepIdsEp));
       formal = formal.unfoldType(ep);
       ASTType formalDual = formal.dual(ep);
 

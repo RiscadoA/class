@@ -1,0 +1,8 @@
+send
+id recv
+close x
+id send
+id close
+recv
+wait id
+wait x

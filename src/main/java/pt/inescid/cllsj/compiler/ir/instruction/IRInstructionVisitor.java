@@ -33,7 +33,7 @@ public abstract class IRInstructionVisitor {
 
   public abstract void visit(IRCallExponential instr);
 
-  public abstract void visit(IRTieSessions instr);
+  public abstract void visit(IRForwardSessions instr);
 
   public abstract void visit(IRBranchTag instr);
 
@@ -44,4 +44,6 @@ public abstract class IRInstructionVisitor {
   public abstract void visit(IRSleep instr);
 
   public abstract void visit(IRPanic instr);
+
+  public abstract void visit(IRJump instr);
 }

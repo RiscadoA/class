@@ -25,7 +25,7 @@ import pt.inescid.cllsj.compiler.ir.instruction.*;
 import pt.inescid.cllsj.compiler.ir.slot.*;
 
 public class IRGenerator extends ASTNodeVisitor {
-  private Compiler compiler;
+  Compiler compiler;
 
   private IRProgram program = new IRProgram();
   private Map<IRProcessId, ASTProcDef> procDefs = new HashMap<>();
@@ -33,11 +33,11 @@ public class IRGenerator extends ASTNodeVisitor {
   private Map<IRProcessId, IREnvironment> procEnvs = new HashMap<>();
   private Queue<IRProcessId> procUsed = new LinkedList<>();
 
-  private IRProcess process;
-  private IRBlock block;
+  IRProcess process;
+  IRBlock block;
   private int nextExponentialId = 0;
 
-  private IREnvironment env;
+  IREnvironment env;
 
   public static IRProgram generate(Compiler compiler, Env<EnvEntry> ep, ASTProgram ast) {
     IRGenerator gen = new IRGenerator();
@@ -361,13 +361,13 @@ public class IRGenerator extends ASTNodeVisitor {
     // Move data stored on the negative session's local data to the positive session's remote data
     block.add(new IRMoveValue(pos.getRemoteData(), neg.getLocalData(), info.activeLocalTree));
 
-    // If the type still has a continuation, we must tie the two sessions together
+    // If the type still has a continuation, we must forward two sessions to each other
     if (!isValue(negChType, false)) {
-      block.add(new IRTieSessions(pos.getSessionId(), neg.getSessionId()));
+      block.add(new IRForwardSessions(neg.getSessionId(), pos.getSessionId(), true));
+    } else {
+      // Jump to the positive session's continuation
+      block.add(new IRFinishSession(pos.getSessionId(), true));
     }
-
-    // Jump to the positive session's continuation
-    block.add(new IRFinishSession(pos.getSessionId(), true));
   }
 
   @Override
@@ -393,9 +393,8 @@ public class IRGenerator extends ASTNodeVisitor {
     for (int i = 0; i < node.getTPars().size(); ++i) {
       ASTType type = node.getTPars().get(i);
       IRSlotsFromASTType info = slotsFromType(type);
-
       tArgPolarities[i] = isPositive(type);
-      tArgValues[i] = isValue(type, tArgPolarities[i]);
+      tArgValues[i] = compiler.optimizeSendValue.get() && isValue(type, tArgPolarities[i]);
 
       IRSlotTree tree = tArgPolarities[i] ? info.activeRemoteTree : info.activeLocalTree;
       typeArguments.add(new IRCallProcess.TypeArgument(tree, new IRTypeId(i)));
@@ -407,20 +406,42 @@ public class IRGenerator extends ASTNodeVisitor {
     IREnvironment processEnv = procEnvs.get(processId);
     ASTProcDef processDef = procDefs.get(processId);
 
+    // Get a map from the process' type argument names to the types we're passing
+    Map<String, ASTType> typeArgs = new HashMap<>();
+    for (int i = 0; i < node.getTPars().size(); ++i) {
+      ASTType type = node.getTPars().get(i);
+      typeArgs.put(node.getProcTParIds().get(i), type);
+    }
+    env = env.withKnownTypes(typeArgs);
+
     // Collect the session and data arguments we'll be passing to it
     List<IRCallProcess.SessionArgument> sessionArguments = new ArrayList<>();
     List<IRCallProcess.DataArgument> dataArguments = new ArrayList<>();
 
     for (int i = 0; i < node.getPars().size(); ++i) {
       // Get the argument's type information
-      ASTType type = node.getParTypes().get(i);
-      IRSlotsFromASTType info = slotsFromType(type);
+      ASTType type = node.getProcParTypes().get(i);
+      try {
+        type = type.unfoldType(env.getEp());
+      } catch (Exception e) {
+        throw new IllegalArgumentException("Error unfolding argument type: " + e.getMessage());
+      }
+      IRSlotsFromASTType info = slotsFromType(type, typeArgs);
       boolean isPositive = isPositive(type);
       boolean isValue = isValue(type, isPositive);
 
       // Get the arguments' channel
-      IREnvironment.Channel channel = env.getChannel(node.getPars().get(i));
+      IREnvironment.Channel argChannel = env.getChannel(node.getPars().get(i));
       IREnvironment.Channel targetChannel = processEnv.getChannel(processDef.getArgs().get(i));
+
+      // If the channel is polymorphic, we need to perform translation
+      IREnvironment.Channel channel;
+      if (IRUsesTypeVar.check(type, typeArgs.keySet())) {
+        // Create a new channel with the polymorphic type
+        channel = IRPolyTranslator.translate(this, typeArgs, type, argChannel.getName());
+      } else {
+        channel = argChannel;
+      }
 
       if (!isValue || isPositive) {
         // If the type is not a value, or if it's a positive value, we must pass the session
@@ -553,24 +574,17 @@ public class IRGenerator extends ASTNodeVisitor {
             node.getRhs().accept(this);
           });
     } else {
-      if (compiler.optimizeSendForward.get() && node.getLhs() instanceof ASTFwd) {
-        // If sending a forward, just send the forwarded session
-        ASTFwd fwd = (ASTFwd) node.getLhs();
-        String argCh = fwd.getCh1().equals(node.getCho()) ? fwd.getCh2() : fwd.getCh1();
-        argSession = env.getChannel(argCh);
-      } else {
-        // Define new session for the channel being sent
-        env = env.addSession(node.getCho(), argInfo.localCombinations());
-        argSession = env.getChannel(node.getCho());
+      // Define new session for the channel being sent
+      env = env.addSession(node.getCho(), argInfo.localCombinations());
+      argSession = env.getChannel(node.getCho());
 
-        // Initialize the new session with a new closure block for the left-hand-side
-        // as its continuation. Immediately write it to the main session's remote data
-        IRBlock closureBlock = process.createBlock("send_closure");
-        recurse(closureBlock, node.getLhs());
-        block.add(
-            new IRInitializeSession(
-                argSession.getSessionId(), closureBlock.getLocation(), argSession.getLocalData()));
-      }
+      // Initialize the new session with a new closure block for the left-hand-side
+      // as its continuation.
+      IRBlock closureBlock = process.createBlock("send_closure");
+      recurse(closureBlock, node.getLhs());
+      block.add(
+          new IRInitializeSession(
+              argSession.getSessionId(), closureBlock.getLocation(), argSession.getLocalData()));
 
       block.add(new IRWriteSession(channel.getRemoteData(), argSession.getSessionId()));
       advanceOrReset(node.getChs(), new IRSessionS(), node.getRhsType(), true);
@@ -745,29 +759,33 @@ public class IRGenerator extends ASTNodeVisitor {
 
   // ======================================= Helper methods =======================================
 
-  private void addContinue(IRSessionId sessionId) {
+  void addContinue(IRSessionId sessionId) {
     IRBlock contBlock = process.createBlock("continue");
     block.add(new IRContinueSession(sessionId, contBlock.getLocation()));
     block = contBlock;
   }
 
-  private void addContinueIfNegative(IRSessionId sessionId, ASTType type) {
+  void addContinueIfNegative(IRSessionId sessionId, ASTType type) {
     if (!isPositive(type)) {
       addContinue(sessionId);
     }
   }
 
-  private void advanceOrReset(String ch, IRSlot slot, ASTType cont, boolean advancePolarity) {
+  void addContinueIfPositive(IRSessionId sessionId, ASTType type) {
+    if (isPositive(type)) {
+      addContinue(sessionId);
+    }
+  }
+
+  void advanceOrReset(String ch, IRSlot slot, ASTType cont, boolean advancePolarity) {
     advanceOrReset(ch, offset(slot, cont), cont, advancePolarity);
   }
 
-  private void advanceOrReset(
-      String ch, IRSlotCombinations slot, ASTType cont, boolean advancePolarity) {
+  void advanceOrReset(String ch, IRSlotCombinations slot, ASTType cont, boolean advancePolarity) {
     advanceOrReset(ch, offset(slot, cont), cont, advancePolarity);
   }
 
-  private void advanceOrReset(
-      String ch, IRSlotOffset offset, ASTType cont, boolean advancePolarity) {
+  void advanceOrReset(String ch, IRSlotOffset offset, ASTType cont, boolean advancePolarity) {
     if (cont instanceof ASTRecT
         || cont instanceof ASTCoRecT
         || isPositive(cont) != advancePolarity) {
@@ -818,8 +836,12 @@ public class IRGenerator extends ASTNodeVisitor {
     return new IRSlotOffset(past, slotsFromType(remainder).slot);
   }
 
-  private IRSlotsFromASTType slotsFromType(ASTType type) {
-    return IRSlotsFromASTType.compute(compiler, env, Set.of(), type);
+  IRSlotsFromASTType slotsFromType(ASTType type) {
+    return slotsFromType(type, Map.of());
+  }
+
+  IRSlotsFromASTType slotsFromType(ASTType type, Map<String, ASTType> knownTypes) {
+    return IRSlotsFromASTType.compute(compiler, env, Set.of(), knownTypes, type);
   }
 
   private int countEndPoints(ASTNode node) {
@@ -830,7 +852,7 @@ public class IRGenerator extends ASTNodeVisitor {
     recurse(block, () -> node.accept(this));
   }
 
-  private void recurse(IRBlock block, Runnable runnable) {
+  void recurse(IRBlock block, Runnable runnable) {
     IRBlock backupBlock = this.block;
     IREnvironment backupEnv = this.env;
     this.block = block;

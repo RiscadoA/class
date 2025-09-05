@@ -1,0 +1,28 @@
+type Id(T) {
+    recv ~T; send T; close
+};;
+
+proc id<T>(x: Id(T)) {
+    println("id recv");
+    recv x(y);
+    println("id send");
+    send x(y);
+    println("id close");
+    close x
+};;
+
+proc main() {
+    cut {
+        id<close>(id)
+        |id: ~Id(close)|
+        println("send");
+        send id(x. println("close x"); close x);
+        println("recv");
+        recv id(x);
+        println("wait id");
+        wait id;
+        println("wait x");
+        wait x;
+        ()
+    }
+};;

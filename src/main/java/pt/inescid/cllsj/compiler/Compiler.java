@@ -55,7 +55,6 @@ public class Compiler {
   private Settings.Int pointerAlignment;
 
   public Settings.Flag optimizeSingleEndpoint;
-  public Settings.Flag optimizeSendForward;
   public Settings.Flag optimizeSendValue;
 
   public Compiler() {
@@ -121,11 +120,6 @@ public class Compiler {
             "optimize-single-endpoint",
             "Optimizes away reference counting for processes with a single end point",
             true);
-    optimizeSendForward =
-        settings.addFlag(
-            "optimize-send-forward",
-            "Optimizes away reference counting for processes with a single end point",
-            true);
     optimizeSendValue =
         settings.addFlag(
             "optimize-send-value",
@@ -146,7 +140,7 @@ public class Compiler {
         "Disables all optimization flags",
         () -> {
           optimizeSingleEndpoint.set(false);
-          optimizeSendForward.set(false);
+          optimizeSendValue.set(false);
         });
 
     settings.addMode(

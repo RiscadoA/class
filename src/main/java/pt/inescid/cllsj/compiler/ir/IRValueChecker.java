@@ -79,16 +79,8 @@ public class IRValueChecker extends ASTTypeVisitor {
       return;
     }
 
-    // We still have a type identifier
-    type = (ASTIdT) unfolded;
-
-    // Use the environment to check if the type is a value type
-    IREnvironment.Type envType = env.getType(type.getid());
-    if (!envType.isValue()) {
-      isValue = false;
-    } else {
-      expectPolarity(envType.isPositive());
-    }
+    // We still have a type identifier, thus this is a polymorphic session and not a value
+    isValue = false;
   }
 
   @Override

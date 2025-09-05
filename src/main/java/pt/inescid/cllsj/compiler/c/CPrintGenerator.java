@@ -3,6 +3,7 @@ package pt.inescid.cllsj.compiler.c;
 import pt.inescid.cllsj.compiler.ir.slot.IRBoolS;
 import pt.inescid.cllsj.compiler.ir.slot.IRExponentialS;
 import pt.inescid.cllsj.compiler.ir.slot.IRIntS;
+import pt.inescid.cllsj.compiler.ir.slot.IRKnownVarS;
 import pt.inescid.cllsj.compiler.ir.slot.IRSessionS;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlot;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotVisitor;
@@ -52,7 +53,12 @@ public class CPrintGenerator extends IRSlotVisitor {
 
   @Override
   public void visit(IRVarS slot) {
-    throw new IllegalArgumentException("Cannot print type variables");
+    throw new IllegalArgumentException("Cannot print polymorphic sessions");
+  }
+
+  @Override
+  public void visit(IRKnownVarS slot) {
+    throw new IllegalArgumentException("Cannot print polymorphic sessions");
   }
 
   @Override

@@ -34,6 +34,7 @@ public class CGenerator extends IRInstructionVisitor {
   private static final String TMP_PTR1 = "tmp_ptr1";
   private static final String TMP_PTR2 = "tmp_ptr2";
   private static final String TMP_INT = "tmp_int";
+  private static final String TMP_SESSION = "tmp_session";
 
   // Main register which hold the execution state across many instructions
   private static final String TASK = "task";
@@ -435,6 +436,7 @@ public class CGenerator extends IRInstructionVisitor {
           putStatement("register void* " + TMP_PTR1);
           putStatement("register void* " + TMP_PTR2);
           putStatement("register int " + TMP_INT);
+          putStatement("struct session " + TMP_SESSION);
           putBlankLine();
 
           // Initialize the task list.
@@ -832,9 +834,18 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   @Override
-  public void visit(IRTieSessions instr) {
-    putAssign(accessRemoteSession(instr.getLhsId()), accessSession(instr.getRhsId()));
-    putAssign(accessRemoteSession(instr.getRhsId()), accessSession(instr.getLhsId()));
+  public void visit(IRForwardSessions instr) {
+    putAssign(TMP_SESSION, accessSession(instr.getNegId()));
+    putAssign(accessRemoteSession(instr.getNegId()), accessSession(instr.getPosId()));
+    putAssign(TMP_PTR1, sessionCont(accessSession(instr.getPosId())));
+    putAssign(TMP_PTR2, sessionContEnv(accessSession(instr.getPosId())));
+    putAssign(accessRemoteSession(instr.getPosId()), TMP_SESSION);
+
+    if (instr.isEndPoint()) {
+      putDecrementEndPoints(true);
+    }
+    putAssign(ENV, cast(TMP_PTR2, "char*"));
+    putComputedGoto(TMP_PTR1);
   }
 
   @Override
@@ -1143,6 +1154,11 @@ public class CGenerator extends IRInstructionVisitor {
   public void visit(IRPanic instr) {
     putDebugLn("Panic: " + instr.getMessage());
     putStatement("exit(1);");
+  }
+
+  @Override
+  public void visit(IRJump instr) {
+    putConstantGoto(codeLocationLabel(instr.getLocation()));
   }
 
   // ============================ Structure expression building helpers ===========================
@@ -1520,6 +1536,9 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   void putFreeEnvironment(IRProcess process, CProcessLayout processLayout, String var) {
+    if (compiler.tracing.get()) {
+      putDebugLn("[endCall(" + process.getId() + ")]");
+    }
     putDoDeferredEnvironmentDrops(process, processLayout, var);
     putFree(var);
     if (compiler.profiling.get()) {

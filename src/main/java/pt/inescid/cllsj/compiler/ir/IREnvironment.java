@@ -1,9 +1,11 @@
 package pt.inescid.cllsj.compiler.ir;
 
+import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
+import pt.inescid.cllsj.TypeEntry;
 import pt.inescid.cllsj.ast.types.ASTIdT;
 import pt.inescid.cllsj.ast.types.ASTNotT;
 import pt.inescid.cllsj.ast.types.ASTType;
@@ -47,8 +49,19 @@ public class IREnvironment {
     return new IREnvironment(this, ep);
   }
 
+  public IREnvironment withKnownTypes(Map<String, ASTType> types) {
+    IREnvironment result = this;
+    Env<EnvEntry> ep = this.ep;
+    for (String k : types.keySet()) {
+      ep = ep.assoc(k, new TypeEntry(new ASTIdT(k)));
+      result =
+          new Type(result, k, Optional.empty(), isPositive(types.get(k)), isPositive(types.get(k)));
+    }
+    return result.changeEp(ep);
+  }
+
   public IREnvironment addType(String name, boolean isPositive, boolean isValue) {
-    return new Type(this, name, process.addType(), isPositive, isValue);
+    return new Type(this, name, Optional.of(process.addType()), isPositive, isValue);
   }
 
   public Type getType(String name) {
@@ -212,12 +225,16 @@ public class IREnvironment {
 
   public static class Type extends IREnvironment {
     private String name;
-    private IRTypeId id;
+    private Optional<IRTypeId> id;
     private boolean isPositive;
     private boolean isValue;
 
     public Type(
-        IREnvironment parent, String name, IRTypeId id, boolean isPositive, boolean isValue) {
+        IREnvironment parent,
+        String name,
+        Optional<IRTypeId> id,
+        boolean isPositive,
+        boolean isValue) {
       super(parent, parent.ep);
       this.name = name;
       this.id = id;
@@ -230,7 +247,7 @@ public class IREnvironment {
     }
 
     public IRTypeId getId() {
-      return id;
+      return id.orElseThrow();
     }
 
     public boolean isPositive() {

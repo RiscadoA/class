@@ -1,0 +1,8 @@
+close a
+wait a
+fwd x y
+close z
+close b
+wait b
+fwd y z
+wait x

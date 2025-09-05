@@ -20,6 +20,6 @@ public class IRVarS extends IRSlot {
 
   @Override
   public String toString() {
-    return typeId.toString();
+    return "poly[" + typeId.toString() + "]";
   }
 }

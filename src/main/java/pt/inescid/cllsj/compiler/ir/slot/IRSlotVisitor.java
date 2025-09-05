@@ -16,4 +16,6 @@ public abstract class IRSlotVisitor {
   public abstract void visit(IRTypeS slot);
 
   public abstract void visit(IRVarS slot);
+
+  public abstract void visit(IRKnownVarS slot);
 }
