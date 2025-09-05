@@ -17,6 +17,8 @@ public abstract class IRInstructionVisitor {
 
   public abstract void visit(IRWriteTag instr);
 
+  public abstract void visit(IRWriteType instr);
+
   public abstract void visit(IRMoveValue instr);
 
   public abstract void visit(IRCloneValue instr);

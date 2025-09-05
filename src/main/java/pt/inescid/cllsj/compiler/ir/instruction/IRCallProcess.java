@@ -1,6 +1,7 @@
 package pt.inescid.cllsj.compiler.ir.instruction;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.function.Function;
 import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
 import pt.inescid.cllsj.compiler.ir.id.IRLocalDataId;
@@ -12,16 +13,31 @@ import pt.inescid.cllsj.compiler.ir.slot.IRSlotTree;
 
 public class IRCallProcess extends IRInstruction {
   public static class TypeArgument {
-    private IRSlotTree sourceTree;
+    private Optional<IRDataLocation> sourceLocation;
+    private Optional<IRSlotTree> sourceTree;
     private IRTypeId targetType;
 
-    public TypeArgument(IRSlotTree sourceTree, IRTypeId targetType) {
-      this.sourceTree = sourceTree;
+    public TypeArgument(IRDataLocation sourceLocation, IRTypeId targetType) {
+      this.sourceLocation = Optional.of(sourceLocation);
+      this.sourceTree = Optional.empty();
       this.targetType = targetType;
     }
 
+    public TypeArgument(IRSlotTree sourceTree, IRTypeId targetType) {
+      this.sourceTree = Optional.of(sourceTree);
+      this.targetType = targetType;
+    }
+
+    public boolean isFromLocation() {
+      return sourceLocation.isPresent();
+    }
+
+    public IRDataLocation getSourceLocation() {
+      return sourceLocation.orElseThrow();
+    }
+
     public IRSlotTree getSourceTree() {
-      return sourceTree;
+      return sourceTree.orElseThrow();
     }
 
     public IRTypeId getTargetType() {
@@ -29,12 +45,16 @@ public class IRCallProcess extends IRInstruction {
     }
 
     public TypeArgument clone() {
-      return new TypeArgument(sourceTree, targetType);
+      if (sourceLocation.isPresent()) {
+        return new TypeArgument(sourceLocation.get(), targetType);
+      } else {
+        return new TypeArgument(sourceTree.get(), targetType);
+      }
     }
 
     @Override
     public String toString() {
-      return targetType + " <- " + sourceTree;
+      return targetType + " <- " + (sourceLocation.isPresent() ? sourceLocation.get() : sourceTree.get());
     }
   }
 
@@ -137,11 +157,11 @@ public class IRCallProcess extends IRInstruction {
     }
   }
 
-  private IRProcessId processId;
-  private List<TypeArgument> typeArguments;
-  private List<SessionArgument> sessionArguments;
-  private List<DataArgument> dataArguments;
-  private boolean isEndPoint;
+  protected IRProcessId processId;
+  protected List<TypeArgument> typeArguments;
+  protected List<SessionArgument> sessionArguments;
+  protected List<DataArgument> dataArguments;
+  protected boolean isEndPoint;
 
   public IRCallProcess(
       IRProcessId processId,

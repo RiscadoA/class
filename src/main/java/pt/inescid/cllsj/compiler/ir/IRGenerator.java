@@ -663,12 +663,24 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTSendTy node) {
+    // TODO:
+    // - define new session through which the right hand side will communicate
+    // - setup a polymorphic translator session for the new session
+    // - write type and translator session to the session's remote data
+
     // TODO Auto-generated method stub
     throw new UnsupportedOperationException("Unimplemented method 'visit'");
   }
 
   @Override
   public void visit(ASTRecvTy node) {
+    // TODO:
+    // - define new process which will inherit types, sessions and data
+    // - the main session of the new process will be the received session
+    //
+    // Maybe this can all be done through IRCallProcess
+    
+
     // TODO Auto-generated method stub
     throw new UnsupportedOperationException("Unimplemented method 'visit'");
   }

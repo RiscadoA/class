@@ -814,6 +814,12 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   @Override
+  public void visit(IRWriteType instr) {
+    String ref = data(instr.getLocation()).deref("struct type");
+    putAssign(ref, typeInitializer(instr.getSlots()));
+  }
+
+  @Override
   public void visit(IRMoveValue instr) {
     putMoveSlots(instr.getSlots(), false, instr.getLocation(), instr.getSourceLocation());
   }
@@ -872,8 +878,11 @@ public class CGenerator extends IRInstructionVisitor {
                                   + " not found in call to process "
                                   + calledProcessId));
 
-          // Now we can just compute the layout of the source type in the current process
-          return layout(arg.getSourceTree().combinations());
+          if (arg.isFromLocation()) {
+            return typeLayout(data(arg.getSourceLocation()).deref("struct type"));
+          } else {
+            return layout(arg.getSourceTree().combinations());
+          }
         };
 
     CProcessLayout calledLayout = layout(calledProcess);
@@ -891,24 +900,13 @@ public class CGenerator extends IRInstructionVisitor {
     putZeroEnvironmentDropBits(calledLayout, newEnv);
 
     for (IRCallProcess.TypeArgument arg : instr.getTypeArguments()) {
-      // Get a reference to the target type in the new environment
+      // Get a reference to the target type in the new environment and initialize it
       String targetType = type(calledLayout, newEnv, arg.getTargetType());
-
-      // Compute the layout of the source type in the current environment
-      // Notice that we use only the first slot to determine alignment
-      // This is because that is the alignment we need to align offsets to
-      CSize size = layout(arg.getSourceTree().combinations()).size;
-      CAlignment firstAlignment = CAlignment.one();
-      if (arg.getSourceTree().slot().isPresent()) {
-        firstAlignment = layout(arg.getSourceTree().slot().get()).alignment;
+      if (arg.isFromLocation()) {
+        putAssign(targetType, data(arg.getSourceLocation()).deref("struct type"));
+      } else {
+        putAssign(targetType, typeInitializer(arg.getSourceTree()));
       }
-
-      // Store the type information
-      StringBuilder sb = new StringBuilder("(struct type)");
-      sb.append("{.size=").append(size);
-      sb.append(",.first_alignment=").append(firstAlignment);
-      sb.append("}");
-      putAssign(targetType, sb.toString());
     }
 
     for (IRCallProcess.SessionArgument arg : instr.getSessionArguments()) {
@@ -1038,24 +1036,9 @@ public class CGenerator extends IRInstructionVisitor {
 
     // Write the type arguments to the exponential's environment
     for (IRWriteExponential.TypeArgument arg : instr.getTypeArguments()) {
-      // Get a reference to the target type in the new environment
+      // Get a reference to the target type in the new environment and initialize itq
       String targetType = type(expProcessLayout, newEnv, arg.getTargetType());
-
-      // Compute the layout of the source type in the current environment
-      // Notice that we use only the first slot to determine alignment
-      // This is because that is the alignment we need to align offsets to
-      CSize size = layout(arg.getSourceTree().combinations()).size;
-      CAlignment firstAlignment = CAlignment.one();
-      if (arg.getSourceTree().slot().isPresent()) {
-        firstAlignment = layout(arg.getSourceTree().slot().get()).alignment;
-      }
-
-      // Store the type information
-      StringBuilder sb = new StringBuilder("(struct type)");
-      sb.append("{.size=").append(size);
-      sb.append(",.first_alignment=").append(firstAlignment);
-      sb.append("}");
-      putAssign(targetType, sb.toString());
+      putAssign(targetType, typeInitializer(arg.getSourceTree()));
     }
 
     for (IRWriteExponential.DataArgument arg : instr.getDataArguments()) {
@@ -1192,9 +1175,25 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   private CLayout typeLayout(CProcessLayout layout, String env, IRTypeId typeId) {
-    String type = type(layout, env, typeId);
+    return typeLayout(type(layout, env, typeId));
+  }
+
+  private CLayout typeLayout(String type) {
     return new CLayout(
         CSize.expression(typeSize(type)), CAlignment.expression(typeFirstAlignment(type)));
+  }
+
+  private String typeInitializer(IRSlotTree slots) {
+    CSize size = layout(slots.combinations()).size;
+    CAlignment firstAlignment = slots.slot().isPresent()
+        ? layout(slots.slot().get()).alignment
+        : CAlignment.one();
+
+    StringBuilder sb = new StringBuilder("(struct type)");
+    sb.append("{.size=").append(size);
+    sb.append(",.first_alignment=").append(firstAlignment);
+    sb.append("}");
+    return sb.toString();
   }
 
   private String type(CProcessLayout layout, String env, IRTypeId id) {
