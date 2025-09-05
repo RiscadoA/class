@@ -3,7 +3,6 @@ package pt.inescid.cllsj.compiler.ir;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import pt.inescid.cllsj.TypeEntry;
@@ -19,7 +18,6 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
   private Compiler compiler;
   private IREnvironment env;
   private Set<String> recursionTypes;
-  private Map<String, ASTType> knownVars;
 
   // Slot corresponding to the root type
   public Optional<IRSlot> slot = Optional.empty();
@@ -77,22 +75,17 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
   }
 
   public static IRSlotsFromASTType compute(
-      Compiler compiler,
-      IREnvironment env,
-      Set<String> recursionTypes,
-      Map<String, ASTType> knownVars,
-      ASTType type) {
+      Compiler compiler, IREnvironment env, Set<String> recursionTypes, ASTType type) {
     IRSlotsFromASTType visitor = new IRSlotsFromASTType();
     visitor.compiler = compiler;
     visitor.env = env;
     visitor.recursionTypes = recursionTypes;
-    visitor.knownVars = knownVars;
     type.accept(visitor);
     return visitor;
   }
 
   private IRSlotsFromASTType recurse(ASTType type) {
-    return compute(compiler, env, recursionTypes, knownVars, type);
+    return compute(compiler, env, recursionTypes, type);
   }
 
   private void localSlot(IRSlot slot) {
@@ -172,10 +165,13 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
       return;
     }
 
-    // If it is a known variable, use the known slot combinations
-    if (knownVars.containsKey(type.getid())) {
-      IRSlotsFromASTType result = recurse(knownVars.get(type.getid()));
-      if (env.isPositive(knownVars.get(type.getid()))) {
+    // Otherwise, use the environment to find more about the type
+    IREnvironment.Type envType = env.getType(type.getid());
+
+    // If it is a known type, use the known slot combinations
+    if (envType.isKnown()) {
+      IRSlotsFromASTType result = recurse(envType.getKnown());
+      if (envType.isPositive()) {
         slot = Optional.of(new IRKnownVarS(result.activeRemoteTree));
         activeRemoteTree = IRSlotTree.of(slot.get());
       } else {
@@ -185,8 +181,7 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
       return;
     }
 
-    // Otherwise, use the type slot
-    IREnvironment.Type envType = env.getType(type.getid());
+    // Otherwise, just create a variable slot
     slot = Optional.of(new IRVarS(envType.getId()));
     if (envType.isPositive()) {
       activeRemoteTree = IRSlotTree.of(slot.get());

@@ -55,13 +55,20 @@ public class IREnvironment {
     for (String k : types.keySet()) {
       ep = ep.assoc(k, new TypeEntry(new ASTIdT(k)));
       result =
-          new Type(result, k, Optional.empty(), isPositive(types.get(k)), isPositive(types.get(k)));
+          new Type(
+              result,
+              k,
+              Optional.empty(),
+              Optional.of(types.get(k)),
+              isPositive(types.get(k)),
+              isPositive(types.get(k)));
     }
     return result.changeEp(ep);
   }
 
   public IREnvironment addType(String name, boolean isPositive, boolean isValue) {
-    return new Type(this, name, Optional.of(process.addType()), isPositive, isValue);
+    return new Type(
+        this, name, Optional.of(process.addType()), Optional.empty(), isPositive, isValue);
   }
 
   public Type getType(String name) {
@@ -226,6 +233,7 @@ public class IREnvironment {
   public static class Type extends IREnvironment {
     private String name;
     private Optional<IRTypeId> id;
+    private Optional<ASTType> known;
     private boolean isPositive;
     private boolean isValue;
 
@@ -233,11 +241,13 @@ public class IREnvironment {
         IREnvironment parent,
         String name,
         Optional<IRTypeId> id,
+        Optional<ASTType> known,
         boolean isPositive,
         boolean isValue) {
       super(parent, parent.ep);
       this.name = name;
       this.id = id;
+      this.known = known;
       this.isPositive = isPositive;
       this.isValue = isValue;
     }
@@ -248,6 +258,14 @@ public class IREnvironment {
 
     public IRTypeId getId() {
       return id.orElseThrow();
+    }
+
+    public ASTType getKnown() {
+      return known.orElseThrow();
+    }
+
+    public boolean isKnown() {
+      return known.isPresent();
     }
 
     public boolean isPositive() {

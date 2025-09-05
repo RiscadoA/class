@@ -1,6 +1,6 @@
 send
-id recv
 close x
+id recv
 id send
 id close
 recv

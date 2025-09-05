@@ -426,7 +426,7 @@ public class IRGenerator extends ASTNodeVisitor {
       } catch (Exception e) {
         throw new IllegalArgumentException("Error unfolding argument type: " + e.getMessage());
       }
-      IRSlotsFromASTType info = slotsFromType(type, typeArgs);
+      IRSlotsFromASTType info = slotsFromType(type);
       boolean isPositive = isPositive(type);
       boolean isValue = isValue(type, isPositive);
 
@@ -837,11 +837,7 @@ public class IRGenerator extends ASTNodeVisitor {
   }
 
   IRSlotsFromASTType slotsFromType(ASTType type) {
-    return slotsFromType(type, Map.of());
-  }
-
-  IRSlotsFromASTType slotsFromType(ASTType type, Map<String, ASTType> knownTypes) {
-    return IRSlotsFromASTType.compute(compiler, env, Set.of(), knownTypes, type);
+    return IRSlotsFromASTType.compute(compiler, env, Set.of(), type);
   }
 
   private int countEndPoints(ASTNode node) {
