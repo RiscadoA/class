@@ -23,6 +23,7 @@ import pt.inescid.cllsj.compiler.ir.slot.*;
 public class IRPolyTranslator extends ASTTypeVisitor {
   private IRGenerator gen;
   private Map<String, ASTType> varTypes;
+  private Set<String> modifiedVarTypes;
   private Map<String, IRSlotsFromASTType> varSlots;
 
   private static int nextNameId = 0;
@@ -34,7 +35,7 @@ public class IRPolyTranslator extends ASTTypeVisitor {
 
   // Returns the name of the new channel created for the polymorphic side
   public static IREnvironment.Channel translate(
-      IRGenerator gen, Map<String, ASTType> varTypes, ASTType polyType, String inst) {
+      IRGenerator gen, Map<String, ASTType> varTypes, Set<String> modifiedVarTypes, ASTType polyType, String inst) {
     String poly = newChannelName(inst);
 
     gen.env = gen.env.addSession(poly, gen.slotsFromType(polyType).combinations());
@@ -49,17 +50,18 @@ public class IRPolyTranslator extends ASTTypeVisitor {
     gen.recurse(
         contBlock,
         () -> {
-          translate(gen, varTypes, polyType, poly, inst);
+          translate(gen, varTypes, modifiedVarTypes, polyType, poly, inst);
         });
 
     return polyChannel;
   }
 
   public static void translate(
-      IRGenerator gen, Map<String, ASTType> varTypes, ASTType polyType, String poly, String inst) {
+      IRGenerator gen, Map<String, ASTType> varTypes, Set<String> modifiedVarTypes, ASTType polyType, String poly, String inst) {
     IRPolyTranslator translator = new IRPolyTranslator();
     translator.gen = gen;
     translator.varTypes = varTypes;
+    translator.modifiedVarTypes = modifiedVarTypes;
     translator.varSlots = new HashMap<>();
     for (Map.Entry<String, ASTType> entry : varTypes.entrySet()) {
       translator.varSlots.put(entry.getKey(), gen.slotsFromType(entry.getValue()));
@@ -89,7 +91,7 @@ public class IRPolyTranslator extends ASTTypeVisitor {
       IRSlotsFromASTType info = polySlotsFromType(negChType);
 
       // Move data stored on the negative session's local data to the positive session's remote data
-      gen.block.add(new IRMoveValue(remoteData(pos), localData(neg), info.activeRemoteTree));
+      addMove(pos, neg, info.activeRemoteTree);
 
       // If the type still has a continuation, we must forward two sessions to each other
       if (!isValuePoly(negChType, false)) {
@@ -202,6 +204,7 @@ public class IRPolyTranslator extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTOfferT type) {
+
     // Here the instantiated side sends a tag to be received by the polymorphic side
 
     addMove(poly, inst, new IRTagS());
@@ -213,15 +216,15 @@ public class IRPolyTranslator extends ASTTypeVisitor {
       ASTType caseType = type.getCaseType(label);
 
       IRBlock caseBlock = gen.process.createBlock("poly_offer_" + label.substring(1).toLowerCase());
-      cases.add(new IRBranch.Case(caseBlock.getLocation(), 0));
+      cases.add(new IRBranch.Case(caseBlock.getLocation(), IRPolyEndPointCounter.count(caseType, modifiedVarTypes)));
       gen.recurse(
           caseBlock,
           () -> {
-            advanceOrResetBoth(new IRTagS(), caseType, true);
+            advanceOrResetBoth(new IRTagS(), caseType, false);
 
-            // The poly channel was positive, and the instantiated channel was negative
-            // If the poly type becomes negative, we must jump to it
-            gen.addContinueIfNegative(sessionId(poly), caseType);
+            // The poly channel was negative, and the instantiated channel was positive
+            // If the poly type becomes positive, we must jump to it
+            gen.addContinueIfPositive(sessionId(poly), caseType);
 
             recurse(caseType);
           });
@@ -243,22 +246,21 @@ public class IRPolyTranslator extends ASTTypeVisitor {
       ASTType caseType = type.getCaseType(label);
 
       IRBlock caseBlock = gen.process.createBlock("poly_case_" + label.substring(1).toLowerCase());
-      cases.add(new IRBranch.Case(caseBlock.getLocation(), 0));
+      cases.add(new IRBranch.Case(caseBlock.getLocation(), IRPolyEndPointCounter.count(caseType, modifiedVarTypes)));
       gen.recurse(
           caseBlock,
           () -> {
-            advanceOrResetBoth(new IRTagS(), caseType, false);
+            advanceOrResetBoth(new IRTagS(), caseType, true);
 
-            // The poly channel was negative, and the instantiated channel was positive
-            // If the instantiated type becomes negative, we must jump to it
-            // The instantiated channel becomes negative if the poly type becomes positive
-            gen.addContinueIfPositive(sessionId(inst), caseType);
+            // The poly channel was positive, and the instantiated channel was negative
+            // If the instantiated channel becomes positive, we must jump to it
+            gen.addContinueIfNegative(sessionId(inst), caseType);
 
             recurse(caseType);
           });
     }
 
-    gen.block.add(new IRBranchTag(localData(inst), cases));
+    gen.block.add(new IRBranchTag(localData(poly), cases));
   }
 
   @Override
@@ -348,14 +350,14 @@ public class IRPolyTranslator extends ASTTypeVisitor {
         gen.recurse(closureBlock, () -> recurse(sentPoly, inst, type.getlhs()));
 
         IRSlotsFromASTType instInfo = instSlotsFromType(type.getlhs());
-        advanceOrResetInst(instInfo.activeTree().combinations(), type.getlhs(), false);
+        advanceOrResetInst(instInfo.activeTree().combinations(), type.getrhs(), false);
       } else {
         // Receive the new session from the instantiated side
         String recvInst = newChannelName(inst);
         gen.env =
             gen.env.addSession(recvInst, instSlotsFromType(type.getlhs()).localCombinations());
         gen.block.add(new IRBindSession(localData(inst), sessionId(recvInst), localData(recvInst)));
-        advanceOrResetInst(new IRSessionS(), type.getlhs(), false);
+        advanceOrResetInst(new IRSessionS(), type.getrhs(), false);
 
         // Generate the closure code which translates the received instantiated session
         gen.recurse(
@@ -371,7 +373,7 @@ public class IRPolyTranslator extends ASTTypeVisitor {
       gen.block.add(new IRWriteSession(remoteData(poly), sessionId(sentPoly)));
       advanceOrResetPoly(new IRSessionS(), type.getrhs(), false);
 
-      // If the polarity changes, we pass control to the side side
+      // If the polarity changes, we pass control to the other side
       gen.addContinueIfPositive(sessionId(poly), type.getrhs());
     } else {
       // If the left-hand-side is not polymorphic, we can just forward it
@@ -420,7 +422,7 @@ public class IRPolyTranslator extends ASTTypeVisitor {
         // We can now continue with the right-hand-side
         gen.block = rhsBlock;
         IRSlotsFromASTType instInfo = instSlotsFromType(type.getlhs());
-        advanceOrResetInst(instInfo.activeTree().combinations(), type.getlhs(), true);
+        advanceOrResetInst(instInfo.activeTree().combinations(), type.getrhs(), true);
       } else {
         // Otherwise, we must create a new instantiated session which translates the
         // received polymorphic session
@@ -439,6 +441,9 @@ public class IRPolyTranslator extends ASTTypeVisitor {
         gen.block.add(new IRWriteSession(remoteData(inst), sessionId(sentInst)));
         advanceOrResetInst(new IRSessionS(), type.getrhs(), true);
       }
+
+      // If the polarity changes, we pass control to the other side
+      gen.addContinueIfNegative(sessionId(inst), type.getrhs());
     } else {
       // If the left-hand-side is not polymorphic, we can just forward it
       if (gen.compiler.optimizeSendValue.get() && isValuePoly(type.getlhs(), true)) {
@@ -609,13 +614,10 @@ public class IRPolyTranslator extends ASTTypeVisitor {
   private ASTType instType(ASTType polyType) {
     Env<EnvEntry> ep = gen.env.getEp();
     for (String var : varTypes.keySet()) {
-      ep = ep.assoc(var, new TypeEntry(varTypes.get(var)));
+      Env<ASTType> ee = new Env<ASTType>().assoc(var, varTypes.get(var));
+      polyType = polyType.unfoldTypeCatch(ep).subst(ee);
     }
-    try {
-      return polyType.unfoldType(ep);
-    } catch (Exception e) {
-      throw new RuntimeException("Error unfolding type " + polyType, e);
-    }
+    return polyType;
   }
 
   private boolean isValueInst(ASTType type, boolean expectedPolarity) {
@@ -664,7 +666,7 @@ public class IRPolyTranslator extends ASTTypeVisitor {
   }
 
   private boolean isPolymorphic(ASTType type) {
-    Set<String> vars = new HashSet<>(varTypes.keySet());
+    Set<String> vars = new HashSet<>(modifiedVarTypes);
     vars.addAll(recursionLabels.keySet());
     vars.addAll(coRecursionLabels.keySet());
     return IRUsesTypeVar.check(type, vars);

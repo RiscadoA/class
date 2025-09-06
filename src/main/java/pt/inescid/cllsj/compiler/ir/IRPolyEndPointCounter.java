@@ -1,15 +1,27 @@
 package pt.inescid.cllsj.compiler.ir;
 
+import java.util.Set;
+
 import pt.inescid.cllsj.ast.ASTTypeVisitor;
 import pt.inescid.cllsj.ast.types.*;
 
 public class IRPolyEndPointCounter extends ASTTypeVisitor {
   private int count = 0;
+  private Set<String> polyNames;
 
-  public static int count(ASTType type) {
+  public static int count(ASTType type, Set<String> polyNames) {
     IRPolyEndPointCounter counter = new IRPolyEndPointCounter();
-    type.accept(counter);
+    counter.polyNames = polyNames;
+    counter.recurse(type);
     return counter.count;
+  }
+
+  private void recurse(ASTType type) {
+    if (IRUsesTypeVar.check(type, polyNames)) {
+      type.accept(this);
+    } else {
+      count += 1;
+    }
   }
 
   @Override
@@ -29,7 +41,7 @@ public class IRPolyEndPointCounter extends ASTTypeVisitor {
     int maxCount = 0;
     for (int i = 0; i < type.getcases().size(); ++i) {
       count = 0;
-      type.getCaseType(type.getLabel(i)).accept(this);
+      recurse(type.getCaseType(type.getLabel(i)));
       maxCount = Math.max(maxCount, count);
     }
     count = oldCount + maxCount;
@@ -37,7 +49,7 @@ public class IRPolyEndPointCounter extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTCoRecT type) {
-    type.getin().accept(this);
+    recurse(type.getin());
   }
 
   @Override
@@ -47,7 +59,7 @@ public class IRPolyEndPointCounter extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTNotT type) {
-    type.getin().accept(this);
+    recurse(type.getin());
   }
 
   @Override
@@ -56,7 +68,7 @@ public class IRPolyEndPointCounter extends ASTTypeVisitor {
     int maxCount = 0;
     for (int i = 0; i < type.getcases().size(); ++i) {
       count = 0;
-      type.getCaseType(type.getLabel(i)).accept(this);
+      recurse(type.getCaseType(type.getLabel(i)));
       maxCount = Math.max(maxCount, count);
     }
     count = oldCount + maxCount;
@@ -69,19 +81,19 @@ public class IRPolyEndPointCounter extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTRecT type) {
-    type.getin().accept(this);
+    recurse(type.getin());
   }
 
   @Override
   public void visit(ASTRecvT type) {
-    type.getlhs().accept(this);
-    type.getrhs().accept(this);
+    recurse(type.getlhs());
+    recurse(type.getrhs());
   }
 
   @Override
   public void visit(ASTSendT type) {
-    type.getlhs().accept(this);
-    type.getrhs().accept(this);
+    recurse(type.getlhs());
+    recurse(type.getrhs());
   }
 
   @Override

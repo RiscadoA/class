@@ -38,8 +38,8 @@ public class CAddress {
     return new CAddress(base, offset.add(delta));
   }
 
-  public CAddress offsetAlign(CSize delta, CAlignment alignment) {
-    return new CAddress(base, offset.add(delta).align(alignment));
+  public CAddress align(CAlignment alignment) {
+    return new CAddress("(char*)ALIGN((uintptr_t)(" + this + "), " + alignment + ")", CSize.zero());
   }
 
   public String cast(String type) {

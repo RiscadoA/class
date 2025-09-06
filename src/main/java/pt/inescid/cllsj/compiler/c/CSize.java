@@ -1,5 +1,7 @@
 package pt.inescid.cllsj.compiler.c;
 
+import java.util.Optional;
+
 public abstract class CSize {
   public static CSize zero() {
     return constant(0);
@@ -65,6 +67,14 @@ public abstract class CSize {
 
   public CSize padding(CAlignment alignment) {
     return new CSizePadding(this, alignment);
+  }
+
+  public Optional<Integer> asConstant() {
+    if (this instanceof CSizeConstant) {
+      return Optional.of(((CSizeConstant) this).bytes);
+    } else {
+      return Optional.empty();
+    }
   }
 
   protected CSize addRemainder(int remainder) {
@@ -250,6 +260,14 @@ public abstract class CSize {
         return constant(Math.max(((CSizeConstant) lhs).bytes, ((CSizeConstant) rhs).bytes));
       }
 
+      if (lhs.asConstant().isPresent() && lhs.asConstant().get() == 0) {
+        return rhs;
+      }
+
+      if (rhs.asConstant().isPresent() && rhs.asConstant().get() == 0) {
+        return lhs;
+      }
+
       return lhs.max(rhs);
     }
 
@@ -297,6 +315,10 @@ public abstract class CSize {
                       + ((alignmentBytes - (offsetBytes % alignmentBytes)) % alignmentBytes))
               .addRemainder(remainder);
         }
+      }
+
+      if (offset.asConstant().isPresent() && offset.asConstant().get() == 0) {
+        return constant(remainder);
       }
 
       return offset.align(alignment).addRemainder(remainder);

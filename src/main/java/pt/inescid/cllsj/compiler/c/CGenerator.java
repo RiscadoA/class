@@ -1367,7 +1367,13 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   private CAddress offset(String address, IRSlotOffset offset) {
-    return CAddress.of(address, offset(CSize.zero(), offset));
+    CSize pastSize = layout(offset.getPast()).size;
+    CAddress result = CAddress.of(address, pastSize);
+    if (offset.getAlignTo().isPresent()) {
+      CAlignment alignment = layout(offset.getAlignTo().get()).alignment;
+      result = result.align(alignment);
+    }
+    return result;
   }
 
   private CLayout layout(IRSlotCombinations combinations) {

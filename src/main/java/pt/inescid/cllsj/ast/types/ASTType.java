@@ -31,9 +31,25 @@ public abstract class ASTType {
 
   public abstract ASTType unfoldType(Env<EnvEntry> e) throws Exception;
 
+  public ASTType unfoldTypeCatch(Env<EnvEntry> e) {
+    try {
+      return unfoldType(e);
+    } catch (Exception ex) {
+      throw new RuntimeException(ex);
+    }
+  }
+
   public abstract void kindcheck(Env<EnvEntry> e) throws Exception;
 
   public abstract String toStr(Env<EnvEntry> e) throws Exception;
+
+  public String toStrCatch(Env<EnvEntry> e) {
+    try {
+      return toStr(e);
+    } catch (Exception ex) {
+      throw new RuntimeException(ex);
+    }
+  }
 
   public abstract ASTType subst(Env<ASTType> e);
 

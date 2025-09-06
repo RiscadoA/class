@@ -1,8 +1,11 @@
 package pt.inescid.cllsj.compiler.ir;
 
 import java.util.HashSet;
+import java.util.Set;
+
 import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.nodes.*;
+import pt.inescid.cllsj.ast.types.ASTIdT;
 import pt.inescid.cllsj.compiler.Compiler;
 
 public class IREndPointCounter extends ASTNodeVisitor {
@@ -48,10 +51,16 @@ public class IREndPointCounter extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTId node) {
+    Set<String> modifiedTypeArgs = new HashSet<>();
+    for (int i = 0; i < node.getTPars().size(); ++i) {
+      if (!(node.getTPars().get(i).unfoldTypeCatch(env.getEp()) instanceof ASTIdT)) {
+        modifiedTypeArgs.add(node.getProcTParIds().get(i));
+      }
+    }
+
     for (int i = 0; i < node.getPars().size(); ++i) {
-      if (IRUsesTypeVar.check(
-          node.getProcParTypes().get(i), new HashSet<>(node.getProcTParIds()))) {
-        count += IRPolyEndPointCounter.count(node.getParTypes().get(i));
+      if (IRUsesTypeVar.check(node.getProcParTypes().get(i), modifiedTypeArgs)) {
+        count += IRPolyEndPointCounter.count(node.getParTypes().get(i), modifiedTypeArgs);
       }
     }
     count += 1;
@@ -158,7 +167,7 @@ public class IREndPointCounter extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTSendTy node) {
-    count += IRPolyEndPointCounter.count(node.getTypeRhsNoSubst().dualCatch(env.getEp()));
+    count += IRPolyEndPointCounter.count(node.getTypeRhsNoSubst().dualCatch(env.getEp()), Set.of(node.getTypeId()));
     count += 1;
     node.getRhs().accept(this);
   }

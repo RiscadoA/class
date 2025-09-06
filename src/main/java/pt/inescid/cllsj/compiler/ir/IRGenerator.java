@@ -388,9 +388,13 @@ public class IRGenerator extends ASTNodeVisitor {
 
     // Get a map from the process' type argument names to the types we're passing
     Map<String, ASTType> typeArgs = new HashMap<>();
+    Set<String> modifiedTypeArgs = new HashSet<>();
     for (int i = 0; i < node.getTPars().size(); ++i) {
       ASTType type = node.getTPars().get(i);
       typeArgs.put(node.getProcTParIds().get(i), type);
+      if (!(type.unfoldTypeCatch(env.getEp()) instanceof ASTIdT)) {
+        modifiedTypeArgs.add(node.getProcTParIds().get(i));
+      }
     }
     env = env.withKnownTypes(typeArgs);
 
@@ -400,12 +404,7 @@ public class IRGenerator extends ASTNodeVisitor {
 
     for (int i = 0; i < node.getPars().size(); ++i) {
       // Get the argument's type information
-      ASTType type = node.getProcParTypes().get(i);
-      try {
-        type = type.unfoldType(env.getEp());
-      } catch (Exception e) {
-        throw new IllegalArgumentException("Error unfolding argument type: " + e.getMessage());
-      }
+      ASTType type = node.getProcParTypes().get(i).unfoldTypeCatch(env.getEp());
       IRSlotsFromASTType info = slotsFromType(type);
       boolean isPositive = isPositive(type);
       boolean isValue = isValue(type, isPositive);
@@ -416,9 +415,9 @@ public class IRGenerator extends ASTNodeVisitor {
 
       // If the channel is polymorphic, we need to perform translation
       IREnvironment.Channel channel;
-      if (IRUsesTypeVar.check(type, typeArgs.keySet())) {
+      if (IRUsesTypeVar.check(type, modifiedTypeArgs)) {
         // Create a new channel with the polymorphic type
-        channel = IRPolyTranslator.translate(this, typeArgs, type, argChannel.getName());
+        channel = IRPolyTranslator.translate(this, typeArgs, modifiedTypeArgs, type, argChannel.getName());
         addContinueIfNegative(channel.getSessionId(), type);
       } else {
         channel = argChannel;
@@ -656,19 +655,20 @@ public class IRGenerator extends ASTNodeVisitor {
     // Overwrite the previous session with a new session of the new type
     IRBlock rhsBlock = process.createBlock("sendty_rhs");
     IRSlotsFromASTType info = slotsFromType(node.getTypeRhs());
-    env = env.addSession(node.getChs(), info.localCombinations());
+    env = env.addSession(node.getChs(), info.combinations());
     IREnvironment.Channel instChannel = env.getChannel(node.getChs());
     block.add(new IRInitializeSession(instChannel.getSessionId(), rhsBlock.getLocation(), instChannel.getLocalData()));
 
     // Create the polymorphic translator session that we'll be sending through the main channel
     Map<String, ASTType> varTypes = Map.of(node.getTypeId(), node.getType());
     env = env.withKnownTypes(varTypes);
-    IREnvironment.Channel polyChannel = IRPolyTranslator.translate(this, varTypes, node.getTypeRhsNoSubst().dualCatch(env.getEp()), node.getChs());
+    IREnvironment.Channel polyChannel = IRPolyTranslator.translate(this, varTypes, varTypes.keySet(), node.getTypeRhsNoSubst().dualCatch(env.getEp()), node.getChs());
 
     addContinueIfPositive(instChannel.getSessionId(), node.getTypeRhs());
 
     // Write the type, the translator session and the type's polarity to the main channel
-    block.add(new IRWriteType(typeLoc, info.activeRemoteTree));
+    IRSlotsFromASTType varInfo = slotsFromType(node.getType());
+    block.add(new IRWriteType(typeLoc, varInfo.activeRemoteTree));
     block.add(new IRWriteSession(sessionLoc, polyChannel.getSessionId()));
     block.add(new IRWriteTag(polarityLoc, isPositive(node.getType()) ? 1 : 0));
     block.add(new IRFinishSession(channel.getSessionId(), true));
@@ -695,7 +695,6 @@ public class IRGenerator extends ASTNodeVisitor {
           // Create a new process which will handle the new type variable
           IRProcessId polyProcessId = processId(process.getId() + "_poly" + processGenId, new boolean[] {polarity});
           IRProcess polyProcess = new IRProcess(polyProcessId);
-          polyProcess.setEndPoints(countEndPoints(node.getRhs()));
           IREnvironment polyEnv = new IREnvironment(polyProcess, env.getEp());
 
           // Prepare lists of arguments to pass to the polymorphic process
@@ -721,6 +720,9 @@ public class IRGenerator extends ASTNodeVisitor {
           polyEnv = polyEnv.changeEp(polyEp);
           typeArguments.add(
               new IRCallProcess.TypeArgument(typeLoc, polyEnv.getType(node.getTyid()).getId()));
+
+          // Count the end points of the polymorphic process
+          polyProcess.setEndPoints(countEndPoints(polyEnv, node.getRhs()));
 
           // Define the argument session for the process
           IRSlotsFromASTType rhsInfo = IRSlotsFromASTType.compute(compiler, polyEnv, Set.of(), node.getTypeRhs());
@@ -974,6 +976,10 @@ public class IRGenerator extends ASTNodeVisitor {
   }
 
   private int countEndPoints(ASTNode node) {
+    return countEndPoints(env, node);
+  }
+
+  private int countEndPoints(IREnvironment env, ASTNode node) {
     return IREndPointCounter.count(compiler, env, node);
   }
 
