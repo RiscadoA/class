@@ -1,0 +1,4 @@
+close 1
+wait 1
+close 2
+wait 2
