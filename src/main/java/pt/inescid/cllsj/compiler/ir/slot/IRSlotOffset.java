@@ -42,7 +42,7 @@ public class IRSlotOffset {
   }
 
   public boolean isZero() {
-    return this.equals(ZERO);
+    return past.isEmpty();
   }
 
   public IRSlotCombinations getPast() {
@@ -58,10 +58,17 @@ public class IRSlotOffset {
   }
 
   public IRSlotOffset advance(IRSlotSequence slots, IRSlot alignTo) {
-    return new IRSlotOffset(past.suffix(slots), alignTo);
+    if (slots.size() == 0) {
+      return this;
+    } else {
+      return new IRSlotOffset(past.suffix(slots), alignTo);
+    }
   }
 
   public IRSlotOffset advance(IRSlotOffset offset) {
+    if (offset.getPast().size() == 0) {
+      return this;
+    }
     return new IRSlotOffset(past.suffix(offset.past), offset.alignTo.or(() -> this.alignTo));
   }
 

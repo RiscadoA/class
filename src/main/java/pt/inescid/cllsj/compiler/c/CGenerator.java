@@ -47,7 +47,7 @@ public class CGenerator extends IRInstructionVisitor {
   private IRProgram program;
   private PrintStream output;
 
-  private IRProcess currentProcess;
+  private IRProcess currentProcess = null;
   private CProcessLayout currentProcessLayout;
   private int indentLevel = 0;
 
@@ -620,6 +620,12 @@ public class CGenerator extends IRInstructionVisitor {
 
   private void generate(IRBlock block) {
     putLabel(codeLocationLabel(block.getLocation()));
+    if (compiler.tracing.get()) {
+      putDebugLn("[block(" + currentProcess.getId() + ":" + block.getLocation().getLabel() + ")]");
+    }
+    if (compiler.debug.get()) {
+      putDebugLn("| env: %p", ENV);
+    }
     block.stream().forEach(i -> generate(i));
   }
 
@@ -771,7 +777,6 @@ public class CGenerator extends IRInstructionVisitor {
     // Modify the remote session to point to our environment
     String remoteSession = accessRemoteSession(instr.getSessionId());
     putAssign(sessionContEnv(remoteSession), ENV);
-    putAssign(sessionContSession(remoteSession), target);
     putAssign(sessionContSession(remoteSession), target);
     putAssign(sessionContData(remoteSession), data(instr.getContinuationData()));
   }

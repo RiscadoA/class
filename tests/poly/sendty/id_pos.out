@@ -1,7 +1,7 @@
 sendty
+id recvty
 send
 close x
-id recvty
 id recv
 id send
 id close

@@ -10,6 +10,7 @@ import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
 import java.util.function.Consumer;
+import java.util.function.Function;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.TypeEntry;
@@ -323,33 +324,7 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTFwd node) {
-    // Get the negative and positive sessions
-    String negCh, posCh;
-    ASTType negChType;
-    if (isPositive(node.getCh2Type())) {
-      negCh = node.getCh1();
-      posCh = node.getCh2();
-      negChType = new ASTNotT(node.getCh2Type());
-    } else {
-      negCh = node.getCh2();
-      posCh = node.getCh1();
-      negChType = node.getCh2Type();
-    }
-    IREnvironment.Channel neg = env.getChannel(negCh);
-    IREnvironment.Channel pos = env.getChannel(posCh);
-
-    IRSlotsFromASTType info = slotsFromType(negChType);
-
-    // Move data stored on the negative session's local data to the positive session's remote data
-    block.add(new IRMoveValue(pos.getRemoteData(), neg.getLocalData(), info.activeLocalTree));
-
-    // If the type still has a continuation, we must forward two sessions to each other
-    if (!isValue(negChType, false)) {
-      block.add(new IRForwardSessions(neg.getSessionId(), pos.getSessionId(), true));
-    } else {
-      // Jump to the positive session's continuation
-      block.add(new IRFinishSession(pos.getSessionId(), true));
-    }
+    addForward(node.getCh1(), node.getCh2(), node.getCh2Type());
   }
 
   @Override
@@ -417,7 +392,9 @@ public class IRGenerator extends ASTNodeVisitor {
       IREnvironment.Channel channel;
       if (IRUsesTypeVar.check(type, modifiedTypeArgs)) {
         // Create a new channel with the polymorphic type
-        channel = IRPolyTranslator.translate(this, typeArgs, modifiedTypeArgs, type, argChannel.getName());
+        channel =
+            IRPolyTranslator.translate(
+                this, typeArgs, modifiedTypeArgs, type, argChannel.getName(), false);
         addContinueIfNegative(channel.getSessionId(), type);
       } else {
         channel = argChannel;
@@ -477,31 +454,10 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTRecv node) {
-    IREnvironment.Channel channel = env.getChannel(node.getChr());
-
-    // Define new session for the channel being received
-    IRSlotsFromASTType info = slotsFromType(node.getChiType());
-    env = env.addSession(node.getChi(), info.localCombinations());
-    IREnvironment.Channel argChannel = env.getChannel(node.getChi());
-
-    if (compiler.optimizeSendValue.get() && isValue(node.getChiType(), false)) {
-      // If the left type is a value, we do the send value optimization
-      block.add(
-          new IRMoveValue(argChannel.getLocalData(), channel.getLocalData(), info.activeLocalTree));
-      advanceOrReset(node.getChr(), info.activeLocalTree.combinations(), node.getRhsType(), false);
-    } else {
-      // Bind the new session to the value received from the main session
-      block.add(
-          new IRBindSession(
-              channel.getLocalData(), argChannel.getSessionId(), argChannel.getLocalData()));
-      advanceOrReset(node.getChr(), new IRSessionS(), node.getRhsType(), false);
-
-      // If the received session is negative, we must jump to it
-      addContinueIfNegative(argChannel.getSessionId(), node.getChiType());
-    }
-
-    // Recurse on the continuation
-    recurse(block, node.getRhs());
+    addRecv(node.getChr(), node.getChi(), node.getChiType(), node.getRhsType(),
+      () -> {
+        node.getRhs().accept(this);
+      });
   }
 
   @Override
@@ -521,60 +477,11 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTSend node) {
-    IREnvironment.Channel channel = env.getChannel(node.getChs());
-    IREnvironment.Channel argSession;
-
-    IRSlotsFromASTType argInfo = slotsFromType(node.getLhsType());
-    if (compiler.optimizeSendValue.get() && isValue(node.getLhsType(), true)) {
-      // We perform the send value optimization:
-      // 1. we define a new session for the sent channel
-      // 2. we initialize it so that it's data pointer points to the main session's data
-      // 3. we jump to it immediately
-
-      env = env.addSession(node.getCho());
-      argSession = env.getChannel(node.getCho());
-
-      // Create block for the right-hand-side to run after the value has been sent
-      IRBlock rhsBlock = process.createBlock("send_rhs");
-
-      // Initialize the new session so that its data points to the main session's data
-      block.add(
-          new IRInitializeSession(
-              argSession.getSessionId(), rhsBlock.getLocation(), channel.getRemoteData()));
-      recurse(block, node.getLhs());
-
-      // Generate the continuation
-      advanceOrReset(
-          node.getChs(), argInfo.activeRemoteTree.combinations(), node.getRhsType(), true);
-      recurse(
-          rhsBlock,
-          () -> {
-            // If the continuation is negative, we must jump to it
-            addContinueIfNegative(channel.getSessionId(), node.getRhsType());
-            node.getRhs().accept(this);
-          });
-    } else {
-      // Define new session for the channel being sent
-      env = env.addSession(node.getCho(), argInfo.localCombinations());
-      argSession = env.getChannel(node.getCho());
-
-      // Initialize the new session with a new closure block for the left-hand-side
-      // as its continuation.
-      IRBlock closureBlock = process.createBlock("send_closure");
-      recurse(closureBlock, node.getLhs());
-      block.add(
-          new IRInitializeSession(
-              argSession.getSessionId(), closureBlock.getLocation(), argSession.getLocalData()));
-
-      block.add(new IRWriteSession(channel.getRemoteData(), argSession.getSessionId()));
-      advanceOrReset(node.getChs(), new IRSessionS(), node.getRhsType(), true);
-
-      // If the continuation is negative, we must jump to it
-      addContinueIfNegative(channel.getSessionId(), node.getRhsType());
-
-      // Recurse on the continuation
-      recurse(block, node.getRhs());
-    }
+    addSend(node.getChs(), node.getCho(), node.getLhsType(), node.getRhsType(), () -> {
+      node.getLhs().accept(this);
+    }, () -> {
+      node.getRhs().accept(this);
+    });
   }
 
   @Override
@@ -643,170 +550,32 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTSendTy node) {
-    IREnvironment.Channel channel = env.getChannel(node.getChs());
-
-    // Get the locations where we'll be writing the necessary data
-    IRDataLocation typeLoc = env.getChannel(node.getChs()).getRemoteData();
-    env = env.advanceChannel(node.getChs(), IRSlotOffset.of(new IRTypeS(), new IRSessionS()));
-    IRDataLocation sessionLoc = env.getChannel(node.getChs()).getRemoteData();
-    env = env.advanceChannel(node.getChs(), IRSlotOffset.of(new IRSessionS(), new IRTagS()));
-    IRDataLocation polarityLoc = env.getChannel(node.getChs()).getRemoteData();
-
-    // Overwrite the previous session with a new session of the new type
-    IRBlock rhsBlock = process.createBlock("sendty_rhs");
-    IRSlotsFromASTType info = slotsFromType(node.getTypeRhs());
-    env = env.addSession(node.getChs(), info.combinations());
-    IREnvironment.Channel instChannel = env.getChannel(node.getChs());
-    block.add(new IRInitializeSession(instChannel.getSessionId(), rhsBlock.getLocation(), instChannel.getLocalData()));
-
-    // Create the polymorphic translator session that we'll be sending through the main channel
-    Map<String, ASTType> varTypes = Map.of(node.getTypeId(), node.getType());
-    env = env.withKnownTypes(varTypes);
-    IREnvironment.Channel polyChannel = IRPolyTranslator.translate(this, varTypes, varTypes.keySet(), node.getTypeRhsNoSubst().dualCatch(env.getEp()), node.getChs());
-
-    addContinueIfPositive(instChannel.getSessionId(), node.getTypeRhs());
-
-    // Write the type, the translator session and the type's polarity to the main channel
-    IRSlotsFromASTType varInfo = slotsFromType(node.getType());
-    block.add(new IRWriteType(typeLoc, varInfo.activeRemoteTree));
-    block.add(new IRWriteSession(sessionLoc, polyChannel.getSessionId()));
-    block.add(new IRWriteTag(polarityLoc, isPositive(node.getType()) ? 1 : 0));
-    block.add(new IRFinishSession(channel.getSessionId(), true));
-
-    // Generate the continuation
-    recurse(rhsBlock, node.getRhs());
+    addSendTy(
+        node.getChs(),
+        node.getTypeId(),
+        node.getType(),
+        node.getTypeRhs(),
+        node.getTypeRhsNoSubst(),
+        () -> {
+          node.getRhs().accept(this);
+        });
   }
 
   @Override
   public void visit(ASTRecvTy node) {
-    // Get the locations where we'll be reading from the type and the new session
-    IRDataLocation typeLoc = env.getChannel(node.getChs()).getLocalData();
-    env =
-        env.advanceChannel(
-            node.getChs(), IRSlotOffset.of(IRSlotSequence.of(new IRTypeS()), new IRSessionS()));
-    IRDataLocation sessionLoc = env.getChannel(node.getChs()).getLocalData();
-    env = env.advanceChannel(node.getChs(), IRSlotOffset.of(new IRSessionS(), new IRTagS()));
-    IRDataLocation polarityLoc = env.getChannel(node.getChs()).getLocalData();
+    Map<String, ASTType> capturedChannels = new HashMap<>();
+    for (String n : node.getRhs().fn(new HashSet<>())) {
+      capturedChannels.put(n, node.getFreeNameType(n));
+    }
 
-    int processGenId = nextProcessGenId++;
-
-    Consumer<Boolean> forPolarity =
-        polarity -> {
-          // Create a new process which will handle the new type variable
-          IRProcessId polyProcessId = processId(process.getId() + "_poly" + processGenId, new boolean[] {polarity});
-          IRProcess polyProcess = new IRProcess(polyProcessId);
-          IREnvironment polyEnv = new IREnvironment(polyProcess, env.getEp());
-
-          // Prepare lists of arguments to pass to the polymorphic process
-          List<IRCallProcess.TypeArgument> typeArguments = new ArrayList<>();
-          List<IRCallProcess.SessionArgument> sessionArguments = new ArrayList<>();
-          List<IRCallProcess.DataArgument> dataArguments = new ArrayList<>();
-
-          // Pass all types in the current environment to the polymorphic process
-          for (int i = 0; i < process.getTypeCount(); ++i) {
-            IRTypeId id = new IRTypeId(i);
-            IREnvironment.Type envType = env.getType(id);
-            polyEnv = polyEnv.addType(envType.getName(), envType.isPositive());
-            IRTypeId newId = polyEnv.getType(envType.getName()).getId();
-            typeArguments.add(new IRCallProcess.TypeArgument(IRSlotTree.of(new IRVarS(id)), newId));
-          }
-
-          // Pass the type variable received to the polymorphic process
-          polyEnv = polyEnv.addType(node.getTyid(), polarity);
-          Env<EnvEntry> polyEp = polyEnv.getEp();
-          polyEp = polyEp.assoc(node.getTyid(), new TypeEntry(new ASTIdT(node.getTyid())));
-          polyEp = polyEp.assoc(node.getTyidGen(), new TypeEntry(new ASTIdT(node.getTyid())));
-          polyEp = polyEp.assoc(node.getTyidPar(), new TypeEntry(new ASTIdT(node.getTyid())));
-          polyEnv = polyEnv.changeEp(polyEp);
-          typeArguments.add(
-              new IRCallProcess.TypeArgument(typeLoc, polyEnv.getType(node.getTyid()).getId()));
-
-          // Count the end points of the polymorphic process
-          polyProcess.setEndPoints(countEndPoints(polyEnv, node.getRhs()));
-
-          // Define the argument session for the process
-          IRSlotsFromASTType rhsInfo = IRSlotsFromASTType.compute(compiler, polyEnv, Set.of(), node.getTypeRhs());
-          polyEnv = polyEnv.addArgSession(node.getChs(), rhsInfo.localCombinations());
-          sessionArguments.add(
-              new IRCallProcess.SessionArgument(
-                  sessionLoc, polyEnv.getChannel(node.getChs()).getSessionId(), IRSlotOffset.ZERO));
-
-          // Pass captured sessions and exponentials to the polymorphic process
-          // as session and data arguments
-          for (String name : node.getRhs().fn(new HashSet<>())) {
-            if (name.equals(node.getChs())) {
-              continue;
-            }
-
-            IREnvironment.Channel captured = env.getChannel(name);
-            if (captured.isExponential()) {
-              // We captured an exponential channel, we pass it as a data argument
-              IRSlotTree valueSlots = captured.getExponentialType();
-              polyEnv = polyEnv.addValue(name, valueSlots.combinations(), Optional.of(valueSlots));
-              dataArguments.add(
-                  new IRCallProcess.DataArgument(
-                      captured.getLocalData(),
-                      polyEnv.getChannel(name).getLocalDataId(),
-                      valueSlots,
-                      false));
-            } else {
-              // We captured a channel, we pass it as a session argument along with its data
-              ASTType type = node.getFreeNameType(name);
-              IRSlotsFromASTType info = IRSlotsFromASTType.compute(compiler, polyEnv, Set.of(), type);
-              boolean isPositive = polyEnv.isPositive(type);
-              boolean isValue = IRValueChecker.check(compiler, polyEnv, type, Optional.empty());
-
-              polyEnv = polyEnv.addArgSession(name, info.localCombinations());
-              IREnvironment.Channel sourceChannel = env.getChannel(name);
-              IREnvironment.Channel targetChannel = polyEnv.getChannel(name);
-
-              if (!isValue || isPositive) {
-                // If the type is not a value, or if it's a positive value, we must pass the session
-                sessionArguments.add(
-                    new IRCallProcess.SessionArgument(
-                        sourceChannel.getSessionId(),
-                        targetChannel.getSessionId(),
-                        sourceChannel.getOffset()));
-              }
-
-              if ((!isValue || !isPositive) && !info.activeLocalTree.isLeaf()) {
-                // If the type is not a value, or if it's a negative value, we must pass the data
-                dataArguments.add(
-                    new IRCallProcess.DataArgument(
-                        sourceChannel.getLocalData(),
-                        targetChannel.getLocalDataId(),
-                        info.activeLocalTree,
-                        false));
-              }
-            }
-          }
-
-          // Store the process we just defined so that it gets generated later
-          procGens.put(polyProcessId, () -> {
-            // We need to immediately continue the received session if it's negative
-            addContinueIfNegative(env.getChannel(node.getChs()).getSessionId(), node.getTypeRhs());
-
-            node.getRhs().accept(this);
-          });
-          procEnvs.put(polyProcessId, polyEnv);
-          procUsed.add(polyProcessId);
-
-          // Call the polymorphic process
-          block.add(
-              new IRCallProcess(
-                  polyProcessId, typeArguments, sessionArguments, dataArguments, true));
-        };
-
-    // Branch on the polarity tag we received, calling forPolarity with the correct value
-    IRBlock positiveBlock = process.createBlock("recvty_pos");
-    IRBlock negativeBlock = process.createBlock("recvty_neg");
-    IRBranch.Case positiveCase = new IRBranch.Case(positiveBlock.getLocation(), 1);
-    IRBranch.Case negativeCase = new IRBranch.Case(negativeBlock.getLocation(), 1);
-    block.add(new IRBranchTag(polarityLoc, List.of(negativeCase, positiveCase)));
-
-    // Generate the branches
-    recurse(positiveBlock, () -> forPolarity.accept(true));
-    recurse(negativeBlock, () -> forPolarity.accept(false));
+    addRecvTy(
+        node.getChs(),
+        node.getTyid(),
+        Set.of(node.getTyidGen(), node.getTyidPar()),
+        capturedChannels,
+        node.getTypeRhs(),
+        env -> countEndPoints(env, node.getRhs()),
+        () -> node.getRhs().accept(this));
   }
 
   @Override
@@ -894,6 +663,305 @@ public class IRGenerator extends ASTNodeVisitor {
   }
 
   // ======================================= Helper methods =======================================
+
+  void addSend(String ch, String cho, ASTType lhsType, ASTType rhsType, Runnable lhsCont, Runnable rhsCont) {
+    IREnvironment.Channel channel = env.getChannel(ch);
+    IREnvironment.Channel argSession;
+
+    IRSlotsFromASTType argInfo = slotsFromType(lhsType);
+    if (compiler.optimizeSendValue.get() && isValue(lhsType, true)) {
+      // We perform the send value optimization:
+      // 1. we define a new session for the sent channel
+      // 2. we initialize it so that it's data pointer points to the main session's data
+      // 3. we jump to it immediately
+
+      env = env.addSession(cho);
+      argSession = env.getChannel(cho);
+
+      // Create block for the right-hand-side to run after the value has been sent
+      IRBlock rhsBlock = process.createBlock("send_rhs");
+
+      // Initialize the new session so that its data points to the main session's data
+      block.add(
+          new IRInitializeSession(
+              argSession.getSessionId(), rhsBlock.getLocation(), channel.getRemoteData()));
+      recurse(block, lhsCont);
+
+      // Generate the continuation
+      advanceOrReset(
+          ch, argInfo.activeRemoteTree.combinations(), rhsType, true);
+      recurse(
+          rhsBlock,
+          () -> {
+            // If the continuation is negative, we must jump to it
+            addContinueIfNegative(channel.getSessionId(), rhsType);
+            rhsCont.run();
+          });
+    } else {
+      // Define new session for the channel being sent
+      env = env.addSession(cho, argInfo.localCombinations());
+      argSession = env.getChannel(cho);
+
+      // Initialize the new session with a new closure block for the left-hand-side
+      // as its continuation.
+      IRBlock closureBlock = process.createBlock("send_closure");
+      recurse(closureBlock, lhsCont);
+      block.add(
+          new IRInitializeSession(
+              argSession.getSessionId(), closureBlock.getLocation(), argSession.getLocalData()));
+
+      block.add(new IRWriteSession(channel.getRemoteData(), argSession.getSessionId()));
+      advanceOrReset(ch, new IRSessionS(), rhsType, true);
+
+      // If the continuation is negative, we must jump to it
+      addContinueIfNegative(channel.getSessionId(), rhsType);
+
+      // Recurse on the continuation
+      recurse(block, rhsCont);
+    }
+  }
+
+  void addRecv(String ch, String chi, ASTType lhsType, ASTType rhsType, Runnable cont) {
+    IREnvironment.Channel channel = env.getChannel(ch);
+
+    // Define new session for the channel being received
+    IRSlotsFromASTType info = slotsFromType(lhsType);
+    env = env.addSession(chi, info.localCombinations());
+    IREnvironment.Channel argChannel = env.getChannel(chi);
+
+    if (compiler.optimizeSendValue.get() && isValue(lhsType, false)) {
+      // If the left type is a value, we do the send value optimization
+      block.add(
+          new IRMoveValue(argChannel.getLocalData(), channel.getLocalData(), info.activeLocalTree));
+      advanceOrReset(ch, info.activeLocalTree.combinations(), rhsType, false);
+    } else {
+      // Bind the new session to the value received from the main session
+      block.add(
+          new IRBindSession(
+              channel.getLocalData(), argChannel.getSessionId(), argChannel.getLocalData()));
+      advanceOrReset(ch, new IRSessionS(), rhsType, false);
+
+      // If the received session is negative, we must jump to it
+      addContinueIfNegative(argChannel.getSessionId(), lhsType);
+    }
+
+    // Recurse on the continuation
+    recurse(block, cont);
+  }
+
+  void addForward(String lhs, String rhs, ASTType rhsType) {
+    // Get the negative and positive sessions
+    String negCh, posCh;
+    ASTType negChType;
+    if (isPositive(rhsType)) {
+      negCh = lhs;
+      posCh = rhs;
+      negChType = new ASTNotT(rhsType);
+    } else {
+      negCh = rhs;
+      posCh = lhs;
+      negChType = rhsType;
+    }
+    IREnvironment.Channel neg = env.getChannel(negCh);
+    IREnvironment.Channel pos = env.getChannel(posCh);
+
+    IRSlotsFromASTType info = slotsFromType(negChType);
+
+    // Move data stored on the negative session's local data to the positive session's remote data
+    block.add(new IRMoveValue(pos.getRemoteData(), neg.getLocalData(), info.activeLocalTree));
+
+    // If the type still has a continuation, we must forward two sessions to each other
+    if (!isValue(negChType, false)) {
+      block.add(new IRForwardSessions(neg.getSessionId(), pos.getSessionId(), true));
+    } else {
+      // Jump to the positive session's continuation
+      block.add(new IRFinishSession(pos.getSessionId(), true));
+    }
+  }
+
+  void addSendTy(
+      String ch,
+      String typeId,
+      ASTType type,
+      ASTType rhsType,
+      ASTType rhsTypeNoSubst,
+      Runnable cont) {
+    IRSessionId originalSession = env.getChannel(ch).getSessionId();
+
+    // Get the locations where we'll be writing the necessary data
+    IRDataLocation typeLoc = env.getChannel(ch).getRemoteData();
+    env = env.advanceChannel(ch, IRSlotOffset.of(new IRTypeS(), new IRSessionS()));
+    IRDataLocation sessionLoc = env.getChannel(ch).getRemoteData();
+    env = env.advanceChannel(ch, IRSlotOffset.of(new IRSessionS(), new IRTagS()));
+    IRDataLocation polarityLoc = env.getChannel(ch).getRemoteData();
+
+    // Overwrite the previous session with a new session of the new type
+    IRBlock rhsBlock = process.createBlock("sendty_rhs");
+    IRSlotsFromASTType info = slotsFromType(rhsType);
+    env = env.addSession(ch, info.combinations());
+    IREnvironment.Channel instChannel = env.getChannel(ch);
+    block.add(
+        new IRInitializeSession(
+            instChannel.getSessionId(), rhsBlock.getLocation(), instChannel.getLocalData()));
+
+    // Create the polymorphic translator session that we'll be sending through the main channel
+    Map<String, ASTType> varTypes = Map.of(typeId, type);
+    env = env.withKnownTypes(varTypes);
+    IREnvironment.Channel polyChannel =
+        IRPolyTranslator.translate(
+            this, varTypes, varTypes.keySet(), rhsTypeNoSubst.dualCatch(env.getEp()), ch, true);
+
+    // Write the type, the translator session and the type's polarity to the main channel
+    IRSlotsFromASTType varInfo = slotsFromType(type);
+    block.add(new IRWriteType(typeLoc, varInfo.activeRemoteTree));
+    block.add(new IRWriteSession(sessionLoc, polyChannel.getSessionId()));
+    block.add(new IRWriteTag(polarityLoc, isPositive(type) ? 1 : 0));
+    block.add(new IRFinishSession(originalSession, true));
+
+    // Generate the continuation
+    recurse(rhsBlock, cont);
+  }
+
+  void addRecvTy(
+      String ch,
+      String typeId,
+      Set<String> otherTypeIds,
+      Map<String, ASTType> capturedChannels,
+      ASTType rhsType,
+      Function<IREnvironment, Integer> contEndPoints,
+      Runnable cont) {
+    // Get the locations where we'll be reading from the type and the new session
+    IRDataLocation typeLoc = env.getChannel(ch).getLocalData();
+    env = env.advanceChannel(ch, IRSlotOffset.of(new IRTypeS(), new IRSessionS()));
+    IRDataLocation sessionLoc = env.getChannel(ch).getLocalData();
+    env = env.advanceChannel(ch, IRSlotOffset.of(new IRSessionS(), new IRTagS()));
+    IRDataLocation polarityLoc = env.getChannel(ch).getLocalData();
+
+    int processGenId = nextProcessGenId++;
+
+    Consumer<Boolean> forPolarity =
+        polarity -> {
+          // Create a new process which will handle the new type variable
+          IRProcessId polyProcessId =
+              processId(process.getId() + "_poly" + processGenId, new boolean[] {polarity});
+          IRProcess polyProcess = new IRProcess(polyProcessId);
+          IREnvironment polyEnv = new IREnvironment(polyProcess, env.getEp());
+
+          // Prepare lists of arguments to pass to the polymorphic process
+          List<IRCallProcess.TypeArgument> typeArguments = new ArrayList<>();
+          List<IRCallProcess.SessionArgument> sessionArguments = new ArrayList<>();
+          List<IRCallProcess.DataArgument> dataArguments = new ArrayList<>();
+
+          // Pass all types in the current environment to the polymorphic process
+          for (int i = 0; i < process.getTypeCount(); ++i) {
+            IRTypeId id = new IRTypeId(i);
+            IREnvironment.Type envType = env.getType(id);
+            polyEnv = polyEnv.addType(envType.getName(), envType.isPositive());
+            IRTypeId newId = polyEnv.getType(envType.getName()).getId();
+            typeArguments.add(new IRCallProcess.TypeArgument(IRSlotTree.of(new IRVarS(id)), newId));
+          }
+
+          // Pass the type variable received to the polymorphic process
+          polyEnv = polyEnv.addType(typeId, polarity);
+          Env<EnvEntry> polyEp = polyEnv.getEp();
+          polyEp = polyEp.assoc(typeId, new TypeEntry(new ASTIdT(typeId)));
+          for (String t : otherTypeIds) {
+            polyEp = polyEp.assoc(t, new TypeEntry(new ASTIdT(typeId)));
+          }
+          polyEnv = polyEnv.changeEp(polyEp);
+          typeArguments.add(
+              new IRCallProcess.TypeArgument(typeLoc, polyEnv.getType(typeId).getId()));
+
+          // Count the end points of the polymorphic process
+          polyProcess.setEndPoints(contEndPoints.apply(polyEnv));
+
+          // Define the argument session for the process
+          IRSlotsFromASTType rhsInfo =
+              IRSlotsFromASTType.compute(compiler, polyEnv, Set.of(), rhsType);
+          polyEnv = polyEnv.addArgSession(ch, rhsInfo.localCombinations());
+          sessionArguments.add(
+              new IRCallProcess.SessionArgument(
+                  sessionLoc, polyEnv.getChannel(ch).getSessionId(), IRSlotOffset.ZERO));
+
+          // Pass captured sessions and exponentials to the polymorphic process
+          // as session and data arguments
+          for (String name : capturedChannels.keySet()) {
+            if (name.equals(ch)) {
+              continue;
+            }
+
+            IREnvironment.Channel captured = env.getChannel(name);
+            if (captured.isExponential()) {
+              // We captured an exponential channel, we pass it as a data argument
+              IRSlotTree valueSlots = captured.getExponentialType();
+              polyEnv = polyEnv.addValue(name, valueSlots.combinations(), Optional.of(valueSlots));
+              dataArguments.add(
+                  new IRCallProcess.DataArgument(
+                      captured.getLocalData(),
+                      polyEnv.getChannel(name).getLocalDataId(),
+                      valueSlots,
+                      false));
+            } else {
+              // We captured a channel, we pass it as a session argument along with its data
+              ASTType type = capturedChannels.get(name);
+              IRSlotsFromASTType info =
+                  IRSlotsFromASTType.compute(compiler, polyEnv, Set.of(), type);
+              boolean isPositive = polyEnv.isPositive(type);
+              boolean isValue = IRValueChecker.check(compiler, polyEnv, type, Optional.empty());
+
+              polyEnv = polyEnv.addArgSession(name, info.localCombinations());
+              IREnvironment.Channel sourceChannel = env.getChannel(name);
+              IREnvironment.Channel targetChannel = polyEnv.getChannel(name);
+
+              if (!isValue || isPositive) {
+                // If the type is not a value, or if it's a positive value, we must pass the session
+                sessionArguments.add(
+                    new IRCallProcess.SessionArgument(
+                        sourceChannel.getSessionId(),
+                        targetChannel.getSessionId(),
+                        sourceChannel.getOffset()));
+              }
+
+              if ((!isValue || !isPositive) && !info.activeLocalTree.isLeaf()) {
+                // If the type is not a value, or if it's a negative value, we must pass the data
+                dataArguments.add(
+                    new IRCallProcess.DataArgument(
+                        sourceChannel.getLocalData(),
+                        targetChannel.getLocalDataId(),
+                        info.activeLocalTree,
+                        false));
+              }
+            }
+          }
+
+          // Store the process we just defined so that it gets generated later
+          procGens.put(
+              polyProcessId,
+              () -> {
+                // We need to immediately continue the received session if it's negative
+                addContinueIfNegative(env.getChannel(ch).getSessionId(), rhsType);
+                cont.run();
+              });
+          procEnvs.put(polyProcessId, polyEnv);
+          procUsed.add(polyProcessId);
+
+          // Call the polymorphic process
+          block.add(
+              new IRCallProcess(
+                  polyProcessId, typeArguments, sessionArguments, dataArguments, true));
+        };
+
+    // Branch on the polarity tag we received, calling forPolarity with the correct value
+    IRBlock positiveBlock = process.createBlock("recvty_pos");
+    IRBlock negativeBlock = process.createBlock("recvty_neg");
+    IRBranch.Case positiveCase = new IRBranch.Case(positiveBlock.getLocation(), 1);
+    IRBranch.Case negativeCase = new IRBranch.Case(negativeBlock.getLocation(), 1);
+    block.add(new IRBranchTag(polarityLoc, List.of(negativeCase, positiveCase)));
+
+    // Generate the branches
+    recurse(positiveBlock, () -> forPolarity.accept(true));
+    recurse(negativeBlock, () -> forPolarity.accept(false));
+  }
 
   void addContinue(IRSessionId sessionId) {
     IRBlock contBlock = process.createBlock("continue");

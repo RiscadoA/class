@@ -1,7 +1,7 @@
 sendty
+recvty
 lhs send
 let y
-recvty
 rhs recv
 rhs send
 rhs close

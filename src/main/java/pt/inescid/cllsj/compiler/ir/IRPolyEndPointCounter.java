@@ -1,7 +1,6 @@
 package pt.inescid.cllsj.compiler.ir;
 
 import java.util.Set;
-
 import pt.inescid.cllsj.ast.ASTTypeVisitor;
 import pt.inescid.cllsj.ast.types.*;
 
@@ -144,14 +143,12 @@ public class IRPolyEndPointCounter extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTSendTT type) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    count += 1;
   }
 
   @Override
   public void visit(ASTRecvTT type) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    count += 1;
   }
 
   @Override

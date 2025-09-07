@@ -2,7 +2,6 @@ package pt.inescid.cllsj.compiler.ir;
 
 import java.util.HashSet;
 import java.util.Set;
-
 import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.nodes.*;
 import pt.inescid.cllsj.ast.types.ASTIdT;
@@ -60,7 +59,7 @@ public class IREndPointCounter extends ASTNodeVisitor {
 
     for (int i = 0; i < node.getPars().size(); ++i) {
       if (IRUsesTypeVar.check(node.getProcParTypes().get(i), modifiedTypeArgs)) {
-        count += IRPolyEndPointCounter.count(node.getParTypes().get(i), modifiedTypeArgs);
+        count += IRPolyEndPointCounter.count(node.getProcParTypes().get(i), modifiedTypeArgs);
       }
     }
     count += 1;
@@ -167,7 +166,9 @@ public class IREndPointCounter extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTSendTy node) {
-    count += IRPolyEndPointCounter.count(node.getTypeRhsNoSubst().dualCatch(env.getEp()), Set.of(node.getTypeId()));
+    count +=
+        IRPolyEndPointCounter.count(
+            node.getTypeRhsNoSubst().dualCatch(env.getEp()), Set.of(node.getTypeId()));
     count += 1;
     node.getRhs().accept(this);
   }
