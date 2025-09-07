@@ -162,63 +162,12 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTBang node) {
-    IREnvironment.Channel channel = env.getChannel(node.getChr());
-    IRSlotsFromASTType info = slotsFromType(node.getType());
-
-    if (isValue(node.getType(), true)) {
-      // If the exponential is a value, we generate the right-hand-side in place
-      // to write directly to the channel's remote data
-      env = env.alias(node.getChr(), node.getChi());
-      recurse(block, node.getRhs());
-    } else {
-      // Create a new process for the exponential
-      IRProcessId expProcessId = new IRProcessId(process.getId() + "_exp" + nextProcessGenId++);
-      IRProcess expProcess = new IRProcess(expProcessId);
-      expProcess.setEndPoints(countEndPoints(node.getRhs()));
-      IREnvironment expEnv = new IREnvironment(expProcess, env.getEp());
-
-      // Define the argument session for the exponential
-      expEnv = expEnv.addArgSession(node.getChi(), info.localCombinations());
-
-      // Pass all types in the current environment to the exponential process
-      List<IRWriteExponential.TypeArgument> typeArguments = new ArrayList<>();
-      for (int i = 0; i < process.getTypeCount(); ++i) {
-        IRTypeId id = new IRTypeId(i);
-        IREnvironment.Type envType = env.getType(id);
-        typeArguments.add(new IRWriteExponential.TypeArgument(IRSlotTree.of(new IRVarS(id)), id));
-        expEnv = expEnv.addType(envType.getName(), envType.isPositive());
-      }
-
-      // Pass captured exponentials to the exponential process as data arguments
-      List<IRWriteExponential.DataArgument> dataArguments = new ArrayList<>();
-      for (String name : node.getRhs().fn(new HashSet<>())) {
-        if (name.equals(node.getChi())) {
-          continue;
-        }
-
-        IREnvironment.Channel captured = env.getChannel(name);
-        IRSlotTree valueSlots = captured.getExponentialType();
-
-        expEnv = expEnv.addValue(name, valueSlots.combinations(), Optional.of(valueSlots));
-
-        dataArguments.add(
-            new IRWriteExponential.DataArgument(
-                captured.getLocalData(),
-                expEnv.getChannel(name).getLocalDataId(),
-                valueSlots,
-                false));
-      }
-
-      // Store the process we just defined so that it gets generated later
-      procGens.put(expProcessId, () -> node.getRhs().accept(this));
-      procEnvs.put(expProcessId, expEnv);
-      procUsed.add(expProcessId);
-
-      block.add(
-          new IRWriteExponential(
-              channel.getRemoteData(), expProcessId, typeArguments, dataArguments));
-      block.add(new IRFinishSession(channel.getSessionId(), true));
+    Set<String> capturedChannels = new HashSet<>();
+    for (String n : node.getRhs().fn(new HashSet<>())) {
+      capturedChannels.add(n);
     }
+
+    addBang(node.getChr(), node.getChi(), node.getType(), capturedChannels, env -> countEndPoints(env, node.getRhs()), () -> node.getRhs().accept(this));
   }
 
   @Override
@@ -776,6 +725,75 @@ public class IRGenerator extends ASTNodeVisitor {
     } else {
       // Jump to the positive session's continuation
       block.add(new IRFinishSession(pos.getSessionId(), true));
+    }
+  }
+
+  void addBang(
+    String ch,
+    String chi,
+    ASTType type,
+    Set<String> capturedChannels,
+    Function<IREnvironment, Integer> contEndPoints,
+    Runnable cont
+  ) {
+    IREnvironment.Channel channel = env.getChannel(ch);
+    IRSlotsFromASTType info = slotsFromType(type);
+
+    if (isValue(type, true)) {
+      // If the exponential is a value, we generate the right-hand-side in place
+      // to write directly to the channel's remote data
+      env = env.alias(ch, chi);
+      recurse(block, cont);
+    } else {
+      // Create a new process for the exponential
+      IRProcessId expProcessId = new IRProcessId(process.getId() + "_exp" + nextProcessGenId++);
+      IRProcess expProcess = new IRProcess(expProcessId);
+      IREnvironment expEnv = new IREnvironment(expProcess, env.getEp());
+
+      // Define the argument session for the exponential
+      expEnv = expEnv.addArgSession(chi, info.localCombinations());
+
+      // Pass all types in the current environment to the exponential process
+      List<IRWriteExponential.TypeArgument> typeArguments = new ArrayList<>();
+      for (int i = 0; i < process.getTypeCount(); ++i) {
+        IRTypeId id = new IRTypeId(i);
+        IREnvironment.Type envType = env.getType(id);
+        typeArguments.add(new IRWriteExponential.TypeArgument(IRSlotTree.of(new IRVarS(id)), id));
+        expEnv = expEnv.addType(envType.getName(), envType.isPositive());
+      }
+
+      // Pass captured exponentials to the exponential process as data arguments
+      List<IRWriteExponential.DataArgument> dataArguments = new ArrayList<>();
+      for (String name : capturedChannels) {
+        if (name.equals(chi)) {
+          continue;
+        }
+
+        IREnvironment.Channel captured = env.getChannel(name);
+        IRSlotTree valueSlots = captured.getExponentialType();
+
+        expEnv = expEnv.addValue(name, valueSlots.combinations(), Optional.of(valueSlots));
+
+        dataArguments.add(
+            new IRWriteExponential.DataArgument(
+                captured.getLocalData(),
+                expEnv.getChannel(name).getLocalDataId(),
+                valueSlots,
+                false));
+      }
+
+      // Count the end points of the exponential process
+      expProcess.setEndPoints(contEndPoints.apply(expEnv));
+
+      // Store the process we just defined so that it gets generated later
+      procGens.put(expProcessId, cont);
+      procEnvs.put(expProcessId, expEnv);
+      procUsed.add(expProcessId);
+
+      block.add(
+          new IRWriteExponential(
+              channel.getRemoteData(), expProcessId, typeArguments, dataArguments));
+      block.add(new IRFinishSession(channel.getSessionId(), true));
     }
   }
 
