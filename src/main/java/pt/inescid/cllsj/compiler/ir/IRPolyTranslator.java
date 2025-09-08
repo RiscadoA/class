@@ -214,6 +214,7 @@ public class IRPolyTranslator extends ASTTypeVisitor {
   public void visit(ASTBangT type) {
     final String inst = this.inst;
     final String poly = this.poly;
+
     gen.addWhy(
         poly,
         polyType(type.getin()),
@@ -245,6 +246,7 @@ public class IRPolyTranslator extends ASTTypeVisitor {
   public void visit(ASTWhyT type) {
     final String inst = this.inst;
     final String poly = this.poly;
+
     gen.addWhy(
         inst,
         instType(type.getin()),
@@ -274,6 +276,8 @@ public class IRPolyTranslator extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTOfferT type) {
+    final String poly = this.poly;
+    final String inst = this.inst;
 
     // Here the instantiated side sends a tag to be received by the polymorphic side
 
@@ -308,6 +312,9 @@ public class IRPolyTranslator extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTCaseT type) {
+    final String poly = this.poly;
+    final String inst = this.inst;
+
     // Here the polymorphic side sends a tag to be received by the instantiated side
 
     addMove(inst, poly, new IRTagS());
@@ -340,6 +347,9 @@ public class IRPolyTranslator extends ASTTypeVisitor {
   }
 
   private void visitRec(String typeId, ASTType inner, boolean isPositive) {
+    final String poly = this.poly;
+    final String inst = this.inst;
+
     IRProcessId processId = gen.genChildProcessId(isPositive ? "poly_rec" : "poly_corec");
     IRProcess process = new IRProcess(processId);
     IREnvironment newEnv = new IREnvironment(process, gen.env.getEp());
@@ -398,8 +408,6 @@ public class IRPolyTranslator extends ASTTypeVisitor {
         };
 
     // Store the process we just defined so that it gets generated later
-    final String poly = this.poly;
-    final String inst = this.inst;
     gen.procGens.put(
         processId,
         () -> {
@@ -485,6 +493,9 @@ public class IRPolyTranslator extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTSendTT type) {
+    final String poly = this.poly;
+    final String inst = this.inst;
+
     String recvTyid = ASTType.gensym();
     ASTType rhsType =
         type.getrhs().subst(new Env<ASTType>().assoc(type.getid(), new ASTIdT(recvTyid)));
@@ -516,6 +527,9 @@ public class IRPolyTranslator extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTRecvTT type) {
+    final String poly = this.poly;
+    final String inst = this.inst;
+
     String recvTyid = ASTType.gensym();
     ASTType rhsType =
         type.getrhs().subst(new Env<ASTType>().assoc(type.getid(), new ASTIdT(recvTyid)));
