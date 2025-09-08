@@ -92,7 +92,7 @@ public class CLayout {
 
     @Override
     public void visit(IRTypeS slot) {
-      visit(arch.typeSize().add(arch.unsignedCharSize), arch.typeAlignment());
+      visit(arch.typeSize(), arch.typeAlignment());
     }
 
     @Override

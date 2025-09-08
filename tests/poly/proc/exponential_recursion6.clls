@@ -1,0 +1,50 @@
+type rec List(A) {
+  choice of {
+    |#next: send A; List(A)
+    |#done: close
+  }
+};;
+
+proc rec promoteList<A>(list: ~List(!A), promoted: !List(A)) {
+  case list of {
+    |#next:
+      recv list(a);
+      cut {
+        promoteList<A>(list, acc)
+        |acc: ~!List(A)|
+        !promoted(l);
+        call a(a2);
+        #next l; send l(a2);
+        call acc(l2); fwd l l2
+      }
+    |#done:
+      wait list;
+      !promoted(l); #done l; close l
+  }
+};;
+
+proc rec printList(list: ~List(lint)) {
+  case list of {
+    |#next:
+      recv list(a); println(a);
+      printList(list)
+    |#done:
+      wait list; ()
+  }
+};;
+
+proc main() {
+  cut {
+    #next l1; send l1(1);
+    #next l1; send l1(2);
+    #next l1; send l1(3);
+    #done l1; close l1
+    |l1: ~List(!lint)|
+    promoteList<lint>(l1, l2)
+    |l2: ~!List(lint)|
+    ?l2; call l2(l);
+    fwd l l3
+    |l3: ~List(lint)|
+    printList(l3)
+  }
+};;

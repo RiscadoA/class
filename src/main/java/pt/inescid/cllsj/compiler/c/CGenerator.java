@@ -1772,10 +1772,11 @@ public class CGenerator extends IRInstructionVisitor {
           }
           if (compiler.debug.get()) {
             putLine("default:");
-            putIndented(() -> {
-              putDebugLn("Invalid switch case: %d", value);
-              putStatement("exit(1)");
-            });
+            putIndented(
+                () -> {
+                  putDebugLn("Invalid switch case: %d", value);
+                  putStatement("exit(1)");
+                });
           }
         });
   }

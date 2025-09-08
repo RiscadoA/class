@@ -19,6 +19,7 @@ import pt.inescid.cllsj.ast.nodes.*;
 import pt.inescid.cllsj.ast.types.*;
 import pt.inescid.cllsj.compiler.Compiler;
 import pt.inescid.cllsj.compiler.ir.expression.IRExpression;
+import pt.inescid.cllsj.compiler.ir.expression.literal.IRStringLiteral;
 import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
 import pt.inescid.cllsj.compiler.ir.id.IRProcessId;
 import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
@@ -320,7 +321,7 @@ public class IRGenerator extends ASTNodeVisitor {
 
       // If the channel is polymorphic, we need to perform translation
       IREnvironment.Channel channel;
-      if (IRUsesTypeVar.check(type, modifiedTypeArgs)) {
+      if (IRUsesTypeVar.check(env.getEp(), type, modifiedTypeArgs)) {
         // Create a new channel with the polymorphic type
         channel =
             IRPolyTranslator.translateLinear(
@@ -337,8 +338,8 @@ public class IRGenerator extends ASTNodeVisitor {
                 channel.getSessionId(), targetChannel.getSessionId(), channel.getOffset()));
       }
 
-      if ((!isValue || !isPositive) && !info.activeLocalTree.isLeaf()) {
-        // If the type is not a value, or if it's a negative value, we must pass the data
+      if (!isPositive && !info.activeLocalTree.isLeaf()) {
+        // If the type is negative, we must pass the data
         dataArguments.add(
             new IRCallProcess.DataArgument(
                 channel.getLocalData(),
@@ -354,7 +355,7 @@ public class IRGenerator extends ASTNodeVisitor {
       IREnvironment.Channel targetChannel = processEnv.getChannel(processDef.getGArgs().get(i));
       IRSlotsFromASTType info = slotsFromType(type);
 
-      if (IRUsesTypeVar.check(type, modifiedTypeArgs)) {
+      if (IRUsesTypeVar.check(env.getEp(), type, modifiedTypeArgs)) {
         channel =
             IRPolyTranslator.translateExponential(
                 this, typeArgs, modifiedTypeArgs, type, channel.getName(), false);
@@ -804,10 +805,11 @@ public class IRGenerator extends ASTNodeVisitor {
 
     // Define new channel
     IRSlotsFromASTType info = slotsFromType(type);
-    env = env.addSession(chi, info.localCombinations());
-    IREnvironment.Channel argChannel = env.getChannel(chi);
 
     if (isValue(type, false)) {
+      env = env.addValue(chi, info.localCombinations(), Optional.empty());
+      IREnvironment.Channel argChannel = env.getChannel(chi);
+
       // TODO: if the value is a basic value (i.e., no clone/drop needed, we can just alias the
       // channels)
 
@@ -816,6 +818,9 @@ public class IRGenerator extends ASTNodeVisitor {
           new IRCloneValue(
               argChannel.getLocalData(), channel.getLocalData(), info.activeLocalTree));
     } else {
+      env = env.addSession(chi, info.localCombinations());
+      IREnvironment.Channel argChannel = env.getChannel(chi);
+
       block.add(
           new IRCallExponential(
               channel.getLocalData(), argChannel.getSessionId(), argChannel.getLocalDataId()));
@@ -970,8 +975,8 @@ public class IRGenerator extends ASTNodeVisitor {
                         sourceChannel.getOffset()));
               }
 
-              if ((!isValue || !isPositive) && !info.activeLocalTree.isLeaf()) {
-                // If the type is not a value, or if it's a negative value, we must pass the data
+              if (!isPositive && !info.activeLocalTree.isLeaf()) {
+                // If the type is negative, we must pass the data
                 dataArguments.add(
                     new IRCallProcess.DataArgument(
                         sourceChannel.getLocalData(),

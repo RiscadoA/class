@@ -22,7 +22,7 @@ public class IRPolyEndPointCounter extends ASTTypeVisitor {
   }
 
   private void recurse(ASTType type) {
-    if (IRUsesTypeVar.check(type, polyNames)) {
+    if (IRUsesTypeVar.check(env.getEp(), type, polyNames)) {
       type.accept(this);
     } else {
       count += 1;
@@ -61,7 +61,13 @@ public class IRPolyEndPointCounter extends ASTTypeVisitor {
   }
 
   @Override
-  public void visit(ASTIdT type) {
+  public void visit(ASTIdT idType) {
+    ASTType type = idType.unfoldTypeCatch(env.getEp());
+    if (!(type instanceof ASTIdT)) {
+      type.accept(this);
+      return;
+    }
+
     count += 1;
   }
 
@@ -106,7 +112,7 @@ public class IRPolyEndPointCounter extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTWhyT type) {
-    if (IRValueChecker.check(compiler, env, type, true)) {
+    if (IRValueChecker.check(compiler, env, type.getin(), false)) {
       type.getin().accept(this);
     } else {
       count += 1;

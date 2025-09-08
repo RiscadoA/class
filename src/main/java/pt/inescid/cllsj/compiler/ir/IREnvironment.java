@@ -91,7 +91,7 @@ public class IREnvironment {
   public Type getType(IRTypeId id) {
     if (this instanceof Type) {
       Type typeEnv = (Type) this;
-      if (typeEnv.getId().equals(id)) {
+      if (typeEnv.hasId() && typeEnv.getId().equals(id)) {
         return typeEnv;
       }
     }
@@ -263,6 +263,10 @@ public class IREnvironment {
       return known.orElseThrow();
     }
 
+    public boolean hasId() {
+      return id.isPresent();
+    }
+
     public boolean isKnown() {
       return known.isPresent();
     }
@@ -304,6 +308,10 @@ public class IREnvironment {
 
     public IRSessionId getSessionId() {
       return sessionId.orElseThrow();
+    }
+
+    public Optional<IRSessionId> getSessionIdMaybe() {
+      return sessionId;
     }
 
     public IRSlotOffset getOffset() {

@@ -7,10 +7,13 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.function.BiConsumer;
+import java.util.function.Function;
+
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.ast.ASTTypeVisitor;
 import pt.inescid.cllsj.ast.types.*;
+import pt.inescid.cllsj.compiler.ir.expression.literal.IRStringLiteral;
 import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
 import pt.inescid.cllsj.compiler.ir.id.IRLocalDataId;
 import pt.inescid.cllsj.compiler.ir.id.IRProcessId;
@@ -29,7 +32,8 @@ public class IRPolyTranslator extends ASTTypeVisitor {
 
   private static int nextNameId = 0;
 
-  private Map<String, BiConsumer<String, String>> recursionCall = new HashMap<>();
+  private Map<String, BiConsumer<String, String>> posRecursionCall = new HashMap<>();
+  private Map<String, BiConsumer<String, String>> negRecursionCall = new HashMap<>();
   private String poly;
   private String inst;
 
@@ -115,7 +119,7 @@ public class IRPolyTranslator extends ASTTypeVisitor {
         poly,
         translator.polyType(type.getin()),
         Set.of(inst),
-        env -> IRPolyEndPointCounter.count(gen.compiler, gen.env, type.getin(), modifiedVarTypes),
+        env -> IRPolyEndPointCounter.count(gen.compiler, env, type.getin(), modifiedVarTypes),
         () -> {
           gen.env = gen.env.withKnownTypes(varTypes);
           gen.addCall(
@@ -227,7 +231,7 @@ public class IRPolyTranslator extends ASTTypeVisitor {
               Set.of(poly),
               env ->
                   IRPolyEndPointCounter.count(
-                      gen.compiler, gen.env, type.getin(), modifiedVarTypes),
+                      gen.compiler, env, type.getin(), modifiedVarTypes),
               () -> {
                 final String linPoly = newChannelName(poly);
                 gen.env = gen.env.withKnownTypes(varTypes);
@@ -259,7 +263,7 @@ public class IRPolyTranslator extends ASTTypeVisitor {
               Set.of(inst),
               env ->
                   IRPolyEndPointCounter.count(
-                      gen.compiler, gen.env, type.getin(), modifiedVarTypes),
+                      gen.compiler, env, type.getin(), modifiedVarTypes),
               () -> {
                 final String linInst = newChannelName(inst);
                 gen.env = gen.env.withKnownTypes(varTypes);
@@ -385,10 +389,29 @@ public class IRPolyTranslator extends ASTTypeVisitor {
     final IRLocalDataId targetPolyData = newEnv.getChannel(poly).getLocalDataId();
     final IRLocalDataId targetInstData = newEnv.getChannel(inst).getLocalDataId();
 
-    BiConsumer<String, String> call =
-        (innerPoly, innerInst) -> {
+    Function<Boolean, BiConsumer<String, String>> call =
+        varIsPositive -> (innerPoly, innerInst) -> {
           gen.env = gen.env.resetChannel(innerPoly);
           gen.env = gen.env.resetChannel(innerInst);
+
+          List<IRCallProcess.DataArgument> dataArguments;
+
+          if (isPositive(polyType(inner)) ^ varIsPositive.booleanValue()) {
+            // If the poly channel is negative, we pass any already received data
+            dataArguments =
+                List.of(
+                    new IRCallProcess.DataArgument(
+                        localData(innerPoly), targetPolyData, polyInfo.activeLocalTree, false));
+          } else if (isPositive(instType(inner)) ^ varIsPositive.booleanValue()) {
+            // If the instantiated channel is negative, we pass any already received data
+            dataArguments =
+                List.of(
+                    new IRCallProcess.DataArgument(
+                        localData(innerInst), targetInstData, instInfo.activeLocalTree, false));
+          } else {
+            throw new IllegalStateException(
+                "poly/inst are dual, at least one should be negative");
+          }
 
           gen.block.add(
               new IRCallProcess(
@@ -399,11 +422,7 @@ public class IRPolyTranslator extends ASTTypeVisitor {
                           sessionId(innerPoly), targetPolySession, IRSlotOffset.ZERO),
                       new IRCallProcess.SessionArgument(
                           sessionId(innerInst), targetInstSession, IRSlotOffset.ZERO)),
-                  List.of(
-                      new IRCallProcess.DataArgument(
-                          localData(innerPoly), targetPolyData, polyInfo.activeLocalTree, false),
-                      new IRCallProcess.DataArgument(
-                          localData(innerInst), targetInstData, instInfo.activeLocalTree, false)),
+                  dataArguments,
                   true));
         };
 
@@ -421,16 +440,20 @@ public class IRPolyTranslator extends ASTTypeVisitor {
             gen.addContinueIfNegative(sessionId(poly), polyType(inner));
           }
 
-          Map<String, BiConsumer<String, String>> recursionCall = this.recursionCall;
-          this.recursionCall = new HashMap<>(this.recursionCall);
-          this.recursionCall.put(typeId, call);
+          Map<String, BiConsumer<String, String>> posRecursionCall = this.posRecursionCall;
+          Map<String, BiConsumer<String, String>> negRecursionCall = this.negRecursionCall;
+          this.posRecursionCall = new HashMap<>(this.posRecursionCall);
+          this.negRecursionCall = new HashMap<>(this.negRecursionCall);
+          this.posRecursionCall.put(typeId, call.apply(true));
+          this.negRecursionCall.put(typeId, call.apply(false));
           recurse(poly, inst, inner);
-          this.recursionCall = recursionCall;
+          this.posRecursionCall = posRecursionCall;
+          this.negRecursionCall = negRecursionCall;
         });
     gen.procEnvs.put(processId, newEnv);
     gen.procUsed.add(processId);
 
-    call.accept(poly, inst);
+    call.apply(isPositive).accept(poly, inst);
   }
 
   @Override
@@ -560,10 +583,22 @@ public class IRPolyTranslator extends ASTTypeVisitor {
   }
 
   @Override
-  public void visit(ASTIdT type) {
+  public void visit(ASTIdT idType) {
+    ASTType type = idType.unfoldTypeCatch(gen.env.getEp());
+    if (!(type instanceof ASTIdT)) {
+      type.accept(this);
+      return;
+    }
+    idType = (ASTIdT) type;
+
+    if (posRecursionCall.containsKey(idType.getid())) {
+      posRecursionCall.get(idType.getid()).accept(poly, inst);
+      return;
+    }
+
     String source, target;
 
-    if (isPositive(type)) {
+    if (isPositive(idType)) {
       source = poly;
       target = inst;
     } else {
@@ -571,10 +606,8 @@ public class IRPolyTranslator extends ASTTypeVisitor {
       target = poly;
     }
 
-    if (recursionCall.containsKey(type.getid())) {
-      recursionCall.get(type.getid()).accept(poly, inst);
-    } else if (varTypes.containsKey(type.getid())) {
-      addMove(target, source, varSlots.get(type.getid()).activeTree());
+    if (varTypes.containsKey(idType.getid())) {
+      addMove(target, source, varSlots.get(idType.getid()).activeTree());
       gen.block.add(new IRFinishSession(sessionId(target), true));
     } else {
       throw new UnsupportedOperationException(
@@ -588,10 +621,21 @@ public class IRPolyTranslator extends ASTTypeVisitor {
       throw new IllegalArgumentException(
           "The typechecker should guarantee nots never appear around non-var types");
     }
-    ASTIdT type = (ASTIdT) notType.getin();
+    ASTIdT idType = (ASTIdT) notType.getin();
+    ASTType type = idType.unfoldTypeCatch(gen.env.getEp());
+    if (!(type instanceof ASTIdT)) {
+      type.dualCatch(gen.env.getEp()).accept(this);
+      return;
+    }
+    idType = (ASTIdT) type;
+
+    if (negRecursionCall.containsKey(idType.getid())) {
+      negRecursionCall.get(idType.getid()).accept(poly, inst);
+      return;
+    }
 
     String source, target;
-    if (isPositive(type)) {
+    if (isPositive(idType)) {
       source = inst;
       target = poly;
     } else {
@@ -599,11 +643,9 @@ public class IRPolyTranslator extends ASTTypeVisitor {
       target = inst;
     }
 
-    if (varTypes.containsKey(type.getid())) {
-      addMove(target, source, varSlots.get(type.getid()).activeTree());
+    if (varTypes.containsKey(idType.getid())) {
+      addMove(target, source, varSlots.get(idType.getid()).activeTree());
       gen.block.add(new IRFinishSession(sessionId(target), true));
-    } else if (recursionCall.containsKey(type.getid())) {
-      recursionCall.get(type.getid()).accept(poly, inst);
     } else {
       throw new UnsupportedOperationException(
           "Not polymorphic, should be caught by the recurse method");
@@ -722,8 +764,9 @@ public class IRPolyTranslator extends ASTTypeVisitor {
 
   private boolean isPolymorphic(ASTType type) {
     Set<String> vars = new HashSet<>(modifiedVarTypes);
-    vars.addAll(recursionCall.keySet());
-    return IRUsesTypeVar.check(type, vars);
+    vars.addAll(posRecursionCall.keySet());
+    vars.addAll(negRecursionCall.keySet());
+    return IRUsesTypeVar.check(gen.env.getEp(), type, vars);
   }
 
   private ASTType dual(ASTType type) {

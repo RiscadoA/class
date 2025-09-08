@@ -78,8 +78,12 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
     return visitor;
   }
 
-  private IRSlotsFromASTType recurse(ASTType type) {
+  private IRSlotsFromASTType recurse(ASTType type, IREnvironment env) {
     return compute(compiler, env, type);
+  }
+
+  private IRSlotsFromASTType recurse(ASTType type) {
+    return recurse(type, env);
   }
 
   private void localSlot(IRSlot slot) {
@@ -122,10 +126,10 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTCoRecT type) {
-    IREnvironment env = this.env;
-    this.env = env.withRecursionType(type.getid(), type);
-    type.getin().accept(this);
-    this.env = env;
+    IRSlotsFromASTType result = recurse(type.getin(), env.withRecursionType(type.getid(), type));
+    slot = Optional.empty();
+    remainderLocalCombinations = result.localCombinations();
+    remainderRemoteCombinations = result.remoteCombinations();
   }
 
   @Override
@@ -208,10 +212,10 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTRecT type) {
-    IREnvironment env = this.env;
-    this.env = env.withRecursionType(type.getid(), type);
-    type.getin().accept(this);
-    this.env = env;
+    IRSlotsFromASTType result = recurse(type.getin(), env.withRecursionType(type.getid(), type));
+    slot = Optional.empty();
+    remainderLocalCombinations = result.localCombinations();
+    remainderRemoteCombinations = result.remoteCombinations();
   }
 
   @Override

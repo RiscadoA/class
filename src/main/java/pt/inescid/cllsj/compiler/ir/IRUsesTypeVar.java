@@ -1,27 +1,40 @@
 package pt.inescid.cllsj.compiler.ir;
 
 import java.util.Set;
+
+import pt.inescid.cllsj.Env;
+import pt.inescid.cllsj.EnvEntry;
+import pt.inescid.cllsj.TypeEntry;
 import pt.inescid.cllsj.ast.ASTTypeVisitor;
 import pt.inescid.cllsj.ast.types.*;
 
 public class IRUsesTypeVar extends ASTTypeVisitor {
+  private Env<EnvEntry> ep;
   private boolean usesTypeVar = false;
   private String varName;
 
-  public static boolean check(ASTType type, Set<String> varNames) {
+  public static boolean check(Env<EnvEntry> ep, ASTType type, Set<String> varNames) {
     for (String varName : varNames) {
-      if (check(type, varName)) {
+      if (check(ep, type, varName)) {
         return true;
       }
     }
     return false;
   }
 
-  public static boolean check(ASTType type, String varName) {
+  public static boolean check(Env<EnvEntry> ep, ASTType type, String varName) {
     IRUsesTypeVar v = new IRUsesTypeVar();
+    v.ep = ep;
     v.varName = varName;
     type.accept(v);
     return v.usesTypeVar;
+  }
+
+  private void recurse(Env<EnvEntry> ep, ASTType type) {
+    Env<EnvEntry> oldEp = this.ep;
+    this.ep = ep;
+    type.accept(this);
+    this.ep = oldEp;
   }
 
   @Override
@@ -42,13 +55,20 @@ public class IRUsesTypeVar extends ASTTypeVisitor {
   @Override
   public void visit(ASTCoRecT type) {
     if (!type.getid().equals(varName)) {
-      type.getin().accept(this);
+      recurse(ep.assoc(type.getid(), new TypeEntry(new ASTIdT(type.getid()))), type.getin());
     }
   }
 
   @Override
-  public void visit(ASTIdT type) {
-    if (type.getid().equals(varName)) {
+  public void visit(ASTIdT idType) {
+    ASTType type = idType.unfoldTypeCatch(ep);
+    if (!(type instanceof ASTIdT)) {
+      type.accept(this);
+      return;
+    }
+    idType = (ASTIdT) type;
+
+    if (idType.getid().equals(varName)) {
       usesTypeVar = true;
     }
   }
@@ -71,7 +91,7 @@ public class IRUsesTypeVar extends ASTTypeVisitor {
   @Override
   public void visit(ASTRecT type) {
     if (!type.getid().equals(varName)) {
-      type.getin().accept(this);
+      recurse(ep.assoc(type.getid(), new TypeEntry(new ASTIdT(type.getid()))), type.getin());
     }
   }
 
@@ -119,14 +139,14 @@ public class IRUsesTypeVar extends ASTTypeVisitor {
   @Override
   public void visit(ASTSendTT type) {
     if (!type.getid().equals(varName)) {
-      type.getrhs().accept(this);
+      recurse(ep.assoc(type.getid(), new TypeEntry(new ASTIdT(type.getid()))), type.getrhs());
     }
   }
 
   @Override
   public void visit(ASTRecvTT type) {
     if (!type.getid().equals(varName)) {
-      type.getrhs().accept(this);
+      recurse(ep.assoc(type.getid(), new TypeEntry(new ASTIdT(type.getid()))), type.getrhs());
     }
   }
 
