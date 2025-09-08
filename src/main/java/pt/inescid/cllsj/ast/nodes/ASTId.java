@@ -44,6 +44,7 @@ public class ASTId extends ASTNode {
 
   List<String> procTParIds;
   List<ASTType> procParTypes;
+  List<ASTType> procGParTypes;
 
   public ASTId(String _id) {
 
@@ -92,6 +93,10 @@ public class ASTId extends ASTNode {
 
   public List<ASTType> getProcParTypes() {
     return procParTypes;
+  }
+
+  public List<ASTType> getProcGParTypes() {
+    return procGParTypes;
   }
 
   public String getId() {
@@ -250,6 +255,8 @@ public class ASTId extends ASTNode {
       } else pars.add(((ASTVId) expr).ch);
     }
 
+    procGParTypes = new ArrayList<ASTType>();
+
     Iterator<ASTType> itgargt = pe.gargtypes.iterator();
     for (ASTExpr gexpr : gexprs) {
 
@@ -258,6 +265,7 @@ public class ASTId extends ASTNode {
 
       ASTType formal = itgargt.next();
 
+      procGParTypes.add(ASTType.unfoldRec(formal.unfoldType(keepIdsEp)));
       formal = formal.unfoldType(ep);
       formal = ASTType.unfoldRec(formal); // was commented away
 

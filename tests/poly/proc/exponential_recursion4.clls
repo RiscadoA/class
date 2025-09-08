@@ -1,0 +1,27 @@
+type corec Gen(A) {
+  offer of {
+    |#next: send A; Gen(A)
+    |#done: close
+  }
+};;
+
+proc rec generateClones<A>(gen: Gen(A); a: ~A) {
+  case gen of {
+    |#next:
+      send gen(x. call a(y); fwd x y);
+      generateClones<A>(gen; a)
+    |#done:
+      close gen
+  }
+};;
+
+proc main() {
+  cut {
+    let! a 71
+    |a: ~!lint|
+    generateClones<lint>(g; a)
+    |g: ~Gen(lint)|
+    #next g; recv g(x); println(x);
+    #done g; wait g; ()
+  }
+};;

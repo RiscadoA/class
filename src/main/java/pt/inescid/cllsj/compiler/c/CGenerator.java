@@ -51,8 +51,6 @@ public class CGenerator extends IRInstructionVisitor {
   private CProcessLayout currentProcessLayout;
   private int indentLevel = 0;
 
-  private int nextLabelId = 0;
-
   private Map<IRProcessId, IRWriteExponential> pendingExponentialManagers = new HashMap<>();
 
   public static void generate(Compiler compiler, IRProgram program, PrintStream output) {
@@ -631,7 +629,7 @@ public class CGenerator extends IRInstructionVisitor {
 
   private void generate(IRInstruction instr) {
     if (compiler.tracing.get()) {
-      // putDebugLn(instr.toString());
+      putDebugLn(instr.toString());
     } else {
       putComment(instr.toString());
     }
@@ -1108,6 +1106,9 @@ public class CGenerator extends IRInstructionVisitor {
       cases.add(
           () -> {
             putSubtractAtomic(endPoints(), instr.getMaxEndPoints() - c.getEndPoints());
+            if (compiler.debug.get()) {
+              putDebugLn("| end points: %d", endPoints());
+            }
             putConstantGoto(codeLocationLabel(c.getLocation()));
           });
     }
@@ -1210,10 +1211,6 @@ public class CGenerator extends IRInstructionVisitor {
     return access(offset.advancePointer(env), "struct type");
   }
 
-  private CSize sessionOffset(IRSessionId id) {
-    return sessionOffset(currentProcessLayout, id);
-  }
-
   private CSize sessionOffset(CProcessLayout layout, IRSessionId id) {
     return layout.sessionOffset(id);
   }
@@ -1270,10 +1267,6 @@ public class CGenerator extends IRInstructionVisitor {
       IRSlotOffset offset) {
     CSize finalOffset = offset(layout.dataOffset(typeLayouts, localDataId), offset);
     return CAddress.of(env, finalOffset);
-  }
-
-  private CAddress remoteData(IRSessionId sessionId, IRSlotOffset offset) {
-    return remoteData(currentProcessLayout, ENV, sessionId, offset);
   }
 
   private CAddress remoteData(
@@ -1383,10 +1376,6 @@ public class CGenerator extends IRInstructionVisitor {
 
   private CLayout layout(IRSlotCombinations combinations) {
     return CLayout.compute(combinations, compiler.arch, typeId -> typeLayout(typeId));
-  }
-
-  private CLayout layout(IRSlotSequence sequence) {
-    return CLayout.compute(sequence, compiler.arch, typeId -> typeLayout(typeId));
   }
 
   private CLayout layout(IRSlot slot) {
@@ -1535,6 +1524,10 @@ public class CGenerator extends IRInstructionVisitor {
     putIf(
         decrementAtomic(exponentialRefCount(var)) + " == 1",
         () -> {
+          if (compiler.tracing.get()) {
+            putDebugLn("[freeExponential]");
+          }
+
           // Call the exponential's manager
           putStatement(exponentialManager(var) + "(" + exponentialEnv(var) + ", 1)"); // 1 = Drop
           putFreeExponential(var);
@@ -1604,6 +1597,9 @@ public class CGenerator extends IRInstructionVisitor {
     if (compiler.optimizeSingleEndpoint.get() && currentProcess.getEndPoints() == 1) {
       free.run();
     } else {
+      if (compiler.debug.get()) {
+        putDebugLn("| end points: %d", endPoints());
+      }
       putIf(decrementAtomic(endPoints()) + " == 1", free);
     }
   }
@@ -1774,6 +1770,13 @@ public class CGenerator extends IRInstructionVisitor {
             putIndented(cases.get(i));
             putStatement("break");
           }
+          if (compiler.debug.get()) {
+            putLine("default:");
+            putIndented(() -> {
+              putDebugLn("Invalid switch case: %d", value);
+              putStatement("exit(1)");
+            });
+          }
         });
   }
 
@@ -1863,9 +1866,5 @@ public class CGenerator extends IRInstructionVisitor {
 
   void put(String str) {
     output.append(str);
-  }
-
-  private String makeLabel(String base) {
-    return base + "_" + (nextLabelId++);
   }
 }

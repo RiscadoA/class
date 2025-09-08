@@ -377,8 +377,8 @@ public class IRPolyTranslator extends ASTTypeVisitor {
 
     BiConsumer<String, String> call =
         (innerPoly, innerInst) -> {
-          gen.env.resetChannel(innerPoly);
-          gen.env.resetChannel(innerInst);
+          gen.env = gen.env.resetChannel(innerPoly);
+          gen.env = gen.env.resetChannel(innerInst);
 
           gen.block.add(
               new IRCallProcess(

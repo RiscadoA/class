@@ -349,7 +349,7 @@ public class IRGenerator extends ASTNodeVisitor {
     }
 
     for (int i = 0; i < node.getGPars().size(); ++i) {
-      ASTWhyT type = new ASTWhyT(node.getGParTypes().get(i));
+      ASTWhyT type = new ASTWhyT(node.getProcGParTypes().get(i).unfoldTypeCatch(env.getEp()));
       IREnvironment.Channel channel = env.getChannel(node.getGPars().get(i));
       IREnvironment.Channel targetChannel = processEnv.getChannel(processDef.getGArgs().get(i));
       IRSlotsFromASTType info = slotsFromType(type);
@@ -358,7 +358,6 @@ public class IRGenerator extends ASTNodeVisitor {
         channel =
             IRPolyTranslator.translateExponential(
                 this, typeArgs, modifiedTypeArgs, type, channel.getName(), false);
-        addContinue(channel.getSessionId());
       }
 
       dataArguments.add(

@@ -6,6 +6,7 @@ import java.util.Set;
 import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.nodes.*;
 import pt.inescid.cllsj.ast.types.ASTIdT;
+import pt.inescid.cllsj.ast.types.ASTWhyT;
 import pt.inescid.cllsj.compiler.Compiler;
 
 public class IREndPointCounter extends ASTNodeVisitor {
@@ -63,6 +64,13 @@ public class IREndPointCounter extends ASTNodeVisitor {
         count +=
             IRPolyEndPointCounter.count(
                 compiler, env, node.getProcParTypes().get(i), modifiedTypeArgs);
+      }
+    }
+    for (int i = 0; i < node.getGPars().size(); ++i) {
+      if (IRUsesTypeVar.check(node.getProcGParTypes().get(i), modifiedTypeArgs)) {
+        count +=
+            IRPolyEndPointCounter.count(
+                compiler, env, new ASTWhyT(node.getProcGParTypes().get(i)), modifiedTypeArgs);
       }
     }
     count += 1;
