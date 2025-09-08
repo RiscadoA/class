@@ -631,7 +631,7 @@ public class CGenerator extends IRInstructionVisitor {
 
   private void generate(IRInstruction instr) {
     if (compiler.tracing.get()) {
-      putDebugLn(instr.toString());
+      // putDebugLn(instr.toString());
     } else {
       putComment(instr.toString());
     }
@@ -1550,6 +1550,7 @@ public class CGenerator extends IRInstructionVisitor {
     putAlloc(var, size);
     if (compiler.profiling.get()) {
       putIncrementAtomic("env_allocs");
+      putAssignMaxAtomic("env_peak", "env_allocs - env_frees");
     }
   }
 

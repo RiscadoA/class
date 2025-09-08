@@ -31,9 +31,9 @@ public class IRGenerator extends ASTNodeVisitor {
 
   private IRProgram program = new IRProgram();
   private Map<IRProcessId, ASTProcDef> procDefs = new HashMap<>();
-  private Map<IRProcessId, Runnable> procGens = new HashMap<>();
-  private Map<IRProcessId, IREnvironment> procEnvs = new HashMap<>();
-  private Queue<IRProcessId> procUsed = new LinkedList<>();
+  Map<IRProcessId, Runnable> procGens = new HashMap<>();
+  Map<IRProcessId, IREnvironment> procEnvs = new HashMap<>();
+  Queue<IRProcessId> procUsed = new LinkedList<>();
 
   IRProcess process;
   IRBlock block;
@@ -167,37 +167,18 @@ public class IRGenerator extends ASTNodeVisitor {
       capturedChannels.add(n);
     }
 
-    addBang(node.getChr(), node.getChi(), node.getType(), capturedChannels, env -> countEndPoints(env, node.getRhs()), () -> node.getRhs().accept(this));
+    addBang(
+        node.getChr(),
+        node.getChi(),
+        node.getType(),
+        capturedChannels,
+        env -> countEndPoints(env, node.getRhs()),
+        () -> node.getRhs().accept(this));
   }
 
   @Override
   public void visit(ASTCall node) {
-    IREnvironment.Channel channel = env.getChannel(node.getChr());
-
-    // Define new channel
-    IRSlotsFromASTType info = slotsFromType(node.getType());
-    env = env.addSession(node.getChi(), info.localCombinations());
-    IREnvironment.Channel argChannel = env.getChannel(node.getChi());
-
-    if (isValue(node.getType(), false)) {
-      // TODO: if the value is a basic value (i.e., no clone/drop needed, we can just alias the
-      // channels)
-
-      // Just clone the exponential's data to the new channel
-      block.add(
-          new IRCloneValue(
-              argChannel.getLocalData(), channel.getLocalData(), info.activeLocalTree));
-    } else {
-      block.add(
-          new IRCallExponential(
-              channel.getLocalData(), argChannel.getSessionId(), argChannel.getLocalDataId()));
-
-      // If the called session is negative, we must jump to it
-      addContinueIfNegative(argChannel.getSessionId(), node.getType());
-    }
-
-    // Recurse on the continuation
-    recurse(block, node.getRhs());
+    addCall(node.getChr(), node.getChi(), node.getType(), () -> node.getRhs().accept(this));
   }
 
   @Override
@@ -342,7 +323,7 @@ public class IRGenerator extends ASTNodeVisitor {
       if (IRUsesTypeVar.check(type, modifiedTypeArgs)) {
         // Create a new channel with the polymorphic type
         channel =
-            IRPolyTranslator.translate(
+            IRPolyTranslator.translateLinear(
                 this, typeArgs, modifiedTypeArgs, type, argChannel.getName(), false);
         addContinueIfNegative(channel.getSessionId(), type);
       } else {
@@ -368,9 +349,17 @@ public class IRGenerator extends ASTNodeVisitor {
     }
 
     for (int i = 0; i < node.getGPars().size(); ++i) {
+      ASTWhyT type = new ASTWhyT(node.getGParTypes().get(i));
       IREnvironment.Channel channel = env.getChannel(node.getGPars().get(i));
       IREnvironment.Channel targetChannel = processEnv.getChannel(processDef.getGArgs().get(i));
-      IRSlotsFromASTType info = slotsFromType(new ASTWhyT(node.getGParTypes().get(i)));
+      IRSlotsFromASTType info = slotsFromType(type);
+
+      if (IRUsesTypeVar.check(type, modifiedTypeArgs)) {
+        channel =
+            IRPolyTranslator.translateExponential(
+                this, typeArgs, modifiedTypeArgs, type, channel.getName(), false);
+        addContinue(channel.getSessionId());
+      }
 
       dataArguments.add(
           new IRCallProcess.DataArgument(
@@ -403,10 +392,14 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTRecv node) {
-    addRecv(node.getChr(), node.getChi(), node.getChiType(), node.getRhsType(),
-      () -> {
-        node.getRhs().accept(this);
-      });
+    addRecv(
+        node.getChr(),
+        node.getChi(),
+        node.getChiType(),
+        node.getRhsType(),
+        () -> {
+          node.getRhs().accept(this);
+        });
   }
 
   @Override
@@ -426,11 +419,17 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTSend node) {
-    addSend(node.getChs(), node.getCho(), node.getLhsType(), node.getRhsType(), () -> {
-      node.getLhs().accept(this);
-    }, () -> {
-      node.getRhs().accept(this);
-    });
+    addSend(
+        node.getChs(),
+        node.getCho(),
+        node.getLhsType(),
+        node.getRhsType(),
+        () -> {
+          node.getLhs().accept(this);
+        },
+        () -> {
+          node.getRhs().accept(this);
+        });
   }
 
   @Override
@@ -448,21 +447,7 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTWhy node) {
-    // The only thing we do here is marking the channel as an exponential and setting the drop bit
-    // The channel holds the exponential at the current offset
-    // Whenever we need to access the exponential, we just read it from the channel's local data
-
-    IRSlotsFromASTType info = slotsFromType(new ASTWhyT(node.getType()));
-    env =
-        env.makeChannelExponential(
-            node.getCh(),
-            info.activeLocalTree,
-            false,
-            id -> {
-              block.add(new IRDeferDrop(id));
-            });
-
-    recurse(block, node.getRhs());
+    addWhy(node.getCh(), node.getType(), () -> node.getRhs().accept(this));
   }
 
   @Override
@@ -613,7 +598,8 @@ public class IRGenerator extends ASTNodeVisitor {
 
   // ======================================= Helper methods =======================================
 
-  void addSend(String ch, String cho, ASTType lhsType, ASTType rhsType, Runnable lhsCont, Runnable rhsCont) {
+  void addSend(
+      String ch, String cho, ASTType lhsType, ASTType rhsType, Runnable lhsCont, Runnable rhsCont) {
     IREnvironment.Channel channel = env.getChannel(ch);
     IREnvironment.Channel argSession;
 
@@ -637,8 +623,7 @@ public class IRGenerator extends ASTNodeVisitor {
       recurse(block, lhsCont);
 
       // Generate the continuation
-      advanceOrReset(
-          ch, argInfo.activeRemoteTree.combinations(), rhsType, true);
+      advanceOrReset(ch, argInfo.activeRemoteTree.combinations(), rhsType, true);
       recurse(
           rhsBlock,
           () -> {
@@ -729,13 +714,12 @@ public class IRGenerator extends ASTNodeVisitor {
   }
 
   void addBang(
-    String ch,
-    String chi,
-    ASTType type,
-    Set<String> capturedChannels,
-    Function<IREnvironment, Integer> contEndPoints,
-    Runnable cont
-  ) {
+      String ch,
+      String chi,
+      ASTType type,
+      Set<String> capturedChannels,
+      Function<IREnvironment, Integer> contEndPoints,
+      Runnable cont) {
     IREnvironment.Channel channel = env.getChannel(ch);
     IRSlotsFromASTType info = slotsFromType(type);
 
@@ -773,13 +757,14 @@ public class IRGenerator extends ASTNodeVisitor {
         IRSlotTree valueSlots = captured.getExponentialType();
 
         expEnv = expEnv.addValue(name, valueSlots.combinations(), Optional.of(valueSlots));
+        expEnv = expEnv.makeChannelExponential(name, valueSlots, true, id -> {});
 
         dataArguments.add(
             new IRWriteExponential.DataArgument(
                 captured.getLocalData(),
                 expEnv.getChannel(name).getLocalDataId(),
                 valueSlots,
-                false));
+                true));
       }
 
       // Count the end points of the exponential process
@@ -795,6 +780,53 @@ public class IRGenerator extends ASTNodeVisitor {
               channel.getRemoteData(), expProcessId, typeArguments, dataArguments));
       block.add(new IRFinishSession(channel.getSessionId(), true));
     }
+  }
+
+  void addWhy(String ch, ASTType type, Runnable cont) {
+    // The only thing we do here is marking the channel as an exponential and setting the drop bit
+    // The channel holds the exponential at the current offset
+    // Whenever we need to access the exponential, we just read it from the channel's local data
+
+    IRSlotsFromASTType info = slotsFromType(new ASTWhyT(type));
+    env =
+        env.makeChannelExponential(
+            ch,
+            info.activeLocalTree,
+            false,
+            id -> {
+              block.add(new IRDeferDrop(id));
+            });
+
+    recurse(block, cont);
+  }
+
+  void addCall(String ch, String chi, ASTType type, Runnable cont) {
+    IREnvironment.Channel channel = env.getChannel(ch);
+
+    // Define new channel
+    IRSlotsFromASTType info = slotsFromType(type);
+    env = env.addSession(chi, info.localCombinations());
+    IREnvironment.Channel argChannel = env.getChannel(chi);
+
+    if (isValue(type, false)) {
+      // TODO: if the value is a basic value (i.e., no clone/drop needed, we can just alias the
+      // channels)
+
+      // Just clone the exponential's data to the new channel
+      block.add(
+          new IRCloneValue(
+              argChannel.getLocalData(), channel.getLocalData(), info.activeLocalTree));
+    } else {
+      block.add(
+          new IRCallExponential(
+              channel.getLocalData(), argChannel.getSessionId(), argChannel.getLocalDataId()));
+
+      // If the called session is negative, we must jump to it
+      addContinueIfNegative(argChannel.getSessionId(), type);
+    }
+
+    // Recurse on the continuation
+    recurse(block, cont);
   }
 
   void addSendTy(
@@ -826,7 +858,7 @@ public class IRGenerator extends ASTNodeVisitor {
     Map<String, ASTType> varTypes = Map.of(typeId, type);
     env = env.withKnownTypes(varTypes);
     IREnvironment.Channel polyChannel =
-        IRPolyTranslator.translate(
+        IRPolyTranslator.translateLinear(
             this, varTypes, varTypes.keySet(), rhsTypeNoSubst.dualCatch(env.getEp()), ch, true);
 
     // Write the type, the translator session and the type's polarity to the main channel
@@ -894,8 +926,7 @@ public class IRGenerator extends ASTNodeVisitor {
           polyProcess.setEndPoints(contEndPoints.apply(polyEnv));
 
           // Define the argument session for the process
-          IRSlotsFromASTType rhsInfo =
-              IRSlotsFromASTType.compute(compiler, polyEnv, Set.of(), rhsType);
+          IRSlotsFromASTType rhsInfo = IRSlotsFromASTType.compute(compiler, polyEnv, rhsType);
           polyEnv = polyEnv.addArgSession(ch, rhsInfo.localCombinations());
           sessionArguments.add(
               new IRCallProcess.SessionArgument(
@@ -913,17 +944,17 @@ public class IRGenerator extends ASTNodeVisitor {
               // We captured an exponential channel, we pass it as a data argument
               IRSlotTree valueSlots = captured.getExponentialType();
               polyEnv = polyEnv.addValue(name, valueSlots.combinations(), Optional.of(valueSlots));
+              polyEnv = polyEnv.makeChannelExponential(name, valueSlots, true, id -> {});
               dataArguments.add(
                   new IRCallProcess.DataArgument(
                       captured.getLocalData(),
                       polyEnv.getChannel(name).getLocalDataId(),
                       valueSlots,
-                      false));
+                      true));
             } else {
               // We captured a channel, we pass it as a session argument along with its data
               ASTType type = capturedChannels.get(name);
-              IRSlotsFromASTType info =
-                  IRSlotsFromASTType.compute(compiler, polyEnv, Set.of(), type);
+              IRSlotsFromASTType info = IRSlotsFromASTType.compute(compiler, polyEnv, type);
               boolean isPositive = polyEnv.isPositive(type);
               boolean isValue = IRValueChecker.check(compiler, polyEnv, type, Optional.empty());
 
@@ -1025,6 +1056,10 @@ public class IRGenerator extends ASTNodeVisitor {
     return IRValueChecker.check(compiler, env, type, requiredPolarity);
   }
 
+  IRProcessId genChildProcessId(String suffix) {
+    return new IRProcessId(process.getId() + "_" + suffix + nextProcessGenId++);
+  }
+
   private IRProcessId processId(String id, boolean tArgPolarities[]) {
     StringBuilder sb = new StringBuilder();
     sb.append(id);
@@ -1058,7 +1093,7 @@ public class IRGenerator extends ASTNodeVisitor {
   }
 
   IRSlotsFromASTType slotsFromType(ASTType type) {
-    return IRSlotsFromASTType.compute(compiler, env, Set.of(), type);
+    return IRSlotsFromASTType.compute(compiler, env, type);
   }
 
   private int countEndPoints(ASTNode node) {

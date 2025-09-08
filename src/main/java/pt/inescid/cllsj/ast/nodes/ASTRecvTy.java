@@ -134,9 +134,15 @@ public class ASTRecvTy extends ASTNode {
     if (ty instanceof ASTRecvTT) {
 
       freeNameTypes = new HashMap<>();
-      for (String name : fn(new HashSet<>())) {
+      for (String name : rhs.fn(new HashSet<>())) {
         if (name.equals(chs)) continue;
-        ASTType t = ed.find(name);
+        ASTType t;
+        try {
+          t = ed.find(name);
+        } catch (Exception e) {
+          t = eg.find(name);
+        }
+
         t = t.unfoldType(ep);
         freeNameTypes.put(name, t);
       }

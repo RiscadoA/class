@@ -49,6 +49,14 @@ public class IREnvironment {
     return new IREnvironment(this, ep);
   }
 
+  public IREnvironment withRecursionType(String typeId, ASTType type) {
+    Env<EnvEntry> ep = this.ep;
+    ep = ep.assoc(typeId, new TypeEntry(new ASTIdT(typeId)));
+    IREnvironment result =
+        new Type(this, typeId, Optional.empty(), Optional.empty(), isPositive(type));
+    return result.changeEp(ep);
+  }
+
   public IREnvironment withKnownTypes(Map<String, ASTType> types) {
     IREnvironment result = this;
     Env<EnvEntry> ep = this.ep;
@@ -187,7 +195,7 @@ public class IREnvironment {
         channel.sessionId,
         channel.getOffset(),
         channel.localDataId,
-        channel.exponentialType);
+        Optional.of(slots));
   }
 
   public IREnvironment alias(String oldName, String newName) {
@@ -257,6 +265,10 @@ public class IREnvironment {
 
     public boolean isKnown() {
       return known.isPresent();
+    }
+
+    public boolean isRecursive() {
+      return id.isEmpty() && known.isEmpty();
     }
 
     public boolean isPositive() {

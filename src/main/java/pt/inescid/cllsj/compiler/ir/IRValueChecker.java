@@ -178,12 +178,12 @@ public class IRValueChecker extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTSendTT type) {
-    expectPolarity(true);
+    isValue = false;
   }
 
   @Override
   public void visit(ASTRecvTT type) {
-    expectPolarity(false);
+    isValue = false;
   }
 
   @Override

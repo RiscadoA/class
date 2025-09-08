@@ -1,10 +1,10 @@
 !
-sendty
-lhs send
-let
 ?
 call
+sendty
 recvty
+lhs send
+let
 rhs recv
 fwd
 2

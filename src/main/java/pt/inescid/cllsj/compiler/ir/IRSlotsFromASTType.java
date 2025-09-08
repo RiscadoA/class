@@ -1,11 +1,8 @@
 package pt.inescid.cllsj.compiler.ir;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
-import pt.inescid.cllsj.TypeEntry;
 import pt.inescid.cllsj.ast.ASTTypeVisitor;
 import pt.inescid.cllsj.ast.types.*;
 import pt.inescid.cllsj.compiler.Compiler;
@@ -17,7 +14,6 @@ import pt.inescid.cllsj.compiler.ir.slot.*;
 public class IRSlotsFromASTType extends ASTTypeVisitor {
   private Compiler compiler;
   private IREnvironment env;
-  private Set<String> recursionTypes;
 
   // Slot corresponding to the root type
   public Optional<IRSlot> slot = Optional.empty();
@@ -74,18 +70,16 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
     }
   }
 
-  public static IRSlotsFromASTType compute(
-      Compiler compiler, IREnvironment env, Set<String> recursionTypes, ASTType type) {
+  public static IRSlotsFromASTType compute(Compiler compiler, IREnvironment env, ASTType type) {
     IRSlotsFromASTType visitor = new IRSlotsFromASTType();
     visitor.compiler = compiler;
     visitor.env = env;
-    visitor.recursionTypes = recursionTypes;
     type.accept(visitor);
     return visitor;
   }
 
   private IRSlotsFromASTType recurse(ASTType type) {
-    return compute(compiler, env, recursionTypes, type);
+    return compute(compiler, env, type);
   }
 
   private void localSlot(IRSlot slot) {
@@ -129,16 +123,8 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
   @Override
   public void visit(ASTCoRecT type) {
     IREnvironment env = this.env;
-    Set<String> recursionTypes = this.recursionTypes;
-
-    this.env =
-        env.changeEp(env.getEp().assoc(type.getid(), new TypeEntry(new ASTIdT(type.getid()))));
-    this.recursionTypes = new HashSet<>(recursionTypes);
-    this.recursionTypes.add(type.getid());
-
+    this.env = env.withRecursionType(type.getid(), type);
     type.getin().accept(this);
-
-    this.recursionTypes = recursionTypes;
     this.env = env;
   }
 
@@ -160,13 +146,12 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
     // We still have a type identifier
     type = (ASTIdT) unfolded;
 
-    // If it is a recursion variable, then stop here
-    if (recursionTypes.contains(type.getid())) {
-      return;
-    }
-
     // Otherwise, use the environment to find more about the type
     IREnvironment.Type envType = env.getType(type.getid());
+
+    if (envType.isRecursive()) {
+      return;
+    }
 
     // If it is a known type, use the known slot combinations
     if (envType.isKnown()) {
@@ -224,16 +209,8 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
   @Override
   public void visit(ASTRecT type) {
     IREnvironment env = this.env;
-    Set<String> recursionTypes = this.recursionTypes;
-
-    this.env =
-        env.changeEp(env.getEp().assoc(type.getid(), new TypeEntry(new ASTIdT(type.getid()))));
-    this.recursionTypes = new HashSet<>(recursionTypes);
-    this.recursionTypes.add(type.getid());
-
+    this.env = env.withRecursionType(type.getid(), type);
     type.getin().accept(this);
-
-    this.recursionTypes = recursionTypes;
     this.env = env;
   }
 

@@ -1,0 +1,33 @@
+type rec List(A) {
+  choice of {
+    |#next: send !A; List(A)
+    |#done: wait
+  }
+};;
+
+proc rec printList<A>(list: ~List(A); printer: send !A; wait) {
+  case list of {
+    |#next:
+      recv list(a);
+      call printer(p);
+      send p(a);
+      wait p;
+      printList<A>(list; printer)
+    |#done:
+      close list
+  }
+};;
+
+proc main() {
+  cut {
+    !p(p: recv ~!lint; close);
+    recv p(i); println(i + " " + i); close p
+    |p: ?send !lint; wait|
+    printList<lint>(l; p)
+    |l: List(lint)|
+    #next l; send l(1);
+    #next l; send l(2);
+    #next l; send l(3);
+    #done l; wait l; ()
+  }
+};;

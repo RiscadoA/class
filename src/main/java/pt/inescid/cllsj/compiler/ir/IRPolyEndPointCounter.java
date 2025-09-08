@@ -3,13 +3,19 @@ package pt.inescid.cllsj.compiler.ir;
 import java.util.Set;
 import pt.inescid.cllsj.ast.ASTTypeVisitor;
 import pt.inescid.cllsj.ast.types.*;
+import pt.inescid.cllsj.compiler.Compiler;
 
 public class IRPolyEndPointCounter extends ASTTypeVisitor {
+  private Compiler compiler;
+  private IREnvironment env;
   private int count = 0;
   private Set<String> polyNames;
 
-  public static int count(ASTType type, Set<String> polyNames) {
+  public static int count(
+      Compiler compiler, IREnvironment env, ASTType type, Set<String> polyNames) {
     IRPolyEndPointCounter counter = new IRPolyEndPointCounter();
+    counter.compiler = compiler;
+    counter.env = env;
     counter.polyNames = polyNames;
     counter.recurse(type);
     return counter.count;
@@ -25,8 +31,11 @@ public class IRPolyEndPointCounter extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTBangT type) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    if (IRValueChecker.check(compiler, env, type.getin(), true)) {
+      type.getin().accept(this);
+    } else {
+      count += 1;
+    }
   }
 
   @Override
@@ -48,7 +57,7 @@ public class IRPolyEndPointCounter extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTCoRecT type) {
-    recurse(type.getin());
+    count += 1;
   }
 
   @Override
@@ -80,7 +89,7 @@ public class IRPolyEndPointCounter extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTRecT type) {
-    recurse(type.getin());
+    count += 1;
   }
 
   @Override
@@ -97,8 +106,11 @@ public class IRPolyEndPointCounter extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTWhyT type) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    if (IRValueChecker.check(compiler, env, type, true)) {
+      type.getin().accept(this);
+    } else {
+      count += 1;
+    }
   }
 
   @Override

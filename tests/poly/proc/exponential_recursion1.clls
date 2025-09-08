@@ -1,0 +1,29 @@
+type rec List(A) {
+  choice of {
+    |#next: send !A; List(A)
+    |#done: wait
+  }
+};;
+
+proc rec dropList<A>(list: ~List(A)) {
+  case list of {
+    |#next:
+      println("drop");
+      recv list(a);
+      dropList<A>(list)
+    |#done:
+      println("done");
+      close list
+  }
+};;
+
+proc main() {
+  cut {
+    dropList<lint>(l)
+    |l: List(lint)|
+    #next l; send l(1);
+    #next l; send l(2);
+    #next l; send l(3);
+    #done l; wait l; ()
+  }
+};;

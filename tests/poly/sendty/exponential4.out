@@ -1,15 +1,15 @@
 sendty
+recvty
 lhs send
 lhs !
 let
-recvty
 rhs recv
 ?
 rhs send
 rhs !
+rhs close
 call
 fwd
-rhs close
 lhs recv
 lhs wait
 lhs ?

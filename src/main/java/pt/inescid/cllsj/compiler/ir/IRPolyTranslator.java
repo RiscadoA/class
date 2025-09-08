@@ -5,16 +5,17 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiConsumer;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
-import pt.inescid.cllsj.TypeEntry;
 import pt.inescid.cllsj.ast.ASTTypeVisitor;
 import pt.inescid.cllsj.ast.types.*;
-import pt.inescid.cllsj.compiler.ir.id.IRCodeLocation;
 import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
+import pt.inescid.cllsj.compiler.ir.id.IRLocalDataId;
+import pt.inescid.cllsj.compiler.ir.id.IRProcessId;
 import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
+import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
 import pt.inescid.cllsj.compiler.ir.instruction.*;
 import pt.inescid.cllsj.compiler.ir.slot.*;
 
@@ -28,19 +29,27 @@ public class IRPolyTranslator extends ASTTypeVisitor {
 
   private static int nextNameId = 0;
 
-  private Map<String, IRCodeLocation> recursionLabels = new HashMap<>();
-  private Map<String, IRCodeLocation> coRecursionLabels = new HashMap<>();
+  private Map<String, BiConsumer<String, String>> recursionCall = new HashMap<>();
   private String poly;
   private String inst;
 
   // Returns the name of the new channel created for the polymorphic side
-  public static IREnvironment.Channel translate(
+  public static IREnvironment.Channel translateLinear(
       IRGenerator gen,
       Map<String, ASTType> varTypes,
       Set<String> modifiedVarTypes,
       ASTType type,
       String inst,
       boolean addContinue) {
+    IRPolyTranslator translator = new IRPolyTranslator();
+    translator.gen = gen;
+    translator.varTypes = varTypes;
+    translator.modifiedVarTypes = modifiedVarTypes;
+    translator.varSlots = new HashMap<>();
+    for (Map.Entry<String, ASTType> entry : varTypes.entrySet()) {
+      translator.varSlots.put(entry.getKey(), gen.slotsFromType(entry.getValue()));
+    }
+
     String poly = newChannelName(inst);
 
     gen.env = gen.env.addSession(poly, gen.slotsFromType(type).combinations());
@@ -59,19 +68,20 @@ public class IRPolyTranslator extends ASTTypeVisitor {
           if (addContinue) {
             gen.addContinueIfNegative(instChannel.getSessionId(), type);
           }
-          translate(gen, varTypes, modifiedVarTypes, type, poly, inst);
+          translator.recurse(poly, inst, type);
         });
 
     return polyChannel;
   }
 
-  public static void translate(
+  // Returns the name of the new channel created for the polymorphic side
+  public static IREnvironment.Channel translateExponential(
       IRGenerator gen,
       Map<String, ASTType> varTypes,
       Set<String> modifiedVarTypes,
-      ASTType type,
-      String poly,
-      String inst) {
+      ASTWhyT type,
+      String inst,
+      boolean addContinue) {
     IRPolyTranslator translator = new IRPolyTranslator();
     translator.gen = gen;
     translator.varTypes = varTypes;
@@ -80,9 +90,46 @@ public class IRPolyTranslator extends ASTTypeVisitor {
     for (Map.Entry<String, ASTType> entry : varTypes.entrySet()) {
       translator.varSlots.put(entry.getKey(), gen.slotsFromType(entry.getValue()));
     }
-    translator.poly = poly;
-    translator.inst = inst;
-    translator.recurse(type);
+
+    String poly = newChannelName(inst);
+
+    IRSlotsFromASTType info = gen.slotsFromType(type);
+
+    gen.env = gen.env.addSession(poly, info.combinations());
+    IRBlock contBlock = gen.process.createBlock("poly_cont");
+    gen.block.add(
+        new IRInitializeSession(
+            translator.sessionId(poly), contBlock.getLocation(), translator.localData(poly)));
+
+    gen.env =
+        gen.env.makeChannelExponential(
+            poly,
+            info.activeLocalTree,
+            false,
+            dropId -> {
+              gen.block.add(new IRDeferDrop(dropId));
+            });
+
+    gen.addBang(
+        poly,
+        poly,
+        translator.polyType(type.getin()),
+        Set.of(inst),
+        env -> IRPolyEndPointCounter.count(gen.compiler, gen.env, type.getin(), modifiedVarTypes),
+        () -> {
+          gen.env = gen.env.withKnownTypes(varTypes);
+          gen.addCall(
+              inst,
+              inst,
+              translator.instType(type.getin()),
+              () -> {
+                translator.recurse(poly, inst, type.getin());
+              });
+        });
+
+    gen.block = contBlock;
+
+    return gen.env.getChannel(poly);
   }
 
   private void recurse(ASTType type) {
@@ -165,31 +212,64 @@ public class IRPolyTranslator extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTBangT type) {
-    // On the polymorphic side, we have a channel of type !A(X)
-    // On the instantiated side, we have a channel of type ?~A(I) where I is the instantiated type
-
-    // We must create a new exponential with a new process which will:
-    // - capture the exponential received from the instantiated side
-    // - if A(I) is not a positive value, this isn't needed, we just access it directly:
-    //    - the process calls the exponential to produce a value
-    // - the process code translates this value to the polymorphic value (recursion)
-
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    final String inst = this.inst;
+    final String poly = this.poly;
+    gen.addWhy(
+        poly,
+        polyType(type.getin()),
+        () -> {
+          final String linInst = newChannelName(inst);
+          gen.addBang(
+              inst,
+              linInst,
+              instType(type.getin()),
+              Set.of(poly),
+              env ->
+                  IRPolyEndPointCounter.count(
+                      gen.compiler, gen.env, type.getin(), modifiedVarTypes),
+              () -> {
+                final String linPoly = newChannelName(poly);
+                gen.env = gen.env.withKnownTypes(varTypes);
+                gen.addCall(
+                    poly,
+                    linPoly,
+                    polyType(type.getin()),
+                    () -> {
+                      recurse(linPoly, linInst, type.getin());
+                    });
+              });
+        });
   }
 
   @Override
   public void visit(ASTWhyT type) {
-    // On the polymorphic side, we have a channel of type ?A(X)
-    // On the instantiated side, we have a channel of type !~A(I) where I is the instantiated type
-
-    // If A(I) is a negative value, we call the polymorphic exponential and translate the result
-    // Otherwise, we must create a new exponential with a new process which will:
-    // - capture the exponential received from the polymorphic side
-    // - the process code translates the value to the instantiated value (recursion)
-
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    final String inst = this.inst;
+    final String poly = this.poly;
+    gen.addWhy(
+        inst,
+        instType(type.getin()),
+        () -> {
+          final String linPoly = newChannelName(poly);
+          gen.addBang(
+              poly,
+              linPoly,
+              polyType(type.getin()),
+              Set.of(inst),
+              env ->
+                  IRPolyEndPointCounter.count(
+                      gen.compiler, gen.env, type.getin(), modifiedVarTypes),
+              () -> {
+                final String linInst = newChannelName(inst);
+                gen.env = gen.env.withKnownTypes(varTypes);
+                gen.addCall(
+                    inst,
+                    linInst,
+                    instType(type.getin()),
+                    () -> {
+                      recurse(linPoly, linInst, type.getin());
+                    });
+              });
+        });
   }
 
   @Override
@@ -208,7 +288,8 @@ public class IRPolyTranslator extends ASTTypeVisitor {
       IRBlock caseBlock = gen.process.createBlock("poly_offer_" + label.substring(1).toLowerCase());
       cases.add(
           new IRBranch.Case(
-              caseBlock.getLocation(), IRPolyEndPointCounter.count(caseType, modifiedVarTypes)));
+              caseBlock.getLocation(),
+              IRPolyEndPointCounter.count(gen.compiler, gen.env, caseType, modifiedVarTypes)));
       gen.recurse(
           caseBlock,
           () -> {
@@ -240,7 +321,8 @@ public class IRPolyTranslator extends ASTTypeVisitor {
       IRBlock caseBlock = gen.process.createBlock("poly_case_" + label.substring(1).toLowerCase());
       cases.add(
           new IRBranch.Case(
-              caseBlock.getLocation(), IRPolyEndPointCounter.count(caseType, modifiedVarTypes)));
+              caseBlock.getLocation(),
+              IRPolyEndPointCounter.count(gen.compiler, gen.env, caseType, modifiedVarTypes)));
       gen.recurse(
           caseBlock,
           () -> {
@@ -257,248 +339,210 @@ public class IRPolyTranslator extends ASTTypeVisitor {
     gen.block.add(new IRBranchTag(localData(poly), cases));
   }
 
-  @Override
-  public void visit(ASTRecT type) {
-    // Create a new block, as we may jump back here later due to recursion
-    IRBlock recBlock = gen.process.createBlock("poly_rec");
-    gen.block.add(new IRJump(recBlock.getLocation()));
+  private void visitRec(String typeId, ASTType inner, boolean isPositive) {
+    IRProcessId processId = gen.genChildProcessId(isPositive ? "poly_rec" : "poly_corec");
+    IRProcess process = new IRProcess(processId);
+    IREnvironment newEnv = new IREnvironment(process, gen.env.getEp());
 
-    Map<String, IRCodeLocation> recursionLabels = this.recursionLabels;
-    gen.recurse(
-        recBlock,
+    // Prepare lists of arguments to pass to the process
+    List<IRCallProcess.TypeArgument> typeArguments = new ArrayList<>();
+
+    // Pass all types in the current environment to the polymorphic process
+    for (int i = 0; i < gen.process.getTypeCount(); ++i) {
+      IRTypeId id = new IRTypeId(i);
+      IREnvironment.Type envType = gen.env.getType(id);
+      newEnv = newEnv.addType(envType.getName(), envType.isPositive());
+      IRTypeId newId = newEnv.getType(envType.getName()).getId();
+      typeArguments.add(new IRCallProcess.TypeArgument(IRSlotTree.of(new IRVarS(id)), newId));
+    }
+    newEnv =
+        newEnv.withRecursionType(
+            typeId, isPositive ? new ASTCoRecT(typeId, inner) : new ASTRecT(typeId, inner));
+    newEnv = newEnv.withKnownTypes(varTypes);
+
+    // Count the end points of the process
+    process.setEndPoints(
+        IRPolyEndPointCounter.count(gen.compiler, newEnv, inner, modifiedVarTypes));
+
+    // Define the argument sessions for the process
+    IRSlotsFromASTType polyInfo = IRSlotsFromASTType.compute(gen.compiler, newEnv, polyType(inner));
+    IRSlotsFromASTType instInfo = IRSlotsFromASTType.compute(gen.compiler, newEnv, instType(inner));
+    newEnv = newEnv.addArgSession(poly, polyInfo.localCombinations());
+    newEnv = newEnv.addArgSession(inst, instInfo.localCombinations());
+
+    final IRSessionId targetPolySession = newEnv.getChannel(poly).getSessionId();
+    final IRSessionId targetInstSession = newEnv.getChannel(inst).getSessionId();
+    final IRLocalDataId targetPolyData = newEnv.getChannel(poly).getLocalDataId();
+    final IRLocalDataId targetInstData = newEnv.getChannel(inst).getLocalDataId();
+
+    BiConsumer<String, String> call =
+        (innerPoly, innerInst) -> {
+          gen.env.resetChannel(innerPoly);
+          gen.env.resetChannel(innerInst);
+
+          gen.block.add(
+              new IRCallProcess(
+                  processId,
+                  typeArguments,
+                  List.of(
+                      new IRCallProcess.SessionArgument(
+                          sessionId(innerPoly), targetPolySession, IRSlotOffset.ZERO),
+                      new IRCallProcess.SessionArgument(
+                          sessionId(innerInst), targetInstSession, IRSlotOffset.ZERO)),
+                  List.of(
+                      new IRCallProcess.DataArgument(
+                          localData(innerPoly), targetPolyData, polyInfo.activeLocalTree, false),
+                      new IRCallProcess.DataArgument(
+                          localData(innerInst), targetInstData, instInfo.activeLocalTree, false)),
+                  true));
+        };
+
+    // Store the process we just defined so that it gets generated later
+    final String poly = this.poly;
+    final String inst = this.inst;
+    gen.procGens.put(
+        processId,
         () -> {
-          this.recursionLabels = new HashMap<>(this.recursionLabels);
-          this.recursionLabels.put(type.getid(), recBlock.getLocation());
-
-          gen.env =
-              gen.env.changeEp(
-                  gen.env.getEp().assoc(type.getid(), new TypeEntry(new ASTIdT(type.getid()))));
-
-          // It is an unfold, so we must jump to both channels
+          // Unfold, must jump to both channels
           gen.addContinue(sessionId(poly));
           gen.addContinue(sessionId(inst));
 
-          // The positive side, polyChannel, will need to be continued if the continuation is
-          // negative
-          gen.addContinueIfNegative(sessionId(poly), type.getin());
+          if (isPositive) {
+            gen.addContinueIfNegative(sessionId(inst), instType(inner));
+          } else {
+            gen.addContinueIfNegative(sessionId(poly), polyType(inner));
+          }
 
-          gen.env.resetChannel(poly);
-          gen.env.resetChannel(inst);
-
-          recurse(type.getin());
+          Map<String, BiConsumer<String, String>> recursionCall = this.recursionCall;
+          this.recursionCall = new HashMap<>(this.recursionCall);
+          this.recursionCall.put(typeId, call);
+          recurse(poly, inst, inner);
+          this.recursionCall = recursionCall;
         });
-    this.recursionLabels = recursionLabels;
+    gen.procEnvs.put(processId, newEnv);
+    gen.procUsed.add(processId);
+
+    call.accept(poly, inst);
+  }
+
+  @Override
+  public void visit(ASTRecT type) {
+    visitRec(type.getid(), type.getin(), true);
   }
 
   @Override
   public void visit(ASTCoRecT type) {
-    // Create a new block, as we may jump back here later due to recursion
-    IRBlock recBlock = gen.process.createBlock("poly_co_rec");
-    gen.block.add(new IRJump(recBlock.getLocation()));
-
-    Map<String, IRCodeLocation> coRecursionLabels = this.coRecursionLabels;
-    gen.recurse(
-        recBlock,
-        () -> {
-          this.coRecursionLabels = new HashMap<>(this.coRecursionLabels);
-          this.coRecursionLabels.put(type.getid(), recBlock.getLocation());
-
-          gen.env =
-              gen.env.changeEp(
-                  gen.env.getEp().assoc(type.getid(), new TypeEntry(new ASTIdT(type.getid()))));
-
-          // It is an unfold, so we must jump to both channels
-          gen.addContinue(sessionId(poly));
-          gen.addContinue(sessionId(inst));
-
-          // The positive side, instChannel, will need to be continued if its continuation is
-          // negative
-          // Since the type we have is the dual, we continue if the poly type is positive
-          gen.addContinueIfPositive(sessionId(inst), type.getin());
-
-          gen.env.resetChannel(poly);
-          gen.env.resetChannel(inst);
-
-          recurse(type.getin());
-        });
-    this.coRecursionLabels = coRecursionLabels;
+    visitRec(type.getid(), type.getin(), false);
   }
 
   @Override
   public void visit(ASTRecvT type) {
-    // if (isPolymorphic(type.getlhs())) {
-      // The left-hand-side of the recv is polymorphic.
-      // Thus, the polymorphic side expects to receive a polymorphic session
-      // We must perform translation of the closure or value received from the instantiated side
-
-      String recvInst = newChannelName(inst);
-      String sentPoly = newChannelName(poly);
-      gen.addRecv(inst, recvInst, instType(type.getlhs()), instType(type.getrhs()), () -> {
-        gen.addSend(poly, sentPoly, polyType(type.getlhs()), polyType(type.getrhs()), () -> {
-          recurse(sentPoly, recvInst, type.getlhs());
-        }, () -> {
-          recurse(poly, inst, type.getrhs());
+    String recvInst = newChannelName(inst);
+    String sentPoly = newChannelName(poly);
+    gen.addRecv(
+        inst,
+        recvInst,
+        instType(type.getlhs()),
+        instType(type.getrhs()),
+        () -> {
+          gen.addSend(
+              poly,
+              sentPoly,
+              polyType(type.getlhs()),
+              polyType(type.getrhs()),
+              () -> {
+                recurse(sentPoly, recvInst, type.getlhs());
+              },
+              () -> {
+                recurse(poly, inst, type.getrhs());
+              });
         });
-      });
-
-      // // Define the new polymorphic session we'll send to the polymorphic side
-      // String sentPoly = newChannelName(poly);
-      // gen.env = gen.env.addSession(sentPoly, polySlotsFromType(type.getlhs()).remoteCombinations());
-      // IRBlock closureBlock = gen.process.createBlock("poly_recv_closure");
-      // gen.block.add(
-      //     new IRInitializeSession(
-      //         sessionId(sentPoly), closureBlock.getLocation(), localData(sentPoly)));
-
-      // if (gen.compiler.optimizeSendValue.get() && isValueInst(type.getlhs(), false)) {
-      //   // If the instantiated side has sent a value, we translate it inside the closure
-      //   gen.recurse(closureBlock, () -> recurse(sentPoly, inst, type.getlhs()));
-
-      //   IRSlotsFromASTType instInfo = instSlotsFromType(type.getlhs());
-      //   advanceOrResetInst(instInfo.activeTree().combinations(), type.getrhs(), false);
-      // } else {
-      //   // Receive the new session from the instantiated side
-      //   String recvInst = newChannelName(inst);
-      //   gen.env =
-      //       gen.env.addSession(recvInst, instSlotsFromType(type.getlhs()).localCombinations());
-      //   gen.block.add(new IRBindSession(localData(inst), sessionId(recvInst), localData(recvInst)));
-      //   advanceOrResetInst(new IRSessionS(), type.getrhs(), false);
-
-      //   // Generate the closure code which translates the received instantiated session
-      //   gen.recurse(
-      //       closureBlock,
-      //       () -> {
-      //         // If the received session is negative, we must pass control to it first
-      //         gen.addContinueIfNegative(sessionId(recvInst), type.getlhs());
-      //         recurse(sentPoly, recvInst, type.getlhs());
-      //       });
-      // }
-
-      // // Write the new polymorphic session to the polymorphic side
-      // gen.block.add(new IRWriteSession(remoteData(poly), sessionId(sentPoly)));
-      // advanceOrResetPoly(new IRSessionS(), type.getrhs(), false);
-    // } else {
-    //   // If the left-hand-side is not polymorphic, we can just forward it
-    //   if (gen.compiler.optimizeSendValue.get() && isValuePoly(type.getlhs(), false)) {
-    //     IRSlotsFromASTType info = polySlotsFromType(type.getlhs());
-    //     addMove(poly, inst, info.activeTree());
-    //     advanceOrResetBoth(info.activeTree().combinations(), type.getrhs(), false);
-    //   } else {
-    //     addMove(poly, inst, new IRSessionS());
-    //     advanceOrResetBoth(new IRSessionS(), type.getrhs(), false);
-    //   }
-
-    //   // If the polarity changes, we pass control to the other side
-    //   gen.addContinueIfPositive(sessionId(poly), type.getrhs());
-
-    //   recurse(type.getrhs());
-    // }
   }
 
   @Override
   public void visit(ASTSendT type) {
-    // if (isPolymorphic(type.getlhs())) {
-      // The left-hand-side of the send is polymorphic.
-      // Thus, the polymorphic side will send a polymorphic session
-      // We must perform translation of the closure to an instantiated session or value
-
-      String recvPoly = newChannelName(poly);
-      String sentInst = newChannelName(inst);
-      gen.addRecv(poly, recvPoly, polyType(type.getlhs()), polyType(type.getrhs()), () -> {
-        gen.addSend(inst, sentInst, instType(type.getlhs()), instType(type.getrhs()), () -> {
-          recurse(recvPoly, sentInst, type.getlhs());
-        }, () -> {
-          recurse(poly, inst, type.getrhs());
+    String recvPoly = newChannelName(poly);
+    String sentInst = newChannelName(inst);
+    gen.addRecv(
+        poly,
+        recvPoly,
+        polyType(type.getlhs()),
+        polyType(type.getrhs()),
+        () -> {
+          gen.addSend(
+              inst,
+              sentInst,
+              instType(type.getlhs()),
+              instType(type.getrhs()),
+              () -> {
+                recurse(recvPoly, sentInst, type.getlhs());
+              },
+              () -> {
+                recurse(poly, inst, type.getrhs());
+              });
         });
-      });
-
-      // Receive the new session from the polymorphic side
-      // String recvPoly = newChannelName(poly);
-      // gen.env = gen.env.addSession(recvPoly, polySlotsFromType(type.getlhs()).remoteCombinations());
-      // gen.block.add(new IRBindSession(localData(poly), sessionId(recvPoly), localData(recvPoly)));
-      // advanceOrResetPoly(new IRSessionS(), type.getlhs(), true);
-
-      // // If the received session is positive, we must pass control to it first
-      // gen.addContinueIfPositive(sessionId(recvPoly), type.getlhs());
-
-      // if (gen.compiler.optimizeSendValue.get() && isValueInst(type.getlhs(), true)) {
-      //   // If the instantiated side expects a value, we must translate it now
-      //   // We thus initialize a new session so that its data points to the main instantiated channel
-      //   IRBlock rhsBlock = gen.process.createBlock("poly_send_cont");
-      //   String sentInst = newChannelName(inst);
-      //   gen.env = gen.env.addSession(sentInst);
-      //   gen.block.add(
-      //       new IRInitializeSession(sessionId(sentInst), rhsBlock.getLocation(), remoteData(inst)));
-
-      //   // Generate the code which translates the received polymorphic session to the instantiated
-      //   // value
-      //   gen.recurse(gen.block, () -> recurse(recvPoly, sentInst, type.getlhs()));
-
-      //   // We can now continue with the right-hand-side
-      //   gen.block = rhsBlock;
-      //   IRSlotsFromASTType instInfo = instSlotsFromType(type.getlhs());
-      //   advanceOrResetInst(instInfo.activeTree().combinations(), type.getrhs(), true);
-      // } else {
-      //   // Otherwise, we must create a new instantiated session which translates the
-      //   // received polymorphic session
-      //   String sentInst = newChannelName(inst);
-      //   gen.env =
-      //       gen.env.addSession(sentInst, instSlotsFromType(type.getlhs()).localCombinations());
-      //   IRBlock closureBlock = gen.process.createBlock("poly_send_closure");
-      //   gen.block.add(
-      //       new IRInitializeSession(
-      //           sessionId(sentInst), closureBlock.getLocation(), localData(sentInst)));
-
-      //   // Generate the closure code which translates the received polymorphic session
-      //   gen.recurse(closureBlock, () -> recurse(recvPoly, sentInst, type.getlhs()));
-
-      //   // Write the new instantiated session to the instantiated side
-      //   gen.block.add(new IRWriteSession(remoteData(inst), sessionId(sentInst)));
-      //   advanceOrResetInst(new IRSessionS(), type.getrhs(), true);
-      // }
-    // } else {
-    //   // If the left-hand-side is not polymorphic, we can just forward it
-    //   if (gen.compiler.optimizeSendValue.get() && isValuePoly(type.getlhs(), true)) {
-    //     IRSlotsFromASTType info = polySlotsFromType(type.getlhs());
-    //     addMove(inst, poly, info.activeTree());
-    //     advanceOrResetBoth(info.activeTree().combinations(), type.getrhs(), true);
-    //   } else {
-    //     addMove(inst, poly, new IRSessionS());
-    //     advanceOrResetBoth(new IRSessionS(), type.getrhs(), true);
-    //   }
-
-    //   // If the polarity changes, we pass control to the other side
-    //   gen.addContinueIfNegative(sessionId(inst), type.getrhs());
-
-    //   recurse(type.getrhs());
-    // }
   }
 
   @Override
   public void visit(ASTSendTT type) {
     String recvTyid = ASTType.gensym();
-    ASTType rhsType = type.getrhs().subst(new Env<ASTType>().assoc(type.getid(), new ASTIdT(recvTyid)));
-    int recvTyEndpoints = 1 + IRPolyEndPointCounter.count(type.getrhs(), Set.of()) + IRPolyEndPointCounter.count(rhsType, modifiedVarTypes);
+    ASTType rhsType =
+        type.getrhs().subst(new Env<ASTType>().assoc(type.getid(), new ASTIdT(recvTyid)));
+    int recvTyEndpoints =
+        1
+            + IRPolyEndPointCounter.count(gen.compiler, gen.env, type.getrhs(), Set.of())
+            + IRPolyEndPointCounter.count(gen.compiler, gen.env, rhsType, modifiedVarTypes);
 
-    gen.addRecvTy(poly, recvTyid, Set.of(type.getid()), Map.of(inst, instType(type)), dual(rhsType), env -> recvTyEndpoints, () -> {
-      gen.env = gen.env.withKnownTypes(varTypes);
-      gen.addSendTy(inst, type.getid(), new ASTIdT(recvTyid), instType(rhsType), instType(type.getrhs()), () -> {
-        recurse(poly, inst, rhsType);
-      });
-    });
+    gen.addRecvTy(
+        poly,
+        recvTyid,
+        Set.of(type.getid()),
+        Map.of(inst, instType(type)),
+        dual(rhsType),
+        env -> recvTyEndpoints,
+        () -> {
+          gen.env = gen.env.withKnownTypes(varTypes);
+          gen.addSendTy(
+              inst,
+              type.getid(),
+              new ASTIdT(recvTyid),
+              instType(rhsType),
+              instType(type.getrhs()),
+              () -> {
+                recurse(poly, inst, rhsType);
+              });
+        });
   }
 
   @Override
   public void visit(ASTRecvTT type) {
     String recvTyid = ASTType.gensym();
-    ASTType rhsType = type.getrhs().subst(new Env<ASTType>().assoc(type.getid(), new ASTIdT(recvTyid)));
-    int recvTyEndpoints = 1 + IRPolyEndPointCounter.count(dual(type.getrhs()), Set.of()) + IRPolyEndPointCounter.count(rhsType, modifiedVarTypes);
+    ASTType rhsType =
+        type.getrhs().subst(new Env<ASTType>().assoc(type.getid(), new ASTIdT(recvTyid)));
+    int recvTyEndpoints =
+        1
+            + IRPolyEndPointCounter.count(gen.compiler, gen.env, dual(type.getrhs()), Set.of())
+            + IRPolyEndPointCounter.count(gen.compiler, gen.env, rhsType, modifiedVarTypes);
 
-    gen.addRecvTy(inst, recvTyid, Set.of(type.getid()), Map.of(poly, dual(type)), instType(rhsType), env -> recvTyEndpoints, () -> {
-      gen.env = gen.env.withKnownTypes(varTypes);
-      gen.addSendTy(poly, type.getid(), new ASTIdT(recvTyid), dual(rhsType), dual(type.getrhs()), () -> {
-        recurse(poly, inst, rhsType);
-      });
-    });
+    gen.addRecvTy(
+        inst,
+        recvTyid,
+        Set.of(type.getid()),
+        Map.of(poly, dual(type)),
+        instType(rhsType),
+        env -> recvTyEndpoints,
+        () -> {
+          gen.env = gen.env.withKnownTypes(varTypes);
+          gen.addSendTy(
+              poly,
+              type.getid(),
+              new ASTIdT(recvTyid),
+              dual(rhsType),
+              dual(type.getrhs()),
+              () -> {
+                recurse(poly, inst, rhsType);
+              });
+        });
   }
 
   @Override
@@ -513,13 +557,11 @@ public class IRPolyTranslator extends ASTTypeVisitor {
       target = poly;
     }
 
-    if (varTypes.containsKey(type.getid())) {
+    if (recursionCall.containsKey(type.getid())) {
+      recursionCall.get(type.getid()).accept(poly, inst);
+    } else if (varTypes.containsKey(type.getid())) {
       addMove(target, source, varSlots.get(type.getid()).activeTree());
       gen.block.add(new IRFinishSession(sessionId(target), true));
-    } else if (recursionLabels.containsKey(type.getid())) {
-      gen.block.add(new IRJump(recursionLabels.get(type.getid())));
-    } else if (coRecursionLabels.containsKey(type.getid())) {
-      gen.block.add(new IRJump(coRecursionLabels.get(type.getid())));
     } else {
       throw new UnsupportedOperationException(
           "Not polymorphic, should be caught by the recurse method");
@@ -546,10 +588,8 @@ public class IRPolyTranslator extends ASTTypeVisitor {
     if (varTypes.containsKey(type.getid())) {
       addMove(target, source, varSlots.get(type.getid()).activeTree());
       gen.block.add(new IRFinishSession(sessionId(target), true));
-    } else if (recursionLabels.containsKey(type.getid())) {
-      gen.block.add(new IRJump(recursionLabels.get(type.getid())));
-    } else if (coRecursionLabels.containsKey(type.getid())) {
-      gen.block.add(new IRJump(coRecursionLabels.get(type.getid())));
+    } else if (recursionCall.containsKey(type.getid())) {
+      recursionCall.get(type.getid()).accept(poly, inst);
     } else {
       throw new UnsupportedOperationException(
           "Not polymorphic, should be caught by the recurse method");
@@ -629,11 +669,6 @@ public class IRPolyTranslator extends ASTTypeVisitor {
     }
     ASTIdT idType = (ASTIdT) type;
 
-    if (recursionLabels.containsKey(idType.getid())) {
-      return true;
-    } else if (coRecursionLabels.containsKey(idType.getid())) {
-      return false;
-    }
     if (varTypes.containsKey(idType.getid())) {
       return gen.env.isPositive(varTypes.get(idType.getid()));
     } else {
@@ -654,25 +689,8 @@ public class IRPolyTranslator extends ASTTypeVisitor {
     return type;
   }
 
-  private boolean isValueInst(ASTType type, boolean expectedPolarity) {
-    return IRValueChecker.check(
-        gen.compiler, gen.env, instType(type), Optional.of(expectedPolarity));
-  }
-
-  private boolean isValuePoly(ASTType type, boolean expectedPolarity) {
-    return IRValueChecker.check(gen.compiler, gen.env, type, Optional.of(expectedPolarity));
-  }
-
   private static String newChannelName(String prefix) {
     return prefix + "_poly_" + (nextNameId++);
-  }
-
-  private IRSlotsFromASTType polySlotsFromType(ASTType type) {
-    return gen.slotsFromType(polyType(type));
-  }
-
-  private IRSlotsFromASTType instSlotsFromType(ASTType type) {
-    return gen.slotsFromType(instType(type));
   }
 
   private void advanceOrResetPoly(IRSlot slot, ASTType remainder, boolean isPositive) {
@@ -683,26 +701,14 @@ public class IRPolyTranslator extends ASTTypeVisitor {
     gen.advanceOrReset(inst, slot, instType(remainder), isPositive);
   }
 
-  private void advanceOrResetInst(
-      IRSlotCombinations combinations, ASTType remainder, boolean isPositive) {
-    gen.advanceOrReset(inst, combinations, instType(remainder), isPositive);
-  }
-
   private void advanceOrResetBoth(IRSlot slot, ASTType remainder, boolean isPositive) {
     advanceOrResetPoly(slot, remainder, isPositive);
     advanceOrResetInst(slot, remainder, isPositive);
   }
 
-  private void advanceOrResetBoth(
-      IRSlotCombinations combinations, ASTType remainder, boolean isPositive) {
-    gen.advanceOrReset(poly, combinations, remainder, isPositive);
-    gen.advanceOrReset(inst, combinations, instType(remainder), isPositive);
-  }
-
   private boolean isPolymorphic(ASTType type) {
     Set<String> vars = new HashSet<>(modifiedVarTypes);
-    vars.addAll(recursionLabels.keySet());
-    vars.addAll(coRecursionLabels.keySet());
+    vars.addAll(recursionCall.keySet());
     return IRUsesTypeVar.check(type, vars);
   }
 
