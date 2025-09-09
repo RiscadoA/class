@@ -97,7 +97,7 @@ public class CLayout {
 
     @Override
     public void visit(IRSessionS slot) {
-      visit(arch.sessionSize(), arch.sessionAlignment());
+      visit(arch.pointerSize, arch.pointerAlignment);
     }
 
     @Override

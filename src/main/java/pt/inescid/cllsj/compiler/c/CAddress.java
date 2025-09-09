@@ -39,7 +39,11 @@ public class CAddress {
   }
 
   public CAddress align(CAlignment alignment) {
-    return new CAddress("(char*)ALIGN((uintptr_t)(" + this + "), " + alignment + ")", CSize.zero());
+    if (alignment.equals(CAlignment.one())) {
+      return this;
+    } else {
+      return new CAddress("(char*)ALIGN((uintptr_t)(" + this + "), " + alignment + ")", CSize.zero());
+    }
   }
 
   public String cast(String type) {
