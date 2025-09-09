@@ -19,7 +19,6 @@ import pt.inescid.cllsj.ast.nodes.*;
 import pt.inescid.cllsj.ast.types.*;
 import pt.inescid.cllsj.compiler.Compiler;
 import pt.inescid.cllsj.compiler.ir.expression.IRExpression;
-import pt.inescid.cllsj.compiler.ir.expression.literal.IRStringLiteral;
 import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
 import pt.inescid.cllsj.compiler.ir.id.IRProcessId;
 import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
@@ -281,9 +280,7 @@ public class IRGenerator extends ASTNodeVisitor {
       ASTType type = node.getTPars().get(i);
       IRSlotsFromASTType info = slotsFromType(type);
       tArgPolarities[i] = isPositive(type);
-
-      IRSlotTree tree = tArgPolarities[i] ? info.activeRemoteTree : info.activeLocalTree;
-      typeArguments.add(new IRCallProcess.TypeArgument(tree, new IRTypeId(i)));
+      typeArguments.add(new IRCallProcess.TypeArgument(info.activeTree(), new IRTypeId(i)));
     }
 
     // Find the process id, and mark it as used so that it gets generated
@@ -867,7 +864,7 @@ public class IRGenerator extends ASTNodeVisitor {
 
     // Write the type, the translator session and the type's polarity to the main channel
     IRSlotsFromASTType varInfo = slotsFromType(type);
-    block.add(new IRWriteType(typeLoc, varInfo.activeRemoteTree));
+    block.add(new IRWriteType(typeLoc, varInfo.activeTree()));
     block.add(new IRWriteSession(sessionLoc, polyChannel.getSessionId()));
     block.add(new IRWriteTag(polarityLoc, isPositive(type) ? 1 : 0));
     block.add(new IRFinishSession(originalSession, true));
