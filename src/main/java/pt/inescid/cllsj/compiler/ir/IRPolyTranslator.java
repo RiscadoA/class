@@ -522,10 +522,6 @@ public class IRPolyTranslator extends ASTTypeVisitor {
     String recvTyid = ASTType.gensym();
     ASTType rhsType =
         type.getrhs().subst(new Env<ASTType>().assoc(type.getid(), new ASTIdT(recvTyid)));
-    int recvTyEndpoints =
-        1
-            + IRPolyEndPointCounter.count(gen.compiler, gen.env, type.getrhs(), Set.of())
-            + IRPolyEndPointCounter.count(gen.compiler, gen.env, rhsType, modifiedVarTypes);
 
     gen.addRecvTy(
         poly,
@@ -533,7 +529,9 @@ public class IRPolyTranslator extends ASTTypeVisitor {
         Set.of(type.getid()),
         Map.of(inst, instType(type)),
         dual(rhsType),
-        env -> recvTyEndpoints,
+        env -> (1
+            + IRPolyEndPointCounter.count(gen.compiler, env, type.getrhs(), Set.of())
+            + IRPolyEndPointCounter.count(gen.compiler, env, rhsType, modifiedVarTypes)),
         () -> {
           gen.env = gen.env.withKnownTypes(varTypes);
           gen.addSendTy(
@@ -556,10 +554,6 @@ public class IRPolyTranslator extends ASTTypeVisitor {
     String recvTyid = ASTType.gensym();
     ASTType rhsType =
         type.getrhs().subst(new Env<ASTType>().assoc(type.getid(), new ASTIdT(recvTyid)));
-    int recvTyEndpoints =
-        1
-            + IRPolyEndPointCounter.count(gen.compiler, gen.env, dual(type.getrhs()), Set.of())
-            + IRPolyEndPointCounter.count(gen.compiler, gen.env, rhsType, modifiedVarTypes);
 
     gen.addRecvTy(
         inst,
@@ -567,7 +561,7 @@ public class IRPolyTranslator extends ASTTypeVisitor {
         Set.of(type.getid()),
         Map.of(poly, dual(type)),
         instType(rhsType),
-        env -> recvTyEndpoints,
+        env -> (1 + IRPolyEndPointCounter.count(gen.compiler, env, dual(type.getrhs()), Set.of()) + IRPolyEndPointCounter.count(gen.compiler, env, rhsType, modifiedVarTypes)),
         () -> {
           gen.env = gen.env.withKnownTypes(varTypes);
           gen.addSendTy(
