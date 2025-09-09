@@ -1,0 +1,14 @@
+proc foo(ch: recvty A; wait) {
+    recvty ch(A);
+    wait ch;
+    ()
+};;
+
+proc main() {
+    cut {
+        foo(ch)
+        |ch: sendty A; close|
+        sendty ch(lint);
+        close ch
+    }
+};;
