@@ -1,0 +1,19 @@
+proc main() {
+  cut {
+    sendty x(~lint);
+    send x(a. !a(b); println(b); ());
+    recv x(a);
+    par {
+      let a 1
+      ||
+      let x 2
+    }
+    |x: recvty A; recv ?~A; send A; A|
+    recvty x(A);
+    recv x(a);
+    call a(a1);
+    call a(a2);
+    send x(a1);
+    fwd x a2
+  }
+};;
