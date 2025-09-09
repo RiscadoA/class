@@ -119,7 +119,7 @@ public class IRPolyTranslator extends ASTTypeVisitor {
         poly,
         translator.polyType(type.getin()),
         Set.of(inst),
-        env -> IRPolyEndPointCounter.count(gen.compiler, env, type.getin(), modifiedVarTypes),
+        env -> IRPolyEndPointCounter.count(gen.compiler, env.withKnownTypes(varTypes), type.getin(), modifiedVarTypes),
         () -> {
           gen.env = gen.env.withKnownTypes(varTypes);
           gen.addCall(
@@ -231,7 +231,7 @@ public class IRPolyTranslator extends ASTTypeVisitor {
               Set.of(poly),
               env ->
                   IRPolyEndPointCounter.count(
-                      gen.compiler, env, type.getin(), modifiedVarTypes),
+                      gen.compiler, env.withKnownTypes(varTypes), type.getin(), modifiedVarTypes),
               () -> {
                 final String linPoly = newChannelName(poly);
                 gen.env = gen.env.withKnownTypes(varTypes);
@@ -263,7 +263,7 @@ public class IRPolyTranslator extends ASTTypeVisitor {
               Set.of(inst),
               env ->
                   IRPolyEndPointCounter.count(
-                      gen.compiler, env, type.getin(), modifiedVarTypes),
+                      gen.compiler, env.withKnownTypes(varTypes), type.getin(), modifiedVarTypes),
               () -> {
                 final String linInst = newChannelName(inst);
                 gen.env = gen.env.withKnownTypes(varTypes);
@@ -530,8 +530,8 @@ public class IRPolyTranslator extends ASTTypeVisitor {
         Map.of(inst, instType(type)),
         dual(rhsType),
         env -> (1
-            + IRPolyEndPointCounter.count(gen.compiler, env, type.getrhs(), Set.of())
-            + IRPolyEndPointCounter.count(gen.compiler, env, rhsType, modifiedVarTypes)),
+            + IRPolyEndPointCounter.count(gen.compiler, env.withKnownTypes(varTypes), type.getrhs(), Set.of())
+            + IRPolyEndPointCounter.count(gen.compiler, env.withKnownTypes(varTypes), rhsType, modifiedVarTypes)),
         () -> {
           gen.env = gen.env.withKnownTypes(varTypes);
           gen.addSendTy(
@@ -561,7 +561,7 @@ public class IRPolyTranslator extends ASTTypeVisitor {
         Set.of(type.getid()),
         Map.of(poly, dual(type)),
         instType(rhsType),
-        env -> (1 + IRPolyEndPointCounter.count(gen.compiler, env, dual(type.getrhs()), Set.of()) + IRPolyEndPointCounter.count(gen.compiler, env, rhsType, modifiedVarTypes)),
+        env -> (1 + IRPolyEndPointCounter.count(gen.compiler, env.withKnownTypes(varTypes), dual(type.getrhs()), Set.of()) + IRPolyEndPointCounter.count(gen.compiler, env, rhsType, modifiedVarTypes)),
         () -> {
           gen.env = gen.env.withKnownTypes(varTypes);
           gen.addSendTy(
