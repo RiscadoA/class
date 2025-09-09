@@ -1,0 +1,15 @@
+proc main() {
+  cut {
+    !x(y); ?y; call y(z); !z(w); println(w); ()
+    |x: ? ! ?lint|
+    ?x; call x(y); !y(z); ?z; 
+    
+    par {
+      call z(w); let w 1
+      ||
+      call z(w); let w 2
+      ||
+      call x(y); !y(z); ?z; call z(w); let w 3
+    }
+  }
+};;
