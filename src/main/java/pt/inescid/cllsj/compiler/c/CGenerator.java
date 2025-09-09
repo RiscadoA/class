@@ -546,13 +546,15 @@ public class CGenerator extends IRInstructionVisitor {
             putMutexUnlock("thread_stops_mutex");
             putMutexDestroy("thread_stops_mutex");
             putCondVarDestroy("thread_stops_cond_var");
-            putFor(
-                "i",
-                0,
-                compiler.allocatorLevels.get(),
-                () -> {
-                  putMutexDestroy("allocator_mutex[i]");
-                });
+            if (compiler.allocatorLevels.get() > 0) {
+              putFor(
+                  "i",
+                  0,
+                  compiler.allocatorLevels.get(),
+                  () -> {
+                    putMutexDestroy("allocator_mutex[i]");
+                  });
+            }
             putBlankLine();
           }
 
@@ -768,9 +770,9 @@ public class CGenerator extends IRInstructionVisitor {
   @Override
   public void visit(IRBindSession instr) {
     // Copy the session into this environment
-    CAddress source = data(instr.getLocation());
+    String source = data(instr.getLocation()).deref("struct session*");
     CAddress target = sessionAddress(instr.getSessionId());
-    putCopyMemory(target, source, compiler.arch.sessionSize());
+    putCopyMemory(target, CAddress.of(source), compiler.arch.sessionSize());
 
     // Modify the remote session to point to our environment
     String remoteSession = accessRemoteSession(instr.getSessionId());
@@ -806,8 +808,8 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRWriteSession instr) {
-    String ref = data(instr.getLocation()).deref("struct session");
-    putAssign(ref, accessSession(instr.getSessionId()));
+    String ref = data(instr.getLocation()).deref("struct session*");
+    putAssign(ref, sessionAddress(instr.getSessionId()).cast("struct session"));
   }
 
   @Override
@@ -916,7 +918,7 @@ public class CGenerator extends IRInstructionVisitor {
       // Get references to the source and target sessions
       String source;
       if (arg.isFromLocation()) {
-        source = data(arg.getSourceSessionLocation()).deref("struct session");
+        source = "(*" + data(arg.getSourceSessionLocation()).deref("struct session*") + ")";
       } else {
         source = accessSession(arg.getSourceSessionId());
       }
@@ -1034,6 +1036,9 @@ public class CGenerator extends IRInstructionVisitor {
       putAssign(endPoints(expProcessLayout, newEnv), expProcess.getEndPoints());
     }
 
+    // Zero out any drop bits
+    putZeroEnvironmentDropBits(expProcessLayout, newEnv);
+
     // Setup the continuation of the entry session
     CAddress entrySessionAddress =
         CAddress.of(newEnv, expProcessLayout.sessionOffset(new IRSessionId(0)));
@@ -1076,6 +1081,8 @@ public class CGenerator extends IRInstructionVisitor {
     putStatement(
         exponentialManager(exponential) + "(" + cast(TMP_PTR1, "char*") + ", 0)"); // 0 = Clone
 
+    // TODO: what about the drop bits? Is everything properly initialized? Make sure of it
+
     // Setup the new session and tie it to the exponential's entry session
     CAddress localSessionAddress = sessionAddress(instr.getSessionId());
     CAddress remoteSessionAddress =
@@ -1106,7 +1113,7 @@ public class CGenerator extends IRInstructionVisitor {
       cases.add(
           () -> {
             putSubtractAtomic(endPoints(), instr.getMaxEndPoints() - c.getEndPoints());
-            if (compiler.debug.get()) {
+            if (instr.getMaxEndPoints() != c.getEndPoints() && compiler.debug.get()) {
               putDebugLn("| end points: %d", endPoints());
             }
             putConstantGoto(codeLocationLabel(c.getLocation()));
@@ -1190,8 +1197,8 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   private CLayout typeLayout(String type) {
-    return new CLayout(
-        CSize.expression(typeSize(type)), CAlignment.expression(typeFirstAlignment(type)));
+    CAlignment firstAlignment = compiler.arch.pointerAlignment.equals(CAlignment.one()) ? CAlignment.one() : CAlignment.expression(typeFirstAlignment(type));
+    return new CLayout(CSize.expression(typeSize(type)), firstAlignment);
   }
 
   private String typeInitializer(IRSlotTree slots) {
