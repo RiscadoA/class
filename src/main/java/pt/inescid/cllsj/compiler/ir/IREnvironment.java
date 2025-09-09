@@ -210,25 +210,19 @@ public class IREnvironment {
   }
 
   public boolean isPositive(ASTType type) {
-    boolean dual = false;
     if (type instanceof ASTNotT) {
       type = ((ASTNotT) type).getin();
-      dual = true;
+      return !isPositive(type);
     }
 
     if (type instanceof ASTIdT) {
-      try {
-        type = type.unfoldType(ep);
-      } catch (Exception e) {
-        e.printStackTrace(System.err);
-        System.exit(1);
-      }
+      type = type.unfoldTypeCatch(ep);
     }
 
     if (type instanceof ASTIdT) {
-      return dual ^ getType(((ASTIdT) type).getid()).isPositive();
+      return getType(((ASTIdT) type).getid()).isPositive();
     } else {
-      return dual ^ type.getPolarityForCompilerCatch(ep).get();
+      return type.getPolarityForCompilerCatch(ep).get();
     }
   }
 
