@@ -105,9 +105,9 @@ public abstract class CAlignment {
       CAlignment rhs = this.rhs.simplify(0);
 
       if (lhs instanceof CAlignmentConstant) {
-        return rhs.simplify(((CAlignmentConstant) lhs).bytes);
+        return this.rhs.simplify(((CAlignmentConstant) lhs).bytes);
       } else if (rhs instanceof CAlignmentConstant) {
-        return lhs.simplify(((CAlignmentConstant) rhs).bytes);
+        return this.lhs.simplify(((CAlignmentConstant) rhs).bytes);
       } else {
         return new CAlignmentMax(lhs, rhs);
       }
