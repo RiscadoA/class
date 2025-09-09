@@ -6,8 +6,10 @@ import java.util.function.Consumer;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.TypeEntry;
+import pt.inescid.cllsj.ast.types.ASTCoRecT;
 import pt.inescid.cllsj.ast.types.ASTIdT;
 import pt.inescid.cllsj.ast.types.ASTNotT;
+import pt.inescid.cllsj.ast.types.ASTRecT;
 import pt.inescid.cllsj.ast.types.ASTType;
 import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
 import pt.inescid.cllsj.compiler.ir.id.IRDropId;
@@ -49,13 +51,21 @@ public class IREnvironment {
     return new IREnvironment(this, ep);
   }
 
-  public IREnvironment withRecursionType(String typeId, ASTType type) {
-    Env<EnvEntry> ep = this.ep;
-    ep = ep.assoc(typeId, new TypeEntry(new ASTIdT(typeId)));
-    IREnvironment result =
-        new Type(this, typeId, Optional.empty(), Optional.empty(), isPositive(type));
-    return result.changeEp(ep);
-  }
+  // public IREnvironment withRecursionType(ASTRecT type) {
+  //   return withRecursionType(type.getid(), type);
+  // }
+
+  // public IREnvironment withRecursionType(ASTCoRecT type) {
+  //   return withRecursionType(type.getid(), type);
+  // }
+
+  // private IREnvironment withRecursionType(String typeId, ASTType type) {
+  //   Env<EnvEntry> ep = this.ep;
+  //   ep = ep.assoc(typeId, new TypeEntry(type));
+  //   IREnvironment result =
+  //       new Type(this, typeId, Optional.empty(), Optional.empty(), isPositive(type));
+  //   return result.changeEp(ep);
+  // }
 
   public IREnvironment withKnownTypes(Map<String, ASTType> types) {
     IREnvironment result = this;

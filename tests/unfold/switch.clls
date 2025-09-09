@@ -1,0 +1,35 @@
+type rec Switch {
+  choice of {
+    |#pass: send !lint; ~Switch
+    |#stop: wait
+  }
+};;
+
+proc rec switch(s: ~Switch) {
+  unfold s;
+  case s of {
+    |#pass:
+      recv s(i);
+      unfold s;
+      if i == 0 {
+        #stop s; wait s; ()
+      } else {
+        println(i);
+        #pass s;
+        send s(i - 1);
+        switch(s)
+      }
+    |#stop:
+      close s 
+  }
+};;
+
+proc main() {
+  cut {
+    switch(s)
+    |s: Switch|
+    unfold s;
+    #pass s; send s(5);
+    switch(s)
+  }
+};;

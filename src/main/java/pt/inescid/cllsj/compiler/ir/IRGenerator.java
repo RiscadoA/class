@@ -319,6 +319,7 @@ public class IRGenerator extends ASTNodeVisitor {
       // If the channel is polymorphic, we need to perform translation
       IREnvironment.Channel channel;
       if (IRUsesTypeVar.check(env.getEp(), type, modifiedTypeArgs)) {
+        System.err.println("linear translate: " + type.toStrCatch(env.getEp()));
         // Create a new channel with the polymorphic type
         channel =
             IRPolyTranslator.translateLinear(

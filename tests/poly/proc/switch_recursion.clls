@@ -1,0 +1,48 @@
+type rec Switch(A) {
+  choice of {
+    |#pass: send A; ~Switch(A)
+    |#stop: wait
+  }
+};;
+
+proc rec switch<A>(s: ~Switch(A); a_to_i: send A; ~!lint, i_to_a: send !lint; ~A) {
+  unfold s;
+  case s of {
+    |#pass:
+      recv s(a);
+      unfold s;
+      call a_to_i(i);
+      send i(a); ?i;
+      if i == 0 {
+        #stop s; wait s; ()
+      } else {
+        println(i);
+        #pass s;
+        send s(a.
+          call i_to_a(a2);
+          send a2(i - 1);
+          fwd a a2
+        );
+        switch<A>(s; a_to_i, i_to_a)
+      }
+    |#stop:
+      close s 
+  }
+};;
+
+proc main() {
+  letc i_to_i: !recv ~!lint; !lint {
+    !i_to_i(i);
+    recv i(a);
+    fwd i a
+  };
+  ?i_to_i;
+
+  cut {
+    switch<!lint>(s; i_to_i, i_to_i)
+    |s: Switch(!lint)|
+    unfold s;
+    #pass s; send s(5);
+    switch<!lint>(s; i_to_i, i_to_i)
+  }
+};;
