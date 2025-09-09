@@ -40,6 +40,11 @@ public abstract class CAlignment {
     return simplify(0).toExpression();
   }
 
+  @Override
+  public boolean equals(Object obj) {
+    return this.toString().equals(obj.toString());
+  }
+
   private static class CAlignmentConstant extends CAlignment {
     public int bytes;
 
