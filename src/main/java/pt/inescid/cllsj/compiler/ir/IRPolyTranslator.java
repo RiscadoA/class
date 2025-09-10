@@ -33,10 +33,15 @@ public class IRPolyTranslator extends ASTTypeVisitor {
 
   private static int nextNameId = 0;
 
-  private Map<String, BiConsumer<String, String>> recursionCall = new HashMap<>();
-  private Map<String, BiConsumer<String, String>> corecursionCall = new HashMap<>();
+  private List<RecursionEntry> recursionCalls = new ArrayList<>();
   private String poly;
   private String inst;
+
+  private static class RecursionEntry {
+    public String typeId;
+    public ASTType type;
+    public BiConsumer<String, String> call;
+  }
 
   // Returns the name of the new channel created for the polymorphic side
   public static IREnvironment.Channel translateLinear(
@@ -66,7 +71,6 @@ public class IRPolyTranslator extends ASTTypeVisitor {
     gen.block.add(
         new IRInitializeSession(
             polyChannel.getSessionId(), contBlock.getLocation(), polyChannel.getLocalData()));
-    // gen.block.add(new IRPrint(new IRStringLiteral("translating linear"), true));
 
     gen.recurse(
         contBlock,
@@ -106,7 +110,6 @@ public class IRPolyTranslator extends ASTTypeVisitor {
     gen.block.add(
         new IRInitializeSession(
             translator.sessionId(poly), contBlock.getLocation(), translator.localData(poly)));
-    // gen.block.add(new IRPrint(new IRStringLiteral("translating exponential"), true));
 
     gen.env =
         gen.env.makeChannelExponential(
@@ -141,13 +144,8 @@ public class IRPolyTranslator extends ASTTypeVisitor {
 
   private void recurse(ASTType type) {
     if (isPolymorphic(type)) {
-      // String p = !isPositive(type) ? remoteData(poly).toString() : localData(poly).toString();
-      // String i = !isPositive(type) ? localData(inst).toString() : remoteData(inst).toString();
-      // gen.block.add(new IRPrint(new IRStringLiteral("translate poly " + p + ": " + polyType(type).toStrCatch(gen.env.getEp())), true));
-      // gen.block.add(new IRPrint(new IRStringLiteral("translate inst " + i + ": " + instType(type).toStrCatch(gen.env.getEp())), true));
       type.accept(this);
     } else {
-      // gen.block.add(new IRPrint(new IRStringLiteral("translate forward " + type.toStrCatch(gen.env.getEp())), true));
       gen.addForward(poly, inst, type);
     }
   }
@@ -359,17 +357,16 @@ public class IRPolyTranslator extends ASTTypeVisitor {
   }
 
   private void visitRec(String typeId, ASTType inner, boolean isRec) {
-    if (isRec && recursionCall.containsKey(typeId)) {
-      recursionCall.get(typeId).accept(poly, inst);
-      return;
-    } else if (!isRec && corecursionCall.containsKey(typeId)) {
-      corecursionCall.get(typeId).accept(poly, inst);
-      return;
-    }
-
     final ASTType rec = isRec ? new ASTRecT(typeId, inner) : new ASTCoRecT(typeId, inner);
     final String poly = this.poly;
     final String inst = this.inst;
+
+    for (RecursionEntry entry : recursionCalls) {
+      if (entry.type.equals(rec)) {
+        entry.call.accept(poly, inst);
+        return;
+      }
+    }
 
     Map<Boolean, List<IRCallProcess.TypeArgument>> typeArguments = new HashMap<>();
 
@@ -446,10 +443,11 @@ public class IRPolyTranslator extends ASTTypeVisitor {
                   innerIsRec ? recProcessId : corecProcessId,
                   typeArguments.get(innerIsRec),
                   List.of(
-                      new IRCallProcess.SessionArgument(
+                    new IRCallProcess.SessionArgument(
                           sessionId(innerPoly), targetPolySession, IRSlotOffset.ZERO),
                       new IRCallProcess.SessionArgument(
-                          sessionId(innerInst), targetInstSession, IRSlotOffset.ZERO)),
+                          sessionId(innerInst), targetInstSession, IRSlotOffset.ZERO)
+                  ),
                   List.of(
                     new IRCallProcess.DataArgument(
                         localData(innerPoly), targetPolyData, polyInfo.activeLocalTree, false),
@@ -462,20 +460,27 @@ public class IRPolyTranslator extends ASTTypeVisitor {
     for (boolean innerIsRec : new boolean[]{false, true}) {
       final IRProcessId processId = innerIsRec ? recProcessId : corecProcessId;
       final IREnvironment env = innerIsRec ? recEnv : corecEnv;
+      final ASTType recType = (innerIsRec == isRec) ? rec : dual(rec);
       final ASTType innerType = (innerIsRec == isRec) ? inner : dual(inner);
 
       gen.procGens.put(
         processId,
         () -> {
-          Map<String, BiConsumer<String, String>> recursionCall = this.recursionCall;
-          Map<String, BiConsumer<String, String>> corecursionCall = this.corecursionCall;
-          this.recursionCall = new HashMap<>(this.recursionCall);
-          this.corecursionCall = new HashMap<>(this.corecursionCall);
-          this.recursionCall.put(typeId, call.apply(true));
-          this.corecursionCall.put(typeId, call.apply(false));
+          RecursionEntry entry = new RecursionEntry();
+          entry.typeId = typeId;
+          entry.type = recType;
+          entry.call = call.apply(innerIsRec);
+
+          RecursionEntry dualEntry = new RecursionEntry();
+          dualEntry.typeId = typeId;
+          dualEntry.type = dual(recType);
+          dualEntry.call = call.apply(!innerIsRec);
+
+          recursionCalls.addLast(entry);
+          recursionCalls.addLast(dualEntry);
           recurse(poly, inst, innerType);
-          this.recursionCall = recursionCall;
-          this.corecursionCall = corecursionCall;
+          recursionCalls.removeLast();
+          recursionCalls.removeLast();
         });
 
       gen.procEnvs.put(processId, env);
@@ -613,19 +618,8 @@ public class IRPolyTranslator extends ASTTypeVisitor {
     }
     idType = (ASTIdT) type;
 
-    String source, target;
-
-    if (isPositive(idType)) {
-      source = poly;
-      target = inst;
-    } else {
-      source = inst;
-      target = poly;
-    }
-
     if (varTypes.containsKey(idType.getid())) {
-      addMove(target, source, varSlots.get(idType.getid()).activeTree());
-      gen.block.add(new IRFinishSession(sessionId(target), true));
+      gen.addForward(poly, inst, instType(idType));
     } else {
       throw new UnsupportedOperationException(
           "Not polymorphic, should be caught by the recurse method");
@@ -646,18 +640,8 @@ public class IRPolyTranslator extends ASTTypeVisitor {
     }
     idType = (ASTIdT) type;
 
-    String source, target;
-    if (isPositive(idType)) {
-      source = inst;
-      target = poly;
-    } else {
-      source = poly;
-      target = inst;
-    }
-
     if (varTypes.containsKey(idType.getid())) {
-      addMove(target, source, varSlots.get(idType.getid()).activeTree());
-      gen.block.add(new IRFinishSession(sessionId(target), true));
+      gen.addForward(poly, inst, instType(dual(idType)));
     } else {
       throw new UnsupportedOperationException(
           "Not polymorphic, should be caught by the recurse method");
@@ -745,14 +729,13 @@ public class IRPolyTranslator extends ASTTypeVisitor {
   }
 
   private ASTType polyType(ASTType type) {
-    return dual(type);
+    return dual(type.unfoldTypeCatch(gen.env.getEp()));
   }
 
   private ASTType instType(ASTType type) {
-    Env<EnvEntry> ep = gen.env.getEp();
     for (String var : varTypes.keySet()) {
       Env<ASTType> ee = new Env<ASTType>().assoc(var, varTypes.get(var));
-      type = type.unfoldTypeCatch(ep).subst(ee);
+      type = type.unfoldTypeCatch(gen.env.getEp()).subst(ee);
     }
     return type;
   }
@@ -776,8 +759,7 @@ public class IRPolyTranslator extends ASTTypeVisitor {
 
   private boolean isPolymorphic(ASTType type) {
     Set<String> vars = new HashSet<>(modifiedVarTypes);
-    vars.addAll(recursionCall.keySet());
-    vars.addAll(corecursionCall.keySet());
+    vars.addAll(recursionCalls.stream().map(e -> e.typeId).toList());
     return IRUsesTypeVar.check(gen.env.getEp(), type, vars);
   }
 

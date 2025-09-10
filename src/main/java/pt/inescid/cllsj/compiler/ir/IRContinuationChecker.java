@@ -1,59 +1,51 @@
 package pt.inescid.cllsj.compiler.ir;
 
-import java.util.Optional;
 import pt.inescid.cllsj.ast.ASTTypeVisitor;
 import pt.inescid.cllsj.ast.types.*;
 import pt.inescid.cllsj.compiler.Compiler;
 
-public class IRValueChecker extends ASTTypeVisitor {
-  private Compiler compiler;
+public class IRContinuationChecker extends ASTTypeVisitor {
   private IREnvironment env;
-  private boolean isValue = true;
-  private Optional<Boolean> polarity;
+  private boolean mayHaveContinuation = false;
+  private boolean isDual = false;
 
-  public static boolean check(
-      Compiler compiler, IREnvironment env, ASTType type, boolean requiredPolarity) {
-    return check(compiler, env, type, Optional.of(requiredPolarity));
+  public static boolean cannotHaveContinuation(
+      Compiler compiler, IREnvironment env, ASTType type) {
+    return !mayHaveContinuation(env, type);
   }
 
-  public static boolean check(
-      Compiler compiler, IREnvironment env, ASTType type, Optional<Boolean> requiredPolarity) {
-    IRValueChecker visitor = new IRValueChecker();
-    visitor.compiler = compiler;
+  public static boolean mayHaveContinuation(IREnvironment env, ASTType type) {
+    IRContinuationChecker visitor = new IRContinuationChecker();
     visitor.env = env;
-    visitor.polarity = requiredPolarity;
     type.accept(visitor);
-    return visitor.isValue;
+    return visitor.mayHaveContinuation;
   }
 
-  private void expectPolarity(boolean polarity) {
-    if (this.polarity.isPresent() && this.polarity.get() != polarity) {
-      isValue = false;
+  private void foundPolarity(boolean polarity) {
+    if (this.isDual ^ polarity) {
+      mayHaveContinuation = true;
     }
-    this.polarity = Optional.of(polarity);
   }
 
   private void recurse(ASTType type) {
-    if (isValue) {
-      Optional<Boolean> savedPolarity = polarity;
-      type.accept(this);
-      polarity = savedPolarity;
-    }
+    boolean oldDual = isDual;
+    type.accept(this);
+    isDual = oldDual;
   }
 
   @Override
   public void visit(ASTBangT type) {
-    expectPolarity(true);
+    foundPolarity(true);
   }
 
   @Override
   public void visit(ASTBotT type) {
-    expectPolarity(false);
+    foundPolarity(false);
   }
 
   @Override
   public void visit(ASTCaseT type) {
-    expectPolarity(true);
+    foundPolarity(true);
     for (ASTType c : type.getcases().values()) {
       recurse(c);
     }
@@ -61,7 +53,7 @@ public class IRValueChecker extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTCoRecT type) {
-    isValue = false;
+    mayHaveContinuation = true;
   }
 
   @Override
@@ -80,20 +72,18 @@ public class IRValueChecker extends ASTTypeVisitor {
     }
 
     // We still have a type identifier, thus this is a polymorphic session and not a value
-    isValue = false;
+    mayHaveContinuation = true;
   }
 
   @Override
   public void visit(ASTNotT type) {
-    if (polarity.isPresent()) {
-      polarity = Optional.of(!polarity.get());
-    }
+    isDual = !isDual;
     recurse(type.getin());
   }
 
   @Override
   public void visit(ASTOfferT type) {
-    expectPolarity(false);
+    foundPolarity(false);
     for (ASTType c : type.getcases().values()) {
       recurse(c);
     }
@@ -101,89 +91,79 @@ public class IRValueChecker extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTOneT type) {
-    expectPolarity(true);
+    foundPolarity(true);
   }
 
   @Override
   public void visit(ASTRecT type) {
-    isValue = false;
+    mayHaveContinuation = true;
   }
 
   @Override
   public void visit(ASTRecvT type) {
-    if (!compiler.optimizeSendValue.get()) {
-      isValue = false;
-    } else {
-      expectPolarity(false);
-      recurse(type.getlhs());
-      recurse(type.getrhs());
-    }
+    foundPolarity(false);
+    recurse(type.getrhs());
   }
 
   @Override
   public void visit(ASTSendT type) {
-    if (!compiler.optimizeSendValue.get()) {
-      isValue = false;
-    } else {
-      expectPolarity(true);
-      recurse(type.getlhs());
-      recurse(type.getrhs());
-    }
+    foundPolarity(true);
+    recurse(type.getrhs());
   }
 
   @Override
   public void visit(ASTWhyT type) {
-    expectPolarity(false);
+    foundPolarity(false);
   }
 
   @Override
   public void visit(ASTintT type) {
-    expectPolarity(true);
+    foundPolarity(true);
   }
 
   @Override
   public void visit(ASTCointT type) {
-    expectPolarity(false);
+    foundPolarity(false);
   }
 
   @Override
   public void visit(ASTLintT type) {
-    expectPolarity(true);
+    foundPolarity(true);
   }
 
   @Override
   public void visit(ASTLCointT type) {
-    expectPolarity(false);
+    foundPolarity(false);
   }
 
   @Override
   public void visit(ASTLboolT type) {
-    expectPolarity(true);
+    foundPolarity(true);
   }
 
   @Override
   public void visit(ASTCoLboolT type) {
-    expectPolarity(false);
+    foundPolarity(false);
   }
 
   @Override
   public void visit(ASTLstringT type) {
-    expectPolarity(true);
+    foundPolarity(true);
   }
 
   @Override
   public void visit(ASTCoLstringT type) {
-    expectPolarity(false);
+    foundPolarity(false);
   }
 
   @Override
   public void visit(ASTSendTT type) {
-    isValue = false;
+    foundPolarity(true);
   }
 
   @Override
   public void visit(ASTRecvTT type) {
-    isValue = false;
+    foundPolarity(false);
   }
 
   @Override
@@ -198,21 +178,21 @@ public class IRValueChecker extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTCellT type) {
-    isValue = false;
+    mayHaveContinuation = true;
   }
 
   @Override
   public void visit(ASTUsageT type) {
-    isValue = false;
+    mayHaveContinuation = true;
   }
 
   @Override
   public void visit(ASTCellLT type) {
-    isValue = false;
+    mayHaveContinuation = true;
   }
 
   @Override
   public void visit(ASTUsageLT type) {
-    isValue = false;
+    mayHaveContinuation = true;
   }
 }

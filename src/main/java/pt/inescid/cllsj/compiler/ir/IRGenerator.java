@@ -138,7 +138,7 @@ public class IRGenerator extends ASTNodeVisitor {
       if (isPositive && IRValueChecker.check(compiler, env, type, isPositive)) {
         // Positive value: no need to store local data
         env = env.addSession(name);
-      } else if (IRValueChecker.hasNoContinuation(compiler, env, type)) {
+      } else if (IRContinuationChecker.cannotHaveContinuation(compiler, env, type)) {
         // Type has no continuation: no need to store session
         env = env.addValue(name, info.localCombinations(), Optional.empty());
       } else {
@@ -292,9 +292,9 @@ public class IRGenerator extends ASTNodeVisitor {
     Map<String, ASTType> typeArgs = new HashMap<>();
     Set<String> modifiedTypeArgs = new HashSet<>();
     for (int i = 0; i < node.getTPars().size(); ++i) {
-      ASTType type = node.getTPars().get(i);
+      ASTType type = node.getTPars().get(i).unfoldTypeCatch(env.getEp());
       typeArgs.put(node.getProcTParIds().get(i), type);
-      if (!(type.unfoldTypeCatch(env.getEp()) instanceof ASTIdT)) {
+      if (!(type instanceof ASTIdT)) {
         modifiedTypeArgs.add(node.getProcTParIds().get(i));
       }
     }
@@ -317,7 +317,6 @@ public class IRGenerator extends ASTNodeVisitor {
       // If the channel is polymorphic, we need to perform translation
       IREnvironment.Channel channel;
       if (IRUsesTypeVar.check(env.getEp(), type, modifiedTypeArgs)) {
-        System.err.println("linear translate: " + type.toStrCatch(env.getEp()));
         // Create a new channel with the polymorphic type
         channel =
             IRPolyTranslator.translateLinear(
@@ -327,7 +326,7 @@ public class IRGenerator extends ASTNodeVisitor {
         channel = argChannel;
       }
 
-      if (hasContinuation(type)) {
+      if (mayHaveContinuation(type)) {
         // If the type has a continuation, we must pass the session
         sessionArguments.add(
             new IRCallProcess.SessionArgument(
@@ -698,10 +697,12 @@ public class IRGenerator extends ASTNodeVisitor {
     IRSlotsFromASTType info = slotsFromType(negChType);
 
     // Move data stored on the negative session's local data to the positive session's remote data
-    block.add(new IRMoveValue(pos.getRemoteData(), neg.getLocalData(), info.activeLocalTree));
+    if (!info.activeLocalTree.isLeaf()) {
+      block.add(new IRMoveValue(pos.getRemoteData(), neg.getLocalData(), info.activeLocalTree));
+    }
 
     // If the type still has a continuation, we must forward two sessions to each other
-    if (hasContinuation(negChType)) {
+    if (mayHaveContinuation(negChType)) {
       block.add(new IRForwardSessions(neg.getSessionId(), pos.getSessionId(), true));
     } else {
       // Jump to the positive session's continuation
@@ -961,7 +962,7 @@ public class IRGenerator extends ASTNodeVisitor {
               IREnvironment.Channel sourceChannel = env.getChannel(name);
               IREnvironment.Channel targetChannel = polyEnv.getChannel(name);
 
-              if (IRValueChecker.hasContinuation(compiler, polyEnv, type)) {
+              if (IRContinuationChecker.mayHaveContinuation(polyEnv, type)) {
                 // If the type is not a value, or if it's a positive value, we must pass the session
                 sessionArguments.add(
                     new IRCallProcess.SessionArgument(
@@ -1055,8 +1056,8 @@ public class IRGenerator extends ASTNodeVisitor {
     return IRValueChecker.check(compiler, env, type, requiredPolarity);
   }
 
-  private boolean hasContinuation(ASTType type) {
-    return IRValueChecker.hasContinuation(compiler, env, type);
+  private boolean mayHaveContinuation(ASTType type) {
+    return IRContinuationChecker.mayHaveContinuation(env, type);
   }
 
   IRProcessId genChildProcessId(String suffix) {

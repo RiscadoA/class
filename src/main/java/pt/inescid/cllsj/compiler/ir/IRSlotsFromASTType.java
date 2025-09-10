@@ -1,10 +1,8 @@
 package pt.inescid.cllsj.compiler.ir;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 import pt.inescid.cllsj.ast.ASTTypeVisitor;
 import pt.inescid.cllsj.ast.types.*;
@@ -17,7 +15,7 @@ import pt.inescid.cllsj.compiler.ir.slot.*;
 public class IRSlotsFromASTType extends ASTTypeVisitor {
   private Compiler compiler;
   private IREnvironment env;
-  private Set<String> recursiveIds;
+  private List<ASTType> visitedRecursive;
 
   // Slot corresponding to the root type
   public Optional<IRSlot> slot = Optional.empty();
@@ -75,20 +73,20 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
   }
   
   public static IRSlotsFromASTType compute(Compiler compiler, IREnvironment env, ASTType type) {
-    return compute(compiler, env, new HashSet<>(), type);
+    return compute(compiler, env, new ArrayList<>(), type);
   }
 
-  private static IRSlotsFromASTType compute(Compiler compiler, IREnvironment env, Set<String> recursiveIds, ASTType type) {
+  private static IRSlotsFromASTType compute(Compiler compiler, IREnvironment env, List<ASTType> visitedRecursive, ASTType type) {
     IRSlotsFromASTType visitor = new IRSlotsFromASTType();
     visitor.compiler = compiler;
     visitor.env = env;
-    visitor.recursiveIds = recursiveIds;
+    visitor.visitedRecursive = visitedRecursive;
     type.accept(visitor);
     return visitor;
   }
 
   private IRSlotsFromASTType recurse(ASTType type, IREnvironment env) {
-    return compute(compiler, env, new HashSet<>(recursiveIds), type);
+    return compute(compiler, env, visitedRecursive, type);
   }
 
   private IRSlotsFromASTType recurse(ASTType type) {
@@ -135,11 +133,15 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTCoRecT type) {
-    if (recursiveIds.add(type.getid())) {
+    if (!visitedRecursive.contains(type)) {
+      visitedRecursive.addLast(type);
+
       IRSlotsFromASTType result = recurse(type.getin(), env);
       slot = Optional.empty();
       remainderLocalCombinations = result.localCombinations();
       remainderRemoteCombinations = result.remoteCombinations();
+
+      visitedRecursive.removeLast();
     }
   }
 
@@ -223,11 +225,15 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTRecT type) {
-    if (recursiveIds.add(type.getid())) {
+    if (!visitedRecursive.contains(type)) {
+      visitedRecursive.addLast(type);
+
       IRSlotsFromASTType result = recurse(type.getin(), env);
       slot = Optional.empty();
       remainderLocalCombinations = result.localCombinations();
       remainderRemoteCombinations = result.remoteCombinations();
+
+      visitedRecursive.removeLast();
     }
   }
 

@@ -756,6 +756,8 @@ public class CGenerator extends IRInstructionVisitor {
   public void visit(IRFinishSession instr) {
     String session = accessSession(instr.getSessionId());
 
+    putAssign(sessionContSession(accessRemoteSession(session)), NULL);
+
     putAssign(TMP_PTR1, sessionCont(session));
     if (instr.isEndPoint()) {
       putAssign(TMP_PTR2, sessionContEnv(session));
@@ -847,7 +849,9 @@ public class CGenerator extends IRInstructionVisitor {
   @Override
   public void visit(IRForwardSessions instr) {
     putAssign(TMP_SESSION, accessSession(instr.getNegId()));
-    putAssign(accessRemoteSession(instr.getNegId()), accessSession(instr.getPosId()));
+    putIf(remoteSessionAddress(TMP_SESSION) + " != " + NULL, () -> {
+      putAssign(accessRemoteSession(TMP_SESSION), accessSession(instr.getPosId()));
+    });
     putAssign(TMP_PTR1, sessionCont(accessSession(instr.getPosId())));
     putAssign(TMP_PTR2, sessionContEnv(accessSession(instr.getPosId())));
     putAssign(accessRemoteSession(instr.getPosId()), TMP_SESSION);
@@ -934,21 +938,24 @@ public class CGenerator extends IRInstructionVisitor {
       // Update the remote session's continuation to match the new environment
       Optional<IRLocalDataId> calledLocalDataId =
           calledProcess.getArgSessionLocalDataId(arg.getTargetSessionId());
-      String remoteSession = accessRemoteSession(source);
-      putAssign(sessionContEnv(remoteSession), newEnv);
-      if (calledLocalDataId.isPresent()) {
+      String remoteSessionAddress = remoteSessionAddress(source);
+      putIf(remoteSessionAddress + " != " + NULL, () -> {
+        String remoteSession = accessSession(remoteSessionAddress);
+        putAssign(sessionContEnv(remoteSession), newEnv);
+        if (calledLocalDataId.isPresent()) {
+          putAssign(
+              sessionContData(remoteSession),
+              localData(
+                  typeLayoutProvider,
+                  calledLayout,
+                  newEnv,
+                  calledLocalDataId.get(),
+                  arg.getDataOffset()));
+        }
         putAssign(
-            sessionContData(remoteSession),
-            localData(
-                typeLayoutProvider,
-                calledLayout,
-                newEnv,
-                calledLocalDataId.get(),
-                arg.getDataOffset()));
-      }
-      putAssign(
-          sessionContSession(remoteSession),
-          sessionAddress(calledLayout, newEnv, arg.getTargetSessionId()));
+            sessionContSession(remoteSession),
+            sessionAddress(calledLayout, newEnv, arg.getTargetSessionId()));
+      });
     }
 
     for (IRCallProcess.DataArgument arg : instr.getDataArguments()) {
@@ -1080,8 +1087,6 @@ public class CGenerator extends IRInstructionVisitor {
     // Call the exponential manager to clone the slots
     putStatement(
         exponentialManager(exponential) + "(" + cast(TMP_PTR1, "char*") + ", 0)"); // 0 = Clone
-
-    // TODO: what about the drop bits? Is everything properly initialized? Make sure of it
 
     // Setup the new session and tie it to the exponential's entry session
     CAddress localSessionAddress = sessionAddress(instr.getSessionId());

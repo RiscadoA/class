@@ -1,5 +1,7 @@
 package pt.inescid.cllsj.compiler.ir;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Set;
 
 import pt.inescid.cllsj.Env;
@@ -12,6 +14,7 @@ public class IRUsesTypeVar extends ASTTypeVisitor {
   private Env<EnvEntry> ep;
   private boolean usesTypeVar = false;
   private String varName;
+  private List<ASTType> visitedRecursive = new ArrayList<>();
 
   public static boolean check(Env<EnvEntry> ep, ASTType type, Set<String> varNames) {
     for (String varName : varNames) {
@@ -55,7 +58,15 @@ public class IRUsesTypeVar extends ASTTypeVisitor {
   @Override
   public void visit(ASTCoRecT type) {
     if (!type.getid().equals(varName)) {
-      recurse(ep.assoc(type.getid(), new TypeEntry(new ASTIdT(type.getid()))), type.getin());
+      // Mark the recursive type as visited to prevent infinite loops
+      if (visitedRecursive.contains(type)) {
+        return;
+      }
+      visitedRecursive.addLast(type);
+
+      type.getin().accept(this);
+
+      visitedRecursive.removeLast();
     }
   }
 
@@ -91,7 +102,15 @@ public class IRUsesTypeVar extends ASTTypeVisitor {
   @Override
   public void visit(ASTRecT type) {
     if (!type.getid().equals(varName)) {
-      recurse(ep.assoc(type.getid(), new TypeEntry(new ASTIdT(type.getid()))), type.getin());
+      // Mark the recursive type as visited to prevent infinite loops
+      if (visitedRecursive.contains(type)) {
+        return;
+      }
+      visitedRecursive.addLast(type);
+
+      type.getin().accept(this);
+
+      visitedRecursive.removeLast();
     }
   }
 

@@ -1,0 +1,58 @@
+type rec List(T) {
+  choice of {
+    |#nil: close
+    |#cons: send T; List(T)
+  }
+};;
+
+proc rec concat<T>(begin: ~List(T), end: ~List(T), out: List(T)) {
+  case begin of {
+    |#nil:
+      wait begin; fwd end out
+    |#cons:
+      recv begin(x); #cons out; send out(x);
+      concat<T>(begin, end, out)
+  }
+};;
+
+proc rec flatten<T>(list: ~List(List(T)), out: List(T)) {
+  case list of {
+    |#nil:
+      wait list;
+      #nil out; close out
+    |#cons:
+      recv list(inner);
+      cut {
+        concat<T>(inner, acc, out)
+        |acc: List(T)|
+        flatten<T>(list, acc)
+      }
+  }
+};;
+
+proc rec printInts(list: ~List(lint)) {
+  case list of {
+    |#nil: wait list; println("End"); ()
+    |#cons: recv list(x); print(x + " "); printInts(list)
+  }
+};;
+
+proc main() {
+  cut {
+    #cons l1; send l1(r.
+      #cons r; send r(1);
+      #cons r; send r(2);
+      #nil r; close r
+    );
+    #cons l1; send l1(r.
+      #cons r; send r(3);
+      #cons r; send r(4);
+      #nil r; close r
+    );
+    #nil l1; close l1
+    |l1: ~List(List(lint))|
+    flatten<lint>(l1, l2)
+    |l2: ~List(lint)|
+    printInts(l2)
+  }
+};;
