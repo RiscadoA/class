@@ -26,7 +26,7 @@ public class IRPushTask extends IRInstruction {
 
   @Override
   public String toString() {
-    return "pushTask(" + location + (concurrent ? ", concurrent" : "" ) + ")";
+    return "pushTask(" + location + (concurrent ? ", concurrent" : "") + ")";
   }
 
   @Override

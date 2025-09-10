@@ -3,7 +3,6 @@ package pt.inescid.cllsj.compiler.ir;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
-
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.TypeEntry;

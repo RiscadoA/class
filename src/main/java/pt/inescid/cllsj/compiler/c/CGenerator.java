@@ -443,19 +443,24 @@ public class CGenerator extends IRInstructionVisitor {
           putBlankLine();
 
           // Jump to the entry process.
-          putIfElse("entry == NULL", () -> {
-            IRProcess entryProcess = program.get(new IRProcessId(compiler.entryProcess.get()));
-            if (entryProcess == null) {
-              throw new IllegalArgumentException(
-                  "Entry process " + compiler.entryProcess.get() + " not found");
-            }
-            generate(new IRCallProcess(entryProcess.getId(), List.of(), List.of(), List.of(), false));
-          }, () -> {
-            putAssign(ENV, taskContEnv("entry"));
-            putAssign(TMP_PTR1, taskCont("entry"));
-            putFreeTask("entry");
-            putComputedGoto(TMP_PTR1);
-          });
+          putIfElse(
+              "entry == NULL",
+              () -> {
+                IRProcess entryProcess = program.get(new IRProcessId(compiler.entryProcess.get()));
+                if (entryProcess == null) {
+                  throw new IllegalArgumentException(
+                      "Entry process " + compiler.entryProcess.get() + " not found");
+                }
+                generate(
+                    new IRCallProcess(
+                        entryProcess.getId(), List.of(), List.of(), List.of(), false));
+              },
+              () -> {
+                putAssign(ENV, taskContEnv("entry"));
+                putAssign(TMP_PTR1, taskCont("entry"));
+                putFreeTask("entry");
+                putComputedGoto(TMP_PTR1);
+              });
           putBlankLine();
 
           // Generate all processes
@@ -864,9 +869,11 @@ public class CGenerator extends IRInstructionVisitor {
   @Override
   public void visit(IRForwardSessions instr) {
     putAssign(TMP_SESSION, accessSession(instr.getNegId()));
-    putIf(remoteSessionAddress(TMP_SESSION) + " != " + NULL, () -> {
-      putAssign(accessRemoteSession(TMP_SESSION), accessSession(instr.getPosId()));
-    });
+    putIf(
+        remoteSessionAddress(TMP_SESSION) + " != " + NULL,
+        () -> {
+          putAssign(accessRemoteSession(TMP_SESSION), accessSession(instr.getPosId()));
+        });
     putAssign(TMP_PTR1, sessionCont(accessSession(instr.getPosId())));
     putAssign(TMP_PTR2, sessionContEnv(accessSession(instr.getPosId())));
     putAssign(accessRemoteSession(instr.getPosId()), TMP_SESSION);
@@ -954,23 +961,25 @@ public class CGenerator extends IRInstructionVisitor {
       Optional<IRLocalDataId> calledLocalDataId =
           calledProcess.getArgSessionLocalDataId(arg.getTargetSessionId());
       String remoteSessionAddress = remoteSessionAddress(source);
-      putIf(remoteSessionAddress + " != " + NULL, () -> {
-        String remoteSession = accessSession(remoteSessionAddress);
-        putAssign(sessionContEnv(remoteSession), newEnv);
-        if (calledLocalDataId.isPresent()) {
-          putAssign(
-              sessionContData(remoteSession),
-              localData(
-                  typeLayoutProvider,
-                  calledLayout,
-                  newEnv,
-                  calledLocalDataId.get(),
-                  arg.getDataOffset()));
-        }
-        putAssign(
-            sessionContSession(remoteSession),
-            sessionAddress(calledLayout, newEnv, arg.getTargetSessionId()));
-      });
+      putIf(
+          remoteSessionAddress + " != " + NULL,
+          () -> {
+            String remoteSession = accessSession(remoteSessionAddress);
+            putAssign(sessionContEnv(remoteSession), newEnv);
+            if (calledLocalDataId.isPresent()) {
+              putAssign(
+                  sessionContData(remoteSession),
+                  localData(
+                      typeLayoutProvider,
+                      calledLayout,
+                      newEnv,
+                      calledLocalDataId.get(),
+                      arg.getDataOffset()));
+            }
+            putAssign(
+                sessionContSession(remoteSession),
+                sessionAddress(calledLayout, newEnv, arg.getTargetSessionId()));
+          });
     }
 
     for (IRCallProcess.DataArgument arg : instr.getDataArguments()) {
@@ -1217,7 +1226,10 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   private CLayout typeLayout(String type) {
-    CAlignment firstAlignment = compiler.arch.pointerAlignment.equals(CAlignment.one()) ? CAlignment.one() : CAlignment.expression(typeFirstAlignment(type));
+    CAlignment firstAlignment =
+        compiler.arch.pointerAlignment.equals(CAlignment.one())
+            ? CAlignment.one()
+            : CAlignment.expression(typeFirstAlignment(type));
     return new CLayout(CSize.expression(typeSize(type)), firstAlignment);
   }
 
@@ -1728,10 +1740,12 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   void putLaunchThread(String func, String arg) {
-    putBlock("", () -> {
-      putStatement("pthread_t result_thread");
-      putStatement("pthread_create(&result_thread, NULL, " + func + ", " + arg + ")");
-    });
+    putBlock(
+        "",
+        () -> {
+          putStatement("pthread_t result_thread");
+          putStatement("pthread_create(&result_thread, NULL, " + func + ", " + arg + ")");
+        });
   }
 
   void putIncrementAtomic(String var) {

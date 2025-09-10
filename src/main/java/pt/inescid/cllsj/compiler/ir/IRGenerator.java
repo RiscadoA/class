@@ -368,7 +368,8 @@ public class IRGenerator extends ASTNodeVisitor {
   @Override
   public void visit(ASTMix node) {
     IRBlock rhsBlock = process.createBlock("mix_rhs");
-    block.add(new IRPushTask(rhsBlock.getLocation(), node.isConcurrent() && compiler.concurrency.get()));
+    block.add(
+        new IRPushTask(rhsBlock.getLocation(), node.isConcurrent() && compiler.concurrency.get()));
     recurse(block, node.getLhs());
     recurse(rhsBlock, node.getRhs());
   }

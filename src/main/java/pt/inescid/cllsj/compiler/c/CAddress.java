@@ -42,7 +42,8 @@ public class CAddress {
     if (alignment.equals(CAlignment.one())) {
       return this;
     } else {
-      return new CAddress("(char*)ALIGN((uintptr_t)(" + this + "), " + alignment + ")", CSize.zero());
+      return new CAddress(
+          "(char*)ALIGN((uintptr_t)(" + this + "), " + alignment + ")", CSize.zero());
     }
   }
 

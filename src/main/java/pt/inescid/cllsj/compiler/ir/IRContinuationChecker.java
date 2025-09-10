@@ -9,8 +9,7 @@ public class IRContinuationChecker extends ASTTypeVisitor {
   private boolean mayHaveContinuation = false;
   private boolean isDual = false;
 
-  public static boolean cannotHaveContinuation(
-      Compiler compiler, IREnvironment env, ASTType type) {
+  public static boolean cannotHaveContinuation(Compiler compiler, IREnvironment env, ASTType type) {
     return !mayHaveContinuation(env, type);
   }
 

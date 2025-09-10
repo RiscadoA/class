@@ -74,7 +74,7 @@ public class IREndPointCounter extends ASTNodeVisitor {
       }
     }
     for (int i = 0; i < node.getGPars().size(); ++i) {
-      if (IRUsesTypeVar.check(env.getEp(),node.getProcGParTypes().get(i), modifiedTypeArgs)) {
+      if (IRUsesTypeVar.check(env.getEp(), node.getProcGParTypes().get(i), modifiedTypeArgs)) {
         count +=
             IRPolyEndPointCounter.count(
                 compiler, env, new ASTWhyT(node.getProcGParTypes().get(i)), modifiedTypeArgs);

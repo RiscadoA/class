@@ -9,12 +9,9 @@ import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.BiFunction;
 import java.util.function.Function;
-
 import pt.inescid.cllsj.Env;
-import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.ast.ASTTypeVisitor;
 import pt.inescid.cllsj.ast.types.*;
-import pt.inescid.cllsj.compiler.ir.expression.literal.IRStringLiteral;
 import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
 import pt.inescid.cllsj.compiler.ir.id.IRLocalDataId;
 import pt.inescid.cllsj.compiler.ir.id.IRProcessId;
@@ -125,7 +122,9 @@ public class IRPolyTranslator extends ASTTypeVisitor {
         poly,
         translator.polyType(type.getin()),
         Set.of(inst),
-        env -> IRPolyEndPointCounter.count(gen.compiler, env.withKnownTypes(varTypes), type.getin(), modifiedVarTypes),
+        env ->
+            IRPolyEndPointCounter.count(
+                gen.compiler, env.withKnownTypes(varTypes), type.getin(), modifiedVarTypes),
         () -> {
           gen.env = gen.env.withKnownTypes(varTypes);
           gen.addCall(
@@ -371,37 +370,43 @@ public class IRPolyTranslator extends ASTTypeVisitor {
     Map<Boolean, List<IRCallProcess.TypeArgument>> typeArguments = new HashMap<>();
 
     // Function used to create the recursive and co-recursive processes
-    BiFunction<Boolean, IRProcessId, IREnvironment> createProcess = (innerIsRec, processId) -> {
-      // Figure out the types
-      ASTType innerType = (isRec == innerIsRec) ? inner : dual(inner);
+    BiFunction<Boolean, IRProcessId, IREnvironment> createProcess =
+        (innerIsRec, processId) -> {
+          // Figure out the types
+          ASTType innerType = (isRec == innerIsRec) ? inner : dual(inner);
 
-      // Create a new empty process and environment
-      IRProcess process = new IRProcess(processId);
-      IREnvironment newEnv = new IREnvironment(process, gen.env.getEp());
+          // Create a new empty process and environment
+          IRProcess process = new IRProcess(processId);
+          IREnvironment newEnv = new IREnvironment(process, gen.env.getEp());
 
-      // Prepare lists of arguments to pass to the processes
-      // Pass all types in the current environment to the polymorphic process
-      typeArguments.put(innerIsRec, new ArrayList<>());
-      for (int i = 0; i < gen.process.getTypeCount(); ++i) {
-        IRTypeId id = new IRTypeId(i);
-        IREnvironment.Type envType = gen.env.getType(id);
-        newEnv = newEnv.addType(envType.getName(), envType.isPositive());
-        IRTypeId newId = newEnv.getType(envType.getName()).getId();
-        typeArguments.get(innerIsRec).add(new IRCallProcess.TypeArgument(IRSlotTree.of(new IRVarS(id)), newId));
-      }
-      newEnv = newEnv.withKnownTypes(varTypes);
+          // Prepare lists of arguments to pass to the processes
+          // Pass all types in the current environment to the polymorphic process
+          typeArguments.put(innerIsRec, new ArrayList<>());
+          for (int i = 0; i < gen.process.getTypeCount(); ++i) {
+            IRTypeId id = new IRTypeId(i);
+            IREnvironment.Type envType = gen.env.getType(id);
+            newEnv = newEnv.addType(envType.getName(), envType.isPositive());
+            IRTypeId newId = newEnv.getType(envType.getName()).getId();
+            typeArguments
+                .get(innerIsRec)
+                .add(new IRCallProcess.TypeArgument(IRSlotTree.of(new IRVarS(id)), newId));
+          }
+          newEnv = newEnv.withKnownTypes(varTypes);
 
-      // Count the end points of the process
-      process.setEndPoints(IRPolyEndPointCounter.count(gen.compiler, newEnv, innerType, modifiedVarTypes));
+          // Count the end points of the process
+          process.setEndPoints(
+              IRPolyEndPointCounter.count(gen.compiler, newEnv, innerType, modifiedVarTypes));
 
-      // Define the argument sessions for the process
-      IRSlotsFromASTType polyInfo = IRSlotsFromASTType.compute(gen.compiler, newEnv, polyType(innerType));
-      IRSlotsFromASTType instInfo = IRSlotsFromASTType.compute(gen.compiler, newEnv, instType(innerType));
-      newEnv = newEnv.addArgSession(poly, polyInfo.combinations());
-      newEnv = newEnv.addArgSession(inst, instInfo.combinations());
+          // Define the argument sessions for the process
+          IRSlotsFromASTType polyInfo =
+              IRSlotsFromASTType.compute(gen.compiler, newEnv, polyType(innerType));
+          IRSlotsFromASTType instInfo =
+              IRSlotsFromASTType.compute(gen.compiler, newEnv, instType(innerType));
+          newEnv = newEnv.addArgSession(poly, polyInfo.combinations());
+          newEnv = newEnv.addArgSession(inst, instInfo.combinations());
 
-      return newEnv;
-    };
+          return newEnv;
+        };
 
     final IRProcessId recProcessId = gen.genChildProcessId("poly_rec");
     final IRProcessId corecProcessId = gen.genChildProcessId("poly_corec");
@@ -409,82 +414,91 @@ public class IRPolyTranslator extends ASTTypeVisitor {
     final IREnvironment corecEnv = createProcess.apply(true, corecProcessId);
 
     Function<Boolean, BiConsumer<String, String>> call =
-        innerIsRec -> (innerPoly, innerInst) -> {
-          final ASTType recType = (isRec == innerIsRec) ? rec : dual(rec);
-          final ASTType innerType = (isRec == innerIsRec) ? inner : dual(inner);
+        innerIsRec ->
+            (innerPoly, innerInst) -> {
+              final ASTType recType = (isRec == innerIsRec) ? rec : dual(rec);
+              final ASTType innerType = (isRec == innerIsRec) ? inner : dual(inner);
 
-          // Unfold, must jump to both channels
-          gen.addContinue(sessionId(innerPoly));
-          gen.addContinue(sessionId(innerInst));
+              // Unfold, must jump to both channels
+              gen.addContinue(sessionId(innerPoly));
+              gen.addContinue(sessionId(innerInst));
 
-          if (isPositive(polyType(recType))) {
-            gen.addContinueIfNegative(sessionId(innerPoly), polyType(innerType));
-          }
-          if (isPositive(instType(recType))) {
-            gen.addContinueIfNegative(sessionId(innerInst), instType(innerType));
-          }
+              if (isPositive(polyType(recType))) {
+                gen.addContinueIfNegative(sessionId(innerPoly), polyType(innerType));
+              }
+              if (isPositive(instType(recType))) {
+                gen.addContinueIfNegative(sessionId(innerInst), instType(innerType));
+              }
 
-          gen.env = gen.env.resetChannel(innerPoly);
-          gen.env = gen.env.resetChannel(innerInst);
+              gen.env = gen.env.resetChannel(innerPoly);
+              gen.env = gen.env.resetChannel(innerInst);
 
-          IREnvironment procEnv = innerIsRec ? recEnv : corecEnv;
+              IREnvironment procEnv = innerIsRec ? recEnv : corecEnv;
 
-          IRSessionId targetPolySession = procEnv.getChannel(poly).getSessionId();
-          IRSessionId targetInstSession = procEnv.getChannel(inst).getSessionId();
-          IRLocalDataId targetPolyData = procEnv.getChannel(poly).getLocalDataId();
-          IRLocalDataId targetInstData = procEnv.getChannel(inst).getLocalDataId();
+              IRSessionId targetPolySession = procEnv.getChannel(poly).getSessionId();
+              IRSessionId targetInstSession = procEnv.getChannel(inst).getSessionId();
+              IRLocalDataId targetPolyData = procEnv.getChannel(poly).getLocalDataId();
+              IRLocalDataId targetInstData = procEnv.getChannel(inst).getLocalDataId();
 
-          IRSlotsFromASTType polyInfo = IRSlotsFromASTType.compute(gen.compiler, procEnv, polyType(innerType));
-          IRSlotsFromASTType instInfo = IRSlotsFromASTType.compute(gen.compiler, procEnv, instType(innerType));
+              IRSlotsFromASTType polyInfo =
+                  IRSlotsFromASTType.compute(gen.compiler, procEnv, polyType(innerType));
+              IRSlotsFromASTType instInfo =
+                  IRSlotsFromASTType.compute(gen.compiler, procEnv, instType(innerType));
 
-          gen.procUsed.add(innerIsRec ? recProcessId : corecProcessId);
-          gen.block.add(
-              new IRCallProcess(
-                  innerIsRec ? recProcessId : corecProcessId,
-                  typeArguments.get(innerIsRec),
-                  List.of(
-                    new IRCallProcess.SessionArgument(
-                          sessionId(innerPoly), targetPolySession, IRSlotOffset.ZERO),
-                      new IRCallProcess.SessionArgument(
-                          sessionId(innerInst), targetInstSession, IRSlotOffset.ZERO)
-                  ),
-                  List.of(
-                    new IRCallProcess.DataArgument(
-                        localData(innerPoly), targetPolyData, polyInfo.activeLocalTree, false),
-                        new IRCallProcess.DataArgument(
-                        localData(innerInst), targetInstData, instInfo.activeLocalTree, false)),
-                  true));
-        };
+              gen.procUsed.add(innerIsRec ? recProcessId : corecProcessId);
+              gen.block.add(
+                  new IRCallProcess(
+                      innerIsRec ? recProcessId : corecProcessId,
+                      typeArguments.get(innerIsRec),
+                      List.of(
+                          new IRCallProcess.SessionArgument(
+                              sessionId(innerPoly), targetPolySession, IRSlotOffset.ZERO),
+                          new IRCallProcess.SessionArgument(
+                              sessionId(innerInst), targetInstSession, IRSlotOffset.ZERO)),
+                      List.of(
+                          new IRCallProcess.DataArgument(
+                              localData(innerPoly),
+                              targetPolyData,
+                              polyInfo.activeLocalTree,
+                              false),
+                          new IRCallProcess.DataArgument(
+                              localData(innerInst),
+                              targetInstData,
+                              instInfo.activeLocalTree,
+                              false)),
+                      true));
+            };
 
     // Store the processes we just defined so that we can generate it later
-    for (boolean innerIsRec : new boolean[]{false, true}) {
+    for (boolean innerIsRec : new boolean[] {false, true}) {
       final IRProcessId processId = innerIsRec ? recProcessId : corecProcessId;
       final IREnvironment env = innerIsRec ? recEnv : corecEnv;
       final ASTType recType = (innerIsRec == isRec) ? rec : dual(rec);
       final ASTType innerType = (innerIsRec == isRec) ? inner : dual(inner);
 
       gen.procGens.put(
-        processId,
-        () -> {
-          RecursionEntry entry = new RecursionEntry();
-          entry.typeId = typeId;
-          entry.type = recType;
-          entry.call = call.apply(innerIsRec);
+          processId,
+          () -> {
+            RecursionEntry entry = new RecursionEntry();
+            entry.typeId = typeId;
+            entry.type = recType;
+            entry.call = call.apply(innerIsRec);
 
-          RecursionEntry dualEntry = new RecursionEntry();
-          dualEntry.typeId = typeId;
-          dualEntry.type = dual(recType);
-          dualEntry.call = call.apply(!innerIsRec);
+            RecursionEntry dualEntry = new RecursionEntry();
+            dualEntry.typeId = typeId;
+            dualEntry.type = dual(recType);
+            dualEntry.call = call.apply(!innerIsRec);
 
-          recursionCalls.addLast(entry);
-          recursionCalls.addLast(dualEntry);
-          recurse(poly, inst, innerType);
-          recursionCalls.removeLast();
-          recursionCalls.removeLast();
-        });
+            recursionCalls.addLast(entry);
+            recursionCalls.addLast(dualEntry);
+            recurse(poly, inst, innerType);
+            recursionCalls.removeLast();
+            recursionCalls.removeLast();
+          });
 
       gen.procEnvs.put(processId, env);
-    };
+    }
+    ;
 
     call.apply(isRec).accept(poly, inst);
   }
@@ -562,9 +576,12 @@ public class IRPolyTranslator extends ASTTypeVisitor {
         Set.of(type.getid()),
         Map.of(inst, instType(type)),
         polyType(rhsType),
-        env -> (1
-            + IRPolyEndPointCounter.count(gen.compiler, env.withKnownTypes(varTypes), type.getrhs(), Set.of())
-            + IRPolyEndPointCounter.count(gen.compiler, env.withKnownTypes(varTypes), rhsType, modifiedVarTypes)),
+        env ->
+            (1
+                + IRPolyEndPointCounter.count(
+                    gen.compiler, env.withKnownTypes(varTypes), type.getrhs(), Set.of())
+                + IRPolyEndPointCounter.count(
+                    gen.compiler, env.withKnownTypes(varTypes), rhsType, modifiedVarTypes)),
         () -> {
           gen.env = gen.env.withKnownTypes(varTypes);
           gen.addSendTy(
@@ -594,7 +611,11 @@ public class IRPolyTranslator extends ASTTypeVisitor {
         Set.of(type.getid()),
         Map.of(poly, polyType(type)),
         instType(rhsType),
-        env -> (1 + IRPolyEndPointCounter.count(gen.compiler, env.withKnownTypes(varTypes), dual(type.getrhs()), Set.of()) + IRPolyEndPointCounter.count(gen.compiler, env, rhsType, modifiedVarTypes)),
+        env ->
+            (1
+                + IRPolyEndPointCounter.count(
+                    gen.compiler, env.withKnownTypes(varTypes), dual(type.getrhs()), Set.of())
+                + IRPolyEndPointCounter.count(gen.compiler, env, rhsType, modifiedVarTypes)),
         () -> {
           gen.env = gen.env.withKnownTypes(varTypes);
           gen.addSendTy(

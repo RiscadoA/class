@@ -3,7 +3,6 @@ package pt.inescid.cllsj.compiler.ir;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-
 import pt.inescid.cllsj.ast.ASTTypeVisitor;
 import pt.inescid.cllsj.ast.types.*;
 import pt.inescid.cllsj.compiler.Compiler;
@@ -71,12 +70,13 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
       return activeRemoteTree;
     }
   }
-  
+
   public static IRSlotsFromASTType compute(Compiler compiler, IREnvironment env, ASTType type) {
     return compute(compiler, env, new ArrayList<>(), type);
   }
 
-  private static IRSlotsFromASTType compute(Compiler compiler, IREnvironment env, List<ASTType> visitedRecursive, ASTType type) {
+  private static IRSlotsFromASTType compute(
+      Compiler compiler, IREnvironment env, List<ASTType> visitedRecursive, ASTType type) {
     IRSlotsFromASTType visitor = new IRSlotsFromASTType();
     visitor.compiler = compiler;
     visitor.env = env;

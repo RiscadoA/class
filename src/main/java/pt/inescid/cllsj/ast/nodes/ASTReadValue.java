@@ -11,7 +11,6 @@ import pt.inescid.cllsj.Session;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.SessionRecord;
 import pt.inescid.cllsj.Value;
-import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.types.ASTType;
 
 public class ASTReadValue extends ASTNode {
@@ -66,10 +65,5 @@ public class ASTReadValue extends ASTNode {
   public void samL(Env<SessionField> frame, Env<EnvEntry> ep, SAMCont p_cont) throws Exception {
     Value v = (Value) cback.readSlot(0);
     rhs.samL(frame.assoc(chr, v), ep, p_cont);
-  }
-
-  @Override
-  public void accept(ASTNodeVisitor visitor) {
-    visitor.visit(this);
   }
 }
