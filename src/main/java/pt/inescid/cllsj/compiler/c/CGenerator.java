@@ -443,12 +443,19 @@ public class CGenerator extends IRInstructionVisitor {
           putBlankLine();
 
           // Jump to the entry process.
-          IRProcess entryProcess = program.get(new IRProcessId(compiler.entryProcess.get()));
-          if (entryProcess == null) {
-            throw new IllegalArgumentException(
-                "Entry process " + compiler.entryProcess.get() + " not found");
-          }
-          generate(new IRCallProcess(entryProcess.getId(), List.of(), List.of(), List.of(), false));
+          putIfElse("entry == NULL", () -> {
+            IRProcess entryProcess = program.get(new IRProcessId(compiler.entryProcess.get()));
+            if (entryProcess == null) {
+              throw new IllegalArgumentException(
+                  "Entry process " + compiler.entryProcess.get() + " not found");
+            }
+            generate(new IRCallProcess(entryProcess.getId(), List.of(), List.of(), List.of(), false));
+          }, () -> {
+            putAssign(ENV, taskContEnv("entry"));
+            putAssign(TMP_PTR1, taskCont("entry"));
+            putFreeTask("entry");
+            putComputedGoto(TMP_PTR1);
+          });
           putBlankLine();
 
           // Generate all processes
@@ -707,11 +714,19 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRPushTask instr) {
-    putAssign(TMP_PTR1, TASK);
-    putAllocTask(TASK);
-    putAssign(taskNext(TASK), cast(TMP_PTR1, "struct task*"));
-    putAssign(taskCont(TASK), codeLocationAddress(instr.getLocation()));
-    putAssign(taskContEnv(TASK), ENV);
+    if (instr.isConcurrent() && compiler.concurrency.get()) {
+      putAllocTask(TMP_PTR1);
+      putAssign(taskCont(cast(TMP_PTR1, "struct task*")), codeLocationAddress(instr.getLocation()));
+      putAssign(taskContEnv(cast(TMP_PTR1, "struct task*")), ENV);
+      putIncrementAtomic("thread_inits");
+      putLaunchThread("thread", TMP_PTR1);
+    } else {
+      putAssign(TMP_PTR1, TASK);
+      putAllocTask(TASK);
+      putAssign(taskNext(TASK), cast(TMP_PTR1, "struct task*"));
+      putAssign(taskCont(TASK), codeLocationAddress(instr.getLocation()));
+      putAssign(taskContEnv(TASK), ENV);
+    }
   }
 
   @Override
@@ -1712,6 +1727,13 @@ public class CGenerator extends IRInstructionVisitor {
     putStatement("pthread_cond_signal(&(" + var + "))");
   }
 
+  void putLaunchThread(String func, String arg) {
+    putBlock("", () -> {
+      putStatement("pthread_t result_thread");
+      putStatement("pthread_create(&result_thread, NULL, " + func + ", " + arg + ")");
+    });
+  }
+
   void putIncrementAtomic(String var) {
     putStatement(incrementAtomic(var));
   }
@@ -1731,7 +1753,11 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   void putAssignMaxAtomic(String var, String value) {
-    putStatement("atomic_store_max(&" + var + ", " + value + ")");
+    if (compiler.concurrency.get()) {
+      putStatement("atomic_store_max(&" + var + ", " + value + ")");
+    } else {
+      putStatement(var + " = MAX(" + var + ", " + value + ")");
+    }
   }
 
   void putDebugLn(String message, String... args) {
@@ -1858,7 +1884,7 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   void putBlock(String begin, Runnable indented) {
-    putLine(begin + " {");
+    putLine(begin + (begin.isEmpty() ? "{" : " {"));
     putIndented(indented);
     putLine("}");
   }

@@ -4,10 +4,6 @@ Profiling results:
   Environment allocations: 1
   Environment frees: 1
   Environment peak: 1
-  Record allocations: 0
-  Record reallocations: 0
-  Record frees: 0
-  Record peak: 0
   Exponential allocations: 0
   Exponential frees: 0
   Task allocations: 5
