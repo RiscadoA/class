@@ -134,13 +134,12 @@ public class IRGenerator extends ASTNodeVisitor {
 
       IRSlotsFromASTType info = slotsFromType(type);
       boolean isPositive = env.isPositive(type);
-      boolean isValue = IRValueChecker.check(compiler, env, type, isPositive);
 
-      if (isPositive && isValue) {
+      if (isPositive && IRValueChecker.check(compiler, env, type, isPositive)) {
         // Positive value: no need to store local data
         env = env.addSession(name);
-      } else if (!isPositive && isValue) {
-        // Negative value: no need for a session, just store the data
+      } else if (IRValueChecker.hasNoContinuation(compiler, env, type)) {
+        // Type has no continuation: no need to store session
         env = env.addValue(name, info.localCombinations(), Optional.empty());
       } else {
         env = env.addArgSession(name, info.localCombinations());
@@ -310,7 +309,6 @@ public class IRGenerator extends ASTNodeVisitor {
       ASTType type = node.getProcParTypes().get(i).unfoldTypeCatch(env.getEp());
       IRSlotsFromASTType info = slotsFromType(type);
       boolean isPositive = isPositive(type);
-      boolean isValue = isValue(type, isPositive);
 
       // Get the arguments' channel
       IREnvironment.Channel argChannel = env.getChannel(node.getPars().get(i));
@@ -329,8 +327,8 @@ public class IRGenerator extends ASTNodeVisitor {
         channel = argChannel;
       }
 
-      if (!isValue || isPositive) {
-        // If the type is not a value, or if it's a positive value, we must pass the session
+      if (hasContinuation(type)) {
+        // If the type has a continuation, we must pass the session
         sessionArguments.add(
             new IRCallProcess.SessionArgument(
                 channel.getSessionId(), targetChannel.getSessionId(), channel.getOffset()));
@@ -703,7 +701,7 @@ public class IRGenerator extends ASTNodeVisitor {
     block.add(new IRMoveValue(pos.getRemoteData(), neg.getLocalData(), info.activeLocalTree));
 
     // If the type still has a continuation, we must forward two sessions to each other
-    if (!isValue(negChType, false)) {
+    if (hasContinuation(negChType)) {
       block.add(new IRForwardSessions(neg.getSessionId(), pos.getSessionId(), true));
     } else {
       // Jump to the positive session's continuation
@@ -958,13 +956,12 @@ public class IRGenerator extends ASTNodeVisitor {
               ASTType type = capturedChannels.get(name);
               IRSlotsFromASTType info = IRSlotsFromASTType.compute(compiler, polyEnv, type);
               boolean isPositive = polyEnv.isPositive(type);
-              boolean isValue = IRValueChecker.check(compiler, polyEnv, type, Optional.empty());
 
               polyEnv = polyEnv.addArgSession(name, info.localCombinations());
               IREnvironment.Channel sourceChannel = env.getChannel(name);
               IREnvironment.Channel targetChannel = polyEnv.getChannel(name);
 
-              if (!isValue || isPositive) {
+              if (IRValueChecker.hasContinuation(compiler, polyEnv, type)) {
                 // If the type is not a value, or if it's a positive value, we must pass the session
                 sessionArguments.add(
                     new IRCallProcess.SessionArgument(
@@ -1056,6 +1053,10 @@ public class IRGenerator extends ASTNodeVisitor {
 
   private boolean isValue(ASTType type, boolean requiredPolarity) {
     return IRValueChecker.check(compiler, env, type, requiredPolarity);
+  }
+
+  private boolean hasContinuation(ASTType type) {
+    return IRValueChecker.hasContinuation(compiler, env, type);
   }
 
   IRProcessId genChildProcessId(String suffix) {

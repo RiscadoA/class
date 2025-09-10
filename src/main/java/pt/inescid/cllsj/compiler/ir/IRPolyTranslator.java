@@ -66,7 +66,7 @@ public class IRPolyTranslator extends ASTTypeVisitor {
     gen.block.add(
         new IRInitializeSession(
             polyChannel.getSessionId(), contBlock.getLocation(), polyChannel.getLocalData()));
-    gen.block.add(new IRPrint(new IRStringLiteral("translating linear"), true));
+    // gen.block.add(new IRPrint(new IRStringLiteral("translating linear"), true));
 
     gen.recurse(
         contBlock,
@@ -106,7 +106,7 @@ public class IRPolyTranslator extends ASTTypeVisitor {
     gen.block.add(
         new IRInitializeSession(
             translator.sessionId(poly), contBlock.getLocation(), translator.localData(poly)));
-    gen.block.add(new IRPrint(new IRStringLiteral("translating exponential"), true));
+    // gen.block.add(new IRPrint(new IRStringLiteral("translating exponential"), true));
 
     gen.env =
         gen.env.makeChannelExponential(
@@ -141,14 +141,13 @@ public class IRPolyTranslator extends ASTTypeVisitor {
 
   private void recurse(ASTType type) {
     if (isPolymorphic(type)) {
-      String p = !isPositive(type) ? remoteData(poly).toString() : localData(poly).toString();
-      String i = !isPositive(type) ? localData(inst).toString() : remoteData(inst).toString();
-
-      gen.block.add(new IRPrint(new IRStringLiteral("translate poly " + p + ": " + polyType(type).toStrCatch(gen.env.getEp())), true));
-      gen.block.add(new IRPrint(new IRStringLiteral("translate inst " + i + ": " + instType(type).toStrCatch(gen.env.getEp())), true));
+      // String p = !isPositive(type) ? remoteData(poly).toString() : localData(poly).toString();
+      // String i = !isPositive(type) ? localData(inst).toString() : remoteData(inst).toString();
+      // gen.block.add(new IRPrint(new IRStringLiteral("translate poly " + p + ": " + polyType(type).toStrCatch(gen.env.getEp())), true));
+      // gen.block.add(new IRPrint(new IRStringLiteral("translate inst " + i + ": " + instType(type).toStrCatch(gen.env.getEp())), true));
       type.accept(this);
     } else {
-      gen.block.add(new IRPrint(new IRStringLiteral("translate forward " + type.toStrCatch(gen.env.getEp())), true));
+      // gen.block.add(new IRPrint(new IRStringLiteral("translate forward " + type.toStrCatch(gen.env.getEp())), true));
       gen.addForward(poly, inst, type);
     }
   }
@@ -393,11 +392,6 @@ public class IRPolyTranslator extends ASTTypeVisitor {
         IRTypeId newId = newEnv.getType(envType.getName()).getId();
         typeArguments.get(innerIsRec).add(new IRCallProcess.TypeArgument(IRSlotTree.of(new IRVarS(id)), newId));
       }
-      // if (innerIsRec) {
-      //   newEnv = newEnv.withRecursionType(new ASTRecT(typeId, innerType));
-      // } else {
-      //   newEnv = newEnv.withRecursionType(new ASTCoRecT(typeId, innerType));
-      // }
       newEnv = newEnv.withKnownTypes(varTypes);
 
       // Count the end points of the process
@@ -446,9 +440,6 @@ public class IRPolyTranslator extends ASTTypeVisitor {
           IRSlotsFromASTType polyInfo = IRSlotsFromASTType.compute(gen.compiler, procEnv, polyType(innerType));
           IRSlotsFromASTType instInfo = IRSlotsFromASTType.compute(gen.compiler, procEnv, instType(innerType));
 
-          // List<IRCallProcess.SessionArgument> sessionArgs = new ArrayList<>();
-          // List<IRCallProcess.DataArgument> dataArgs = new ArrayList<>();
-
           gen.procUsed.add(innerIsRec ? recProcessId : corecProcessId);
           gen.block.add(
               new IRCallProcess(
@@ -495,14 +486,6 @@ public class IRPolyTranslator extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTRecT type) {
-    // TODO: we must substitute the type variable with a fresh variable
-    // otherwise type arguments will be kept for example
-    // Rec Gen.CHOICE OF { | #done : CCLOSE | #next : RECV ~$1;~Gen($1)
-    //
-    // should actually be
-    //
-    // Rec $2.CHOICE OF { | #done : CCLOSE | #next : RECV ~$1;$2
-    System.err.println(type.toStrCatch(gen.env.getEp()));
     visitRec(type.getid(), type.getin(), true);
   }
 
@@ -573,7 +556,7 @@ public class IRPolyTranslator extends ASTTypeVisitor {
         recvTyid,
         Set.of(type.getid()),
         Map.of(inst, instType(type)),
-        dual(rhsType),
+        polyType(rhsType),
         env -> (1
             + IRPolyEndPointCounter.count(gen.compiler, env.withKnownTypes(varTypes), type.getrhs(), Set.of())
             + IRPolyEndPointCounter.count(gen.compiler, env.withKnownTypes(varTypes), rhsType, modifiedVarTypes)),
@@ -604,7 +587,7 @@ public class IRPolyTranslator extends ASTTypeVisitor {
         inst,
         recvTyid,
         Set.of(type.getid()),
-        Map.of(poly, dual(type)),
+        Map.of(poly, polyType(type)),
         instType(rhsType),
         env -> (1 + IRPolyEndPointCounter.count(gen.compiler, env.withKnownTypes(varTypes), dual(type.getrhs()), Set.of()) + IRPolyEndPointCounter.count(gen.compiler, env, rhsType, modifiedVarTypes)),
         () -> {
@@ -613,8 +596,8 @@ public class IRPolyTranslator extends ASTTypeVisitor {
               poly,
               type.getid(),
               new ASTIdT(recvTyid),
-              dual(rhsType),
-              dual(type.getrhs()),
+              polyType(rhsType),
+              polyType(type.getrhs()),
               () -> {
                 recurse(poly, inst, rhsType);
               });

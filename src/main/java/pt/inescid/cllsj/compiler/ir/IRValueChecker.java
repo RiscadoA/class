@@ -10,6 +10,7 @@ public class IRValueChecker extends ASTTypeVisitor {
   private IREnvironment env;
   private boolean isValue = true;
   private Optional<Boolean> polarity;
+  private boolean allowArgumentsAndPolymorphism = false;
 
   public static boolean check(
       Compiler compiler, IREnvironment env, ASTType type, boolean requiredPolarity) {
@@ -22,6 +23,22 @@ public class IRValueChecker extends ASTTypeVisitor {
     visitor.compiler = compiler;
     visitor.env = env;
     visitor.polarity = requiredPolarity;
+    type.accept(visitor);
+    return visitor.isValue;
+  }
+
+  public static boolean hasContinuation(Compiler compiler, IREnvironment env, ASTType type) {
+    return !hasNoContinuation(compiler, env, type);
+  }
+
+  // Used to check if a given type requires a continuation to be stored
+  public static boolean hasNoContinuation(
+      Compiler compiler, IREnvironment env, ASTType type) {
+    IRValueChecker visitor = new IRValueChecker();
+    visitor.compiler = compiler;
+    visitor.env = env;
+    visitor.polarity = Optional.of(false);
+    visitor.allowArgumentsAndPolymorphism = true;
     type.accept(visitor);
     return visitor.isValue;
   }
@@ -80,7 +97,11 @@ public class IRValueChecker extends ASTTypeVisitor {
     }
 
     // We still have a type identifier, thus this is a polymorphic session and not a value
-    isValue = false;
+    if (allowArgumentsAndPolymorphism) {
+      expectPolarity(env.isPositive(type));
+    } else {
+      isValue = false;
+    }
   }
 
   @Override
@@ -111,22 +132,26 @@ public class IRValueChecker extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTRecvT type) {
-    if (!compiler.optimizeSendValue.get()) {
+    if (!allowArgumentsAndPolymorphism && !compiler.optimizeSendValue.get()) {
       isValue = false;
     } else {
       expectPolarity(false);
-      recurse(type.getlhs());
+      if (!allowArgumentsAndPolymorphism) {
+        recurse(type.getlhs());
+      }
       recurse(type.getrhs());
     }
   }
 
   @Override
   public void visit(ASTSendT type) {
-    if (!compiler.optimizeSendValue.get()) {
+    if (!allowArgumentsAndPolymorphism && !compiler.optimizeSendValue.get()) {
       isValue = false;
     } else {
       expectPolarity(true);
-      recurse(type.getlhs());
+      if (!allowArgumentsAndPolymorphism) {
+        recurse(type.getlhs());
+      }
       recurse(type.getrhs());
     }
   }
@@ -178,12 +203,20 @@ public class IRValueChecker extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTSendTT type) {
-    isValue = false;
+    if (allowArgumentsAndPolymorphism) {
+      expectPolarity(true);
+    } else {
+      isValue = false;
+    }
   }
 
   @Override
   public void visit(ASTRecvTT type) {
-    isValue = false;
+    if (allowArgumentsAndPolymorphism) {
+      expectPolarity(false);
+    } else {
+      isValue = false;
+    }
   }
 
   @Override
