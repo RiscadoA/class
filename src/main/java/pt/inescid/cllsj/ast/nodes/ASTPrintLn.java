@@ -6,14 +6,15 @@ import java.util.logging.*;
 import pt.inescid.cllsj.CLLSj;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
-import pt.inescid.cllsj.LinSession;
 import pt.inescid.cllsj.SAMCont;
 import pt.inescid.cllsj.Server;
+import pt.inescid.cllsj.Session;
 import pt.inescid.cllsj.SessionClosure;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.TypeError;
 import pt.inescid.cllsj.Value;
 import pt.inescid.cllsj.ast.ASTNodeVisitor;
+import pt.inescid.cllsj.ast.types.ASTCoBasicType;
 import pt.inescid.cllsj.ast.types.ASTCoLBasicType;
 import pt.inescid.cllsj.ast.types.ASTCointT;
 import pt.inescid.cllsj.ast.types.ASTType;
@@ -79,14 +80,15 @@ public class ASTPrintLn extends ASTNode {
 
   public void typecheck(Env<ASTType> ed, Env<ASTType> eg, Env<EnvEntry> ep) throws Exception {
     ASTType et;
-
     try {
       et = expr.etypecheck(ed, eg, ep, false);
     } catch (Exception ee) {
       et = expr.etypecheck(ed, eg, ep, true);
     }
-    if (!(et instanceof ASTCoLBasicType))
-      throw new TypeError("Line " + lineno + " :" + "PRINT : argument not of CoLBasicType");
+    ;
+    if (!(et instanceof ASTCoLBasicType || et instanceof ASTCoBasicType))
+      throw new TypeError(
+          "Line " + lineno + " :" + "PRINT : argument not of CoLBasicType or ASTCoBasicType");
     rhs.typecheck(ed, eg, ep);
   }
 
@@ -114,7 +116,7 @@ public class ASTPrintLn extends ASTNode {
     rhs.subs(x, y);
   }
 
-  public void runproc(Env<EnvEntry> ep, Env<LinSession> ed, Env<Server> eg, Logger logger)
+  public void runproc(Env<EnvEntry> ep, Env<Session> ed, Env<Server> eg, Logger logger)
       throws Exception {
     Value v = expr.eval(ed, eg);
     if (nl) System.out.println(v.toStr());

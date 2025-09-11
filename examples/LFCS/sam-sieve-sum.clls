@@ -27,7 +27,7 @@ proc unsafe_rec filter(fouts:IntStream, fins:~IntStream; n:~lint)
 	 		}
 	 	}
  };;
- 
+
 proc unsafe_rec sieve(souts:IntStream, sins:~IntStream)
  {
       case souts of { 
@@ -41,7 +41,7 @@ proc unsafe_rec sieve(souts:IntStream, sins:~IntStream)
 		      	filter(outp,sins;p)
 		    }
 		|#stop:
-			#stop sins; wait sins; close souts
+			#stop sins; close souts; wait sins; ()
 	}
  };;
 
@@ -55,6 +55,7 @@ proc primesN(primes:IntStream) {
 proc unsafe_rec printfirstN(il:~IntStream;k:~lint)
 {
    if(k==0) {
+	  println("DONE!");
 	  #stop il; wait il; ()
 	 }
    {
@@ -73,6 +74,6 @@ proc main_ss(;np:colint)
  };;
 
 proc main() {
-   main_ss(;1000)
+   main_ss(;10000)
 };;
 

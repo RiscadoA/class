@@ -3,8 +3,8 @@ package pt.inescid.cllsj.ast.nodes;
 import java.util.*;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
-import pt.inescid.cllsj.LinSession;
 import pt.inescid.cllsj.Server;
+import pt.inescid.cllsj.Session;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.TypeError;
 import pt.inescid.cllsj.VBool;
@@ -13,6 +13,7 @@ import pt.inescid.cllsj.ast.ASTExprVisitor;
 import pt.inescid.cllsj.ast.types.ASTBotT;
 import pt.inescid.cllsj.ast.types.ASTCoLboolT;
 import pt.inescid.cllsj.ast.types.ASTCoLstringT;
+import pt.inescid.cllsj.ast.types.ASTCointT;
 import pt.inescid.cllsj.ast.types.ASTLCointT;
 import pt.inescid.cllsj.ast.types.ASTType;
 
@@ -63,15 +64,16 @@ public class ASTEq extends ASTExpr {
 
   public ASTType etypecheck(Env<ASTType> ed, Env<ASTType> eg, Env<EnvEntry> ep, boolean lin)
       throws Exception {
+
     Env<ASTType> eglhs = eg.assoc("$DUMMY", new ASTBotT());
-
     ASTType lhst = lhs.etypecheck(ed, eglhs, ep, lin);
-
     Env<ASTType> egrhs = eg.assoc("$DUMMY", new ASTBotT());
-
     ASTType rhst = rhs.etypecheck(ed, egrhs, ep, lin);
 
-    if (!((lhst instanceof ASTLCointT && rhst instanceof ASTLCointT)
+    boolean lhsInt = lhst instanceof ASTLCointT || lhst instanceof ASTCointT;
+    boolean rhsInt = rhst instanceof ASTLCointT || rhst instanceof ASTCointT;
+
+    if (!((lhsInt && rhsInt)
         || (lhst instanceof ASTCoLstringT && rhst instanceof ASTCoLstringT)
         || (lhst instanceof ASTCoLboolT && rhst instanceof ASTCoLboolT)))
       throw new TypeError(
@@ -79,7 +81,7 @@ public class ASTEq extends ASTExpr {
     return new ASTCoLboolT();
   }
 
-  public Value eval(Env<LinSession> ed, Env<Server> eg) throws Exception {
+  public Value eval(Env<Session> ed, Env<Server> eg) throws Exception {
     Value vleft = lhs.eval(ed, eg);
     Value vright = rhs.eval(ed, eg);
     return new VBool(vleft.equal(vright));

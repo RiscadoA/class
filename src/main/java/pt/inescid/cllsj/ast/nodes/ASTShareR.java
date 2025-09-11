@@ -8,6 +8,7 @@ import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.LinSession;
 import pt.inescid.cllsj.Server;
+import pt.inescid.cllsj.Session;
 import pt.inescid.cllsj.TypeError;
 import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.types.ASTBotT;
@@ -129,7 +130,7 @@ public class ASTShareR extends ASTNode {
     rhs.subs(x, y);
   }
 
-  public void runproc(Env<EnvEntry> ep, Env<LinSession> ed, Env<Server> eg, Logger logger)
+  public void runproc(Env<EnvEntry> ep, Env<Session> ed, Env<Server> eg, Logger logger)
       throws Exception {
     LinSession session = (LinSession) ed.find(sh);
 

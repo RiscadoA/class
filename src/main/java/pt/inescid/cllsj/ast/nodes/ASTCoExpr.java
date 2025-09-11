@@ -8,10 +8,10 @@ import pt.inescid.cllsj.Channel;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.IndexedSessionRef;
-import pt.inescid.cllsj.LinSession;
 import pt.inescid.cllsj.LinSessionValue;
 import pt.inescid.cllsj.SAMCont;
 import pt.inescid.cllsj.Server;
+import pt.inescid.cllsj.Session;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.SessionRecord;
 import pt.inescid.cllsj.SessionValue;
@@ -69,11 +69,13 @@ public class ASTCoExpr extends ASTNode {
   }
 
   public void typecheck(Env<ASTType> ed, Env<ASTType> eg, Env<EnvEntry> ep) throws Exception {
-
-    this.inferUses(ch, ed, ep);
-
-    ASTType bt = expr.etypecheck(ed, eg, ep, true);
-
+    ASTType bt;
+    try {
+      bt = expr.etypecheck(ed, eg, ep, false);
+    } catch (Exception ee) {
+      bt = expr.etypecheck(ed, eg, ep, true);
+    }
+    ;
     ASTType idt = ed.find(ch);
     if (idt instanceof ASTBasicType) {
       ASTBasicType idtt = ((ASTBasicType) idt);
@@ -117,7 +119,7 @@ public class ASTCoExpr extends ASTNode {
     return "let " + ch + " " + expr.toStr(ep);
   }
 
-  public void runproc(Env<EnvEntry> ep, Env<LinSession> ed, Env<Server> eg, Logger logger)
+  public void runproc(Env<EnvEntry> ep, Env<Session> ed, Env<Server> eg, Logger logger)
       throws Exception {
     Value v = expr.eval(ed, eg);
     Channel channel = (Channel) ed.find(ch);

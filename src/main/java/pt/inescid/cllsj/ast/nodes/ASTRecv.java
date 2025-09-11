@@ -13,12 +13,15 @@ import pt.inescid.cllsj.LinSessionValue;
 import pt.inescid.cllsj.SAMCont;
 import pt.inescid.cllsj.SAMError;
 import pt.inescid.cllsj.Server;
+import pt.inescid.cllsj.Session;
 import pt.inescid.cllsj.SessionClosure;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.SessionRecord;
 import pt.inescid.cllsj.Trail;
 import pt.inescid.cllsj.TypeError;
+import pt.inescid.cllsj.Value;
 import pt.inescid.cllsj.ast.ASTNodeVisitor;
+import pt.inescid.cllsj.ast.types.ASTCointT;
 import pt.inescid.cllsj.ast.types.ASTRecvT;
 import pt.inescid.cllsj.ast.types.ASTType;
 
@@ -209,17 +212,27 @@ public class ASTRecv extends ASTNode {
     } else if (y != chi) rhs.subs(x, y);
   }
 
-  public void runproc(Env<EnvEntry> ep, Env<LinSession> ed, Env<Server> eg, Logger logger)
+  public void runproc(Env<EnvEntry> ep, Env<Session> ed, Env<Server> eg, Logger logger)
       throws Exception {
     Channel channel = (Channel) ed.find(chr);
     // System.out.println("[RunStatus] RECV on "+session.id+" start.");
 
-    CLLSj.inc_recvs(+1);
+    // CLLSj.inc_recvs(+1);
     LinSession session_in = (LinSession) channel.receive();
-    CLLSj.inc_recvs(-1);
+    // CLLSj.inc_recvs(-1);
+    // System.out.println("RECV on "+session_in.id+":"+session_in);
+
+    if (type instanceof ASTCointT) {
+      // read int and promote id->v to exponential environment
+      // no !: use linear environment to store id -> v
+      Value v = (Value) session_in.receive();
+      ed = ed.assoc(chi, v);
+    } else {
+      ed = ed.assoc(chi, session_in);
+    }
 
     // System.out.println("[RunStatus] RECV on "+session.id+" end.");
-    rhs.runproc(ep, ed.assoc(chi, session_in), eg, logger);
+    rhs.runproc(ep, ed, eg, logger);
   }
 
   public void samLRecv(
@@ -312,14 +325,34 @@ public class ASTRecv extends ASTNode {
       srec.writeSlot(null, doffset); // reset linear value
       sref.incOffset();
 
-      srec.setPol(tyrhs.isPos(ep)); // set polarity endpoint for continuation!!!
-      SessionRecord sreco = SessionRecord.newSessionRecord(arg.getSize());
+      // System.out.println("recv-type "+chr+" "+srec+" @ "+type);
 
+      srec.setPol(tyrhs.isPos(ep)); // set polarity endpoint for continuation!!!
+
+      SessionRecord sreco = SessionRecord.newSessionRecord(arg.getSize());
       IndexedSessionRef srecfw = new IndexedSessionRef(0, sreco);
       IndexedSessionRef srecfr = new IndexedSessionRef(0, sreco);
 
       if (CLLSj.trace) {
         System.out.println("recv-op new = " + sreco);
+      }
+
+      if (type instanceof ASTCointT) {
+        Env<SessionField> fwrite = frameloc.assoc(id, srecfw);
+        sreco.setPol(true);
+        sreco.setPolDual(false);
+
+        sreco.setcch(chi);
+        sreco.setCont(rhs);
+        sreco.setFrame(null);
+        sreco.setFrameP(ep);
+
+        arg.getBody().samL(fwrite, framep, SAMCont.Null);
+
+        Value v = (Value) sreco.readSlot(0);
+        Env<SessionField> fread = frame.assoc(chi, v);
+        rhs.samL(fread, ep, p_cont);
+        return;
       }
 
       if (!type.isPos(ep)) { // recv arg is writer U;T U negative

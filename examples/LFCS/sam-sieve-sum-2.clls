@@ -1,0 +1,79 @@
+type corec IntStream {
+       offer of   {
+     	   | #next: send !lint; IntStream
+	   | #stop: wait
+ 	   }	   	   
+ };;
+ 
+proc rec integersfrom(n: IntStream; k:~lint)
+{
+    case n of {
+      	|	#next: send n(k); integersfrom(n;k+1)
+	 	|	#stop: wait n;()
+ 	}	   	   
+ };;
+ 
+proc unsafe_rec filter(fouts:IntStream, fins:~IntStream; n:~lint)
+ {
+    #next fins;
+    recv fins (v);  
+    if  ((v/n)*n == v) then
+	 	{ filter(fouts,fins;n) }
+    else
+		{  
+	    		case fouts of { 
+	    		|#next:  send fouts (v); filter(fouts, fins;n) 
+	    		|#stop:  wait fouts; #stop fins; close fins
+	 		}
+	 	}
+ };;
+ 
+proc unsafe_rec sieve(souts:IntStream, sins:~IntStream)
+ {
+      case souts of { 
+  	  	|#next:  
+			#next sins;
+      		recv sins (p);
+  	  	    send souts(p);
+		    cut  {
+		       	sieve(souts,outp)
+		      		|outp:IntStream|
+		      	filter(outp,sins;p)
+		    }
+		|#stop:
+			wait souts; #stop sins; close sins
+	}
+ };;
+
+proc primesN(primes:IntStream) { 
+	letc n:IntStream {
+      integersfrom(n;2)
+	};
+    sieve(primes,n)
+};;
+
+proc unsafe_rec printfirstN(il:~IntStream;k:~lint)
+{
+   if(k==0) {
+	  println("DONE!");
+	  #stop il; close il
+	 }
+   {
+	 #next il; recv il(n);
+	 println(n);
+	 printfirstN(il;k-1)
+   }
+};;
+
+proc main_ss(;np:colint)
+{
+    letc primes:IntStream {
+		primesN(primes)
+	};
+    printfirstN(primes;np)
+ };;
+
+proc main() {
+   main_ss(;10000)
+};;
+

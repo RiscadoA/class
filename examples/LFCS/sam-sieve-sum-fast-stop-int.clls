@@ -27,7 +27,7 @@ proc unsafe_rec filter(fouts:IntStream, fins:~IntStream, n:~int) {
 } and filter_next(fouts:NextIntStream, fins:~IntStream, n:~int) {
 	#next fins;
 	recv fins(v);
-	if ((v / n)*n == v) {
+	if (v%n == 0) {
 		filter_next(fouts, fins, n)
 	} else {
 		send fouts(v);
@@ -83,5 +83,5 @@ proc main_ss(np:coint)
  };;
 
 proc main() {
-	  	main_ss(10000)
+	  	main_ss(1000)
 };;

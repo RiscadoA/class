@@ -6,17 +6,19 @@ import pt.inescid.cllsj.Channel;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.IndexedSessionRef;
-import pt.inescid.cllsj.LinSession;
 import pt.inescid.cllsj.LinSessionValue;
 import pt.inescid.cllsj.SAM;
 import pt.inescid.cllsj.Server;
+import pt.inescid.cllsj.Session;
 import pt.inescid.cllsj.SessionClosure;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.SessionRecord;
 import pt.inescid.cllsj.Value;
 import pt.inescid.cllsj.ast.ASTExprVisitor;
 import pt.inescid.cllsj.ast.types.ASTCoAffineT;
+import pt.inescid.cllsj.ast.types.ASTCoBasicType;
 import pt.inescid.cllsj.ast.types.ASTCoLBasicType;
+import pt.inescid.cllsj.ast.types.ASTCointT;
 import pt.inescid.cllsj.ast.types.ASTType;
 import pt.inescid.cllsj.ast.types.ASTUsageT;
 import pt.inescid.cllsj.ast.types.ASTWhyT;
@@ -81,14 +83,17 @@ public class ASTVId extends ASTExpr {
 
   public ASTType etypecheck(Env<ASTType> ed, Env<ASTType> eg, Env<EnvEntry> ep, boolean lin)
       throws Exception {
-    // System.out.println("VID typecheck "+ch+" "+lin);
+    ty = null;
 
     if (lin) {
+      // System.out.println("lin VID typecheck " + ch);
+
       try {
         ty = ed.find(ch);
         linId = true;
         ty = ty.unfoldType(ep);
         ty = ASTType.unfoldRec(ty);
+
         if (ty instanceof ASTWhyT) {
           // System.out.println("lin VID typecheck-ASTWhy "+ch);
           ASTWhyT t = (ASTWhyT) ty;
@@ -113,33 +118,29 @@ public class ASTVId extends ASTExpr {
           return this.etypecheck(ed, eg, ep, lin);
         }
         if (ty instanceof ASTCoLBasicType) {
+          // System.out.println("VID consume=" + ch + ":" + ty);
           ed.upd(ch, null);
         }
+        if (ty instanceof ASTCoBasicType) {
+          // System.out.println("VID CoBasic=" + ch + ":" + ty);
+        }
+
+        // System.out.println("VIDt=" + ty);
         return ty;
       } catch (Exception e) {
         // System.out.println("VID typecheck-try-gamma of ?T or linear "+ch);
       }
     }
 
-    /*
-    try {
-        ty = ed.find(ch);
-        if (ty instanceof ASTWhyT) {
-    		System.out.println("Should infer ?"+ch);
-    		return this.etypecheck(ed,eg,ep,true);
-    	}
-
-    } catch (Exception e) {
-        // System.out.println("VID typecheck-try-gamma "+ch);
-    }
-    */
-
     // must check exponential context!
 
     if (!lin) {
       try {
         ty = ed.find(ch);
-        // System.out.println("lin "+ch+" expected in exp context");
+        if (ty instanceof ASTCointT) {
+          // System.out.println("VID exp typecheck-ASTCointT "+ch);
+          return this.etypecheck(ed, eg, ep, true);
+        }
         if (ty instanceof ASTWhyT) {
           // System.out.println("Should infer ?"+ch);
           return this.etypecheck(ed, eg, ep, true);
@@ -157,7 +158,6 @@ public class ASTVId extends ASTExpr {
           this.getanc().ASTInsertUse(ch, tyco.getin(), this, disposableCont);
           return this.etypecheck(ed, eg, ep, lin);
         }
-
       } catch (Exception e) {
       }
     }
@@ -180,12 +180,20 @@ public class ASTVId extends ASTExpr {
     } else return ty;
   }
 
-  public Value eval(Env<LinSession> ed, Env<Server> eg) throws Exception {
+  public Value eval(Env<Session> ed, Env<Server> eg) throws Exception {
     Value v;
-    if (linId) {
-      Channel channel = (Channel) ed.find(ch);
-      v = (Value) channel.receive();
-      return v;
+    // System.out.println("VID-eval "+ch+" lin="+linId);
+    if (linId) { // in linear context
+      Session session = (Session) ed.find(ch);
+      try { // session
+        Channel sessionc = (Channel) session;
+        // System.out.println("VID-recv "+ch+"="+sessionc);
+        v = (Value) sessionc.receive();
+        return v;
+      } catch (Exception _) { // copyable value (int)
+        // System.out.println("VID-val "+ch+"="+session);
+        return (Value) session;
+      }
     } else {
       Server server = eg.find(ch);
       if (server instanceof Value) {
@@ -236,11 +244,12 @@ public class ASTVId extends ASTExpr {
       IndexedSessionRef sref = (IndexedSessionRef) sf;
       int doffset = sref.getOffset();
       SessionRecord srec = sref.getSessionRec();
-      Value sval = (Value) srec.readSlot(doffset);
       if (CLLSj.trace) {
         System.out.println("vid-op-lin " + ch + " " + srec + " @ " + doffset);
       }
+      Value sval = (Value) srec.readSlot(doffset);
       sref.incOffset();
+      // if CoInt ??
       return sval;
     } else {
       if (linId) {

@@ -6,9 +6,9 @@ import java.util.logging.*;
 import pt.inescid.cllsj.CLLSj;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
-import pt.inescid.cllsj.LinSession;
 import pt.inescid.cllsj.SAMCont;
 import pt.inescid.cllsj.Server;
+import pt.inescid.cllsj.Session;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.types.ASTType;
@@ -66,7 +66,7 @@ public class ASTEmpty extends ASTNode {
   public void subs(String x, String y) { // implements x/y (substitutes y by x)
   }
 
-  public void runproc(Env<EnvEntry> ep, Env<LinSession> ed, Env<Server> eg, Logger logger)
+  public void runproc(Env<EnvEntry> ep, Env<Session> ed, Env<Server> eg, Logger logger)
       throws Exception {
     CLLSj.elapsed = System.nanoTime();
   }

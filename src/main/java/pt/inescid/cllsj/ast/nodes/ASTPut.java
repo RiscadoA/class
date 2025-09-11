@@ -7,11 +7,11 @@ import pt.inescid.cllsj.CLLSj;
 import pt.inescid.cllsj.Cell;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
-import pt.inescid.cllsj.LinSession;
 import pt.inescid.cllsj.MVar;
 import pt.inescid.cllsj.SAMCont;
 import pt.inescid.cllsj.SAMError;
 import pt.inescid.cllsj.Server;
+import pt.inescid.cllsj.Session;
 import pt.inescid.cllsj.SessionClosure;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.Trail;
@@ -329,7 +329,7 @@ public class ASTPut extends ASTNode {
     } else rhs.subs(x, y);
   }
 
-  public void runproc(Env<EnvEntry> ep, Env<LinSession> ed, Env<Server> eg, Logger logger)
+  public void runproc(Env<EnvEntry> ep, Env<Session> ed, Env<Server> eg, Logger logger)
       throws Exception {
     Cell cell = (Cell) ed.find(chs);
     cell.put(cho, lhs, ep, ed, eg);

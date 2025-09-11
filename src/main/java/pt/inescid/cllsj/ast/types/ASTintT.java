@@ -28,4 +28,8 @@ public class ASTintT extends ASTBasicType {
   public ASTType subst(Env<ASTType> e) {
     return this;
   }
+
+  public int SetOffsets(int base, Env<EnvEntry> e) throws Exception {
+    return base;
+  }
 }

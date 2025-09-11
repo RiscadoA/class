@@ -17,7 +17,7 @@ proc unsafe_rec filter(fouts:IntStream, fins:~IntStream, n:~int)
  {
     #next fins;
     recv fins (v);  
-    if  ((v / n)*n == v) then
+    if  (v % n == 0) then
 	 	{ filter(fouts,fins,n) }
     else
 		{  

@@ -1,6 +1,7 @@
 package pt.inescid.cllsj;
 
 import pt.inescid.cllsj.ast.nodes.ASTTypeDef;
+import pt.inescid.cllsj.ast.types.ASTCoBasicType;
 import pt.inescid.cllsj.ast.types.ASTIdT;
 import pt.inescid.cllsj.ast.types.ASTType;
 
@@ -57,6 +58,14 @@ public class Env<X> {
   public synchronized boolean eq(Env<X> e0) {
     if (anc != null && !anc.eq(e0.anc)) return false;
     return (assoc == e0.assoc);
+  }
+
+  public synchronized boolean eqlin(Env<ASTType> e0) {
+    if (anc != null && !anc.eqlin(e0.anc)) return false;
+    // System.out.println("assoc " + assoc + " " + e0.assoc);
+    return (assoc == e0.assoc)
+        || (e0.assoc instanceof ASTCoBasicType)
+        || (assoc instanceof ASTCoBasicType);
   }
 
   public synchronized String findI(SessionRecord _it) throws Exception {

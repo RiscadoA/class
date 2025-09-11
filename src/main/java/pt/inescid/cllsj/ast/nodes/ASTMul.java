@@ -3,14 +3,15 @@ package pt.inescid.cllsj.ast.nodes;
 import java.util.*;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
-import pt.inescid.cllsj.LinSession;
 import pt.inescid.cllsj.Server;
+import pt.inescid.cllsj.Session;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.TypeError;
 import pt.inescid.cllsj.VInt;
 import pt.inescid.cllsj.Value;
 import pt.inescid.cllsj.ast.ASTExprVisitor;
 import pt.inescid.cllsj.ast.types.ASTBotT;
+import pt.inescid.cllsj.ast.types.ASTCointT;
 import pt.inescid.cllsj.ast.types.ASTLCointT;
 import pt.inescid.cllsj.ast.types.ASTType;
 
@@ -68,9 +69,11 @@ public class ASTMul extends ASTExpr {
     Env<ASTType> egrhs = eg.assoc("$DUMMY", new ASTBotT());
 
     ASTType rhst = rhs.etypecheck(ed, egrhs, ep, lin);
-    if (!(lhst instanceof ASTLCointT && rhst instanceof ASTLCointT))
-      throw new TypeError("Line " + lineno + " :" + "+ : expression arguments not of COINT type");
-    return new ASTLCointT();
+
+    boolean lhsti = lhst instanceof ASTLCointT || lhst instanceof ASTCointT;
+    boolean rhsti = rhst instanceof ASTLCointT || rhst instanceof ASTCointT;
+    if (lhsti && rhsti) return new ASTCointT(); // NON-LIN-INT
+    throw new TypeError("Line " + lineno + " :" + "- : expression arguments not of COINT type");
   }
 
   public Value sameval(Env<SessionField> env) throws Exception {
@@ -79,7 +82,7 @@ public class ASTMul extends ASTExpr {
     return new VInt(vleft.get() * vright.get());
   }
 
-  public Value eval(Env<LinSession> ed, Env<Server> eg) throws Exception {
+  public Value eval(Env<Session> ed, Env<Server> eg) throws Exception {
     VInt vleft = (VInt) lhs.eval(ed, eg);
     VInt vright = (VInt) rhs.eval(ed, eg);
     return new VInt(vleft.get() * vright.get());

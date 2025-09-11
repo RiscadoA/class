@@ -8,9 +8,9 @@ import pt.inescid.cllsj.Channel;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.IndexedSessionRef;
-import pt.inescid.cllsj.LinSession;
 import pt.inescid.cllsj.SAMCont;
 import pt.inescid.cllsj.Server;
+import pt.inescid.cllsj.Session;
 import pt.inescid.cllsj.SessionClosure;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.SessionRecord;
@@ -122,7 +122,7 @@ public class ASTPromoCoExpr extends ASTNode {
     else expr.subs(x, y);
   }
 
-  public void runproc(Env<EnvEntry> ep, Env<LinSession> ed, Env<Server> eg, Logger logger)
+  public void runproc(Env<EnvEntry> ep, Env<Session> ed, Env<Server> eg, Logger logger)
       throws Exception {
     Value v =
         expr.eval(

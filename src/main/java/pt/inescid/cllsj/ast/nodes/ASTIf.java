@@ -5,9 +5,9 @@ import java.util.function.*;
 import java.util.logging.*;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
-import pt.inescid.cllsj.LinSession;
 import pt.inescid.cllsj.SAMCont;
 import pt.inescid.cllsj.Server;
+import pt.inescid.cllsj.Session;
 import pt.inescid.cllsj.SessionClosure;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.TypeError;
@@ -179,7 +179,7 @@ public class ASTIf extends ASTNode {
     elsep.subs(x, y);
   }
 
-  public void runproc(Env<EnvEntry> ep, Env<LinSession> ed, Env<Server> eg, Logger logger)
+  public void runproc(Env<EnvEntry> ep, Env<Session> ed, Env<Server> eg, Logger logger)
       throws Exception {
     VBool v = (VBool) expr.eval(ed, eg);
     if (v.get()) thenp.runproc(ep, ed, eg, logger);

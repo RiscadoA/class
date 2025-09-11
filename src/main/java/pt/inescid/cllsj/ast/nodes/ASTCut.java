@@ -12,11 +12,14 @@ import pt.inescid.cllsj.LinSessionValue;
 import pt.inescid.cllsj.SAM;
 import pt.inescid.cllsj.SAMCont;
 import pt.inescid.cllsj.Server;
+import pt.inescid.cllsj.Session;
 import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.SessionRecord;
+import pt.inescid.cllsj.Value;
 import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.types.ASTBotT;
 import pt.inescid.cllsj.ast.types.ASTType;
+import pt.inescid.cllsj.ast.types.ASTintT;
 
 // unfolded
 
@@ -146,13 +149,19 @@ public class ASTCut extends ASTNode {
 
     ASTType cutty = type.unfoldType(ep);
     ASTType dcutty = cutty.dual(ep);
-    // System.out.println("CUT type "+cutty);
-    // System.out.println("type "+dcutty);
+    type = cutty;
 
-    // for SAM
+    if (!cutty.isPos(ep)) {
+      ASTNode sw = lhs;
+      lhs = rhs;
+      rhs = sw;
+      ASTType otype = cutty;
+      type = cutty = dcutty;
+      dcutty = otype;
+    }
+
     sessionSize = 1 + cutty.SetOffsets(0, ep);
     dcutty.SetOffsets(0, ep);
-    // for SAM END
 
     Env<ASTType> el = ed.assoc(id, dcutty);
     Env<ASTType> er = ed.assoc(id, cutty);
@@ -202,26 +211,30 @@ public class ASTCut extends ASTNode {
     lhs.subs(x, y);
   }
 
-  /*
-    Calls runproc on lhs and rhs in parallel with session_directory = session_directory, id -> new Session(id)
-  */
-  public void runproc(Env<EnvEntry> ep, Env<LinSession> ed, Env<Server> eg, Logger logger)
+  public void runproc(Env<EnvEntry> ep, Env<Session> ed, Env<Server> eg, Logger logger)
       throws Exception {
+
     LinSession session = new LinSession(id);
-    Env<LinSession> edCut = ed.assoc(id, session);
+    Env<Session> edCut = ed.assoc(id, session);
 
     CLLSj.threadPool.submit(
         new Runnable() {
           public void run() {
             try {
-              lhs.runproc(ep, edCut, eg, logger);
+              rhs.runproc(ep, edCut, eg, logger);
             } catch (Exception e) {
               e.printStackTrace(System.out);
             }
           }
         });
 
-    rhs.runproc(ep, edCut, eg, logger);
+    if (type instanceof ASTintT) {
+      Value v = (Value) session.receive();
+      edCut.upd(id, v);
+    }
+    ;
+
+    lhs.runproc(ep, edCut, eg, logger);
   }
 
   public String toStr(Env<EnvEntry> ep) throws Exception {
@@ -257,6 +270,12 @@ public class ASTCut extends ASTNode {
     // represent SessionValues as normal 1-slot session records !
     // this requires refactoring on cut, send, receive
 
+    // After type check type is always set to positive and refers to rhs writer
+
+    // System.out.println("ccut-ty "+type);
+
+    boolean seqtz = type instanceof ASTintT;
+
     if (con) {
       samCCut(frame, ep, p_cont);
     } else {
@@ -275,15 +294,24 @@ public class ASTCut extends ASTNode {
         srec.setPol(true);
         srec.setPolDual(false);
         srec.setcch(id);
-        srec.setCont(lhs);
-        srec.setFrame(fread);
+
+        if (seqtz) {
+          srec.setCont(new ASTReadValue(id, srec, lhs));
+          srec.setFrame(fread);
+        } else {
+          srec.setCont(lhs);
+          srec.setFrame(fread);
+        }
         srec.setFrameP(ep);
 
         p_cont.code = rhs;
         p_cont.frame = fwrite;
         p_cont.epnm = ep;
 
-      } else { // lhs writer
+      } else {
+        // lhs writer
+        // unreachable
+        int i = 0 / 0;
         srec.setPol(true);
         srec.setPolDual(false);
         srec.setcch(id);
