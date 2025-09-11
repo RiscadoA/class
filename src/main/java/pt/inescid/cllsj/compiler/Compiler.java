@@ -56,6 +56,7 @@ public class Compiler {
 
   public Settings.Flag optimizeSingleEndpoint;
   public Settings.Flag optimizeSendValue;
+  public Settings.Flag optimizeAffineValue;
 
   public Compiler() {
     // Compiler operation settings
@@ -124,6 +125,11 @@ public class Compiler {
         settings.addFlag(
             "optimize-send-value",
             "Optimizes sends of closures into sends of values where possible",
+            true);
+    optimizeAffineValue =
+        settings.addFlag(
+            "optimize-affine-value",
+            "Computes affine values eagerly when possible, avoiding closures but risking doing useless work",
             true);
 
     settings.addMode(

@@ -6,9 +6,12 @@ import java.util.function.Consumer;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.TypeEntry;
+import pt.inescid.cllsj.ast.types.ASTAffineT;
+import pt.inescid.cllsj.ast.types.ASTCoAffineT;
 import pt.inescid.cllsj.ast.types.ASTIdT;
 import pt.inescid.cllsj.ast.types.ASTNotT;
 import pt.inescid.cllsj.ast.types.ASTType;
+import pt.inescid.cllsj.compiler.Compiler;
 import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
 import pt.inescid.cllsj.compiler.ir.id.IRDropId;
 import pt.inescid.cllsj.compiler.ir.id.IRLocalDataId;
@@ -21,17 +24,20 @@ import pt.inescid.cllsj.compiler.ir.slot.IRSlotTree;
 
 // Maps names to IR ids for types, sessions and local data within a process
 public class IREnvironment {
+  private Compiler compiler;
   protected IRProcess process;
   private Optional<IREnvironment> parent;
   private Env<EnvEntry> ep;
 
-  public IREnvironment(IRProcess process, Env<EnvEntry> ep) {
+  public IREnvironment(Compiler compiler, IRProcess process, Env<EnvEntry> ep) {
+    this.compiler = compiler;
     this.process = process;
     this.parent = Optional.empty();
     this.ep = ep;
   }
 
   public IREnvironment(IREnvironment parent, Env<EnvEntry> ep) {
+    this.compiler = parent.compiler;
     this.process = parent.process;
     this.parent = Optional.of(parent);
     this.ep = ep;
@@ -213,8 +219,16 @@ public class IREnvironment {
 
     if (type instanceof ASTIdT) {
       return getType(((ASTIdT) type).getid()).isPositive();
+    } else if (type instanceof ASTAffineT) {
+      // This and the below edge case are necessary due to us compiling affine
+      // as an offer and coaffine as a choice, except when they are values
+      boolean isValue = IRValueChecker.check(compiler, this, ((ASTAffineT) type).getin(), true);
+      return compiler.optimizeAffineValue.get() && isValue;
+    } else if (type instanceof ASTCoAffineT) {
+      boolean isValue = IRValueChecker.check(compiler, this, ((ASTCoAffineT) type).getin(), false);
+      return !(compiler.optimizeAffineValue.get() && isValue);
     } else {
-      return type.getPolarityForCompilerCatch(ep).get();
+      return type.isPosCatch(ep);
     }
   }
 

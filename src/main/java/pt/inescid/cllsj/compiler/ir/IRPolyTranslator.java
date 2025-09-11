@@ -73,7 +73,7 @@ public class IRPolyTranslator extends ASTTypeVisitor {
         contBlock,
         () -> {
           if (addContinue) {
-            gen.addContinueIfNegative(instChannel.getSessionId(), type);
+            gen.addContinueIfNegative(instChannel.getSessionId(), translator.instType(type));
           }
           translator.recurse(poly, inst, type);
         });
@@ -377,7 +377,7 @@ public class IRPolyTranslator extends ASTTypeVisitor {
 
           // Create a new empty process and environment
           IRProcess process = new IRProcess(processId);
-          IREnvironment newEnv = new IREnvironment(process, gen.env.getEp());
+          IREnvironment newEnv = new IREnvironment(gen.compiler, process, gen.env.getEp());
 
           // Prepare lists of arguments to pass to the processes
           // Pass all types in the current environment to the polymorphic process
@@ -671,12 +671,22 @@ public class IRPolyTranslator extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTAffineT type) {
-    throw new UnsupportedOperationException("Should no longer appear at this stage");
+    gen.addAffine(inst, instType(type.getin()), Map.of(), Map.of(poly, polyType(type.getin())),
+      IRPolyEndPointCounter.count(gen.compiler, gen.env, type.getin(), modifiedVarTypes), () -> {
+      gen.addUse(poly, polyType(type.getin()), () -> {
+        recurse(poly, inst, type.getin());
+      });
+    });
   }
 
   @Override
   public void visit(ASTCoAffineT type) {
-    throw new UnsupportedOperationException("Should no longer appear at this stage");
+    gen.addAffine(poly, polyType(type.getin()), Map.of(), Map.of(inst, instType(type.getin())),
+      IRPolyEndPointCounter.count(gen.compiler, gen.env, type.getin(), modifiedVarTypes), () -> {
+      gen.addUse(inst, instType(type.getin()), () -> {
+        recurse(poly, inst, type.getin());
+      });
+    });
   }
 
   @Override

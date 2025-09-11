@@ -171,14 +171,12 @@ public class IRPolyEndPointCounter extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTAffineT type) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    type.getin().accept(this);
   }
 
   @Override
   public void visit(ASTCoAffineT type) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    type.getin().accept(this);
   }
 
   @Override

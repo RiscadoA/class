@@ -204,7 +204,7 @@ public class IREndPointCounter extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTAffine node) {
-    count += 1;
+    node.getRhs().accept(this);
   }
 
   @Override

@@ -188,12 +188,22 @@ public class IRValueChecker extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTAffineT type) {
-    throw new UnsupportedOperationException("Affine types should no longer exist at this stage");
+    if (compiler.optimizeAffineValue.get()) {
+      expectPolarity(true);
+      type.getin().accept(this);
+    } else {
+      isValue = false;
+    }
   }
 
   @Override
   public void visit(ASTCoAffineT type) {
-    throw new UnsupportedOperationException("Affine types should no longer exist at this stage");
+    if (compiler.optimizeAffineValue.get()) {
+      expectPolarity(false);
+      type.getin().accept(this);
+    } else {
+      isValue = false;
+    }
   }
 
   @Override

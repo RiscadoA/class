@@ -5,16 +5,18 @@ import pt.inescid.cllsj.ast.types.*;
 import pt.inescid.cllsj.compiler.Compiler;
 
 public class IRContinuationChecker extends ASTTypeVisitor {
+  private Compiler compiler;
   private IREnvironment env;
   private boolean mayHaveContinuation = false;
   private boolean isDual = false;
 
   public static boolean cannotHaveContinuation(Compiler compiler, IREnvironment env, ASTType type) {
-    return !mayHaveContinuation(env, type);
+    return !mayHaveContinuation(compiler, env, type);
   }
 
-  public static boolean mayHaveContinuation(IREnvironment env, ASTType type) {
+  public static boolean mayHaveContinuation(Compiler compiler, IREnvironment env, ASTType type) {
     IRContinuationChecker visitor = new IRContinuationChecker();
+    visitor.compiler = compiler;
     visitor.env = env;
     type.accept(visitor);
     return visitor.mayHaveContinuation;
@@ -167,12 +169,20 @@ public class IRContinuationChecker extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTAffineT type) {
-    throw new UnsupportedOperationException("Affine types should no longer exist at this stage");
+    if (compiler.optimizeAffineValue.get() && IRValueChecker.check(compiler, env, type.getin(), true)) {
+      foundPolarity(true);
+    } else {
+      mayHaveContinuation = true;
+    }
   }
 
   @Override
   public void visit(ASTCoAffineT type) {
-    throw new UnsupportedOperationException("Affine types should no longer exist at this stage");
+    if (compiler.optimizeAffineValue.get() && IRValueChecker.check(compiler, env, type.getin(), false)) {
+      foundPolarity(false);
+    } else {
+      mayHaveContinuation = true;
+    }
   }
 
   @Override

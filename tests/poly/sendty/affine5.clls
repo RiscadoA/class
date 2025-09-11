@@ -1,0 +1,14 @@
+proc main() {
+  cut {
+    sendty x(lint);
+    send x(32);
+    discard x
+    |x: recvty A; recv coaffine ~A; affine A|
+    recvty x(A);
+    recv x(a);
+    affine x;
+    println("affine");
+    use a;
+    fwd x a
+  }
+};;

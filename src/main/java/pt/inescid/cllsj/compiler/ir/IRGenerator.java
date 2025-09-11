@@ -112,7 +112,7 @@ public class IRGenerator extends ASTNodeVisitor {
 
   private IREnvironment environment(
       ASTProcDef procDef, Env<EnvEntry> globalEp, IRProcess process, boolean tArgPolarities[]) {
-    env = new IREnvironment(process, globalEp);
+    env = new IREnvironment(compiler, process, globalEp);
 
     // Start by collecting type arguments
     for (int i = 0; i < procDef.getTArgs().size(); ++i) {
@@ -510,20 +510,30 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTAffine node) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    addAffine(node.getCh(), node.getContType(), node.getUsageSet(), node.getCoaffineSet(), countEndPoints(node.getRhs()), () -> node.getRhs().accept(this));
   }
 
   @Override
   public void visit(ASTUse node) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    addUse(node.getCh(), node.getContType(), () -> node.getRhs().accept(this));
   }
 
   @Override
   public void visit(ASTDiscard node) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    IREnvironment.Channel channel = env.getChannel(node.getCh());
+
+    if (compiler.optimizeAffineValue.get() && isValue(node.getCoAffineT(), false)) {
+      // The value is already present, we must drop it
+      block.add(
+          new IRDropValue(
+              channel.getLocalData(), slotsFromType(node.getCoAffineT()).activeLocalTree));
+    } else {
+      // Write a tag indicating the coaffine is being discarded and pass control to it
+      block.add(new IRWriteTag(channel.getRemoteData(), 0));
+      addContinue(channel.getSessionId());
+    }
+
+    block.add(new IRPopTask(true));
   }
 
   @Override
@@ -730,7 +740,7 @@ public class IRGenerator extends ASTNodeVisitor {
       // Create a new process for the exponential
       IRProcessId expProcessId = new IRProcessId(process.getId() + "_exp" + nextProcessGenId++);
       IRProcess expProcess = new IRProcess(expProcessId);
-      IREnvironment expEnv = new IREnvironment(expProcess, env.getEp());
+      IREnvironment expEnv = new IREnvironment(compiler, expProcess, env.getEp());
 
       // Define the argument session for the exponential
       expEnv = expEnv.addArgSession(chi, info.localCombinations());
@@ -897,7 +907,7 @@ public class IRGenerator extends ASTNodeVisitor {
           IRProcessId polyProcessId =
               processId(process.getId() + "_poly" + processGenId, new boolean[] {polarity});
           IRProcess polyProcess = new IRProcess(polyProcessId);
-          IREnvironment polyEnv = new IREnvironment(polyProcess, env.getEp());
+          IREnvironment polyEnv = new IREnvironment(compiler, polyProcess, env.getEp());
 
           // Prepare lists of arguments to pass to the polymorphic process
           List<IRCallProcess.TypeArgument> typeArguments = new ArrayList<>();
@@ -963,7 +973,7 @@ public class IRGenerator extends ASTNodeVisitor {
               IREnvironment.Channel sourceChannel = env.getChannel(name);
               IREnvironment.Channel targetChannel = polyEnv.getChannel(name);
 
-              if (IRContinuationChecker.mayHaveContinuation(polyEnv, type)) {
+              if (IRContinuationChecker.mayHaveContinuation(compiler, polyEnv, type)) {
                 // If the type is not a value, or if it's a positive value, we must pass the session
                 sessionArguments.add(
                     new IRCallProcess.SessionArgument(
@@ -1012,6 +1022,67 @@ public class IRGenerator extends ASTNodeVisitor {
     recurse(positiveBlock, () -> forPolarity.accept(true));
     recurse(negativeBlock, () -> forPolarity.accept(false));
   }
+  
+  void addAffine(String ch, ASTType contType, Map<String, ASTType> usageSet, Map<String, ASTType> coaffineSet, int contEndPoints, Runnable cont) {
+    IREnvironment.Channel channel = env.getChannel(ch);
+
+    if (compiler.optimizeAffineValue.get() && isValue(contType, true)) {
+      // In this case, we immediately produce the value in place
+      cont.run();
+    } else {
+      // Otherwise, we branch on whether the affine is used or not
+      IRBlock usedBlock = process.createBlock("affine_used");
+      IRBlock unusedBlock = process.createBlock("affine_unused");
+      IRBranch.Case used = new IRBranch.Case(usedBlock.getLocation(), contEndPoints);
+      IRBranch.Case unused = new IRBranch.Case(unusedBlock.getLocation(), 1);
+
+      block.add(new IRBranchTag(channel.getLocalData(), List.of(unused, used)));
+      recurse(usedBlock, cont);
+      recurse(
+          unusedBlock,
+          () -> {
+            // If the affine is unused, we must discard any data associated with it
+            // This includes both references to cells and coaffine channels
+
+            for (String name : usageSet.keySet()) {
+              throw new UnsupportedOperationException("TODO: decrement cell reference count");
+            }
+
+            for (String name : coaffineSet.keySet()) {
+              ASTType type = coaffineSet.get(name);
+              IREnvironment.Channel capturedChannel = env.getChannel(name);
+
+              if (compiler.optimizeAffineValue.get() && isValue(type, false)) {
+                // If the coaffine is a value, we can simply drop it
+                block.add(
+                    new IRDropValue(
+                        env.getChannel(name).getLocalData(), slotsFromType(type).activeLocalTree));
+              } else {
+                // Otherwise, we must write a drop tag and jump to the closure
+                block.add(new IRWriteTag(capturedChannel.getRemoteData(), 0));
+                addContinue(capturedChannel.getSessionId());
+              }
+            }
+
+            block.add(new IRFinishSession(channel.getSessionId(), true));
+          });
+    }
+  }
+
+  void addUse(String ch, ASTType contType, Runnable cont) {
+    if (compiler.optimizeAffineValue.get() && isValue(contType, false)) {
+      // The value is already present, so we do nothing
+      recurse(block, cont);
+      return;
+    }
+
+    // Write a tag indicating the affine is being used and pass control to it if it's negative
+    IREnvironment.Channel channel = env.getChannel(ch);
+    block.add(new IRWriteTag(channel.getRemoteData(), 1));
+    addContinueIfNegative(channel.getSessionId(), contType);
+
+    recurse(block, cont);
+  }
 
   void addContinue(IRSessionId sessionId) {
     IRBlock contBlock = process.createBlock("continue");
@@ -1058,7 +1129,7 @@ public class IRGenerator extends ASTNodeVisitor {
   }
 
   private boolean mayHaveContinuation(ASTType type) {
-    return IRContinuationChecker.mayHaveContinuation(env, type);
+    return IRContinuationChecker.mayHaveContinuation(compiler, env, type);
   }
 
   IRProcessId genChildProcessId(String suffix) {

@@ -263,28 +263,11 @@ public abstract class ASTType {
   //	return offset;
   // }
 
-  public Optional<Boolean> getPolarityForCompilerCatch(Env<EnvEntry> ep) {
+  public boolean isPosCatch(Env<EnvEntry> ep) {
     try {
-      return getPolarityForCompiler(ep);
-    } catch (Exception e) {
-      e.printStackTrace(System.out);
-      System.exit(1);
-      return Optional.empty();
-    }
-  }
-
-  public Optional<Boolean> getPolarityForCompiler(Env<EnvEntry> ep) throws Exception {
-    ASTType it = unfoldType(ep);
-    if (it instanceof ASTNotT || it instanceof ASTIdT) {
-      return Optional.empty();
-    } else if (it instanceof ASTAffineT) {
-      // This and the below edge case are necessary due to us compiling affine
-      // as an offer and coaffine as a choice
-      return Optional.of(false);
-    } else if (it instanceof ASTCoAffineT) {
-      return Optional.of(true);
-    } else {
-      return Optional.of(it.isPos(ep));
+      return isPos(ep);
+    } catch (Exception ex) {
+      throw new RuntimeException(ex);
     }
   }
 

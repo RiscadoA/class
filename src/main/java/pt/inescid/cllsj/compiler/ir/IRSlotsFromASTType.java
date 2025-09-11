@@ -338,12 +338,30 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTAffineT type) {
-    throw new UnsupportedOperationException("Affine types should no longer exist at this stage");
+    if (compiler.optimizeAffineValue.get()
+        && IRValueChecker.check(compiler, env, type.getin(), Optional.of(true))) {
+      type.getin().accept(this);
+    } else {
+      IRSlotsFromASTType result = recurse(type.getin());
+      slot = Optional.of(new IRTagS());
+      activeLocalTree = new IRSlotTree.Tag(List.of(IRSlotTree.LEAF, result.activeLocalTree));
+      remainderLocalCombinations = result.remainderLocalCombinations;
+      remainderRemoteCombinations = result.remoteCombinations();
+    }
   }
 
   @Override
   public void visit(ASTCoAffineT type) {
-    throw new UnsupportedOperationException("Affine types should no longer exist at this stage");
+    if (compiler.optimizeAffineValue.get()
+        && IRValueChecker.check(compiler, env, type.getin(), Optional.of(false))) {
+      type.getin().accept(this);
+    } else {
+      IRSlotsFromASTType result = recurse(type.getin());
+      slot = Optional.of(new IRTagS());
+      activeRemoteTree = new IRSlotTree.Tag(List.of(IRSlotTree.LEAF, result.activeRemoteTree));
+      remainderLocalCombinations = result.localCombinations();
+      remainderRemoteCombinations = result.remainderRemoteCombinations;
+    }
   }
 
   @Override

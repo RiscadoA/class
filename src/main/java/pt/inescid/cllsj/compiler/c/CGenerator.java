@@ -857,6 +857,15 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   @Override
+  public void visit(IRDropValue instr) {
+    putDropSlots(
+        instr.getSlots(),
+        (past, slot) -> {
+          return data(instr.getLocation().advance(past, slot));
+        });
+  }
+
+  @Override
   public void visit(IRPrint instr) {
     String value = expression(instr.getExpression());
     CPrintGenerator gen = CPrintGenerator.forValue(value, instr.getExpression().getSlot());

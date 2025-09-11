@@ -23,6 +23,8 @@ public abstract class IRInstructionVisitor {
 
   public abstract void visit(IRCloneValue instr);
 
+  public abstract void visit(IRDropValue instr);
+
   public abstract void visit(IRPrint instr);
 
   public abstract void visit(IRPushTask instr);
