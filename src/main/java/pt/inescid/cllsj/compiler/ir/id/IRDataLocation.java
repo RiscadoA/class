@@ -1,7 +1,6 @@
 package pt.inescid.cllsj.compiler.ir.id;
 
 import java.util.Optional;
-
 import pt.inescid.cllsj.compiler.ir.slot.IRSlot;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotOffset;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotSequence;
@@ -29,7 +28,8 @@ public class IRDataLocation {
     return new IRDataLocation(0, false, Optional.of(cell), offset);
   }
 
-  private IRDataLocation(int index, boolean remote, Optional<IRDataLocation> cell, IRSlotOffset offset) {
+  private IRDataLocation(
+      int index, boolean remote, Optional<IRDataLocation> cell, IRSlotOffset offset) {
     this.index = index;
     this.remote = remote;
     this.cell = cell;

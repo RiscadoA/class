@@ -671,22 +671,38 @@ public class IRPolyTranslator extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTAffineT type) {
-    gen.addAffine(inst, instType(type.getin()), Map.of(), Map.of(poly, polyType(type.getin())),
-      IRPolyEndPointCounter.count(gen.compiler, gen.env, type.getin(), modifiedVarTypes), () -> {
-      gen.addUse(poly, polyType(type.getin()), () -> {
-        recurse(poly, inst, type.getin());
-      });
-    });
+    gen.addAffine(
+        inst,
+        instType(type.getin()),
+        Map.of(),
+        Map.of(poly, polyType(type.getin())),
+        IRPolyEndPointCounter.count(gen.compiler, gen.env, type.getin(), modifiedVarTypes),
+        () -> {
+          gen.addUse(
+              poly,
+              polyType(type.getin()),
+              () -> {
+                recurse(poly, inst, type.getin());
+              });
+        });
   }
 
   @Override
   public void visit(ASTCoAffineT type) {
-    gen.addAffine(poly, polyType(type.getin()), Map.of(), Map.of(inst, instType(type.getin())),
-      IRPolyEndPointCounter.count(gen.compiler, gen.env, type.getin(), modifiedVarTypes), () -> {
-      gen.addUse(inst, instType(type.getin()), () -> {
-        recurse(poly, inst, type.getin());
-      });
-    });
+    gen.addAffine(
+        poly,
+        polyType(type.getin()),
+        Map.of(),
+        Map.of(inst, instType(type.getin())),
+        IRPolyEndPointCounter.count(gen.compiler, gen.env, type.getin(), modifiedVarTypes),
+        () -> {
+          gen.addUse(
+              inst,
+              instType(type.getin()),
+              () -> {
+                recurse(poly, inst, type.getin());
+              });
+        });
   }
 
   @Override
@@ -696,7 +712,7 @@ public class IRPolyTranslator extends ASTTypeVisitor {
 
     // Polymorphic cells are always affine, i.e., they hold only a session pointer
 
-    // Ideally we would create a 'wrapper' cell here that holds 
+    // Ideally we would create a 'wrapper' cell here that holds
 
     // TODO: we can have some rule such that polymorphic cells are always represented differently
 
@@ -708,7 +724,7 @@ public class IRPolyTranslator extends ASTTypeVisitor {
 
     // Cells could be passed around with exponentials used to translate them
     // Whenever a cell passes through a 'translation layer', that exponential is modified.
-    // I.e., basically, cells store hooks 
+    // I.e., basically, cells store hooks
 
     throw new UnsupportedOperationException("Unimplemented method 'visit'");
   }

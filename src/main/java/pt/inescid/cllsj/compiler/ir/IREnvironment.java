@@ -215,7 +215,8 @@ public class IREnvironment {
         Optional.empty());
   }
 
-  public IREnvironment addCellAccess(IRSessionId sessionId, IRDataLocation cell, String accessName) {
+  public IREnvironment addCellAccess(
+      IRSessionId sessionId, IRDataLocation cell, String accessName) {
     return new Channel(
         this,
         accessName,

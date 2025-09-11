@@ -316,7 +316,10 @@ public abstract class CSize {
               .addRemainder(remainder);
         } else if (offset instanceof CSizeAlign) {
           CSizeAlign inner = (CSizeAlign) offset;
-          return inner.offset.align(alignment.max(inner.alignment).simplify(0)).addRemainder(remainder);
+          return inner
+              .offset
+              .align(alignment.max(inner.alignment).simplify(0))
+              .addRemainder(remainder);
         }
       }
 

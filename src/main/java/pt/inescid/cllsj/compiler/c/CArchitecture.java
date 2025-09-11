@@ -2,8 +2,6 @@ package pt.inescid.cllsj.compiler.c;
 
 import java.util.List;
 
-import pt.inescid.cllsj.compiler.Compiler;
-
 public class CArchitecture {
   public CSize recordHeaderSize = CSize.constant(24);
 

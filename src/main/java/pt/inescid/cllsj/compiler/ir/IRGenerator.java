@@ -510,7 +510,13 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTAffine node) {
-    addAffine(node.getCh(), node.getContType(), node.getUsageSet(), node.getCoaffineSet(), countEndPoints(node.getRhs()), () -> node.getRhs().accept(this));
+    addAffine(
+        node.getCh(),
+        node.getContType(),
+        node.getUsageSet(),
+        node.getCoaffineSet(),
+        countEndPoints(node.getRhs()),
+        () -> node.getRhs().accept(this));
   }
 
   @Override
@@ -543,7 +549,12 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTPut node) {
-    addPut(node.getChs(), node.getCho(), node.getLhsType(), () -> node.getLhs().accept(this), () -> node.getRhs().accept(this));
+    addPut(
+        node.getChs(),
+        node.getCho(),
+        node.getLhsType(),
+        () -> node.getLhs().accept(this),
+        () -> node.getRhs().accept(this));
   }
 
   @Override
@@ -556,22 +567,28 @@ public class IRGenerator extends ASTNodeVisitor {
     if (!(node.getTy() instanceof ASTUsageT)) {
       throw new IllegalArgumentException("Release type must be a usage type");
     }
-    addRelease(node.getChr(), (ASTUsageT)node.getTy(), true);
+    addRelease(node.getChr(), (ASTUsageT) node.getTy(), true);
   }
 
   @Override
   public void visit(ASTShare node) {
-    addShare(node.getCh(), node.isConcurrent(), () -> node.getLhs().accept(this), () -> node.getRhs().accept(this));
+    addShare(
+        node.getCh(),
+        node.isConcurrent(),
+        () -> node.getLhs().accept(this),
+        () -> node.getRhs().accept(this));
   }
 
   @Override
   public void visit(ASTShareL node) {
-    addShare(node.getCh(), true, () -> node.getLhs().accept(this), () -> node.getRhs().accept(this));
+    addShare(
+        node.getCh(), true, () -> node.getLhs().accept(this), () -> node.getRhs().accept(this));
   }
 
   @Override
   public void visit(ASTShareR node) {
-    addShare(node.getCh(), true, () -> node.getRhs().accept(this), () -> node.getLhs().accept(this));
+    addShare(
+        node.getCh(), true, () -> node.getRhs().accept(this), () -> node.getLhs().accept(this));
   }
 
   @Override
@@ -1022,8 +1039,14 @@ public class IRGenerator extends ASTNodeVisitor {
     recurse(positiveBlock, () -> forPolarity.accept(true));
     recurse(negativeBlock, () -> forPolarity.accept(false));
   }
-  
-  void addAffine(String ch, ASTType contType, Map<String, ASTType> usageSet, Map<String, ASTType> coaffineSet, int contEndPoints, Runnable cont) {
+
+  void addAffine(
+      String ch,
+      ASTType contType,
+      Map<String, ASTType> usageSet,
+      Map<String, ASTType> coaffineSet,
+      int contEndPoints,
+      Runnable cont) {
     IREnvironment.Channel channel = env.getChannel(ch);
 
     if (isValue(contType, true)) {
@@ -1047,9 +1070,10 @@ public class IRGenerator extends ASTNodeVisitor {
             for (String name : usageSet.keySet()) {
               ASTType type = usageSet.get(name);
               if (!(type instanceof ASTUsageT)) {
-                throw new RuntimeException("Internal error: affine usage set contains non-usage type");
+                throw new RuntimeException(
+                    "Internal error: affine usage set contains non-usage type");
               }
-              addRelease(name, (ASTUsageT)usageSet.get(name), false);
+              addRelease(name, (ASTUsageT) usageSet.get(name), false);
             }
 
             for (String name : coaffineSet.keySet()) {
@@ -1106,7 +1130,7 @@ public class IRGenerator extends ASTNodeVisitor {
 
   void addShare(String ch, boolean concurrent, Runnable lhsCont, Runnable rhsCont) {
     block.add(new IRIncrementCell(env.getChannel(ch).getLocalData()));
-    
+
     IRBlock rhsBlock = process.createBlock("share_rhs");
     block.add(new IRPushTask(rhsBlock.getLocation(), concurrent && compiler.concurrency.get()));
     recurse(block, lhsCont);
@@ -1135,9 +1159,12 @@ public class IRGenerator extends ASTNodeVisitor {
       block.add(
           new IRInitializeSession(
               cellSession.getSessionId(), cellBlock.getLocation(), cellSession.getLocalData()));
-  
+
       // Store it in the cell and finish
-      block.add(new IRWriteSession(IRDataLocation.cell(channel.getRemoteData(), IRSlotOffset.ZERO), cellSession.getSessionId()));
+      block.add(
+          new IRWriteSession(
+              IRDataLocation.cell(channel.getRemoteData(), IRSlotOffset.ZERO),
+              cellSession.getSessionId()));
       block.add(new IRFinishSession(channel.getSessionId(), false));
 
       // Recurse on the cell's right-hand-side
@@ -1149,7 +1176,6 @@ public class IRGenerator extends ASTNodeVisitor {
     IREnvironment.Channel channel = env.getChannel(ch);
     IRDataLocation cellDataLoc = IRDataLocation.cell(channel.getLocalData(), IRSlotOffset.ZERO);
 
-
     if (isValue(typeLhs, true)) {
       // If the left-hand-side is a value, we do basically the same as the send value optimization
       env = env.addSession(chc);
@@ -1160,8 +1186,7 @@ public class IRGenerator extends ASTNodeVisitor {
 
       // Initialize the new session so that its data points to the cell's data
       block.add(
-          new IRInitializeSession(
-              argSession.getSessionId(), rhsBlock.getLocation(), cellDataLoc));
+          new IRInitializeSession(argSession.getSessionId(), rhsBlock.getLocation(), cellDataLoc));
       recurse(block, contLhs);
 
       // Generate the continuation
@@ -1223,7 +1248,7 @@ public class IRGenerator extends ASTNodeVisitor {
 
       // Otherwise, we bind the new session to the one stored in the cell
       block.add(
-        new IRBindSession(cellDataLoc, argChannel.getSessionId(), argChannel.getLocalData()));
+          new IRBindSession(cellDataLoc, argChannel.getSessionId(), argChannel.getLocalData()));
 
       // The received session is guaranteed to an affine session
       // We immediately mark it as used

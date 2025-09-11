@@ -1372,12 +1372,14 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   private CAddress cellData(String var, IRSlotOffset offset) {
-    CAddress base = CAddress.of(cast(var, "char*"), compiler.arch.cellDataOffset(compiler.concurrency.get()));
+    CAddress base =
+        CAddress.of(cast(var, "char*"), compiler.arch.cellDataOffset(compiler.concurrency.get()));
     return offset(base, offset);
   }
 
   private CAddress cellData(CAddress cell, IRSlotOffset offset) {
-    CAddress base = CAddress.of(cell.deref("char*"), compiler.arch.cellDataOffset(compiler.concurrency.get()));
+    CAddress base =
+        CAddress.of(cell.deref("char*"), compiler.arch.cellDataOffset(compiler.concurrency.get()));
     return offset(base, offset);
   }
 
@@ -1702,7 +1704,8 @@ public class CGenerator extends IRInstructionVisitor {
 
           // Drop the cell's data
           if (cell.isValue()) {
-            putDropSlots(cell.getValue(), (past, slot) -> cellData(var, IRSlotOffset.of(past, slot)));
+            putDropSlots(
+                cell.getValue(), (past, slot) -> cellData(var, IRSlotOffset.of(past, slot)));
           } else if (cell.isAffine()) {
             // If the cell holds an affine session, we must jump to it and discard it
             String session = cellData(var, IRSlotOffset.ZERO).deref("struct session*");
@@ -1710,7 +1713,7 @@ public class CGenerator extends IRInstructionVisitor {
           } else {
             throw new IllegalArgumentException("Unknown cell type " + cell);
           }
-          
+
           if (compiler.concurrency.get()) {
             putMutexDestroy(cellMutex(var));
           }
