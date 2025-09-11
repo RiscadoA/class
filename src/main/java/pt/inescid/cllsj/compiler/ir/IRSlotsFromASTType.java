@@ -362,36 +362,23 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
     }
   }
 
-  private IRCellS makeCellSlot(ASTType inner) {
-    if (IRUsesTypeVar.check(env.getEp(), inner)) {
-      // If the inner type uses a type variable, then this is ae polymorphic cell.
-    }
-
-    if (IRValueChecker.check(compiler, env, inner, true)) {
-      IRSlotsFromASTType result = recurse(inner);
-      return IRCellS.value(result.activeRemoteTree);
-    } else {
-      return IRCellS.affine();
-    }
-  }
-
   @Override
   public void visit(ASTCellT type) {
-    remoteSlot(makeCellSlot(type.getin()));
+    remoteSlot(new IRCellS());
   }
 
   @Override
   public void visit(ASTUsageT type) {
-    localSlot(makeCellSlot(type.getin().dualCatch(env.getEp())));
+    localSlot(new IRCellS());
   }
 
   @Override
   public void visit(ASTCellLT type) {
-    remoteSlot(makeCellSlot(type.getin()));
+    remoteSlot(new IRCellS());
   }
 
   @Override
   public void visit(ASTUsageLT type) {
-    localSlot(makeCellSlot(type.getin().dualCatch(env.getEp())));
+    localSlot(new IRCellS());
   }
 }

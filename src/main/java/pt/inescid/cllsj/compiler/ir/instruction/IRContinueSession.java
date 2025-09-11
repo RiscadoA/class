@@ -1,20 +1,36 @@
 package pt.inescid.cllsj.compiler.ir.instruction;
 
+import java.util.Optional;
 import java.util.function.Function;
 import pt.inescid.cllsj.compiler.ir.id.IRCodeLocation;
+import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
 import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
 
 public class IRContinueSession extends IRInstruction {
-  private IRSessionId sessionId;
+  private Optional<IRSessionId> sessionId;
+  private Optional<IRDataLocation> sessionLocation;
   private IRCodeLocation continuation;
 
   public IRContinueSession(IRSessionId sessionId, IRCodeLocation continuation) {
-    this.sessionId = sessionId;
+    this.sessionId = Optional.of(sessionId);
     this.continuation = continuation;
   }
 
+  public IRContinueSession(IRDataLocation sessionLocation, IRCodeLocation continuation) {
+    this.sessionLocation = Optional.of(sessionLocation);
+    this.continuation = continuation;
+  }
+
+  public boolean isById() {
+    return sessionId.isPresent();
+  }
+
   public IRSessionId getSessionId() {
-    return sessionId;
+    return sessionId.orElseThrow();
+  }
+
+  public IRDataLocation getSessionLocation() {
+    return sessionLocation.orElseThrow();
   }
 
   public IRCodeLocation getContinuation() {
@@ -23,7 +39,11 @@ public class IRContinueSession extends IRInstruction {
 
   @Override
   public IRInstruction clone() {
-    return new IRContinueSession(sessionId, continuation);
+    if (sessionId.isPresent()) {
+      return new IRContinueSession(sessionId.get(), continuation);
+    } else {
+      return new IRContinueSession(sessionLocation.get(), continuation);
+    }
   }
 
   @Override
@@ -33,7 +53,12 @@ public class IRContinueSession extends IRInstruction {
 
   @Override
   public void replaceSessions(Function<IRSessionId, IRSessionId> replacer) {
-    sessionId = replacer.apply(sessionId);
+    sessionId = sessionId.map(replacer);
+  }
+
+  @Override
+  public void replaceDataLocations(Function<IRDataLocation, IRDataLocation> replacer) {
+    sessionLocation = sessionLocation.map(replacer);
   }
 
   @Override
@@ -43,6 +68,10 @@ public class IRContinueSession extends IRInstruction {
 
   @Override
   public String toString() {
-    return "continueSession(" + sessionId + ", " + continuation + ")";
+    if (isById()) {
+      return "continueSession(" + sessionId.get() + ", " + continuation + ")";
+    } else {
+      return "continueSession(" + sessionLocation.get() + ", " + continuation + ")";
+    }
   }
 }

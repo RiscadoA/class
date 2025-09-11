@@ -16,8 +16,12 @@ public class IRSlotCombinations {
     return new IRSlotCombinations(List.of(IRSlotSequence.of(slot)));
   }
 
-  public static IRSlotCombinations of(IRSlotSequence sequence) {
-    return new IRSlotCombinations(List.of(sequence));
+  public static IRSlotCombinations of(IRSlot... slots) {
+    return new IRSlotCombinations(List.of(IRSlotSequence.of(slots)));
+  }
+
+  public static IRSlotCombinations of(IRSlotSequence... sequences) {
+    return new IRSlotCombinations(List.of(sequences));
   }
 
   public List<IRSlotSequence> list() {

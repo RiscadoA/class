@@ -20,7 +20,6 @@ import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
 import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
 import pt.inescid.cllsj.compiler.ir.instruction.*;
 import pt.inescid.cllsj.compiler.ir.slot.IRBoolS;
-import pt.inescid.cllsj.compiler.ir.slot.IRCellS;
 import pt.inescid.cllsj.compiler.ir.slot.IRIntS;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlot;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotCombinations;
@@ -44,6 +43,11 @@ public class CGenerator extends IRInstructionVisitor {
   // Useful constants
   private static final String NULL = "NULL";
 
+  // Cell manager modes
+  public static final int CELL_MANAGER_MODE_PUT = 0;
+  public static final int CELL_MANAGER_MODE_TAKE = 1;
+  public static final int CELL_MANAGER_MODE_DROP = 2;
+
   private Compiler compiler;
   private IRProgram program;
   private PrintStream output;
@@ -53,7 +57,8 @@ public class CGenerator extends IRInstructionVisitor {
   private int indentLevel = 0;
   private int nextLabelId = 0;
 
-  private Map<IRProcessId, IRWriteExponential> pendingExponentialManagers = new HashMap<>();
+  private Map<IRProcessId, List<IRWriteExponential.DataArgument>> pendingExponentialManagers =
+      new HashMap<>();
 
   public static void generate(Compiler compiler, IRProgram program, PrintStream output) {
     CGenerator gen = new CGenerator();
@@ -663,7 +668,8 @@ public class CGenerator extends IRInstructionVisitor {
     instr.accept(this);
   }
 
-  private void generateExponentialManager(IRProcessId processId, IRWriteExponential instr) {
+  private void generateExponentialManager(
+      IRProcessId processId, List<IRWriteExponential.DataArgument> dataArguments) {
     // The purpose of this section is described in a comment in the IRWriteExponential visit method
 
     // Set up the layout and the function used to get layouts from types
@@ -677,7 +683,7 @@ public class CGenerator extends IRInstructionVisitor {
               "mode == 0",
               () -> {
                 putComment("Clone mode");
-                for (IRWriteExponential.DataArgument arg : instr.getDataArguments()) {
+                for (IRWriteExponential.DataArgument arg : dataArguments) {
                   IRLocalDataId dataId = arg.getTargetDataId();
                   putSlotTraversal(
                       arg.getSlots(),
@@ -702,7 +708,7 @@ public class CGenerator extends IRInstructionVisitor {
               },
               () -> {
                 putComment("Drop mode");
-                for (IRWriteExponential.DataArgument arg : instr.getDataArguments()) {
+                for (IRWriteExponential.DataArgument arg : dataArguments) {
                   IRLocalDataId dataId = arg.getTargetDataId();
                   putSlotTraversal(
                       arg.getSlots(),
@@ -739,12 +745,16 @@ public class CGenerator extends IRInstructionVisitor {
       putIncrementAtomic("thread_inits");
       putLaunchThread("thread", TMP_PTR1);
     } else {
-      putAssign(TMP_PTR1, TASK);
-      putAllocTask(TASK);
-      putAssign(taskNext(TASK), cast(TMP_PTR1, "struct task*"));
-      putAssign(taskCont(TASK), codeLocationAddress(instr.getLocation()));
-      putAssign(taskContEnv(TASK), ENV);
+      putPushTask(TMP_PTR1, codeLocationAddress(instr.getLocation()));
     }
+  }
+
+  private void putPushTask(String tmpVar, String address) {
+    putAssign(tmpVar, TASK);
+    putAllocTask(TASK);
+    putAssign(taskNext(TASK), cast(tmpVar, "struct task*"));
+    putAssign(taskCont(TASK), address);
+    putAssign(taskContEnv(TASK), ENV);
   }
 
   @Override
@@ -774,7 +784,10 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRContinueSession instr) {
-    putContinue(accessSession(instr.getSessionId()), codeLocationAddress(instr.getContinuation()));
+    putContinue(
+        TMP_PTR1,
+        accessSession(instr.getSessionId()),
+        codeLocationAddress(instr.getContinuation()));
   }
 
   @Override
@@ -1017,10 +1030,21 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRWriteExponential instr) {
-    IRProcessId expProcessId = instr.getProcessId();
-    IRProcess expProcess = program.get(expProcessId);
+    putWriteExponential(
+        data(instr.getLocation()).deref("struct exponential*"),
+        instr.getProcessId(),
+        instr.getTypeArguments(),
+        instr.getDataArguments());
+  }
+
+  private void putWriteExponential(
+      String exponential,
+      IRProcessId processId,
+      List<IRWriteExponential.TypeArgument> typeArguments,
+      List<IRWriteExponential.DataArgument> dataArguments) {
+    IRProcess expProcess = program.get(processId);
     if (expProcess == null) {
-      throw new IllegalArgumentException("Exponential process " + expProcessId + " not found");
+      throw new IllegalArgumentException("Exponential process " + processId + " not found");
     }
 
     Function<IRTypeId, CLayout> typeLayoutProvider =
@@ -1028,7 +1052,7 @@ public class CGenerator extends IRInstructionVisitor {
           // We need to find the type layout for given type identifier in the called process
           // This type was passed as an argument, so we search for it
           IRWriteExponential.TypeArgument arg =
-              instr.getTypeArguments().stream()
+              typeArguments.stream()
                   .filter(a -> a.getTargetType().equals(typeId))
                   .findFirst()
                   .orElseThrow(
@@ -1037,7 +1061,7 @@ public class CGenerator extends IRInstructionVisitor {
                               "Type argument "
                                   + typeId
                                   + " not found in call to exponential process "
-                                  + expProcessId));
+                                  + processId));
 
           // Now we can just compute the layout of the source type in the current process
           return layout(arg.getSourceTree().combinations());
@@ -1057,23 +1081,22 @@ public class CGenerator extends IRInstructionVisitor {
     // - TMP_INT holds the operation to perform (0 = clone, 1 = drop)
 
     // Allocate a new exponential and write it to the target location
-    putAllocExponential(TMP_PTR1, typeLayoutProvider, expProcessLayout);
-    String exp = cast(TMP_PTR1, "struct exponential*");
-    putAssign(data(instr.getLocation()).deref("struct exponential*"), exp);
+    putAllocExponential(exponential, typeLayoutProvider, expProcessLayout);
 
     // Initialize the exponential
-    pendingExponentialManagers.put(expProcessId, instr);
-    putAssign(exponentialRefCount(exp), 1);
+    pendingExponentialManagers.put(processId, dataArguments);
+    putAssign(exponentialRefCount(exponential), 1);
     putAssign(
-        exponentialEntrySessionOffset(exp), expProcessLayout.sessionOffset(new IRSessionId(0)));
+        exponentialEntrySessionOffset(exponential),
+        expProcessLayout.sessionOffset(new IRSessionId(0)));
     putAssign(
-        exponentialEntryDataOffset(exp),
+        exponentialEntryDataOffset(exponential),
         expProcessLayout.dataOffset(typeLayoutProvider, new IRLocalDataId(0)));
-    putAssign(exponentialEnvSize(exp), expProcessLayout.size(typeLayoutProvider));
+    putAssign(exponentialEnvSize(exponential), expProcessLayout.size(typeLayoutProvider));
     putStatement(
-        "void " + managerName(expProcessId) + "(char* env, int mode)"); // Forward declare function
-    putAssign(exponentialManager(exp), managerName(expProcessId));
-    putAssign(TMP_PTR1, exponentialEnv(exp));
+        "void " + managerName(processId) + "(char* env, int mode)"); // Forward declare function
+    putAssign(exponentialManager(exponential), managerName(processId));
+    putAssign(TMP_PTR1, exponentialEnv(exponential));
     String newEnv = cast(TMP_PTR1, "char*");
 
     // Setup the end points for the new environment
@@ -1093,13 +1116,13 @@ public class CGenerator extends IRInstructionVisitor {
         labelAddress(codeLocationLabel(expProcess, IRCodeLocation.entry())));
 
     // Write the type arguments to the exponential's environment
-    for (IRWriteExponential.TypeArgument arg : instr.getTypeArguments()) {
+    for (IRWriteExponential.TypeArgument arg : typeArguments) {
       // Get a reference to the target type in the new environment and initialize itq
       String targetType = type(expProcessLayout, newEnv, arg.getTargetType());
       putAssign(targetType, typeInitializer(arg.getSourceTree()));
     }
 
-    for (IRWriteExponential.DataArgument arg : instr.getDataArguments()) {
+    for (IRWriteExponential.DataArgument arg : dataArguments) {
       // Here we simply copy data from some location in the current environment to
       // a local data section in the new environment
       IRDataLocation target = IRDataLocation.local(arg.getTargetDataId(), IRSlotOffset.ZERO);
@@ -1115,38 +1138,54 @@ public class CGenerator extends IRInstructionVisitor {
   @Override
   public void visit(IRCallExponential instr) {
     String exponential = data(instr.getLocation()).deref("struct exponential*");
+    Optional<CAddress> localSessionAddress = Optional.of(sessionAddress(instr.getSessionId()));
+    Optional<CAddress> localDataAddress = Optional.of(localData(instr.getLocalDataId()));
+    putCallExponential(TMP_PTR1, exponential, localSessionAddress, localDataAddress);
+  }
+
+  private void putCallExponential(
+      String envVar,
+      String exponential,
+      Optional<CAddress> localSessionAddress,
+      Optional<CAddress> localDataAddress) {
     CAddress oldEnv = CAddress.of(exponentialEnv(exponential));
 
     // Allocate the new environment and initialize it by copying the one stored in the exponential
-    putAllocEnvironment(TMP_PTR1, CSize.expression(exponentialEnvSize(exponential)));
-    CAddress newEnv = castToAddress(TMP_PTR1);
+    putAllocEnvironment(envVar, CSize.expression(exponentialEnvSize(exponential)));
+    CAddress newEnv = castToAddress(envVar);
     putCopyMemory(newEnv, oldEnv, CSize.expression(exponentialEnvSize(exponential)));
 
     // Call the exponential manager to clone the slots
     putStatement(
-        exponentialManager(exponential) + "(" + cast(TMP_PTR1, "char*") + ", 0)"); // 0 = Clone
+        exponentialManager(exponential) + "(" + cast(envVar, "char*") + ", 0)"); // 0 = Clone
 
     // Setup the new session and tie it to the exponential's entry session
-    CAddress localSessionAddress = sessionAddress(instr.getSessionId());
     CAddress remoteSessionAddress =
         newEnv.offset(CSize.expression(exponentialEntrySessionOffset(exponential)));
-    String localSession = localSessionAddress.deref("struct session");
     String remoteSession = remoteSessionAddress.deref("struct session");
     CAddress remoteData = newEnv.offset(CSize.expression(exponentialEntryDataOffset(exponential)));
 
     // Initialize local session
-    StringBuilder sb = new StringBuilder("(struct session)");
-    sb.append("{.cont=").append(sessionCont(remoteSession));
-    sb.append(",.cont_env=").append(newEnv);
-    sb.append(",.cont_data=").append(remoteData);
-    sb.append(",.cont_session=").append(remoteSessionAddress);
-    sb.append("}");
-    putAssign(localSession, sb.toString());
+    if (localSessionAddress.isPresent()) {
+      StringBuilder sb = new StringBuilder("(struct session)");
+      sb.append("{.cont=").append(sessionCont(remoteSession));
+      sb.append(",.cont_env=").append(newEnv);
+      sb.append(",.cont_data=").append(remoteData);
+      sb.append(",.cont_session=").append(remoteSessionAddress);
+      sb.append("}");
+      putAssign(localSessionAddress.get().deref("struct session"), sb.toString());
+    }
 
     // Initialize remote session (the one stored in the exponential)
     putAssign(sessionContEnv(remoteSession), ENV);
-    putAssign(sessionContData(remoteSession), localData(instr.getLocalDataId()));
-    putAssign(sessionContSession(remoteSession), localSessionAddress);
+    if (localDataAddress.isPresent()) {
+      putAssign(sessionContData(remoteSession), localDataAddress.get());
+    }
+    if (localSessionAddress.isPresent()) {
+      putAssign(sessionContSession(remoteSession), localSessionAddress.get());
+    } else {
+      putAssign(sessionContSession(remoteSession), remoteSession);
+    }
   }
 
   @Override
@@ -1191,22 +1230,19 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRWriteCell instr) {
-    String ref = data(instr.getLocation()).deref("struct cell*");
-    CSize dataSize;
-    if (instr.getSlot().isValue()) {
-      // We store the value directly
-      dataSize = layout(instr.getSlot().getValue().combinations()).size;
-    } else if (instr.getSlot().isAffine()) {
-      // We store a session pointer
-      dataSize = compiler.arch.pointerSize;
-    } else {
-      throw new IllegalArgumentException("Unsupported cell slot type");
-    }
-    putAllocCell(ref, dataSize);
-    putAssign(cellRefCount(ref), 1);
+    CAddress slotAddr = data(instr.getLocation());
+    String cell = slotAddr.deref("struct cell*");
+    putAllocCell(cell, layout(instr.getSlots().combinations()).size);
+    putAssign(cellRefCount(cell), 1);
     if (compiler.concurrency.get()) {
-      putMutexInit(cellMutex(ref));
+      putMutexInit(cellMutex(cell));
     }
+
+    putWriteExponential(
+        cellSlotManager(slotAddr),
+        instr.getManagerId(),
+        instr.getManagerTypeArguments(),
+        List.of());
   }
 
   @Override
@@ -1216,7 +1252,7 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRDecrementCell instr) {
-    putDecrementCell(data(instr.getLocation()).deref("struct cell*"), instr.getSlot());
+    putDecrementCell(data(instr.getLocation()));
   }
 
   @Override
@@ -1471,6 +1507,14 @@ public class CGenerator extends IRInstructionVisitor {
     return var + "->mutex";
   }
 
+  private CAddress cellSlotManagerAddress(CAddress cellSlotAddr) {
+    return cellSlotAddr.offset(compiler.arch.pointerSize);
+  }
+
+  private String cellSlotManager(CAddress cellSlotAddr) {
+    return cellSlotManagerAddress(cellSlotAddr).deref("struct exponential*");
+  }
+
   private CSize offset(CSize base, IRSlotOffset offset) {
     if (offset.isZero()) {
       return base;
@@ -1525,11 +1569,11 @@ public class CGenerator extends IRInstructionVisitor {
 
   // ============================ Structure statement building helpers ============================
 
-  void putContinue(String session, String continuationAddress) {
-    putAssign(TMP_PTR1, sessionCont(session));
+  void putContinue(String tmpVar, String session, String continuationAddress) {
+    putAssign(tmpVar, sessionCont(session));
     putAssign(sessionCont(accessRemoteSession(session)), continuationAddress);
     putAssign(ENV, sessionContEnv(session));
-    putComputedGoto(TMP_PTR1);
+    putComputedGoto(tmpVar);
   }
 
   void putMoveSlots(
@@ -1590,7 +1634,7 @@ public class CGenerator extends IRInstructionVisitor {
     putAssign(ref, 0); // 0 means discard
 
     String label = makeLabel("drop_affine");
-    putContinue(session, labelAddress(label));
+    putContinue(TMP_PTR1, session, labelAddress(label));
     putLabel(label);
   }
 
@@ -1694,30 +1738,50 @@ public class CGenerator extends IRInstructionVisitor {
     putIncrementAtomic(cellRefCount(var));
   }
 
-  void putDecrementCell(String var, IRCellS cell) {
+  void putDecrementCell(CAddress cellAddr) {
+    String ref = cellAddr.deref("struct cell*");
+
     putIf(
-        decrementAtomic(cellRefCount(var)) + " == 1",
+        decrementAtomic(cellRefCount(ref)) + " == 1",
         () -> {
           if (compiler.tracing.get()) {
             putDebugLn("[freeCell]");
           }
 
-          // Drop the cell's data
-          if (cell.isValue()) {
-            putDropSlots(
-                cell.getValue(), (past, slot) -> cellData(var, IRSlotOffset.of(past, slot)));
-          } else if (cell.isAffine()) {
-            // If the cell holds an affine session, we must jump to it and discard it
-            String session = cellData(var, IRSlotOffset.ZERO).deref("struct session*");
-            putDropAffine("(*" + session + ")");
-          } else {
-            throw new IllegalArgumentException("Unknown cell type " + cell);
-          }
+          // To drop the cell's contents, we must call its manager
+          CAddress managerAddr = cellSlotManagerAddress(cellAddr);
+          String manager = managerAddr.deref("void*");
+          putCallExponential(
+              TMP_PTR1,
+              managerAddr.deref("struct exponential*"),
+              Optional.empty(),
+              Optional.empty());
+          CAddress managerEnv = castToAddress(TMP_PTR1);
 
+          CAddress remoteData =
+              managerEnv.offset(CSize.expression(exponentialEntryDataOffset(manager)));
+          CAddress remoteSessionAddr =
+              managerEnv.offset(CSize.expression(exponentialEntrySessionOffset(manager)));
+          String remoteSession = remoteSessionAddr.deref("struct session");
+
+          // Pass the cell to the manager
+          putAssign(remoteData.deref("struct cell*"), ref);
+          remoteData = remoteData.offset(compiler.arch.pointerSize);
+
+          // Pass a tag indicating we want to drop the cell data
+          String tagRef = remoteData.deref("unsigned char");
+          putAssign(tagRef, CELL_MANAGER_MODE_DROP); // 0 means drops
+
+          // Pass control to the manager
+          String contLabel = makeLabel("drop_cell_data");
+          putContinue(TMP_PTR2, remoteSession, labelAddress(contLabel));
+          putLabel(contLabel);
+
+          // Now we can free the cell itself
           if (compiler.concurrency.get()) {
-            putMutexDestroy(cellMutex(var));
+            putMutexDestroy(cellMutex(ref));
           }
-          putFreeCell(var);
+          putFreeCell(ref);
         });
   }
 

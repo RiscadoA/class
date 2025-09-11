@@ -92,7 +92,7 @@ public class CLayout {
 
     @Override
     public void visit(IRCellS slot) {
-      visit(arch.pointerSize, arch.pointerAlignment);
+      visit(arch.pointerSize.multiply(2), arch.pointerAlignment);
     }
 
     @Override

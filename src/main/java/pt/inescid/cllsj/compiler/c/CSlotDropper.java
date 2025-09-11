@@ -50,7 +50,7 @@ public class CSlotDropper extends IRSlotVisitor {
 
   @Override
   public void visit(IRCellS slot) {
-    gen.putDecrementCell(address.deref("struct cell*"), slot);
+    gen.putDecrementCell(address);
   }
 
   @Override

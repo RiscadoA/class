@@ -18,8 +18,10 @@ import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.nodes.*;
 import pt.inescid.cllsj.ast.types.*;
 import pt.inescid.cllsj.compiler.Compiler;
+import pt.inescid.cllsj.compiler.c.CGenerator;
 import pt.inescid.cllsj.compiler.ir.expression.IRExpression;
 import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
+import pt.inescid.cllsj.compiler.ir.id.IRLocalDataId;
 import pt.inescid.cllsj.compiler.ir.id.IRProcessId;
 import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
 import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
@@ -155,6 +157,52 @@ public class IRGenerator extends ASTNodeVisitor {
     }
 
     return env;
+  }
+
+  private IRProcessId generateIdentityCellManager(ASTType rhsType) {
+    IRProcessId processId = new IRProcessId("cell_manager_id" + nextProcessGenId++);
+    IRProcess manager = new IRProcess(processId);
+
+    // Declare arguments
+    IRLocalDataId dataId = manager.addLocalData(IRSlotCombinations.of(new IRCellS(), new IRTagS()));
+    IRSessionId sessionId = manager.addArgSession(dataId);
+
+    IRDataLocation cellLoc = IRDataLocation.local(dataId, IRSlotOffset.ZERO);
+    IRDataLocation tagLoc = IRDataLocation.local(dataId, IRSlotOffset.of(new IRSessionS(), new IRTagS()));
+
+    // Branch on manager mode
+    IRBlock onPut = manager.createBlock("on_put");
+    IRBlock onTake = manager.createBlock("on_take");
+    IRBlock onDrop = manager.createBlock("on_drop");
+
+    IRBranchTag.Case[] cases = new IRBranchTag.Case[3]; 
+    cases[CGenerator.CELL_MANAGER_MODE_PUT] = new IRBranchTag.Case(onPut.getLocation(), 1);
+    cases[CGenerator.CELL_MANAGER_MODE_TAKE] = new IRBranchTag.Case(onTake.getLocation(), 1);
+    cases[CGenerator.CELL_MANAGER_MODE_DROP] = new IRBranchTag.Case(onDrop.getLocation(), 1);
+    manager.getEntry().add(new IRBranchTag(tagLoc, List.of(cases)));
+
+    // Generate the put mode
+    // TODO:
+
+    // Generate the take mode
+    // TODO:
+
+    // Generate the drop mode, which simply discards the value if present
+    if (isValue(rhsType, true)) {
+      IRDataLocation sessionLoc = IRDataLocation.cell(cellLoc, IRSlotOffset.ZERO);
+      onDrop.add(new IRDropValue(sessionLoc, slotsFromType(rhsType).activeRemoteTree));
+      onDrop.add(new IRFinishSession(sessionId, true));
+    } else {
+      IRBlock contBlock = process.createBlock("discard_cont");
+
+      IRDataLocation sessionLoc = IRDataLocation.cell(cellLoc, IRSlotOffset.ZERO);
+      onDrop.add(new IRWriteTag(tagLoc, 0)); // 0 indicates drop
+      onDrop.add(new IRContinueSession(sessionLoc, contBlock.getLocation()));
+
+      contBlock.add(new IRFinishSession(sessionId, true));
+    }
+
+    return processId;
   }
 
   // ============================ Instruction generation visit methods ============================
@@ -1113,16 +1161,7 @@ public class IRGenerator extends ASTNodeVisitor {
   }
 
   void addRelease(String ch, ASTUsageT type, boolean popTask) {
-    IREnvironment.Channel channel = env.getChannel(ch);
-
-    IRCellS slot;
-    if (isValue(type.getin(), false)) {
-      slot = IRCellS.value(slotsFromType(type.getin()).activeLocalTree);
-    } else {
-      slot = IRCellS.affine();
-    }
-
-    block.add(new IRDecrementCell(channel.getLocalData(), slot));
+    block.add(new IRDecrementCell(env.getChannel(ch).getLocalData()));
     if (popTask) {
       block.add(new IRPopTask(true));
     }
@@ -1140,17 +1179,18 @@ public class IRGenerator extends ASTNodeVisitor {
   void addCell(String ch, String chc, ASTType typeRhs, Runnable cont) {
     IREnvironment.Channel channel = env.getChannel(ch);
 
+    IRProcessId managerId = generateIdentityCellManager(typeRhs);
+
     if (isValue(typeRhs, true)) {
       // Write a new cell containing the value directly
-      IRCellS cellSlot = IRCellS.value(slotsFromType(typeRhs).activeRemoteTree);
-      block.add(new IRWriteCell(channel.getRemoteData(), cellSlot));
+      block.add(new IRWriteCell(channel.getRemoteData(), slotsFromType(typeRhs).activeRemoteTree, managerId, List.of()));
 
       // In We immediately produce the value in place
       env = env.addCellAccess(channel.getSessionId(), channel.getRemoteData(), chc);
       recurse(block, cont);
     } else {
       // Otherwise, the cell will store a pointer to a session
-      block.add(new IRWriteCell(channel.getRemoteData(), IRCellS.affine()));
+      block.add(new IRWriteCell(channel.getRemoteData(), IRSlotTree.of(new IRSessionS()), managerId, List.of()));
 
       // Initialize the session we'll store in the cell
       env = env.addSession(chc, slotsFromType(typeRhs).localCombinations());
