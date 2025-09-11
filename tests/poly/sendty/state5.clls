@@ -1,0 +1,27 @@
+proc foo<A>(x: coaffine recv ~A; wait, y: state A) {
+  cell y(a.
+    affine a;
+    use x; recv x(b); wait x;
+    fwd b a
+  )
+};;
+
+proc main() {
+  cut {
+    sendty x(lint);
+    send x(42);
+    take x(y); println(y);
+    put x(1);
+    take x(y); println(y);
+    put x(2);
+    release x
+    |x: recvty A; recv coaffine ~A; state A|
+    recvty x(A);
+    recv x(y);
+    cut {
+      affine z; use y; send z(y); close z
+      |z: coaffine recv ~A; wait|
+      foo<A>(z, x)
+    }
+  }
+};;

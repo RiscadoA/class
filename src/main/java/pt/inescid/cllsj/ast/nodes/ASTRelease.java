@@ -23,6 +23,7 @@ import pt.inescid.cllsj.ast.types.ASTUsageT;
 
 public class ASTRelease extends ASTNode {
   String chr;
+  ASTType ty;
 
   public ASTRelease(String _chr) {
     chr = _chr;
@@ -34,6 +35,10 @@ public class ASTRelease extends ASTNode {
 
   public void setChr(String _chr) {
     chr = _chr;
+  }
+
+  public ASTType getTy() {
+    return ty;
   }
 
   public void ASTInsertPipe(Function<ASTNode, ASTNode> f, ASTNode from) throws Exception {
@@ -63,7 +68,7 @@ public class ASTRelease extends ASTNode {
   public void typecheck(Env<ASTType> ed, Env<ASTType> eg, Env<EnvEntry> ep) throws Exception {
     //	this.inferUses(chr,ed,ep);
 
-    ASTType ty = ed.find(chr);
+    ty = ed.find(chr);
     ty = ty.unfoldType(ep);
     ty = ASTType.unfoldRecInfer(ty, this, chr, ep);
 

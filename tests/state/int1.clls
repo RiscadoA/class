@@ -1,0 +1,10 @@
+proc main() {
+    cut {
+        cell c1(13)
+        |c1: ~state lint|
+        take c1(x);
+        println(x);
+        put c1(0);
+        release c1
+    }
+};;

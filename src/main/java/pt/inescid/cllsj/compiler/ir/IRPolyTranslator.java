@@ -691,7 +691,25 @@ public class IRPolyTranslator extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTCellT type) {
-    // TODO Auto-generated method stub
+    // The instantiated side must received a cell of the instantiated type
+    // The polymorphic side is giving us a cell of the polymorphic type
+
+    // Polymorphic cells are always affine, i.e., they hold only a session pointer
+
+    // Ideally we would create a 'wrapper' cell here that holds 
+
+    // TODO: we can have some rule such that polymorphic cells are always represented differently
+
+    // Polymorphic cells store:
+    // - a pointer to the cell
+    // - an exponential to perform translation on the cell
+    //
+    // Here, the only thing that needs to be done is to attach the exponential to the cell
+
+    // Cells could be passed around with exponentials used to translate them
+    // Whenever a cell passes through a 'translation layer', that exponential is modified.
+    // I.e., basically, cells store hooks 
+
     throw new UnsupportedOperationException("Unimplemented method 'visit'");
   }
 

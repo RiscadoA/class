@@ -91,6 +91,11 @@ public class CLayout {
     }
 
     @Override
+    public void visit(IRCellS slot) {
+      visit(arch.pointerSize, arch.pointerAlignment);
+    }
+
+    @Override
     public void visit(IRTypeS slot) {
       visit(arch.typeSize(), arch.typeAlignment());
     }

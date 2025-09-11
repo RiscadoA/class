@@ -13,6 +13,8 @@ public abstract class IRSlotVisitor {
 
   public abstract void visit(IRExponentialS slot);
 
+  public abstract void visit(IRCellS slot);
+
   public abstract void visit(IRTypeS slot);
 
   public abstract void visit(IRVarS slot);

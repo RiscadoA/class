@@ -1,0 +1,12 @@
+proc main() {
+  cut {
+    cell x(y.
+      affine y;
+      sendty y(lint);
+      send y(10);
+      println(y); ()
+    )
+    |x: usage recvty A; recv ~A; A|
+    release x
+  }
+};;

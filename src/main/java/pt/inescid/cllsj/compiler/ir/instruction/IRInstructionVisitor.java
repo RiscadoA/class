@@ -50,4 +50,14 @@ public abstract class IRInstructionVisitor {
   public abstract void visit(IRPanic instr);
 
   public abstract void visit(IRJump instr);
+
+  public abstract void visit(IRIncrementCell instr);
+
+  public abstract void visit(IRDecrementCell instr);
+
+  public abstract void visit(IRWriteCell instr);
+
+  public abstract void visit(IRLockCell instr);
+
+  public abstract void visit(IRUnlockCell instr);
 }

@@ -169,7 +169,7 @@ public class IRContinuationChecker extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTAffineT type) {
-    if (compiler.optimizeAffineValue.get() && IRValueChecker.check(compiler, env, type.getin(), true)) {
+    if (IRValueChecker.check(compiler, env, type.getin(), true)) {
       foundPolarity(true);
     } else {
       mayHaveContinuation = true;
@@ -178,7 +178,7 @@ public class IRContinuationChecker extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTCoAffineT type) {
-    if (compiler.optimizeAffineValue.get() && IRValueChecker.check(compiler, env, type.getin(), false)) {
+    if (IRValueChecker.check(compiler, env, type.getin(), false)) {
       foundPolarity(false);
     } else {
       mayHaveContinuation = true;
@@ -187,21 +187,21 @@ public class IRContinuationChecker extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTCellT type) {
-    mayHaveContinuation = true;
+    foundPolarity(true);
   }
 
   @Override
   public void visit(ASTUsageT type) {
-    mayHaveContinuation = true;
+    foundPolarity(false);
   }
 
   @Override
   public void visit(ASTCellLT type) {
-    mayHaveContinuation = true;
+    foundPolarity(true);
   }
 
   @Override
   public void visit(ASTUsageLT type) {
-    mayHaveContinuation = true;
+    foundPolarity(false);
   }
 }

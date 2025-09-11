@@ -522,7 +522,7 @@ public class IRGenerator extends ASTNodeVisitor {
   public void visit(ASTDiscard node) {
     IREnvironment.Channel channel = env.getChannel(node.getCh());
 
-    if (compiler.optimizeAffineValue.get() && isValue(node.getCoAffineT(), false)) {
+    if (isValue(node.getCoAffineT(), false)) {
       // The value is already present, we must drop it
       block.add(
           new IRDropValue(
@@ -538,44 +538,40 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTCell node) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    addCell(node.getCh(), node.getChc(), node.getTypeRhs(), () -> node.getRhs().accept(this));
   }
 
   @Override
   public void visit(ASTPut node) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    addPut(node.getChs(), node.getCho(), node.getLhsType(), () -> node.getLhs().accept(this), () -> node.getRhs().accept(this));
   }
 
   @Override
   public void visit(ASTTake node) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    addTake(node.getChr(), node.getChi(), node.getChiType(), () -> node.getRhs().accept(this));
   }
 
   @Override
   public void visit(ASTRelease node) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    if (!(node.getTy() instanceof ASTUsageT)) {
+      throw new IllegalArgumentException("Release type must be a usage type");
+    }
+    addRelease(node.getChr(), (ASTUsageT)node.getTy(), true);
   }
 
   @Override
   public void visit(ASTShare node) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    addShare(node.getCh(), node.isConcurrent(), () -> node.getLhs().accept(this), () -> node.getRhs().accept(this));
   }
 
   @Override
   public void visit(ASTShareL node) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    addShare(node.getCh(), true, () -> node.getLhs().accept(this), () -> node.getRhs().accept(this));
   }
 
   @Override
   public void visit(ASTShareR node) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    addShare(node.getCh(), true, () -> node.getRhs().accept(this), () -> node.getLhs().accept(this));
   }
 
   @Override
@@ -666,15 +662,19 @@ public class IRGenerator extends ASTNodeVisitor {
 
     // Define new session for the channel being received
     IRSlotsFromASTType info = slotsFromType(lhsType);
-    env = env.addSession(chi, info.localCombinations());
-    IREnvironment.Channel argChannel = env.getChannel(chi);
 
     if (compiler.optimizeSendValue.get() && isValue(lhsType, false)) {
+      env = env.addValue(chi, info.localCombinations(), Optional.empty());
+      IREnvironment.Channel argChannel = env.getChannel(chi);
+
       // If the left type is a value, we do the send value optimization
       block.add(
           new IRMoveValue(argChannel.getLocalData(), channel.getLocalData(), info.activeLocalTree));
       advanceOrReset(ch, info.activeLocalTree.combinations(), rhsType, false);
     } else {
+      env = env.addSession(chi, info.localCombinations());
+      IREnvironment.Channel argChannel = env.getChannel(chi);
+
       // Bind the new session to the value received from the main session
       block.add(
           new IRBindSession(
@@ -1026,7 +1026,7 @@ public class IRGenerator extends ASTNodeVisitor {
   void addAffine(String ch, ASTType contType, Map<String, ASTType> usageSet, Map<String, ASTType> coaffineSet, int contEndPoints, Runnable cont) {
     IREnvironment.Channel channel = env.getChannel(ch);
 
-    if (compiler.optimizeAffineValue.get() && isValue(contType, true)) {
+    if (isValue(contType, true)) {
       // In this case, we immediately produce the value in place
       cont.run();
     } else {
@@ -1045,14 +1045,18 @@ public class IRGenerator extends ASTNodeVisitor {
             // This includes both references to cells and coaffine channels
 
             for (String name : usageSet.keySet()) {
-              throw new UnsupportedOperationException("TODO: decrement cell reference count");
+              ASTType type = usageSet.get(name);
+              if (!(type instanceof ASTUsageT)) {
+                throw new RuntimeException("Internal error: affine usage set contains non-usage type");
+              }
+              addRelease(name, (ASTUsageT)usageSet.get(name), false);
             }
 
             for (String name : coaffineSet.keySet()) {
               ASTType type = coaffineSet.get(name);
               IREnvironment.Channel capturedChannel = env.getChannel(name);
 
-              if (compiler.optimizeAffineValue.get() && isValue(type, false)) {
+              if (isValue(type, false)) {
                 // If the coaffine is a value, we can simply drop it
                 block.add(
                     new IRDropValue(
@@ -1070,7 +1074,7 @@ public class IRGenerator extends ASTNodeVisitor {
   }
 
   void addUse(String ch, ASTType contType, Runnable cont) {
-    if (compiler.optimizeAffineValue.get() && isValue(contType, false)) {
+    if (isValue(contType, false)) {
       // The value is already present, so we do nothing
       recurse(block, cont);
       return;
@@ -1082,6 +1086,149 @@ public class IRGenerator extends ASTNodeVisitor {
     addContinueIfNegative(channel.getSessionId(), contType);
 
     recurse(block, cont);
+  }
+
+  void addRelease(String ch, ASTUsageT type, boolean popTask) {
+    IREnvironment.Channel channel = env.getChannel(ch);
+
+    IRCellS slot;
+    if (isValue(type.getin(), false)) {
+      slot = IRCellS.value(slotsFromType(type.getin()).activeLocalTree);
+    } else {
+      slot = IRCellS.affine();
+    }
+
+    block.add(new IRDecrementCell(channel.getLocalData(), slot));
+    if (popTask) {
+      block.add(new IRPopTask(true));
+    }
+  }
+
+  void addShare(String ch, boolean concurrent, Runnable lhsCont, Runnable rhsCont) {
+    block.add(new IRIncrementCell(env.getChannel(ch).getLocalData()));
+    
+    IRBlock rhsBlock = process.createBlock("share_rhs");
+    block.add(new IRPushTask(rhsBlock.getLocation(), concurrent && compiler.concurrency.get()));
+    recurse(block, lhsCont);
+    recurse(rhsBlock, rhsCont);
+  }
+
+  void addCell(String ch, String chc, ASTType typeRhs, Runnable cont) {
+    IREnvironment.Channel channel = env.getChannel(ch);
+
+    if (isValue(typeRhs, true)) {
+      // Write a new cell containing the value directly
+      IRCellS cellSlot = IRCellS.value(slotsFromType(typeRhs).activeRemoteTree);
+      block.add(new IRWriteCell(channel.getRemoteData(), cellSlot));
+
+      // In We immediately produce the value in place
+      env = env.addCellAccess(channel.getSessionId(), channel.getRemoteData(), chc);
+      recurse(block, cont);
+    } else {
+      // Otherwise, the cell will store a pointer to a session
+      block.add(new IRWriteCell(channel.getRemoteData(), IRCellS.affine()));
+
+      // Initialize the session we'll store in the cell
+      env = env.addSession(chc, slotsFromType(typeRhs).localCombinations());
+      IREnvironment.Channel cellSession = env.getChannel(chc);
+      IRBlock cellBlock = process.createBlock("cell_rhs");
+      block.add(
+          new IRInitializeSession(
+              cellSession.getSessionId(), cellBlock.getLocation(), cellSession.getLocalData()));
+  
+      // Store it in the cell and finish
+      block.add(new IRWriteSession(IRDataLocation.cell(channel.getRemoteData(), IRSlotOffset.ZERO), cellSession.getSessionId()));
+      block.add(new IRFinishSession(channel.getSessionId(), false));
+
+      // Recurse on the cell's right-hand-side
+      recurse(cellBlock, cont);
+    }
+  }
+
+  void addPut(String ch, String chc, ASTType typeLhs, Runnable contLhs, Runnable contRhs) {
+    IREnvironment.Channel channel = env.getChannel(ch);
+    IRDataLocation cellDataLoc = IRDataLocation.cell(channel.getLocalData(), IRSlotOffset.ZERO);
+
+
+    if (isValue(typeLhs, true)) {
+      // If the left-hand-side is a value, we do basically the same as the send value optimization
+      env = env.addSession(chc);
+      IREnvironment.Channel argSession = env.getChannel(chc);
+
+      // Create block for the right-hand-side to run after the value has been written
+      IRBlock rhsBlock = process.createBlock("put_rhs");
+
+      // Initialize the new session so that its data points to the cell's data
+      block.add(
+          new IRInitializeSession(
+              argSession.getSessionId(), rhsBlock.getLocation(), cellDataLoc));
+      recurse(block, contLhs);
+
+      // Generate the continuation
+      recurse(
+          rhsBlock,
+          () -> {
+            if (compiler.concurrency.get()) {
+              block.add(new IRUnlockCell(channel.getLocalData()));
+            }
+            contRhs.run();
+          });
+    } else {
+      // Define new session for the channel being stored
+      IRSlotsFromASTType argInfo = slotsFromType(typeLhs);
+      env = env.addSession(chc, argInfo.localCombinations());
+      IREnvironment.Channel argSession = env.getChannel(chc);
+
+      // Initialize the new session with a new closure block for the left-hand-side
+      // as its continuation.
+      IRBlock closureBlock = process.createBlock("put_lhs");
+      recurse(closureBlock, contLhs);
+      block.add(
+          new IRInitializeSession(
+              argSession.getSessionId(), closureBlock.getLocation(), argSession.getLocalData()));
+
+      block.add(new IRWriteSession(cellDataLoc, argSession.getSessionId()));
+
+      // Recurse on the continuation
+      if (compiler.concurrency.get()) {
+        block.add(new IRUnlockCell(channel.getLocalData()));
+      }
+      recurse(block, contRhs);
+    }
+  }
+
+  void addTake(String ch, String chc, ASTType typeLhs, Runnable cont) {
+    IREnvironment.Channel channel = env.getChannel(ch);
+    IRDataLocation cellDataLoc = IRDataLocation.cell(channel.getLocalData(), IRSlotOffset.ZERO);
+
+    // Lock the cell while we're accessing it
+    if (compiler.concurrency.get()) {
+      block.add(new IRLockCell(channel.getLocalData()));
+    }
+
+    // Define new session for the channel being received
+    IRSlotsFromASTType info = slotsFromType(typeLhs);
+
+    if (isValue(typeLhs, false)) {
+      // If the left-hand-side is a value, we just move it out of the cell
+      env = env.addValue(chc, info.localCombinations(), Optional.empty());
+      IREnvironment.Channel argChannel = env.getChannel(chc);
+      block.add(new IRMoveValue(argChannel.getLocalData(), cellDataLoc, info.activeLocalTree));
+
+      // Recurse on the continuation
+      recurse(block, cont);
+    } else {
+      env = env.addSession(chc, info.localCombinations());
+      IREnvironment.Channel argChannel = env.getChannel(chc);
+
+      // Otherwise, we bind the new session to the one stored in the cell
+      block.add(
+        new IRBindSession(cellDataLoc, argChannel.getSessionId(), argChannel.getLocalData()));
+
+      // The received session is guaranteed to an affine session
+      // We immediately mark it as used
+      addUse(chc, typeLhs, cont);
+    }
   }
 
   void addContinue(IRSessionId sessionId) {

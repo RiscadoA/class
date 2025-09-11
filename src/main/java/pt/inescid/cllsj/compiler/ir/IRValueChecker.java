@@ -188,41 +188,33 @@ public class IRValueChecker extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTAffineT type) {
-    if (compiler.optimizeAffineValue.get()) {
-      expectPolarity(true);
-      type.getin().accept(this);
-    } else {
-      isValue = false;
-    }
+    expectPolarity(true);
+    type.getin().accept(this);
   }
 
   @Override
   public void visit(ASTCoAffineT type) {
-    if (compiler.optimizeAffineValue.get()) {
-      expectPolarity(false);
-      type.getin().accept(this);
-    } else {
-      isValue = false;
-    }
+    expectPolarity(false);
+    type.getin().accept(this);
   }
 
   @Override
   public void visit(ASTCellT type) {
-    isValue = false;
+    expectPolarity(true);
   }
 
   @Override
   public void visit(ASTUsageT type) {
-    isValue = false;
+    expectPolarity(false);
   }
 
   @Override
   public void visit(ASTCellLT type) {
-    isValue = false;
+    expectPolarity(true);
   }
 
   @Override
   public void visit(ASTUsageLT type) {
-    isValue = false;
+    expectPolarity(false);
   }
 }

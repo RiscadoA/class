@@ -338,8 +338,7 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTAffineT type) {
-    if (compiler.optimizeAffineValue.get()
-        && IRValueChecker.check(compiler, env, type.getin(), Optional.of(true))) {
+    if (IRValueChecker.check(compiler, env, type.getin(), Optional.of(true))) {
       type.getin().accept(this);
     } else {
       IRSlotsFromASTType result = recurse(type.getin());
@@ -352,8 +351,7 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTCoAffineT type) {
-    if (compiler.optimizeAffineValue.get()
-        && IRValueChecker.check(compiler, env, type.getin(), Optional.of(false))) {
+    if (IRValueChecker.check(compiler, env, type.getin(), Optional.of(false))) {
       type.getin().accept(this);
     } else {
       IRSlotsFromASTType result = recurse(type.getin());
@@ -364,27 +362,36 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
     }
   }
 
+  private IRCellS makeCellSlot(ASTType inner) {
+    if (IRUsesTypeVar.check(env.getEp(), inner)) {
+      // If the inner type uses a type variable, then this is ae polymorphic cell.
+    }
+
+    if (IRValueChecker.check(compiler, env, inner, true)) {
+      IRSlotsFromASTType result = recurse(inner);
+      return IRCellS.value(result.activeRemoteTree);
+    } else {
+      return IRCellS.affine();
+    }
+  }
+
   @Override
   public void visit(ASTCellT type) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    remoteSlot(makeCellSlot(type.getin()));
   }
 
   @Override
   public void visit(ASTUsageT type) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    localSlot(makeCellSlot(type.getin().dualCatch(env.getEp())));
   }
 
   @Override
   public void visit(ASTCellLT type) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    remoteSlot(makeCellSlot(type.getin()));
   }
 
   @Override
   public void visit(ASTUsageLT type) {
-    // TODO Auto-generated method stub
-    throw new UnsupportedOperationException("Unimplemented method 'visit'");
+    localSlot(makeCellSlot(type.getin().dualCatch(env.getEp())));
   }
 }

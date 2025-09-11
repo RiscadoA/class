@@ -1,6 +1,7 @@
 package pt.inescid.cllsj.compiler.c;
 
 import pt.inescid.cllsj.compiler.ir.slot.IRBoolS;
+import pt.inescid.cllsj.compiler.ir.slot.IRCellS;
 import pt.inescid.cllsj.compiler.ir.slot.IRExponentialS;
 import pt.inescid.cllsj.compiler.ir.slot.IRIntS;
 import pt.inescid.cllsj.compiler.ir.slot.IRKnownVarS;
@@ -45,6 +46,11 @@ public class CSlotDropper extends IRSlotVisitor {
   @Override
   public void visit(IRExponentialS slot) {
     gen.putDecrementExponential(address.deref("struct exponential*"));
+  }
+
+  @Override
+  public void visit(IRCellS slot) {
+    gen.putDecrementCell(address.deref("struct cell*"), slot);
   }
 
   @Override

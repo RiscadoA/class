@@ -109,6 +109,7 @@ public class IREnvironment {
         Optional.of(process.addArgSession(localDataId)),
         IRSlotOffset.ZERO,
         Optional.of(localDataId),
+        Optional.empty(),
         Optional.empty());
   }
 
@@ -120,6 +121,7 @@ public class IREnvironment {
         Optional.of(process.addSession()),
         IRSlotOffset.ZERO,
         Optional.of(localDataId),
+        Optional.empty(),
         Optional.empty());
   }
 
@@ -129,6 +131,7 @@ public class IREnvironment {
         name,
         Optional.of(process.addSession()),
         IRSlotOffset.ZERO,
+        Optional.empty(),
         Optional.empty(),
         Optional.empty());
   }
@@ -141,7 +144,8 @@ public class IREnvironment {
         Optional.empty(),
         IRSlotOffset.ZERO,
         Optional.of(process.addLocalData(combinations)),
-        exponentialType);
+        exponentialType,
+        Optional.empty());
   }
 
   public Channel getChannel(String name) {
@@ -167,7 +171,8 @@ public class IREnvironment {
         channel.sessionId,
         channel.getOffset().advance(offset),
         channel.localDataId,
-        channel.exponentialType);
+        channel.exponentialType,
+        Optional.empty());
   }
 
   public IREnvironment resetChannel(String name) {
@@ -178,7 +183,8 @@ public class IREnvironment {
         channel.sessionId,
         IRSlotOffset.ZERO,
         channel.localDataId,
-        channel.exponentialType);
+        channel.exponentialType,
+        Optional.empty());
   }
 
   public IREnvironment makeChannelExponential(
@@ -193,7 +199,8 @@ public class IREnvironment {
         channel.sessionId,
         channel.getOffset(),
         channel.localDataId,
-        Optional.of(slots));
+        Optional.of(slots),
+        Optional.empty());
   }
 
   public IREnvironment alias(String oldName, String newName) {
@@ -204,7 +211,19 @@ public class IREnvironment {
         channel.sessionId,
         channel.getOffset(),
         channel.localDataId,
-        channel.exponentialType);
+        channel.exponentialType,
+        Optional.empty());
+  }
+
+  public IREnvironment addCellAccess(IRSessionId sessionId, IRDataLocation cell, String accessName) {
+    return new Channel(
+        this,
+        accessName,
+        Optional.of(sessionId),
+        IRSlotOffset.ZERO,
+        Optional.empty(),
+        Optional.empty(),
+        Optional.of(cell));
   }
 
   public boolean isPositive(ASTType type) {
@@ -222,11 +241,9 @@ public class IREnvironment {
     } else if (type instanceof ASTAffineT) {
       // This and the below edge case are necessary due to us compiling affine
       // as an offer and coaffine as a choice, except when they are values
-      boolean isValue = IRValueChecker.check(compiler, this, ((ASTAffineT) type).getin(), true);
-      return compiler.optimizeAffineValue.get() && isValue;
+      return IRValueChecker.check(compiler, this, ((ASTAffineT) type).getin(), true);
     } else if (type instanceof ASTCoAffineT) {
-      boolean isValue = IRValueChecker.check(compiler, this, ((ASTCoAffineT) type).getin(), false);
-      return !(compiler.optimizeAffineValue.get() && isValue);
+      return !IRValueChecker.check(compiler, this, ((ASTCoAffineT) type).getin(), false);
     } else {
       return type.isPosCatch(ep);
     }
@@ -286,6 +303,7 @@ public class IREnvironment {
     private IRSlotOffset offset;
     private Optional<IRLocalDataId> localDataId;
     private Optional<IRSlotTree> exponentialType;
+    private Optional<IRDataLocation> cellLocation;
 
     public Channel(
         IREnvironment parent,
@@ -293,13 +311,15 @@ public class IREnvironment {
         Optional<IRSessionId> sessionId,
         IRSlotOffset offset,
         Optional<IRLocalDataId> localDataId,
-        Optional<IRSlotTree> exponentialType) {
+        Optional<IRSlotTree> exponentialType,
+        Optional<IRDataLocation> cellLocation) {
       super(parent, parent.ep);
       this.name = name;
       this.sessionId = sessionId;
       this.offset = offset;
       this.localDataId = localDataId;
       this.exponentialType = exponentialType;
+      this.cellLocation = cellLocation;
     }
 
     public String getName() {
@@ -323,11 +343,19 @@ public class IREnvironment {
     }
 
     public IRDataLocation getLocalData() {
-      return IRDataLocation.local(getLocalDataId(), offset);
+      if (cellLocation.isPresent()) {
+        return IRDataLocation.cell(cellLocation.get(), offset);
+      } else {
+        return IRDataLocation.local(getLocalDataId(), offset);
+      }
     }
 
     public IRDataLocation getRemoteData() {
-      return IRDataLocation.remote(getSessionId(), offset);
+      if (cellLocation.isPresent()) {
+        return IRDataLocation.cell(cellLocation.get(), offset);
+      } else {
+        return IRDataLocation.remote(getSessionId(), offset);
+      }
     }
 
     public boolean isExponential() {

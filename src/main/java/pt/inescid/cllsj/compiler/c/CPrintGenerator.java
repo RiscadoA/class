@@ -1,6 +1,7 @@
 package pt.inescid.cllsj.compiler.c;
 
 import pt.inescid.cllsj.compiler.ir.slot.IRBoolS;
+import pt.inescid.cllsj.compiler.ir.slot.IRCellS;
 import pt.inescid.cllsj.compiler.ir.slot.IRExponentialS;
 import pt.inescid.cllsj.compiler.ir.slot.IRIntS;
 import pt.inescid.cllsj.compiler.ir.slot.IRKnownVarS;
@@ -74,5 +75,10 @@ public class CPrintGenerator extends IRSlotVisitor {
   @Override
   public void visit(IRExponentialS slot) {
     throw new IllegalArgumentException("Cannot print exponential values");
+  }
+
+  @Override
+  public void visit(IRCellS slot) {
+    throw new IllegalArgumentException("Cannot print cells");
   }
 }

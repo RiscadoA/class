@@ -1,0 +1,27 @@
+proc foo<A>(out: state A; a: ~A, p: send A; wait) {
+  cut {
+    cell c1(x. fwd x a)
+    |c1: usage ~A|
+    share c1 {
+      fwd c1 out
+      ||
+      take c1(x); call p(p1); send p1(x); wait p1;
+      call a(x); put c1(x);
+      release c1
+    }
+  }
+};;
+
+proc main() {
+  letc p: !recv ~lint; close {
+    !p(p); recv p(i); println("foo: " + i); close p
+  };
+  letc a: !lint { let! a 1 };
+
+  cut {
+    foo<lint>(c; a, p)
+    |c: usage ~lint|
+    take c(x); println("main: " + x); put c(2);
+    release c
+  }
+};;

@@ -20,6 +20,7 @@ import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
 import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
 import pt.inescid.cllsj.compiler.ir.instruction.*;
 import pt.inescid.cllsj.compiler.ir.slot.IRBoolS;
+import pt.inescid.cllsj.compiler.ir.slot.IRCellS;
 import pt.inescid.cllsj.compiler.ir.slot.IRIntS;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlot;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotCombinations;
@@ -50,6 +51,7 @@ public class CGenerator extends IRInstructionVisitor {
   private IRProcess currentProcess = null;
   private CProcessLayout currentProcessLayout;
   private int indentLevel = 0;
+  private int nextLabelId = 0;
 
   private Map<IRProcessId, IRWriteExponential> pendingExponentialManagers = new HashMap<>();
 
@@ -247,6 +249,17 @@ public class CGenerator extends IRInstructionVisitor {
           putStatement("int env_size");
           putStatement("void(*manager)(char* env, int mode)");
           putStatement("char env[]");
+        });
+
+    putStruct(
+        "cell",
+        () -> {
+          if (compiler.concurrency.get()) {
+            putStatement("pthread_mutex_t mutex");
+            putStatement("atomic_int ref_count");
+          } else {
+            putStatement("int ref_count");
+          }
         });
 
     putStruct(
@@ -761,15 +774,7 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRContinueSession instr) {
-    String session = accessSession(instr.getSessionId());
-
-    String remoteSession = accessRemoteSession(instr.getSessionId());
-    String remoteSessionCont = sessionCont(remoteSession);
-
-    putAssign(TMP_PTR1, sessionCont(session));
-    putAssign(remoteSessionCont, codeLocationAddress(instr.getContinuation()));
-    putAssign(ENV, sessionContEnv(session));
-    putComputedGoto(TMP_PTR1);
+    putContinue(accessSession(instr.getSessionId()), codeLocationAddress(instr.getContinuation()));
   }
 
   @Override
@@ -1185,6 +1190,50 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   @Override
+  public void visit(IRWriteCell instr) {
+    String ref = data(instr.getLocation()).deref("struct cell*");
+    CSize dataSize;
+    if (instr.getSlot().isValue()) {
+      // We store the value directly
+      dataSize = layout(instr.getSlot().getValue().combinations()).size;
+    } else if (instr.getSlot().isAffine()) {
+      // We store a session pointer
+      dataSize = compiler.arch.pointerSize;
+    } else {
+      throw new IllegalArgumentException("Unsupported cell slot type");
+    }
+    putAllocCell(ref, dataSize);
+    putAssign(cellRefCount(ref), 1);
+    if (compiler.concurrency.get()) {
+      putMutexInit(cellMutex(ref));
+    }
+  }
+
+  @Override
+  public void visit(IRIncrementCell instr) {
+    putIncrementCell(data(instr.getLocation()).deref("struct cell*"));
+  }
+
+  @Override
+  public void visit(IRDecrementCell instr) {
+    putDecrementCell(data(instr.getLocation()).deref("struct cell*"), instr.getSlot());
+  }
+
+  @Override
+  public void visit(IRLockCell instr) {
+    if (compiler.concurrency.get()) {
+      putMutexLock(cellMutex(data(instr.getLocation()).deref("struct cell*")));
+    }
+  }
+
+  @Override
+  public void visit(IRUnlockCell instr) {
+    if (compiler.concurrency.get()) {
+      putMutexUnlock(cellMutex(data(instr.getLocation()).deref("struct cell*")));
+    }
+  }
+
+  @Override
   public void visit(IRSleep instr) {
     putStatement("sleep_msecs(" + instr.getMsecs() + ")");
   }
@@ -1322,6 +1371,16 @@ public class CGenerator extends IRInstructionVisitor {
     return offset(sessionContData(accessSession(sessionId)), offset);
   }
 
+  private CAddress cellData(String var, IRSlotOffset offset) {
+    CAddress base = CAddress.of(cast(var, "char*"), compiler.arch.cellDataOffset(compiler.concurrency.get()));
+    return offset(base, offset);
+  }
+
+  private CAddress cellData(CAddress cell, IRSlotOffset offset) {
+    CAddress base = CAddress.of(cell.deref("char*"), compiler.arch.cellDataOffset(compiler.concurrency.get()));
+    return offset(base, offset);
+  }
+
   private CAddress data(IRDataLocation data) {
     return data(this::typeLayout, currentProcessLayout, ENV, data);
   }
@@ -1333,8 +1392,12 @@ public class CGenerator extends IRInstructionVisitor {
       IRDataLocation data) {
     if (data.isRemote()) {
       return remoteData(layout, env, data.getSessionId(), data.getOffset());
-    } else {
+    } else if (data.isLocal()) {
       return localData(typeLayouts, layout, env, data.getLocalDataId(), data.getOffset());
+    } else if (data.isCell()) {
+      return cellData(data(typeLayouts, layout, env, data.getCell()), data.getOffset());
+    } else {
+      throw new IllegalArgumentException("Unknown data location " + data);
     }
   }
 
@@ -1398,6 +1461,14 @@ public class CGenerator extends IRInstructionVisitor {
     return var + "->env";
   }
 
+  private String cellRefCount(String var) {
+    return var + "->ref_count";
+  }
+
+  private String cellMutex(String var) {
+    return var + "->mutex";
+  }
+
   private CSize offset(CSize base, IRSlotOffset offset) {
     if (offset.isZero()) {
       return base;
@@ -1413,8 +1484,12 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   private CAddress offset(String address, IRSlotOffset offset) {
+    return offset(CAddress.of(address), offset);
+  }
+
+  private CAddress offset(CAddress address, IRSlotOffset offset) {
     CSize pastSize = layout(offset.getPast()).size;
-    CAddress result = CAddress.of(address, pastSize);
+    CAddress result = address.offset(pastSize);
     if (offset.getAlignTo().isPresent()) {
       CAlignment alignment = layout(offset.getAlignTo().get()).alignment;
       result = result.align(alignment);
@@ -1447,6 +1522,13 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   // ============================ Structure statement building helpers ============================
+
+  void putContinue(String session, String continuationAddress) {
+    putAssign(TMP_PTR1, sessionCont(session));
+    putAssign(sessionCont(accessRemoteSession(session)), continuationAddress);
+    putAssign(ENV, sessionContEnv(session));
+    putComputedGoto(TMP_PTR1);
+  }
 
   void putMoveSlots(
       IRSlotTree slots,
@@ -1498,6 +1580,16 @@ public class CGenerator extends IRInstructionVisitor {
   // Drops a slot, e.g., decrementing reference counts if necessary
   void putDropSlot(CAddress address, IRSlot slot) {
     CSlotDropper.drop(this, address, slot);
+  }
+
+  // Drops an affine session, i..e, writes a '0' (discard) tag and continues it.
+  void putDropAffine(String session) {
+    String ref = CAddress.of(sessionContData(session)).deref("unsigned char");
+    putAssign(ref, 0); // 0 means discard
+
+    String label = makeLabel("drop_affine");
+    putContinue(session, labelAddress(label));
+    putLabel(label);
   }
 
   void putSlotTraversal(
@@ -1579,6 +1671,50 @@ public class CGenerator extends IRInstructionVisitor {
           // Call the exponential's manager
           putStatement(exponentialManager(var) + "(" + exponentialEnv(var) + ", 1)"); // 1 = Drop
           putFreeExponential(var);
+        });
+  }
+
+  void putAllocCell(String var, CSize dataSize) {
+    putAlloc(var, compiler.arch.cellSize(compiler.concurrency.get(), dataSize));
+    if (compiler.profiling.get()) {
+      putIncrementAtomic("cell_allocs");
+    }
+  }
+
+  void putFreeCell(String var) {
+    putFree(var);
+    if (compiler.profiling.get()) {
+      putIncrementAtomic("cell_frees");
+    }
+  }
+
+  void putIncrementCell(String var) {
+    putIncrementAtomic(cellRefCount(var));
+  }
+
+  void putDecrementCell(String var, IRCellS cell) {
+    putIf(
+        decrementAtomic(cellRefCount(var)) + " == 1",
+        () -> {
+          if (compiler.tracing.get()) {
+            putDebugLn("[freeCell]");
+          }
+
+          // Drop the cell's data
+          if (cell.isValue()) {
+            putDropSlots(cell.getValue(), (past, slot) -> cellData(var, IRSlotOffset.of(past, slot)));
+          } else if (cell.isAffine()) {
+            // If the cell holds an affine session, we must jump to it and discard it
+            String session = cellData(var, IRSlotOffset.ZERO).deref("struct session*");
+            putDropAffine("(*" + session + ")");
+          } else {
+            throw new IllegalArgumentException("Unknown cell type " + cell);
+          }
+          
+          if (compiler.concurrency.get()) {
+            putMutexDestroy(cellMutex(var));
+          }
+          putFreeCell(var);
         });
   }
 
@@ -1704,6 +1840,10 @@ public class CGenerator extends IRInstructionVisitor {
     } else {
       return var + "--";
     }
+  }
+
+  private String makeLabel(String prefix) {
+    return currentProcess.getId() + "_" + prefix + "_" + (nextLabelId++);
   }
 
   // =============================== Base statement building helpers ==============================

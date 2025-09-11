@@ -2,6 +2,8 @@ package pt.inescid.cllsj.compiler.c;
 
 import java.util.List;
 
+import pt.inescid.cllsj.compiler.Compiler;
+
 public class CArchitecture {
   public CSize recordHeaderSize = CSize.constant(24);
 
@@ -26,8 +28,16 @@ public class CArchitecture {
     return pointerSize.multiply(3).add(envSize);
   }
 
-  public CAlignment exponentialAlignment() {
-    return pointerAlignment;
+  public CSize cellDataOffset(boolean withMutex) {
+    CSize size = withMutex ? CSize.sizeOf("pthread_mutex_t") : CSize.zero();
+    size = size.align(intAlignment);
+    size = size.add(intSize); // ref count
+    size = size.align(pointerAlignment); // assume data is pointer aligned
+    return size;
+  }
+
+  public CSize cellSize(boolean withMutex, CSize dataSize) {
+    return cellDataOffset(withMutex).add(dataSize);
   }
 
   public CSize typeSize() {

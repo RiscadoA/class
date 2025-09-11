@@ -11,9 +11,17 @@ import pt.inescid.cllsj.ast.types.*;
 
 public class IRUsesTypeVar extends ASTTypeVisitor {
   private Env<EnvEntry> ep;
+  private boolean usesAnyTypeVar = false;
   private boolean usesTypeVar = false;
-  private String varName;
+  private String varName = "";
   private List<ASTType> visitedRecursive = new ArrayList<>();
+
+  public static boolean check(Env<EnvEntry> ep, ASTType type) {
+    IRUsesTypeVar v = new IRUsesTypeVar();
+    v.ep = ep;
+    type.accept(v);
+    return v.usesAnyTypeVar;
+  }
 
   public static boolean check(Env<EnvEntry> ep, ASTType type, Set<String> varNames) {
     for (String varName : varNames) {
@@ -78,6 +86,7 @@ public class IRUsesTypeVar extends ASTTypeVisitor {
     }
     idType = (ASTIdT) type;
 
+    usesAnyTypeVar = true;
     if (idType.getid().equals(varName)) {
       usesTypeVar = true;
     }

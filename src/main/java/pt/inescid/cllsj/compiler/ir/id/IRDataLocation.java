@@ -1,5 +1,7 @@
 package pt.inescid.cllsj.compiler.ir.id;
 
+import java.util.Optional;
+
 import pt.inescid.cllsj.compiler.ir.slot.IRSlot;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotOffset;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotSequence;
@@ -7,38 +9,64 @@ import pt.inescid.cllsj.compiler.ir.slot.IRSlotSequence;
 public class IRDataLocation {
   private int index;
   private boolean remote; // True if the location is remote, false if local
+
+  // If we're pointing to a cell's content, this is used
+  // In that case, index is irrelevant and remote should be false
+  private Optional<IRDataLocation> cell;
+
+  // Offset within the data (can be zero)
   private IRSlotOffset offset;
 
   public static IRDataLocation local(IRLocalDataId id, IRSlotOffset offset) {
-    return new IRDataLocation(id.getIndex(), false, offset);
+    return new IRDataLocation(id.getIndex(), false, Optional.empty(), offset);
   }
 
   public static IRDataLocation remote(IRSessionId id, IRSlotOffset offset) {
-    return new IRDataLocation(id.getIndex(), true, offset);
+    return new IRDataLocation(id.getIndex(), true, Optional.empty(), offset);
   }
 
-  private IRDataLocation(int index, boolean remote, IRSlotOffset offset) {
+  public static IRDataLocation cell(IRDataLocation cell, IRSlotOffset offset) {
+    return new IRDataLocation(0, false, Optional.of(cell), offset);
+  }
+
+  private IRDataLocation(int index, boolean remote, Optional<IRDataLocation> cell, IRSlotOffset offset) {
     this.index = index;
     this.remote = remote;
+    this.cell = cell;
     this.offset = offset;
   }
 
   public IRLocalDataId getLocalDataId() {
-    if (remote) {
-      throw new IllegalStateException("Data location is remote");
+    if (!isLocal()) {
+      throw new IllegalStateException("Data location is not local");
     }
     return new IRLocalDataId(index);
   }
 
   public IRSessionId getSessionId() {
-    if (!remote) {
-      throw new IllegalStateException("Data location is local");
+    if (!isRemote()) {
+      throw new IllegalStateException("Data location is not remote");
     }
     return new IRSessionId(index);
   }
 
+  public IRDataLocation getCell() {
+    if (!isCell()) {
+      throw new IllegalStateException("Data location is not a cell");
+    }
+    return cell.get();
+  }
+
+  public boolean isLocal() {
+    return !remote && cell.isEmpty();
+  }
+
   public boolean isRemote() {
     return remote;
+  }
+
+  public boolean isCell() {
+    return cell.isPresent();
   }
 
   public IRSlotOffset getOffset() {
@@ -46,15 +74,15 @@ public class IRDataLocation {
   }
 
   public IRDataLocation advance(IRSlot slot, IRSlot alignTo) {
-    return new IRDataLocation(index, remote, offset.advance(slot, alignTo));
+    return new IRDataLocation(index, remote, cell, offset.advance(slot, alignTo));
   }
 
   public IRDataLocation advance(IRSlotSequence slots, IRSlot alignTo) {
-    return new IRDataLocation(index, remote, offset.advance(slots, alignTo));
+    return new IRDataLocation(index, remote, cell, offset.advance(slots, alignTo));
   }
 
   public IRDataLocation advance(IRSlotOffset offset) {
-    return new IRDataLocation(index, remote, this.offset.advance(offset));
+    return new IRDataLocation(index, remote, cell, this.offset.advance(offset));
   }
 
   @Override
@@ -62,8 +90,12 @@ public class IRDataLocation {
     StringBuilder b = new StringBuilder();
     if (remote) {
       b.append(new IRSessionId(index).toString());
-    } else {
+    } else if (cell.isEmpty()) {
       b.append(new IRLocalDataId(index).toString());
+    } else {
+      b.append("c(");
+      b.append(cell.get().toString());
+      b.append(")");
     }
     b.append(offset.toString());
     return b.toString();

@@ -1,13 +1,5 @@
-send 1
-close 1
 take 1
 put 1
-recv 1
-send 2
-close 2
 take 2
 put 2
-recv 1
-send 3
-close 3
 release
