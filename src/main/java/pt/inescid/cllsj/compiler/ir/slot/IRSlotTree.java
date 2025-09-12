@@ -1,7 +1,10 @@
 package pt.inescid.cllsj.compiler.ir.slot;
 
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
+import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
 
 public abstract class IRSlotTree {
   public static final IRSlotTree LEAF = new Leaf();
@@ -24,6 +27,11 @@ public abstract class IRSlotTree {
 
   public static Tag tag(List<IRSlotTree> cases) {
     return new Tag(cases);
+  }
+
+  public static IsValue isValue(
+      IRValueRequisites requisites, IRSlotTree value, IRSlotTree notValue) {
+    return new IsValue(requisites, value, notValue);
   }
 
   public abstract IRSlotCombinations combinations();
@@ -49,7 +57,20 @@ public abstract class IRSlotTree {
     return this instanceof Tag;
   }
 
-  public abstract Optional<IRSlot> slot();
+  public boolean isIsValue() {
+    return this instanceof IsValue;
+  }
+
+  public abstract Set<IRSlot> head();
+
+  public Optional<IRSlot> singleHead() {
+    Set<IRSlot> heads = head();
+    if (heads.size() == 1) {
+      return Optional.of(heads.iterator().next());
+    } else {
+      return Optional.empty();
+    }
+  }
 
   public abstract IRSlotTree suffix(IRSlotTree other);
 
@@ -60,8 +81,8 @@ public abstract class IRSlotTree {
     }
 
     @Override
-    public Optional<IRSlot> slot() {
-      return Optional.empty();
+    public Set<IRSlot> head() {
+      return Set.of();
     }
 
     @Override
@@ -96,8 +117,8 @@ public abstract class IRSlotTree {
     }
 
     @Override
-    public Optional<IRSlot> slot() {
-      return Optional.of(slot);
+    public Set<IRSlot> head() {
+      return Set.of(slot);
     }
 
     @Override
@@ -144,8 +165,8 @@ public abstract class IRSlotTree {
     }
 
     @Override
-    public Optional<IRSlot> slot() {
-      return Optional.of(new IRTagS());
+    public Set<IRSlot> head() {
+      return Set.of(new IRTagS());
     }
 
     @Override
@@ -162,6 +183,56 @@ public abstract class IRSlotTree {
         }
         sb.append(cases.get(i));
       }
+      sb.append("]");
+    }
+  }
+
+  public static class IsValue extends IRSlotTree {
+    private IRValueRequisites requisites;
+    private IRSlotTree value;
+    private IRSlotTree notValue;
+
+    public IsValue(IRValueRequisites requisites, IRSlotTree value, IRSlotTree notValue) {
+      this.requisites = requisites;
+      this.value = value;
+      this.notValue = notValue;
+    }
+
+    public IRValueRequisites requisites() {
+      return requisites;
+    }
+
+    public IRSlotTree value() {
+      return value;
+    }
+
+    public IRSlotTree notValue() {
+      return notValue;
+    }
+
+    @Override
+    public IRSlotCombinations combinations() {
+      return value.combinations().merge(notValue.combinations());
+    }
+
+    @Override
+    public Set<IRSlot> head() {
+      Set<IRSlot> heads = new HashSet<>();
+      heads.addAll(value.head());
+      heads.addAll(notValue.head());
+      return heads;
+    }
+
+    @Override
+    public IRSlotTree suffix(IRSlotTree other) {
+      return new IsValue(requisites, value.suffix(other), notValue.suffix(other));
+    }
+
+    @Override
+    protected void toStringHelper(StringBuilder sb) {
+      sb.append("isValue(").append(requisites).append(")[");
+      sb.append("yes: ").append(value);
+      sb.append(" | no: ").append(notValue);
       sb.append("]");
     }
   }

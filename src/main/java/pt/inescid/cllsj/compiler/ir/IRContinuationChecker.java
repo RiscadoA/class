@@ -169,7 +169,7 @@ public class IRContinuationChecker extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTAffineT type) {
-    if (IRValueChecker.check(compiler, env, type.getin(), true)) {
+    if (IRValueRequisites.check(compiler, env, type.getin(), true).mustBeValue()) {
       foundPolarity(true);
     } else {
       mayHaveContinuation = true;
@@ -178,7 +178,7 @@ public class IRContinuationChecker extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTCoAffineT type) {
-    if (IRValueChecker.check(compiler, env, type.getin(), false)) {
+    if (IRValueRequisites.check(compiler, env, type.getin(), false).mustBeValue()) {
       foundPolarity(false);
     } else {
       mayHaveContinuation = true;

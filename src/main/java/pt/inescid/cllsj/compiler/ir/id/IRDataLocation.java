@@ -2,6 +2,7 @@ package pt.inescid.cllsj.compiler.ir.id;
 
 import java.util.Optional;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlot;
+import pt.inescid.cllsj.compiler.ir.slot.IRSlotCombinations;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotOffset;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotSequence;
 
@@ -73,12 +74,12 @@ public class IRDataLocation {
     return offset;
   }
 
-  public IRDataLocation advance(IRSlot slot, IRSlot alignTo) {
-    return new IRDataLocation(index, remote, cell, offset.advance(slot, alignTo));
+  public IRDataLocation advance(IRSlot slot, IRSlotCombinations future) {
+    return new IRDataLocation(index, remote, cell, offset.advance(slot, future));
   }
 
-  public IRDataLocation advance(IRSlotSequence slots, IRSlot alignTo) {
-    return new IRDataLocation(index, remote, cell, offset.advance(slots, alignTo));
+  public IRDataLocation advance(IRSlotSequence slots, IRSlotCombinations future) {
+    return new IRDataLocation(index, remote, cell, offset.advance(slots, future));
   }
 
   public IRDataLocation advance(IRSlotOffset offset) {

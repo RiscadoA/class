@@ -1,11 +1,9 @@
 package pt.inescid.cllsj.compiler.ir;
 
-import java.util.Map;
 import java.util.Optional;
 import java.util.function.Consumer;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
-import pt.inescid.cllsj.TypeEntry;
 import pt.inescid.cllsj.ast.types.ASTAffineT;
 import pt.inescid.cllsj.ast.types.ASTCoAffineT;
 import pt.inescid.cllsj.ast.types.ASTIdT;
@@ -55,20 +53,8 @@ public class IREnvironment {
     return new IREnvironment(this, ep);
   }
 
-  public IREnvironment withKnownTypes(Map<String, ASTType> types) {
-    IREnvironment result = this;
-    Env<EnvEntry> ep = this.ep;
-    for (String k : types.keySet()) {
-      ep = ep.assoc(k, new TypeEntry(new ASTIdT(k)));
-      result =
-          new Type(
-              result, k, Optional.empty(), Optional.of(types.get(k)), isPositive(types.get(k)));
-    }
-    return result.changeEp(ep);
-  }
-
   public IREnvironment addType(String name, boolean isPositive) {
-    return new Type(this, name, Optional.of(process.addType()), Optional.empty(), isPositive);
+    return new Type(this, name, Optional.of(process.addType()), isPositive);
   }
 
   public Type getType(String name) {
@@ -241,10 +227,10 @@ public class IREnvironment {
       return getType(((ASTIdT) type).getid()).isPositive();
     } else if (type instanceof ASTAffineT) {
       // This and the below edge case are necessary due to us compiling affine
-      // as an offer and coaffine as a choice, except when they are values
-      return IRValueChecker.check(compiler, this, ((ASTAffineT) type).getin(), true);
+      // as an offer and coaffine as a choice
+      return false;
     } else if (type instanceof ASTCoAffineT) {
-      return !IRValueChecker.check(compiler, this, ((ASTCoAffineT) type).getin(), false);
+      return true;
     } else {
       return type.isPosCatch(ep);
     }
@@ -253,19 +239,12 @@ public class IREnvironment {
   public static class Type extends IREnvironment {
     private String name;
     private Optional<IRTypeId> id;
-    private Optional<ASTType> known;
     private boolean isPositive;
 
-    public Type(
-        IREnvironment parent,
-        String name,
-        Optional<IRTypeId> id,
-        Optional<ASTType> known,
-        boolean isPositive) {
+    public Type(IREnvironment parent, String name, Optional<IRTypeId> id, boolean isPositive) {
       super(parent, parent.ep);
       this.name = name;
       this.id = id;
-      this.known = known;
       this.isPositive = isPositive;
     }
 
@@ -277,20 +256,8 @@ public class IREnvironment {
       return id.orElseThrow();
     }
 
-    public ASTType getKnown() {
-      return known.orElseThrow();
-    }
-
     public boolean hasId() {
       return id.isPresent();
-    }
-
-    public boolean isKnown() {
-      return known.isPresent();
-    }
-
-    public boolean isRecursive() {
-      return id.isEmpty() && known.isEmpty();
     }
 
     public boolean isPositive() {

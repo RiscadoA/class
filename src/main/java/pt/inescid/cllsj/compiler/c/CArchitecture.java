@@ -39,7 +39,7 @@ public class CArchitecture {
   }
 
   public CSize typeSize() {
-    return intSize.multiply(2);
+    return intSize.add(unsignedCharSize.multiply(2)).align(intAlignment).add(intSize.multiply(2));
   }
 
   public CAlignment typeAlignment() {

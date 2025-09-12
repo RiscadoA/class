@@ -13,7 +13,6 @@ public class CLayout {
   public CLayout(CSize size, CAlignment alignment) {
     this.size = size;
     this.alignment = alignment;
-    this.alignment = alignment;
   }
 
   // Computes the maximum size the given slot combinations can take
@@ -33,7 +32,7 @@ public class CLayout {
   public static CLayout compute(
       IRSlotSequence sequence, CArchitecture arch, Function<IRTypeId, CLayout> typeLayoutProvider) {
     Visitor visitor = new Visitor(arch, typeLayoutProvider);
-    for (IRSlot slot : sequence.list()) {
+    for (IRSlot slot : sequence.list().reversed()) {
       slot.accept(visitor);
     }
     return visitor.layout;
@@ -57,8 +56,9 @@ public class CLayout {
     }
 
     private void visit(CSize elementSize, CAlignment elementAlignment) {
+      // Adds the element before the existing layout
+      layout.size = elementSize.align(layout.alignment).add(layout.size);
       layout.alignment = layout.alignment.max(elementAlignment);
-      layout.size = layout.size.align(elementAlignment).add(elementSize);
     }
 
     private void visit(CLayout elementLayout) {
@@ -92,7 +92,7 @@ public class CLayout {
 
     @Override
     public void visit(IRCellS slot) {
-      visit(arch.pointerSize.multiply(2), arch.pointerAlignment);
+      visit(arch.pointerSize, arch.pointerAlignment);
     }
 
     @Override
@@ -108,16 +108,6 @@ public class CLayout {
     @Override
     public void visit(IRVarS slot) {
       visit(typeLayoutProvider.apply(slot.getTypeId()));
-    }
-
-    @Override
-    public void visit(IRKnownVarS slot) {
-      CLayout full = CLayout.compute(slot.getSlots().combinations(), arch, typeLayoutProvider);
-      layout.size = full.size;
-      if (slot.getSlots().slot().isPresent()) {
-        layout.alignment =
-            CLayout.compute(slot.getSlots().slot().get(), arch, typeLayoutProvider).alignment;
-      }
     }
   }
 }

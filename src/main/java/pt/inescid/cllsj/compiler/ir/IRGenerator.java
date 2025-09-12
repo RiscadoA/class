@@ -18,10 +18,9 @@ import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.nodes.*;
 import pt.inescid.cllsj.ast.types.*;
 import pt.inescid.cllsj.compiler.Compiler;
-import pt.inescid.cllsj.compiler.c.CGenerator;
+import pt.inescid.cllsj.compiler.Settings;
 import pt.inescid.cllsj.compiler.ir.expression.IRExpression;
 import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
-import pt.inescid.cllsj.compiler.ir.id.IRLocalDataId;
 import pt.inescid.cllsj.compiler.ir.id.IRProcessId;
 import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
 import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
@@ -135,10 +134,8 @@ public class IRGenerator extends ASTNodeVisitor {
       ASTType type = procDef.getArgTypes().get(i);
 
       IRSlotsFromASTType info = slotsFromType(type);
-      boolean isPositive = env.isPositive(type);
-
-      if (isPositive && IRValueChecker.check(compiler, env, type, isPositive)) {
-        // Positive value: no need to store local data
+      if (!info.hasLocalData()) {
+        // Completely positive type: no need to store local data
         env = env.addSession(name);
       } else if (IRContinuationChecker.cannotHaveContinuation(compiler, env, type)) {
         // Type has no continuation: no need to store session
@@ -159,64 +156,6 @@ public class IRGenerator extends ASTNodeVisitor {
     return env;
   }
 
-  private IRProcessId generateIdentityCellManager(ASTType rhsType) {
-    IRProcessId processId = new IRProcessId("cell_manager_id" + nextProcessGenId++);
-    IRProcess manager = new IRProcess(processId);
-
-    // Declare arguments
-    IRLocalDataId dataId = manager.addLocalData(IRSlotCombinations.of(
-      IRSlotSequence.of(new IRCellS(), new IRTagS()),
-      IRSlotSequence.of(new IRCellS(), new IRTagS(), new IRSessionS()), //
-      IRSlotSequence.of(new IRSessionS())
-    ));
-    IRSessionId sessionId = manager.addArgSession(dataId);
-
-    IRDataLocation cellLoc = IRDataLocation.local(dataId, IRSlotOffset.ZERO);
-    IRDataLocation tagLoc = cellLoc.advance(new IRCellS(), new IRTagS());
-    IRDataLocation argSessionLoc = tagLoc.advance(new IRTagS(), new IRSessionS());
-
-    // Branch on manager mode
-    IRBlock onPut = manager.createBlock("on_put");
-    IRBlock onTake = manager.createBlock("on_take");
-    IRBlock onDrop = manager.createBlock("on_drop");
-
-    IRBranchTag.Case[] cases = new IRBranchTag.Case[3]; 
-    cases[CGenerator.CELL_MANAGER_MODE_PUT] = new IRBranchTag.Case(onPut.getLocation(), 1);
-    cases[CGenerator.CELL_MANAGER_MODE_TAKE] = new IRBranchTag.Case(onTake.getLocation(), 1);
-    cases[CGenerator.CELL_MANAGER_MODE_DROP] = new IRBranchTag.Case(onDrop.getLocation(), 1);
-    manager.getEntry().add(new IRBranchTag(tagLoc, List.of(cases)));
-
-    // Generate the put mode
-    if (isValue(rhsType, true)) {
-      // If the type is a value, we execute the session immediately
-
-    } else {
-
-    }
-
-    // TODO:
-
-    // Generate the take mode
-    // TODO:
-
-    // Generate the drop mode, which simply discards the value if present
-    if (isValue(rhsType, true)) {
-      IRDataLocation sessionLoc = IRDataLocation.cell(cellLoc, IRSlotOffset.ZERO);
-      onDrop.add(new IRDropValue(sessionLoc, slotsFromType(rhsType).activeRemoteTree));
-      onDrop.add(new IRFinishSession(sessionId, true));
-    } else {
-      IRBlock contBlock = process.createBlock("discard_cont");
-
-      IRDataLocation sessionLoc = IRDataLocation.cell(cellLoc, IRSlotOffset.ZERO);
-      onDrop.add(new IRWriteTag(tagLoc, 0)); // 0 indicates drop
-      onDrop.add(new IRContinueSession(sessionLoc, contBlock.getLocation()));
-
-      contBlock.add(new IRFinishSession(sessionId, true));
-    }
-
-    return processId;
-  }
-
   // ============================ Instruction generation visit methods ============================
 
   @Override
@@ -231,13 +170,18 @@ public class IRGenerator extends ASTNodeVisitor {
         node.getChi(),
         node.getType(),
         capturedChannels,
-        env -> countEndPoints(env, node.getRhs()),
+        countEndPoints(node.getRhs()),
         () -> node.getRhs().accept(this));
   }
 
   @Override
   public void visit(ASTCall node) {
-    addCall(node.getChr(), node.getChi(), node.getType(), () -> node.getRhs().accept(this));
+    addCall(
+        node.getChr(),
+        node.getChi(),
+        node.getType(),
+        countEndPoints(node.getRhs()),
+        () -> node.getRhs().accept(this));
   }
 
   @Override
@@ -348,43 +292,19 @@ public class IRGenerator extends ASTNodeVisitor {
     IREnvironment processEnv = procEnvs.get(processId);
     ASTProcDef processDef = procDefs.get(processId);
 
-    // Get a map from the process' type argument names to the types we're passing
-    Map<String, ASTType> typeArgs = new HashMap<>();
-    Set<String> modifiedTypeArgs = new HashSet<>();
-    for (int i = 0; i < node.getTPars().size(); ++i) {
-      ASTType type = node.getTPars().get(i).unfoldTypeCatch(env.getEp());
-      typeArgs.put(node.getProcTParIds().get(i), type);
-      if (!(type instanceof ASTIdT)) {
-        modifiedTypeArgs.add(node.getProcTParIds().get(i));
-      }
-    }
-    env = env.withKnownTypes(typeArgs);
-
     // Collect the session and data arguments we'll be passing to it
     List<IRCallProcess.SessionArgument> sessionArguments = new ArrayList<>();
     List<IRCallProcess.DataArgument> dataArguments = new ArrayList<>();
 
     for (int i = 0; i < node.getPars().size(); ++i) {
       // Get the argument's type information
-      ASTType type = node.getProcParTypes().get(i).unfoldTypeCatch(env.getEp());
+      ASTType type = node.getParTypes().get(i).unfoldTypeCatch(env.getEp());
       IRSlotsFromASTType info = slotsFromType(type);
       boolean isPositive = isPositive(type);
 
       // Get the arguments' channel
-      IREnvironment.Channel argChannel = env.getChannel(node.getPars().get(i));
+      IREnvironment.Channel channel = env.getChannel(node.getPars().get(i));
       IREnvironment.Channel targetChannel = processEnv.getChannel(processDef.getArgs().get(i));
-
-      // If the channel is polymorphic, we need to perform translation
-      IREnvironment.Channel channel;
-      if (IRUsesTypeVar.check(env.getEp(), type, modifiedTypeArgs)) {
-        // Create a new channel with the polymorphic type
-        channel =
-            IRPolyTranslator.translateLinear(
-                this, typeArgs, modifiedTypeArgs, type, argChannel.getName(), false);
-        addContinueIfNegative(channel.getSessionId(), type);
-      } else {
-        channel = argChannel;
-      }
 
       if (mayHaveContinuation(type)) {
         // If the type has a continuation, we must pass the session
@@ -405,16 +325,10 @@ public class IRGenerator extends ASTNodeVisitor {
     }
 
     for (int i = 0; i < node.getGPars().size(); ++i) {
-      ASTWhyT type = new ASTWhyT(node.getProcGParTypes().get(i).unfoldTypeCatch(env.getEp()));
+      ASTWhyT type = new ASTWhyT(node.getGParTypes().get(i).unfoldTypeCatch(env.getEp()));
       IREnvironment.Channel channel = env.getChannel(node.getGPars().get(i));
       IREnvironment.Channel targetChannel = processEnv.getChannel(processDef.getGArgs().get(i));
       IRSlotsFromASTType info = slotsFromType(type);
-
-      if (IRUsesTypeVar.check(env.getEp(), type, modifiedTypeArgs)) {
-        channel =
-            IRPolyTranslator.translateExponential(
-                this, typeArgs, modifiedTypeArgs, type, channel.getName(), false);
-      }
 
       dataArguments.add(
           new IRCallProcess.DataArgument(
@@ -453,6 +367,7 @@ public class IRGenerator extends ASTNodeVisitor {
         node.getChi(),
         node.getChiType(),
         node.getRhsType(),
+        countEndPoints(node),
         () -> {
           node.getRhs().accept(this);
         });
@@ -480,6 +395,7 @@ public class IRGenerator extends ASTNodeVisitor {
         node.getCho(),
         node.getLhsType(),
         node.getRhsType(),
+        countEndPoints(node),
         () -> {
           node.getLhs().accept(this);
         },
@@ -545,7 +461,6 @@ public class IRGenerator extends ASTNodeVisitor {
         node.getTypeId(),
         node.getType(),
         node.getTypeRhs(),
-        node.getTypeRhsNoSubst(),
         () -> {
           node.getRhs().accept(this);
         });
@@ -587,19 +502,25 @@ public class IRGenerator extends ASTNodeVisitor {
   @Override
   public void visit(ASTDiscard node) {
     IREnvironment.Channel channel = env.getChannel(node.getCh());
+    IRValueRequisites reqs = valueRequisites(node.getCoAffineT(), false);
 
-    if (isValue(node.getCoAffineT(), false)) {
-      // The value is already present, we must drop it
-      block.add(
-          new IRDropValue(
-              channel.getLocalData(), slotsFromType(node.getCoAffineT()).activeLocalTree));
-    } else {
-      // Write a tag indicating the coaffine is being discarded and pass control to it
-      block.add(new IRWriteTag(channel.getRemoteData(), 0));
-      addContinue(channel.getSessionId());
-    }
-
-    block.add(new IRPopTask(true));
+    addBranchIsValue(
+        reqs,
+        1,
+        () -> {
+          // The value is already present, we must drop it
+          block.add(
+              new IRDropValue(
+                  channel.getLocalData(), slotsFromType(node.getCoAffineT()).activeLocalTree));
+          block.add(new IRPopTask(true));
+        },
+        1,
+        () -> {
+          // Write a tag indicating the coaffine is being discarded and pass control to it
+          block.add(new IRWriteTag(channel.getRemoteData(), 0));
+          addContinue(channel.getSessionId());
+          block.add(new IRPopTask(true));
+        });
   }
 
   @Override
@@ -655,7 +576,8 @@ public class IRGenerator extends ASTNodeVisitor {
   public void visit(ASTScan node) {
     IREnvironment.Channel channel = env.getChannel(node.getCh());
     IRSlotsFromASTType info = slotsFromType(node.getType());
-    block.add(new IRWriteScan(channel.getRemoteData(), info.slot.orElseThrow()));
+    block.add(
+        new IRWriteScan(channel.getRemoteData(), info.activeRemoteTree.singleHead().orElseThrow()));
     block.add(new IRFinishSession(channel.getSessionId(), true));
   }
 
@@ -678,88 +600,123 @@ public class IRGenerator extends ASTNodeVisitor {
   // ======================================= Helper methods =======================================
 
   void addSend(
-      String ch, String cho, ASTType lhsType, ASTType rhsType, Runnable lhsCont, Runnable rhsCont) {
+      String ch,
+      String cho,
+      ASTType lhsType,
+      ASTType rhsType,
+      int endPoints,
+      Runnable lhsCont,
+      Runnable rhsCont) {
     IREnvironment.Channel channel = env.getChannel(ch);
-    IREnvironment.Channel argSession;
-
     IRSlotsFromASTType argInfo = slotsFromType(lhsType);
-    if (compiler.optimizeSendValue.get() && isValue(lhsType, true)) {
-      // We perform the send value optimization:
-      // 1. we define a new session for the sent channel
-      // 2. we initialize it so that it's data pointer points to the main session's data
-      // 3. we jump to it immediately
 
-      env = env.addSession(cho);
-      argSession = env.getChannel(cho);
+    // Create block for the right-hand-side to run after the argument has been sent
+    IRBlock rhsBlock = process.createBlock("send_rhs");
 
-      // Create block for the right-hand-side to run after the value has been sent
-      IRBlock rhsBlock = process.createBlock("send_rhs");
+    IRValueRequisites reqs = valueRequisites(lhsType, true);
+    addBranchIsValue(
+        compiler.optimizeSendValue,
+        reqs,
+        endPoints,
+        () -> {
+          // We perform the send value optimization:
+          // 1. we define a new session for the sent channel
+          // 2. we initialize it so that it's data pointer points to the main session's data
+          // 3. we jump to it immediately
 
-      // Initialize the new session so that its data points to the main session's data
-      block.add(
-          new IRInitializeSession(
-              argSession.getSessionId(), rhsBlock.getLocation(), channel.getRemoteData()));
-      recurse(block, lhsCont);
+          env = env.addSession(cho);
+          IREnvironment.Channel argSession = env.getChannel(cho);
 
-      // Generate the continuation
-      advanceOrReset(ch, argInfo.activeRemoteTree.combinations(), rhsType, true);
-      recurse(
-          rhsBlock,
-          () -> {
-            // If the continuation is negative, we must jump to it
-            addContinueIfNegative(channel.getSessionId(), rhsType);
-            rhsCont.run();
-          });
+          // Initialize the new session so that its data points to the main session's data
+          block.add(
+              new IRInitializeSession(
+                  argSession.getSessionId(), rhsBlock.getLocation(), channel.getRemoteData()));
+          recurse(block, lhsCont);
+        },
+        () -> {
+          // Define new session for the channel being sent
+          env = env.addSession(cho, argInfo.localCombinations());
+          IREnvironment.Channel argSession = env.getChannel(cho);
+
+          // Initialize the new session with a new closure block for the left-hand-side
+          // as its continuation.
+          IRBlock closureBlock = process.createBlock("send_closure");
+          recurse(closureBlock, lhsCont);
+          block.add(
+              new IRInitializeSession(
+                  argSession.getSessionId(),
+                  closureBlock.getLocation(),
+                  argSession.getLocalData()));
+
+          block.add(new IRWriteSession(channel.getRemoteData(), argSession.getSessionId()));
+
+          // Jump to the right-hand-side
+          block.add(new IRJump(rhsBlock.getLocation()));
+        });
+
+    // Advance the main session depending on what we sent
+    if (reqs.canBeValue()) {
+      advanceOrReset(
+          ch,
+          argInfo.activeRemoteTree.combinations().merge(IRSlotCombinations.of(new IRSessionS())),
+          rhsType,
+          true);
     } else {
-      // Define new session for the channel being sent
-      env = env.addSession(cho, argInfo.localCombinations());
-      argSession = env.getChannel(cho);
-
-      // Initialize the new session with a new closure block for the left-hand-side
-      // as its continuation.
-      IRBlock closureBlock = process.createBlock("send_closure");
-      recurse(closureBlock, lhsCont);
-      block.add(
-          new IRInitializeSession(
-              argSession.getSessionId(), closureBlock.getLocation(), argSession.getLocalData()));
-
-      block.add(new IRWriteSession(channel.getRemoteData(), argSession.getSessionId()));
       advanceOrReset(ch, new IRSessionS(), rhsType, true);
-
-      // If the continuation is negative, we must jump to it
-      addContinueIfNegative(channel.getSessionId(), rhsType);
-
-      // Recurse on the continuation
-      recurse(block, rhsCont);
     }
+
+    recurse(
+        rhsBlock,
+        () -> {
+          // If the continuation is negative, we must jump to it
+          addContinueIfNegative(channel.getSessionId(), rhsType);
+          rhsCont.run();
+        });
   }
 
-  void addRecv(String ch, String chi, ASTType lhsType, ASTType rhsType, Runnable cont) {
+  void addRecv(
+      String ch, String chi, ASTType lhsType, ASTType rhsType, int endPoints, Runnable cont) {
     IREnvironment.Channel channel = env.getChannel(ch);
 
     // Define new session for the channel being received
     IRSlotsFromASTType info = slotsFromType(lhsType);
 
-    if (compiler.optimizeSendValue.get() && isValue(lhsType, false)) {
-      env = env.addValue(chi, info.localCombinations(), Optional.empty());
-      IREnvironment.Channel argChannel = env.getChannel(chi);
+    IRValueRequisites reqs = valueRequisites(lhsType, false);
+    addBranchIsValue(
+        compiler.optimizeSendValue,
+        reqs,
+        endPoints,
+        () -> {
+          env = env.addValue(chi, info.localCombinations(), Optional.empty());
+          IREnvironment.Channel argChannel = env.getChannel(chi);
 
-      // If the left type is a value, we do the send value optimization
-      block.add(
-          new IRMoveValue(argChannel.getLocalData(), channel.getLocalData(), info.activeLocalTree));
-      advanceOrReset(ch, info.activeLocalTree.combinations(), rhsType, false);
+          // If the left type is a value, we do the send value optimization
+          block.add(
+              new IRMoveValue(
+                  argChannel.getLocalData(), channel.getLocalData(), info.activeLocalTree));
+        },
+        () -> {
+          env = env.addSession(chi, info.localCombinations());
+          IREnvironment.Channel argChannel = env.getChannel(chi);
+
+          // Bind the new session to the value received from the main session
+          block.add(
+              new IRBindSession(
+                  channel.getLocalData(), argChannel.getSessionId(), argChannel.getLocalData()));
+
+          // If the received session is negative, we must jump to it
+          addContinueIfNegative(argChannel.getSessionId(), lhsType);
+        });
+
+    // Advance the main session depending on what we received
+    if (reqs.canBeValue()) {
+      advanceOrReset(
+          ch,
+          info.activeLocalTree.combinations().merge(IRSlotCombinations.of(new IRSessionS())),
+          rhsType,
+          false);
     } else {
-      env = env.addSession(chi, info.localCombinations());
-      IREnvironment.Channel argChannel = env.getChannel(chi);
-
-      // Bind the new session to the value received from the main session
-      block.add(
-          new IRBindSession(
-              channel.getLocalData(), argChannel.getSessionId(), argChannel.getLocalData()));
       advanceOrReset(ch, new IRSessionS(), rhsType, false);
-
-      // If the received session is negative, we must jump to it
-      addContinueIfNegative(argChannel.getSessionId(), lhsType);
     }
 
     // Recurse on the continuation
@@ -803,68 +760,75 @@ public class IRGenerator extends ASTNodeVisitor {
       String chi,
       ASTType type,
       Set<String> capturedChannels,
-      Function<IREnvironment, Integer> contEndPoints,
+      int contEndPoints,
       Runnable cont) {
     IREnvironment.Channel channel = env.getChannel(ch);
     IRSlotsFromASTType info = slotsFromType(type);
 
-    if (isValue(type, true)) {
-      // If the exponential is a value, we generate the right-hand-side in place
-      // to write directly to the channel's remote data
-      env = env.alias(ch, chi);
-      recurse(block, cont);
-    } else {
-      // Create a new process for the exponential
-      IRProcessId expProcessId = new IRProcessId(process.getId() + "_exp" + nextProcessGenId++);
-      IRProcess expProcess = new IRProcess(expProcessId);
-      IREnvironment expEnv = new IREnvironment(compiler, expProcess, env.getEp());
+    IRValueRequisites reqs = valueRequisites(type, true);
+    addBranchIsValue(
+        reqs,
+        contEndPoints,
+        () -> {
+          // If the exponential is a value, we generate the right-hand-side in place
+          // to write directly to the channel's remote data
+          env = env.alias(ch, chi);
+          recurse(block, cont);
+        },
+        1,
+        () -> {
+          // Create a new process for the exponential
+          IRProcessId expProcessId = new IRProcessId(process.getId() + "_exp" + nextProcessGenId++);
+          IRProcess expProcess = new IRProcess(expProcessId);
+          IREnvironment expEnv = new IREnvironment(compiler, expProcess, env.getEp());
 
-      // Define the argument session for the exponential
-      expEnv = expEnv.addArgSession(chi, info.localCombinations());
+          // Define the argument session for the exponential
+          expEnv = expEnv.addArgSession(chi, info.localCombinations());
 
-      // Pass all types in the current environment to the exponential process
-      List<IRWriteExponential.TypeArgument> typeArguments = new ArrayList<>();
-      for (int i = 0; i < process.getTypeCount(); ++i) {
-        IRTypeId id = new IRTypeId(i);
-        IREnvironment.Type envType = env.getType(id);
-        typeArguments.add(new IRWriteExponential.TypeArgument(IRSlotTree.of(new IRVarS(id)), id));
-        expEnv = expEnv.addType(envType.getName(), envType.isPositive());
-      }
+          // Pass all types in the current environment to the exponential process
+          List<IRWriteExponential.TypeArgument> typeArguments = new ArrayList<>();
+          for (int i = 0; i < process.getTypeCount(); ++i) {
+            IRTypeId id = new IRTypeId(i);
+            IREnvironment.Type envType = env.getType(id);
+            typeArguments.add(
+                new IRWriteExponential.TypeArgument(IRSlotTree.of(new IRVarS(id)), id));
+            expEnv = expEnv.addType(envType.getName(), envType.isPositive());
+          }
 
-      // Pass captured exponentials to the exponential process as data arguments
-      List<IRWriteExponential.DataArgument> dataArguments = new ArrayList<>();
-      for (String name : capturedChannels) {
-        if (name.equals(chi)) {
-          continue;
-        }
+          // Pass captured exponentials to the exponential process as data arguments
+          List<IRWriteExponential.DataArgument> dataArguments = new ArrayList<>();
+          for (String name : capturedChannels) {
+            if (name.equals(chi)) {
+              continue;
+            }
 
-        IREnvironment.Channel captured = env.getChannel(name);
-        IRSlotTree valueSlots = captured.getExponentialType();
+            IREnvironment.Channel captured = env.getChannel(name);
+            IRSlotTree valueSlots = captured.getExponentialType();
 
-        expEnv = expEnv.addValue(name, valueSlots.combinations(), Optional.of(valueSlots));
-        expEnv = expEnv.makeChannelExponential(name, valueSlots, true, id -> {});
+            expEnv = expEnv.addValue(name, valueSlots.combinations(), Optional.of(valueSlots));
+            expEnv = expEnv.makeChannelExponential(name, valueSlots, true, id -> {});
 
-        dataArguments.add(
-            new IRWriteExponential.DataArgument(
-                captured.getLocalData(),
-                expEnv.getChannel(name).getLocalDataId(),
-                valueSlots,
-                true));
-      }
+            dataArguments.add(
+                new IRWriteExponential.DataArgument(
+                    captured.getLocalData(),
+                    expEnv.getChannel(name).getLocalDataId(),
+                    valueSlots,
+                    true));
+          }
 
-      // Count the end points of the exponential process
-      expProcess.setEndPoints(contEndPoints.apply(expEnv));
+          // Count the end points of the exponential process
+          expProcess.setEndPoints(contEndPoints);
 
-      // Store the process we just defined so that it gets generated later
-      procGens.put(expProcessId, cont);
-      procEnvs.put(expProcessId, expEnv);
-      procUsed.add(expProcessId);
+          // Store the process we just defined so that it gets generated later
+          procGens.put(expProcessId, cont);
+          procEnvs.put(expProcessId, expEnv);
+          procUsed.add(expProcessId);
 
-      block.add(
-          new IRWriteExponential(
-              channel.getRemoteData(), expProcessId, typeArguments, dataArguments));
-      block.add(new IRFinishSession(channel.getSessionId(), true));
-    }
+          block.add(
+              new IRWriteExponential(
+                  channel.getRemoteData(), expProcessId, typeArguments, dataArguments));
+          block.add(new IRFinishSession(channel.getSessionId(), true));
+        });
   }
 
   void addWhy(String ch, ASTType type, Runnable cont) {
@@ -885,75 +849,74 @@ public class IRGenerator extends ASTNodeVisitor {
     recurse(block, cont);
   }
 
-  void addCall(String ch, String chi, ASTType type, Runnable cont) {
+  void addCall(String ch, String chi, ASTType type, int endPoints, Runnable cont) {
     IREnvironment.Channel channel = env.getChannel(ch);
-
-    // Define new channel
     IRSlotsFromASTType info = slotsFromType(type);
+    IRValueRequisites reqs = valueRequisites(type, false);
 
-    if (isValue(type, false)) {
-      env = env.addValue(chi, info.localCombinations(), Optional.empty());
-      IREnvironment.Channel argChannel = env.getChannel(chi);
+    IRBlock rhsBlock = process.createBlock("call_rhs");
 
-      // TODO: if the value is a basic value (i.e., no clone/drop needed, we can just alias the
-      // channels)
+    addBranchIsValue(
+        reqs,
+        endPoints,
+        () -> {
+          env = env.addValue(chi, info.localCombinations(), Optional.empty());
+          IREnvironment.Channel argChannel = env.getChannel(chi);
 
-      // Just clone the exponential's data to the new channel
-      block.add(
-          new IRCloneValue(
-              argChannel.getLocalData(), channel.getLocalData(), info.activeLocalTree));
-    } else {
-      env = env.addSession(chi, info.localCombinations());
-      IREnvironment.Channel argChannel = env.getChannel(chi);
+          // Just clone the exponential's data to the new channel
+          block.add(
+              new IRCloneValue(
+                  argChannel.getLocalData(), channel.getLocalData(), info.activeLocalTree));
 
-      block.add(
-          new IRCallExponential(
-              channel.getLocalData(), argChannel.getSessionId(), argChannel.getLocalDataId()));
+          block.add(new IRJump(rhsBlock.getLocation()));
+        },
+        endPoints,
+        () -> {
+          env = env.addSession(chi, info.localCombinations());
+          IREnvironment.Channel argChannel = env.getChannel(chi);
 
-      // If the called session is negative, we must jump to it
-      addContinueIfNegative(argChannel.getSessionId(), type);
-    }
+          block.add(
+              new IRCallExponential(
+                  channel.getLocalData(), argChannel.getSessionId(), argChannel.getLocalDataId()));
+
+          // If the called session is negative, we must jump to it
+          addContinueIfNegative(argChannel.getSessionId(), type);
+
+          block.add(new IRJump(rhsBlock.getLocation()));
+        });
 
     // Recurse on the continuation
-    recurse(block, cont);
+    recurse(rhsBlock, cont);
   }
 
-  void addSendTy(
-      String ch,
-      String typeId,
-      ASTType type,
-      ASTType rhsType,
-      ASTType rhsTypeNoSubst,
-      Runnable cont) {
+  void addSendTy(String ch, String typeId, ASTType type, ASTType rhsType, Runnable cont) {
     IRSessionId originalSession = env.getChannel(ch).getSessionId();
 
     // Get the locations where we'll be writing the necessary data
     IRDataLocation typeLoc = env.getChannel(ch).getRemoteData();
-    env = env.advanceChannel(ch, IRSlotOffset.of(new IRTypeS(), new IRSessionS()));
+    env =
+        env.advanceChannel(
+            ch,
+            IRSlotOffset.of(new IRTypeS(), IRSlotCombinations.of(new IRSessionS(), new IRTagS())));
     IRDataLocation sessionLoc = env.getChannel(ch).getRemoteData();
-    env = env.advanceChannel(ch, IRSlotOffset.of(new IRSessionS(), new IRTagS()));
+    env =
+        env.advanceChannel(
+            ch, IRSlotOffset.of(new IRSessionS(), IRSlotCombinations.of(new IRTagS())));
     IRDataLocation polarityLoc = env.getChannel(ch).getRemoteData();
 
     // Overwrite the previous session with a new session of the new type
     IRBlock rhsBlock = process.createBlock("sendty_rhs");
     IRSlotsFromASTType info = slotsFromType(rhsType);
     env = env.addSession(ch, info.combinations());
-    IREnvironment.Channel instChannel = env.getChannel(ch);
+    IREnvironment.Channel channel = env.getChannel(ch);
     block.add(
         new IRInitializeSession(
-            instChannel.getSessionId(), rhsBlock.getLocation(), instChannel.getLocalData()));
+            channel.getSessionId(), rhsBlock.getLocation(), channel.getLocalData()));
 
-    // Create the polymorphic translator session that we'll be sending through the main channel
-    Map<String, ASTType> varTypes = Map.of(typeId, type);
-    env = env.withKnownTypes(varTypes);
-    IREnvironment.Channel polyChannel =
-        IRPolyTranslator.translateLinear(
-            this, varTypes, varTypes.keySet(), rhsTypeNoSubst.dualCatch(env.getEp()), ch, true);
-
-    // Write the type, the translator session and the type's polarity to the main channel
+    // Write the type, the right-hand-side session and the type's polarity to the main channel
     IRSlotsFromASTType varInfo = slotsFromType(type);
     block.add(new IRWriteType(typeLoc, varInfo.activeTree()));
-    block.add(new IRWriteSession(sessionLoc, polyChannel.getSessionId()));
+    block.add(new IRWriteSession(sessionLoc, channel.getSessionId()));
     block.add(new IRWriteTag(polarityLoc, isPositive(type) ? 1 : 0));
     block.add(new IRFinishSession(originalSession, true));
 
@@ -971,9 +934,14 @@ public class IRGenerator extends ASTNodeVisitor {
       Runnable cont) {
     // Get the locations where we'll be reading from the type and the new session
     IRDataLocation typeLoc = env.getChannel(ch).getLocalData();
-    env = env.advanceChannel(ch, IRSlotOffset.of(new IRTypeS(), new IRSessionS()));
+    env =
+        env.advanceChannel(
+            ch,
+            IRSlotOffset.of(new IRTypeS(), IRSlotCombinations.of(new IRSessionS(), new IRTagS())));
     IRDataLocation sessionLoc = env.getChannel(ch).getLocalData();
-    env = env.advanceChannel(ch, IRSlotOffset.of(new IRSessionS(), new IRTagS()));
+    env =
+        env.advanceChannel(
+            ch, IRSlotOffset.of(new IRSessionS(), IRSlotCombinations.of(new IRTagS())));
     IRDataLocation polarityLoc = env.getChannel(ch).getLocalData();
 
     int processGenId = nextProcessGenId++;
@@ -1109,61 +1077,41 @@ public class IRGenerator extends ASTNodeVisitor {
       Runnable cont) {
     IREnvironment.Channel channel = env.getChannel(ch);
 
-    if (isValue(contType, true)) {
-      // In this case, we immediately produce the value in place
-      cont.run();
-    } else {
-      // Otherwise, we branch on whether the affine is used or not
-      IRBlock usedBlock = process.createBlock("affine_used");
-      IRBlock unusedBlock = process.createBlock("affine_unused");
-      IRBranch.Case used = new IRBranch.Case(usedBlock.getLocation(), contEndPoints);
-      IRBranch.Case unused = new IRBranch.Case(unusedBlock.getLocation(), 1);
+    // We branch on whether the affine is used or not
+    IRBlock usedBlock = process.createBlock("affine_used");
+    IRBlock unusedBlock = process.createBlock("affine_unused");
+    IRBranch.Case used = new IRBranch.Case(usedBlock.getLocation(), contEndPoints);
+    IRBranch.Case unused = new IRBranch.Case(unusedBlock.getLocation(), 1);
 
-      block.add(new IRBranchTag(channel.getLocalData(), List.of(unused, used)));
-      recurse(usedBlock, cont);
-      recurse(
-          unusedBlock,
-          () -> {
-            // If the affine is unused, we must discard any data associated with it
-            // This includes both references to cells and coaffine channels
+    block.add(new IRBranchTag(channel.getLocalData(), List.of(unused, used)));
+    recurse(usedBlock, cont);
+    recurse(
+        unusedBlock,
+        () -> {
+          // If the affine is unused, we must discard any data associated with it
+          // This includes both references to cells and coaffine channels
 
-            for (String name : usageSet.keySet()) {
-              ASTType type = usageSet.get(name);
-              if (!(type instanceof ASTUsageT)) {
-                throw new RuntimeException(
-                    "Internal error: affine usage set contains non-usage type");
-              }
-              addRelease(name, (ASTUsageT) usageSet.get(name), false);
+          for (String name : usageSet.keySet()) {
+            ASTType type = usageSet.get(name);
+            if (!(type instanceof ASTUsageT)) {
+              throw new RuntimeException(
+                  "Internal error: affine usage set contains non-usage type");
             }
+            addRelease(name, (ASTUsageT) usageSet.get(name), false);
+          }
 
-            for (String name : coaffineSet.keySet()) {
-              ASTType type = coaffineSet.get(name);
-              IREnvironment.Channel capturedChannel = env.getChannel(name);
+          for (String name : coaffineSet.keySet()) {
+            // We must write a drop tag and jump to the closure
+            IREnvironment.Channel capturedChannel = env.getChannel(name);
+            block.add(new IRWriteTag(capturedChannel.getRemoteData(), 0));
+            addContinue(capturedChannel.getSessionId());
+          }
 
-              if (isValue(type, false)) {
-                // If the coaffine is a value, we can simply drop it
-                block.add(
-                    new IRDropValue(
-                        env.getChannel(name).getLocalData(), slotsFromType(type).activeLocalTree));
-              } else {
-                // Otherwise, we must write a drop tag and jump to the closure
-                block.add(new IRWriteTag(capturedChannel.getRemoteData(), 0));
-                addContinue(capturedChannel.getSessionId());
-              }
-            }
-
-            block.add(new IRFinishSession(channel.getSessionId(), true));
-          });
-    }
+          block.add(new IRFinishSession(channel.getSessionId(), true));
+        });
   }
 
   void addUse(String ch, ASTType contType, Runnable cont) {
-    if (isValue(contType, false)) {
-      // The value is already present, so we do nothing
-      recurse(block, cont);
-      return;
-    }
-
     // Write a tag indicating the affine is being used and pass control to it if it's negative
     IREnvironment.Channel channel = env.getChannel(ch);
     block.add(new IRWriteTag(channel.getRemoteData(), 1));
@@ -1191,92 +1139,52 @@ public class IRGenerator extends ASTNodeVisitor {
   void addCell(String ch, String chc, ASTType typeRhs, Runnable cont) {
     IREnvironment.Channel channel = env.getChannel(ch);
 
-    IRProcessId managerId = generateIdentityCellManager(typeRhs);
+    // The cell will store a pointer to a session
+    block.add(new IRWriteCell(channel.getRemoteData(), IRSlotTree.of(new IRSessionS())));
 
-    if (isValue(typeRhs, true)) {
-      // Write a new cell containing the value directly
-      block.add(new IRWriteCell(channel.getRemoteData(), slotsFromType(typeRhs).activeRemoteTree, managerId, List.of()));
+    // Initialize the session we'll store in the cell
+    env = env.addSession(chc, slotsFromType(typeRhs).localCombinations());
+    IREnvironment.Channel cellSession = env.getChannel(chc);
+    IRBlock cellBlock = process.createBlock("cell_rhs");
+    block.add(
+        new IRInitializeSession(
+            cellSession.getSessionId(), cellBlock.getLocation(), cellSession.getLocalData()));
 
-      // In We immediately produce the value in place
-      env = env.addCellAccess(channel.getSessionId(), channel.getRemoteData(), chc);
-      recurse(block, cont);
-    } else {
-      // Otherwise, the cell will store a pointer to a session
-      block.add(new IRWriteCell(channel.getRemoteData(), IRSlotTree.of(new IRSessionS()), managerId, List.of()));
+    // Store it in the cell and finish
+    block.add(
+        new IRWriteSession(
+            IRDataLocation.cell(channel.getRemoteData(), IRSlotOffset.ZERO),
+            cellSession.getSessionId()));
+    block.add(new IRFinishSession(channel.getSessionId(), false));
 
-      // Initialize the session we'll store in the cell
-      env = env.addSession(chc, slotsFromType(typeRhs).localCombinations());
-      IREnvironment.Channel cellSession = env.getChannel(chc);
-      IRBlock cellBlock = process.createBlock("cell_rhs");
-      block.add(
-          new IRInitializeSession(
-              cellSession.getSessionId(), cellBlock.getLocation(), cellSession.getLocalData()));
-
-      // Store it in the cell and finish
-      block.add(
-          new IRWriteSession(
-              IRDataLocation.cell(channel.getRemoteData(), IRSlotOffset.ZERO),
-              cellSession.getSessionId()));
-      block.add(new IRFinishSession(channel.getSessionId(), false));
-
-      // Recurse on the cell's right-hand-side
-      recurse(cellBlock, cont);
-    }
+    // Recurse on the cell's right-hand-side
+    recurse(cellBlock, cont);
   }
 
   void addPut(String ch, String chc, ASTType typeLhs, Runnable contLhs, Runnable contRhs) {
     IREnvironment.Channel channel = env.getChannel(ch);
     IRDataLocation cellDataLoc = IRDataLocation.cell(channel.getLocalData(), IRSlotOffset.ZERO);
 
-    // TODO:
-    // 1. call cell manager
-    // 2. send cell and 'put' tag to manager
-    // 3. receive session from manager
+    // Define new session for the channel being stored
+    IRSlotsFromASTType argInfo = slotsFromType(typeLhs);
+    env = env.addSession(chc, argInfo.localCombinations());
+    IREnvironment.Channel argSession = env.getChannel(chc);
 
-    if (isValue(typeLhs, true)) {
-      // If the left-hand-side is a value, we do basically the same as the send value optimization
-      env = env.addSession(chc);
-      IREnvironment.Channel argSession = env.getChannel(chc);
+    // Initialize the new session with a new closure block for the left-hand-side
+    // as its continuation.
+    IRBlock closureBlock = process.createBlock("put_lhs");
+    recurse(closureBlock, contLhs);
+    block.add(
+        new IRInitializeSession(
+            argSession.getSessionId(), closureBlock.getLocation(), argSession.getLocalData()));
 
-      // Create block for the right-hand-side to run after the value has been written
-      IRBlock rhsBlock = process.createBlock("put_rhs");
+    block.add(new IRWriteSession(cellDataLoc, argSession.getSessionId()));
 
-      // Initialize the new session so that its data points to the cell's data
-      block.add(
-          new IRInitializeSession(argSession.getSessionId(), rhsBlock.getLocation(), cellDataLoc));
-      recurse(block, contLhs);
-
-      // Generate the continuation
-      recurse(
-          rhsBlock,
-          () -> {
-            if (compiler.concurrency.get()) {
-              block.add(new IRUnlockCell(channel.getLocalData()));
-            }
-            contRhs.run();
-          });
-    } else {
-      // Define new session for the channel being stored
-      IRSlotsFromASTType argInfo = slotsFromType(typeLhs);
-      env = env.addSession(chc, argInfo.localCombinations());
-      IREnvironment.Channel argSession = env.getChannel(chc);
-
-      // Initialize the new session with a new closure block for the left-hand-side
-      // as its continuation.
-      IRBlock closureBlock = process.createBlock("put_lhs");
-      recurse(closureBlock, contLhs);
-      block.add(
-          new IRInitializeSession(
-              argSession.getSessionId(), closureBlock.getLocation(), argSession.getLocalData()));
-
-      block.add(new IRWriteSession(cellDataLoc, argSession.getSessionId()));
-
-      // Recurse on the continuation
-      if (compiler.concurrency.get()) {
-        block.add(new IRUnlockCell(channel.getLocalData()));
-      }
-      recurse(block, contRhs);
+    // Recurse on the continuation
+    if (compiler.concurrency.get()) {
+      block.add(new IRUnlockCell(channel.getLocalData()));
     }
+    recurse(block, contRhs);
   }
 
   void addTake(String ch, String chc, ASTType typeLhs, Runnable cont) {
@@ -1290,26 +1198,49 @@ public class IRGenerator extends ASTNodeVisitor {
 
     // Define new session for the channel being received
     IRSlotsFromASTType info = slotsFromType(typeLhs);
+    env = env.addSession(chc, info.localCombinations());
+    IREnvironment.Channel argChannel = env.getChannel(chc);
 
-    if (isValue(typeLhs, false)) {
-      // If the left-hand-side is a value, we just move it out of the cell
-      env = env.addValue(chc, info.localCombinations(), Optional.empty());
-      IREnvironment.Channel argChannel = env.getChannel(chc);
-      block.add(new IRMoveValue(argChannel.getLocalData(), cellDataLoc, info.activeLocalTree));
+    // Otherwise, we bind the new session to the one stored in the cell
+    block.add(new IRBindSession(cellDataLoc, argChannel.getSessionId(), argChannel.getLocalData()));
 
-      // Recurse on the continuation
-      recurse(block, cont);
+    // The received session is guaranteed to an affine session
+    // We immediately mark it as used
+    addUse(chc, typeLhs, cont);
+  }
+
+  void addBranchIsValue(
+      IRValueRequisites reqs,
+      int ifValueEndPoints,
+      Runnable ifValue,
+      int ifNotValueEndPoints,
+      Runnable ifNotValue) {
+    if (reqs.mustBeValue()) {
+      ifValue.run();
+    } else if (reqs.canBeValue()) {
+      IRBlock valueBlock = process.createBlock("value");
+      IRBlock notValueBlock = process.createBlock("not_value");
+      IRBranch.Case valueCase = new IRBranch.Case(valueBlock.getLocation(), ifValueEndPoints);
+      IRBranch.Case notValueCase =
+          new IRBranch.Case(notValueBlock.getLocation(), ifNotValueEndPoints);
+      block.add(new IRBranchIsValue(reqs, valueCase, notValueCase));
+      recurse(valueBlock, ifValue);
+      recurse(notValueBlock, ifNotValue);
     } else {
-      env = env.addSession(chc, info.localCombinations());
-      IREnvironment.Channel argChannel = env.getChannel(chc);
+      ifNotValue.run();
+    }
+  }
 
-      // Otherwise, we bind the new session to the one stored in the cell
-      block.add(
-          new IRBindSession(cellDataLoc, argChannel.getSessionId(), argChannel.getLocalData()));
-
-      // The received session is guaranteed to an affine session
-      // We immediately mark it as used
-      addUse(chc, typeLhs, cont);
+  void addBranchIsValue(
+      Settings.Flag flag,
+      IRValueRequisites reqs,
+      int endPoints,
+      Runnable ifValue,
+      Runnable ifNotValue) {
+    if (flag.get()) {
+      addBranchIsValue(reqs, endPoints, ifValue, endPoints, ifNotValue);
+    } else {
+      ifNotValue.run();
     }
   }
 
@@ -1353,8 +1284,8 @@ public class IRGenerator extends ASTNodeVisitor {
     return env.isPositive(type);
   }
 
-  private boolean isValue(ASTType type, boolean requiredPolarity) {
-    return IRValueChecker.check(compiler, env, type, requiredPolarity);
+  private IRValueRequisites valueRequisites(ASTType type, boolean requiredPolarity) {
+    return IRValueRequisites.check(compiler, env, type, requiredPolarity);
   }
 
   private boolean mayHaveContinuation(ASTType type) {
@@ -1383,7 +1314,8 @@ public class IRGenerator extends ASTNodeVisitor {
         expr,
         type ->
             slotsFromType(type)
-                .slot
+                .activeLocalTree
+                .singleHead()
                 .orElseThrow(
                     () ->
                         new UnsupportedOperationException("Types in expressions must have slots")));
@@ -1394,7 +1326,7 @@ public class IRGenerator extends ASTNodeVisitor {
   }
 
   private IRSlotOffset offset(IRSlotCombinations past, ASTType remainder) {
-    return new IRSlotOffset(past, slotsFromType(remainder).slot);
+    return new IRSlotOffset(past, slotsFromType(remainder).activeTree().combinations());
   }
 
   IRSlotsFromASTType slotsFromType(ASTType type) {

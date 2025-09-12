@@ -1,14 +1,7 @@
 package pt.inescid.cllsj.compiler.ir;
 
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
 import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.nodes.*;
-import pt.inescid.cllsj.ast.types.ASTIdT;
-import pt.inescid.cllsj.ast.types.ASTType;
-import pt.inescid.cllsj.ast.types.ASTWhyT;
 import pt.inescid.cllsj.compiler.Compiler;
 
 public class IREndPointCounter extends ASTNodeVisitor {
@@ -54,32 +47,6 @@ public class IREndPointCounter extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTId node) {
-    Map<String, ASTType> typeArgs = new HashMap<>();
-    Set<String> modifiedTypeArgs = new HashSet<>();
-    for (int i = 0; i < node.getTPars().size(); ++i) {
-      ASTType type = node.getTPars().get(i).unfoldTypeCatch(env.getEp());
-      typeArgs.put(node.getProcTParIds().get(i), type);
-      if (!(type instanceof ASTIdT)) {
-        modifiedTypeArgs.add(node.getProcTParIds().get(i));
-      }
-    }
-
-    IREnvironment env = this.env.withKnownTypes(typeArgs);
-
-    for (int i = 0; i < node.getPars().size(); ++i) {
-      if (IRUsesTypeVar.check(env.getEp(), node.getProcParTypes().get(i), modifiedTypeArgs)) {
-        count +=
-            IRPolyEndPointCounter.count(
-                compiler, env, node.getProcParTypes().get(i), modifiedTypeArgs);
-      }
-    }
-    for (int i = 0; i < node.getGPars().size(); ++i) {
-      if (IRUsesTypeVar.check(env.getEp(), node.getProcGParTypes().get(i), modifiedTypeArgs)) {
-        count +=
-            IRPolyEndPointCounter.count(
-                compiler, env, new ASTWhyT(node.getProcGParTypes().get(i)), modifiedTypeArgs);
-      }
-    }
     count += 1;
   }
 
@@ -158,7 +125,7 @@ public class IREndPointCounter extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTBang node) {
-    if (IRValueChecker.check(compiler, env, node.getType(), true)) {
+    if (IRValueRequisites.check(compiler, env, node.getType(), true).canBeValue()) {
       node.getRhs().accept(this);
     } else {
       count += 1;
@@ -184,17 +151,8 @@ public class IREndPointCounter extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTSendTy node) {
-    env = env.withKnownTypes(Map.of(node.getTypeId(), node.getType().unfoldTypeCatch(env.getEp())));
-    count +=
-        IRPolyEndPointCounter.count(
-            compiler,
-            env,
-            node.getTypeRhsNoSubst().dualCatch(env.getEp()),
-            Set.of(node.getTypeId()));
     count += 1;
-    IREnvironment backupEnv = env;
     node.getRhs().accept(this);
-    env = backupEnv;
   }
 
   @Override

@@ -7,9 +7,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.function.BiConsumer;
-import java.util.function.BiFunction;
 import java.util.function.Function;
 import pt.inescid.cllsj.compiler.Compiler;
+import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
 import pt.inescid.cllsj.compiler.ir.expression.IRExpression;
 import pt.inescid.cllsj.compiler.ir.id.IRCodeLocation;
 import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
@@ -27,7 +27,6 @@ import pt.inescid.cllsj.compiler.ir.slot.IRSlotOffset;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotSequence;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotTree;
 import pt.inescid.cllsj.compiler.ir.slot.IRStringS;
-import pt.inescid.cllsj.compiler.ir.slot.IRTagS;
 
 public class CGenerator extends IRInstructionVisitor {
   // Auxiliary registers used in the execution of a single instruction
@@ -43,10 +42,8 @@ public class CGenerator extends IRInstructionVisitor {
   // Useful constants
   private static final String NULL = "NULL";
 
-  // Cell manager modes
-  public static final int CELL_MANAGER_MODE_PUT = 0;
-  public static final int CELL_MANAGER_MODE_TAKE = 1;
-  public static final int CELL_MANAGER_MODE_DROP = 2;
+  // Type flags
+  public static final int TYPE_FLAG_VALUE = 1 << 0;
 
   private Compiler compiler;
   private IRProgram program;
@@ -229,7 +226,10 @@ public class CGenerator extends IRInstructionVisitor {
         "type",
         () -> {
           putStatement("int size");
-          putStatement("int first_alignment;");
+          putStatement("unsigned char alignment;");
+          putStatement("unsigned char flags;");
+          putStatement("unsigned int strings;");
+          putStatement("unsigned int exponentials;");
         });
 
     putStruct(
@@ -282,6 +282,11 @@ public class CGenerator extends IRInstructionVisitor {
 
     // Utility macro for getting the maximum value of two values.
     putLine("#define MAX(a, b) ((a) > (b) ? (a) : (b))");
+    putBlankLine();
+
+    // Utility for getting and clearing, respectively, the least significant set bit of an integer.
+    putLine("#define GET_LSSB(x) ((x) & -(x))");
+    putLine("#define CLEAR_LSSB(x) ((x) & ((x) - 1))");
     putBlankLine();
 
     // Functions used for operations on string expressions.
@@ -687,21 +692,11 @@ public class CGenerator extends IRInstructionVisitor {
                   IRLocalDataId dataId = arg.getTargetDataId();
                   putSlotTraversal(
                       arg.getSlots(),
-                      past ->
-                          localData(
-                              typeLayoutProvider,
-                              layout,
-                              "exp_env",
-                              dataId,
-                              IRSlotOffset.of(past, new IRTagS())),
-                      (past, slot) -> {
+                      reqs -> isValue(layout, "exp_env", reqs),
+                      offset -> localData(typeLayoutProvider, layout, "exp_env", dataId, offset),
+                      (offset, slot) -> {
                         CAddress target =
-                            localData(
-                                typeLayoutProvider,
-                                layout,
-                                "exp_env",
-                                dataId,
-                                IRSlotOffset.of(past, slot));
+                            localData(typeLayoutProvider, layout, "exp_env", dataId, offset);
                         putCloneSlot(target, slot);
                       });
                 }
@@ -712,21 +707,11 @@ public class CGenerator extends IRInstructionVisitor {
                   IRLocalDataId dataId = arg.getTargetDataId();
                   putSlotTraversal(
                       arg.getSlots(),
-                      past ->
-                          localData(
-                              typeLayoutProvider,
-                              layout,
-                              "exp_env",
-                              dataId,
-                              IRSlotOffset.of(past, new IRTagS())),
-                      (past, slot) -> {
+                      reqs -> isValue(layout, "exp_env", reqs),
+                      offset -> localData(typeLayoutProvider, layout, "exp_env", dataId, offset),
+                      (offset, slot) -> {
                         CAddress target =
-                            localData(
-                                typeLayoutProvider,
-                                layout,
-                                "exp_env",
-                                dataId,
-                                IRSlotOffset.of(past, slot));
+                            localData(typeLayoutProvider, layout, "exp_env", dataId, offset);
                         putDropSlot(target, slot);
                       });
                 }
@@ -866,21 +851,28 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRMoveValue instr) {
-    putMoveSlots(instr.getSlots(), false, instr.getLocation(), instr.getSourceLocation());
+    putMoveSlots(
+        instr.getSlots(),
+        req -> isValue(req),
+        false,
+        instr.getLocation(),
+        instr.getSourceLocation());
   }
 
   @Override
   public void visit(IRCloneValue instr) {
-    putMoveSlots(instr.getSlots(), true, instr.getLocation(), instr.getSourceLocation());
+    putMoveSlots(
+        instr.getSlots(),
+        req -> isValue(req),
+        true,
+        instr.getLocation(),
+        instr.getSourceLocation());
   }
 
   @Override
   public void visit(IRDropValue instr) {
     putDropSlots(
-        instr.getSlots(),
-        (past, slot) -> {
-          return data(instr.getLocation().advance(past, slot));
-        });
+        instr.getSlots(), req -> isValue(req), offset -> data(instr.getLocation().advance(offset)));
   }
 
   @Override
@@ -1016,9 +1008,9 @@ public class CGenerator extends IRInstructionVisitor {
       putMoveSlots(
           arg.getSlots(),
           arg.isClone(),
-          (past, slot) ->
-              data(typeLayoutProvider, calledLayout, newEnv, target.advance(past, slot)),
-          (past, slot) -> data(arg.getSourceLocation().advance(past, slot)));
+          req -> isValue(calledLayout, newEnv, req),
+          offset -> data(typeLayoutProvider, calledLayout, newEnv, target.advance(offset)),
+          offset -> data(arg.getSourceLocation().advance(offset)));
     }
 
     // Decrement the end points of the current process, if applicable
@@ -1129,9 +1121,9 @@ public class CGenerator extends IRInstructionVisitor {
       putMoveSlots(
           arg.getSlots(),
           arg.isClone(),
-          (past, slot) ->
-              data(typeLayoutProvider, expProcessLayout, newEnv, target.advance(past, slot)),
-          (past, slot) -> data(arg.getSourceLocation().advance(past, slot)));
+          req -> isValue(expProcessLayout, newEnv, req),
+          offset -> data(typeLayoutProvider, expProcessLayout, newEnv, target.advance(offset)),
+          offset -> data(arg.getSourceLocation().advance(offset)));
     }
   }
 
@@ -1221,6 +1213,12 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   @Override
+  public void visit(IRBranchIsValue instr) {
+    // TODO:
+    throw new UnsupportedOperationException("TODO: implement");
+  }
+
+  @Override
   public void visit(IRDeferDrop instr) {
     CSizeBits dropBitOffset = currentProcessLayout.dropBitOffset(instr.getDropId());
     CAddress dropByteAddress = CAddress.of(ENV, dropBitOffset.getSize());
@@ -1237,12 +1235,6 @@ public class CGenerator extends IRInstructionVisitor {
     if (compiler.concurrency.get()) {
       putMutexInit(cellMutex(cell));
     }
-
-    putWriteExponential(
-        cellSlotManager(slotAddr),
-        instr.getManagerId(),
-        instr.getManagerTypeArguments(),
-        List.of());
   }
 
   @Override
@@ -1320,21 +1312,18 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   private CLayout typeLayout(String type) {
-    CAlignment firstAlignment =
+    CAlignment alignment =
         compiler.arch.pointerAlignment.equals(CAlignment.one())
             ? CAlignment.one()
-            : CAlignment.expression(typeFirstAlignment(type));
-    return new CLayout(CSize.expression(typeSize(type)), firstAlignment);
+            : CAlignment.expression(typeAlignment(type));
+    return new CLayout(CSize.expression(typeSize(type)), alignment);
   }
 
   private String typeInitializer(IRSlotTree slots) {
-    CSize size = layout(slots.combinations()).size;
-    CAlignment firstAlignment =
-        slots.slot().isPresent() ? layout(slots.slot().get()).alignment : CAlignment.one();
-
+    CLayout layout = layout(slots.combinations());
     StringBuilder sb = new StringBuilder("(struct type)");
-    sb.append("{.size=").append(size);
-    sb.append(",.first_alignment=").append(firstAlignment);
+    sb.append("{.size=").append(layout.size);
+    sb.append(",.alignment=").append(layout.alignment);
     sb.append("}");
     return sb.toString();
   }
@@ -1443,8 +1432,12 @@ public class CGenerator extends IRInstructionVisitor {
     return var + ".size";
   }
 
-  private String typeFirstAlignment(String var) {
-    return var + ".first_alignment";
+  private String typeAlignment(String var) {
+    return var + ".alignment";
+  }
+
+  private String typeFlags(String var) {
+    return var + ".flags";
   }
 
   private String taskNext(String var) {
@@ -1507,25 +1500,13 @@ public class CGenerator extends IRInstructionVisitor {
     return var + "->mutex";
   }
 
-  private CAddress cellSlotManagerAddress(CAddress cellSlotAddr) {
-    return cellSlotAddr.offset(compiler.arch.pointerSize);
-  }
-
-  private String cellSlotManager(CAddress cellSlotAddr) {
-    return cellSlotManagerAddress(cellSlotAddr).deref("struct exponential*");
-  }
-
   private CSize offset(CSize base, IRSlotOffset offset) {
     if (offset.isZero()) {
       return base;
     } else {
       CSize pastSize = layout(offset.getPast()).size;
-      if (offset.getAlignTo().isPresent()) {
-        CAlignment alignment = layout(offset.getAlignTo().get()).alignment;
-        return base.add(pastSize).align(alignment);
-      } else {
-        return base.add(pastSize);
-      }
+      CAlignment futureAlignment = layout(offset.getFuture()).alignment;
+      return base.add(pastSize).align(futureAlignment);
     }
   }
 
@@ -1535,12 +1516,8 @@ public class CGenerator extends IRInstructionVisitor {
 
   private CAddress offset(CAddress address, IRSlotOffset offset) {
     CSize pastSize = layout(offset.getPast()).size;
-    CAddress result = address.offset(pastSize);
-    if (offset.getAlignTo().isPresent()) {
-      CAlignment alignment = layout(offset.getAlignTo().get()).alignment;
-      result = result.align(alignment);
-    }
-    return result;
+    CAlignment futureAlignment = layout(offset.getFuture()).alignment;
+    return address.offset(pastSize).align(futureAlignment);
   }
 
   private CLayout layout(IRSlotCombinations combinations) {
@@ -1578,27 +1555,31 @@ public class CGenerator extends IRInstructionVisitor {
 
   void putMoveSlots(
       IRSlotTree slots,
+      Function<IRValueRequisites, CCondition> typeIsValue,
       boolean clone,
       IRDataLocation targetLocation,
       IRDataLocation sourceLocation) {
     putMoveSlots(
         slots,
         clone,
-        (past, slot) -> data(targetLocation.advance(past, slot)),
-        (past, slot) -> data(sourceLocation.advance(past, slot)));
+        typeIsValue,
+        offset -> data(targetLocation.advance(offset)),
+        offset -> data(sourceLocation.advance(offset)));
   }
 
   void putMoveSlots(
       IRSlotTree slots,
       boolean clone,
-      BiFunction<IRSlotSequence, IRSlot, CAddress> targetAddress,
-      BiFunction<IRSlotSequence, IRSlot, CAddress> sourceAddress) {
+      Function<IRValueRequisites, CCondition> typeIsValue,
+      Function<IRSlotOffset, CAddress> targetAddress,
+      Function<IRSlotOffset, CAddress> sourceAddress) {
     putSlotTraversal(
         slots,
-        past -> sourceAddress.apply(past, new IRTagS()),
-        (past, slot) -> {
-          CAddress source = sourceAddress.apply(past, slot);
-          CAddress target = targetAddress.apply(past, slot);
+        typeIsValue,
+        offset -> sourceAddress.apply(offset),
+        (offset, slot) -> {
+          CAddress source = sourceAddress.apply(offset);
+          CAddress target = targetAddress.apply(offset);
           putMoveSlot(target, source, slot);
           if (clone) {
             putCloneSlot(target, slot);
@@ -1616,11 +1597,15 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   // Drops each slot on the tree
-  void putDropSlots(IRSlotTree slots, BiFunction<IRSlotSequence, IRSlot, CAddress> addresser) {
+  void putDropSlots(
+      IRSlotTree slots,
+      Function<IRValueRequisites, CCondition> typeIsValue,
+      Function<IRSlotOffset, CAddress> addresser) {
     putSlotTraversal(
         slots,
-        past -> addresser.apply(past, new IRTagS()),
-        (past, slot) -> putDropSlot(addresser.apply(past, slot), slot));
+        typeIsValue,
+        offset -> addresser.apply(offset),
+        (offset, slot) -> putDropSlot(addresser.apply(offset), slot));
   }
 
   // Drops a slot, e.g., decrementing reference counts if necessary
@@ -1640,36 +1625,60 @@ public class CGenerator extends IRInstructionVisitor {
 
   void putSlotTraversal(
       IRSlotTree slots,
-      Function<IRSlotSequence, CAddress> tagAddresser,
-      BiConsumer<IRSlotSequence, IRSlot> atSlot) {
-    putSlotTraversal(slots, tagAddresser, atSlot, IRSlotSequence.EMPTY);
+      Function<IRValueRequisites, CCondition> typeIsValue,
+      Function<IRSlotOffset, CAddress> tagAddresser,
+      BiConsumer<IRSlotOffset, IRSlot> atSlot) {
+    putSlotTraversal(slots, typeIsValue, tagAddresser, atSlot, IRSlotSequence.EMPTY);
   }
 
   void putSlotTraversal(
       IRSlotTree slots,
-      Function<IRSlotSequence, CAddress> tagAddresser,
-      BiConsumer<IRSlotSequence, IRSlot> atSlot,
+      Function<IRValueRequisites, CCondition> typeIsValue,
+      Function<IRSlotOffset, CAddress> tagAddresser,
+      BiConsumer<IRSlotOffset, IRSlot> atSlot,
       IRSlotSequence past) {
-    if (slots.slot().isPresent()) {
-      atSlot.accept(past, slots.slot().get());
+    if (slots.singleHead().isPresent()) {
+      atSlot.accept(IRSlotOffset.of(past, slots.combinations()), slots.singleHead().get());
     }
 
     if (slots.isUnary()) {
       putSlotTraversal(
           ((IRSlotTree.Unary) slots).child(),
+          typeIsValue,
           tagAddresser,
           atSlot,
-          past.suffix(slots.slot().get()));
+          past.suffix(slots.singleHead().get()));
     } else if (slots.isTag()) {
       IRSlotTree.Tag tag = (IRSlotTree.Tag) slots;
       List<Runnable> cases = new ArrayList<>();
 
       for (IRSlotTree child : tag.cases()) {
         cases.add(
-            () -> putSlotTraversal(child, tagAddresser, atSlot, past.suffix(slots.slot().get())));
+            () ->
+                putSlotTraversal(
+                    child,
+                    typeIsValue,
+                    tagAddresser,
+                    atSlot,
+                    past.suffix(slots.singleHead().get())));
       }
 
-      putSwitch(tagAddresser.apply(past).deref("unsigned char"), cases);
+      putSwitch(
+          tagAddresser.apply(IRSlotOffset.of(past, tag.combinations())).deref("unsigned char"),
+          cases);
+    } else if (slots.isIsValue()) {
+      IRSlotTree.IsValue isValue = (IRSlotTree.IsValue) slots;
+
+      putIfElse(
+          typeIsValue.apply(isValue.requisites()),
+          () -> {
+            putSlotTraversal(isValue.value(), typeIsValue, tagAddresser, atSlot, past);
+          },
+          () -> {
+            putSlotTraversal(isValue.notValue(), typeIsValue, tagAddresser, atSlot, past);
+          });
+    } else if (!slots.isLeaf()) {
+      throw new IllegalArgumentException("Unknown slot tree " + slots);
     }
   }
 
@@ -1748,34 +1757,9 @@ public class CGenerator extends IRInstructionVisitor {
             putDebugLn("[freeCell]");
           }
 
-          // To drop the cell's contents, we must call its manager
-          CAddress managerAddr = cellSlotManagerAddress(cellAddr);
-          String manager = managerAddr.deref("void*");
-          putCallExponential(
-              TMP_PTR1,
-              managerAddr.deref("struct exponential*"),
-              Optional.empty(),
-              Optional.empty());
-          CAddress managerEnv = castToAddress(TMP_PTR1);
-
-          CAddress remoteData =
-              managerEnv.offset(CSize.expression(exponentialEntryDataOffset(manager)));
-          CAddress remoteSessionAddr =
-              managerEnv.offset(CSize.expression(exponentialEntrySessionOffset(manager)));
-          String remoteSession = remoteSessionAddr.deref("struct session");
-
-          // Pass the cell to the manager
-          putAssign(remoteData.deref("struct cell*"), ref);
-          remoteData = remoteData.offset(compiler.arch.pointerSize);
-
-          // Pass a tag indicating we want to drop the cell data
-          String tagRef = remoteData.deref("unsigned char");
-          putAssign(tagRef, CELL_MANAGER_MODE_DROP); // 0 means drops
-
-          // Pass control to the manager
-          String contLabel = makeLabel("drop_cell_data");
-          putContinue(TMP_PTR2, remoteSession, labelAddress(contLabel));
-          putLabel(contLabel);
+          // To drop the cell's contents, we simply drop its affine session
+          String sessionPtr = cellData(cellAddr, IRSlotOffset.ZERO).deref("struct session*");
+          putDropAffine(accessSession(sessionPtr));
 
           // Now we can free the cell itself
           if (compiler.concurrency.get()) {
@@ -1821,8 +1805,8 @@ public class CGenerator extends IRInstructionVisitor {
           () ->
               putDropSlots(
                   drop.getSlots(),
-                  (past, slot) ->
-                      localData(drop.getLocalDataId(), drop.getOffset().advance(past, slot)));
+                  reqs -> isValue(processLayout, var, reqs),
+                  offset -> localData(drop.getLocalDataId(), drop.getOffset().advance(offset)));
 
       if (drop.isAlways()) {
         putDrop.run();
@@ -1911,6 +1895,27 @@ public class CGenerator extends IRInstructionVisitor {
 
   private String makeLabel(String prefix) {
     return currentProcess.getId() + "_" + prefix + "_" + (nextLabelId++);
+  }
+
+  private CCondition isValue(IRValueRequisites reqs) {
+    return isValue(currentProcessLayout, ENV, reqs);
+  }
+
+  private CCondition isValue(CProcessLayout processLayout, String env, IRValueRequisites reqs) {
+    if (reqs.mustBeValue()) {
+      return CCondition.certainlyTrue();
+    } else if (reqs.canBeValue()) {
+      String expr = "";
+      for (IRTypeId typeId : reqs.typesWhichMustBeValue()) {
+        if (!expr.isEmpty()) {
+          expr += " && ";
+        }
+        expr += "(" + typeFlags(type(processLayout, env, typeId)) + " & " + TYPE_FLAG_VALUE + ")";
+      }
+      return CCondition.maybe(expr);
+    } else {
+      return CCondition.certainlyFalse();
+    }
   }
 
   // =============================== Base statement building helpers ==============================
@@ -2022,11 +2027,21 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   void putIfElse(String condition, Runnable then, Runnable otherwise) {
-    putLine("if (" + condition + ") {");
-    putIndented(then);
-    putLine("} else {");
-    putIndented(otherwise);
-    putLine("}");
+    putIfElse(CCondition.maybe(condition), then, otherwise);
+  }
+
+  void putIfElse(CCondition condition, Runnable then, Runnable otherwise) {
+    if (condition.isCertainlyTrue()) {
+      then.run();
+    } else if (condition.isCertainlyFalse()) {
+      otherwise.run();
+    } else {
+      putLine("if (" + condition.expression() + ") {");
+      putIndented(then);
+      putLine("} else {");
+      putIndented(otherwise);
+      putLine("}");
+    }
   }
 
   void putSwitch(String value, List<Runnable> cases) {
