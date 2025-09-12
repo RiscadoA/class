@@ -200,21 +200,21 @@ public class IRValueChecker extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTCellT type) {
-    expectPolarity(true);
+    isValue = false;
   }
 
   @Override
   public void visit(ASTUsageT type) {
-    expectPolarity(false);
+    isValue = false;
   }
 
   @Override
   public void visit(ASTCellLT type) {
-    expectPolarity(true);
+    isValue = false;
   }
 
   @Override
   public void visit(ASTUsageLT type) {
-    expectPolarity(false);
+    isValue = false;
   }
 }

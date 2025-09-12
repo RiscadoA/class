@@ -164,11 +164,16 @@ public class IRGenerator extends ASTNodeVisitor {
     IRProcess manager = new IRProcess(processId);
 
     // Declare arguments
-    IRLocalDataId dataId = manager.addLocalData(IRSlotCombinations.of(new IRCellS(), new IRTagS()));
+    IRLocalDataId dataId = manager.addLocalData(IRSlotCombinations.of(
+      IRSlotSequence.of(new IRCellS(), new IRTagS()),
+      IRSlotSequence.of(new IRCellS(), new IRTagS(), new IRSessionS()), //
+      IRSlotSequence.of(new IRSessionS())
+    ));
     IRSessionId sessionId = manager.addArgSession(dataId);
 
     IRDataLocation cellLoc = IRDataLocation.local(dataId, IRSlotOffset.ZERO);
-    IRDataLocation tagLoc = IRDataLocation.local(dataId, IRSlotOffset.of(new IRSessionS(), new IRTagS()));
+    IRDataLocation tagLoc = cellLoc.advance(new IRCellS(), new IRTagS());
+    IRDataLocation argSessionLoc = tagLoc.advance(new IRTagS(), new IRSessionS());
 
     // Branch on manager mode
     IRBlock onPut = manager.createBlock("on_put");
@@ -182,6 +187,13 @@ public class IRGenerator extends ASTNodeVisitor {
     manager.getEntry().add(new IRBranchTag(tagLoc, List.of(cases)));
 
     // Generate the put mode
+    if (isValue(rhsType, true)) {
+      // If the type is a value, we execute the session immediately
+
+    } else {
+
+    }
+
     // TODO:
 
     // Generate the take mode
@@ -1215,6 +1227,11 @@ public class IRGenerator extends ASTNodeVisitor {
   void addPut(String ch, String chc, ASTType typeLhs, Runnable contLhs, Runnable contRhs) {
     IREnvironment.Channel channel = env.getChannel(ch);
     IRDataLocation cellDataLoc = IRDataLocation.cell(channel.getLocalData(), IRSlotOffset.ZERO);
+
+    // TODO:
+    // 1. call cell manager
+    // 2. send cell and 'put' tag to manager
+    // 3. receive session from manager
 
     if (isValue(typeLhs, true)) {
       // If the left-hand-side is a value, we do basically the same as the send value optimization
