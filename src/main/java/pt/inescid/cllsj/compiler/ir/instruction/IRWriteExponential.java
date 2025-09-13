@@ -10,16 +10,16 @@ import pt.inescid.cllsj.compiler.ir.slot.IRSlotTree;
 
 public class IRWriteExponential extends IRWrite {
   public static class TypeArgument {
-    private IRSlotTree sourceTree;
+    private IRTypeId sourceType;
     private IRTypeId targetType;
 
-    public TypeArgument(IRSlotTree sourceTree, IRTypeId targetType) {
-      this.sourceTree = sourceTree;
+    public TypeArgument(IRTypeId sourceType, IRTypeId targetType) {
+      this.sourceType = sourceType;
       this.targetType = targetType;
     }
 
-    public IRSlotTree getSourceTree() {
-      return sourceTree;
+    public IRTypeId getSourceType() {
+      return sourceType;
     }
 
     public IRTypeId getTargetType() {
@@ -27,12 +27,12 @@ public class IRWriteExponential extends IRWrite {
     }
 
     public TypeArgument clone() {
-      return new TypeArgument(sourceTree, targetType);
+      return new TypeArgument(sourceType, targetType);
     }
 
     @Override
     public String toString() {
-      return targetType + " <- " + sourceTree;
+      return targetType + " <- " + sourceType;
     }
   }
 

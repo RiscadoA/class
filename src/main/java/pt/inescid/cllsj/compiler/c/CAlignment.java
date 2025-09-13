@@ -79,6 +79,8 @@ public abstract class CAlignment {
     protected CAlignment simplify(int max) {
       if (max <= 1) {
         return this;
+      } else if (max >= 8) {
+        return constant(max);
       } else {
         return this.max(constant(max));
       }

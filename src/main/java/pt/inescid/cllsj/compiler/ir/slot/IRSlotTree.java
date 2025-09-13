@@ -31,12 +31,10 @@ public abstract class IRSlotTree {
 
   public static IRSlotTree isValue(
       IRValueRequisites requisites, IRSlotTree value, IRSlotTree notValue) {
-    if (requisites.mustBeValue()) {
-      return value;
-    } else if (!requisites.canBeValue()) {
-      return notValue;
-    } else {
+    if (requisites.canBeValue()) {
       return new IsValue(requisites, value, notValue);
+    } else {
+      return notValue;
     }
   }
 
@@ -241,7 +239,7 @@ public abstract class IRSlotTree {
 
     @Override
     protected void toStringHelper(StringBuilder sb) {
-      sb.append("isValue(").append(requisites).append(")[");
+      sb.append("isValue<").append(requisites).append(">[");
       sb.append("yes: ").append(value);
       sb.append(" | no: ").append(notValue);
       sb.append("]");

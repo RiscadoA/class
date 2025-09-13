@@ -3,6 +3,8 @@ package pt.inescid.cllsj.compiler.ir;
 import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
+
 import pt.inescid.cllsj.ast.ASTTypeVisitor;
 import pt.inescid.cllsj.ast.types.ASTAffineT;
 import pt.inescid.cllsj.ast.types.ASTBangT;
@@ -57,6 +59,10 @@ public class IRValueRequisites {
     return new IRValueRequisites(Optional.of(types));
   }
 
+  public static IRValueRequisites valueIf(IRTypeId type) {
+    return valueIf(Set.of(type));
+  }
+
   public static IRValueRequisites value() {
     return valueIf(Set.of());
   }
@@ -75,6 +81,18 @@ public class IRValueRequisites {
 
   public Set<IRTypeId> typesWhichMustBeValue() {
     return types.orElseThrow();
+  }
+
+  public IRValueRequisites replaceTypes(Function<IRTypeId, IRTypeId> replacer) {
+    if (types.isPresent()) {
+      Set<IRTypeId> newTypes = new HashSet<>();
+      for (IRTypeId t : types.get()) {
+        newTypes.add(replacer.apply(t));
+      }
+      return IRValueRequisites.valueIf(newTypes);
+    } else {
+      return this;
+    }
   }
 
   @Override

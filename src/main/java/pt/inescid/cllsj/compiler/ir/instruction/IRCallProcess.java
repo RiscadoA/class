@@ -3,6 +3,8 @@ package pt.inescid.cllsj.compiler.ir.instruction;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
+
+import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
 import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
 import pt.inescid.cllsj.compiler.ir.id.IRLocalDataId;
 import pt.inescid.cllsj.compiler.ir.id.IRProcessId;
@@ -15,17 +17,20 @@ public class IRCallProcess extends IRInstruction {
   public static class TypeArgument {
     private Optional<IRDataLocation> sourceLocation;
     private Optional<IRSlotTree> sourceTree;
+    private Optional<IRValueRequisites> sourceIsValue;
     private IRTypeId targetType;
 
     public TypeArgument(IRDataLocation sourceLocation, IRTypeId targetType) {
       this.sourceLocation = Optional.of(sourceLocation);
       this.sourceTree = Optional.empty();
+      this.sourceIsValue = Optional.empty();
       this.targetType = targetType;
     }
 
-    public TypeArgument(IRSlotTree sourceTree, IRTypeId targetType) {
+    public TypeArgument(IRSlotTree sourceTree, IRValueRequisites sourceIsValue, IRTypeId targetType) {
       this.sourceLocation = Optional.empty();
       this.sourceTree = Optional.of(sourceTree);
+      this.sourceIsValue = Optional.of(sourceIsValue);
       this.targetType = targetType;
     }
 
@@ -41,6 +46,10 @@ public class IRCallProcess extends IRInstruction {
       return sourceTree.orElseThrow();
     }
 
+    public IRValueRequisites getSourceIsValue() {
+      return sourceIsValue.orElseThrow();
+    }
+
     public IRTypeId getTargetType() {
       return targetType;
     }
@@ -49,15 +58,17 @@ public class IRCallProcess extends IRInstruction {
       if (sourceLocation.isPresent()) {
         return new TypeArgument(sourceLocation.get(), targetType);
       } else {
-        return new TypeArgument(sourceTree.get(), targetType);
+        return new TypeArgument(sourceTree.get(), sourceIsValue.get(), targetType);
       }
     }
 
     @Override
     public String toString() {
-      return targetType
-          + " <- "
-          + (sourceLocation.isPresent() ? sourceLocation.get() : sourceTree.get());
+      if (sourceLocation.isPresent()) {
+        return targetType + " <- " + sourceLocation.get();
+      } else {
+        return targetType + " <- " + sourceTree.get() + " (value=" + sourceIsValue.get() + ")";
+      }
     }
   }
 

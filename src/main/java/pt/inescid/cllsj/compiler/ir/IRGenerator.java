@@ -282,7 +282,7 @@ public class IRGenerator extends ASTNodeVisitor {
       ASTType type = node.getTPars().get(i);
       IRSlotsFromASTType info = slotsFromType(type);
       tArgPolarities[i] = isPositive(type);
-      typeArguments.add(new IRCallProcess.TypeArgument(info.activeTree(), new IRTypeId(i)));
+      typeArguments.add(new IRCallProcess.TypeArgument(info.activeTree(), valueRequisites(type, tArgPolarities[i]), new IRTypeId(i)));
     }
 
     // Find the process id, and mark it as used so that it gets generated
@@ -794,8 +794,7 @@ public class IRGenerator extends ASTNodeVisitor {
           for (int i = 0; i < process.getTypeCount(); ++i) {
             IRTypeId id = new IRTypeId(i);
             IREnvironment.Type envType = env.getType(id);
-            typeArguments.add(
-                new IRWriteExponential.TypeArgument(IRSlotTree.of(new IRVarS(id)), id));
+            typeArguments.add(new IRWriteExponential.TypeArgument(id, id));
             expEnv = expEnv.addType(envType.getName(), envType.isPositive());
           }
 
@@ -916,7 +915,7 @@ public class IRGenerator extends ASTNodeVisitor {
 
     // Write the type, the right-hand-side session and the type's polarity to the main channel
     IRSlotsFromASTType varInfo = slotsFromType(type);
-    block.add(new IRWriteType(typeLoc, varInfo.activeTree()));
+    block.add(new IRWriteType(typeLoc, varInfo.activeTree(), valueRequisites(type, isPositive(type))));
     block.add(new IRWriteSession(sessionLoc, channel.getSessionId()));
     block.add(new IRWriteTag(polarityLoc, isPositive(type) ? 1 : 0));
     block.add(new IRFinishSession(originalSession, true));
@@ -966,7 +965,7 @@ public class IRGenerator extends ASTNodeVisitor {
             IREnvironment.Type envType = env.getType(id);
             polyEnv = polyEnv.addType(envType.getName(), envType.isPositive());
             IRTypeId newId = polyEnv.getType(envType.getName()).getId();
-            typeArguments.add(new IRCallProcess.TypeArgument(IRSlotTree.of(new IRVarS(id)), newId));
+            typeArguments.add(new IRCallProcess.TypeArgument(IRSlotTree.of(new IRVarS(id)), IRValueRequisites.valueIf(id), newId));
           }
 
           // Pass the type variable received to the polymorphic process

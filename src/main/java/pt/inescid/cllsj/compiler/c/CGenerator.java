@@ -847,7 +847,7 @@ public class CGenerator extends IRInstructionVisitor {
   @Override
   public void visit(IRWriteType instr) {
     String ref = data(instr.getLocation()).deref("struct type");
-    putAssign(ref, typeInitializer(instr.getSlots()));
+    putAssign(ref, typeInitializer(instr.getSlots(), instr.getValueRequisites()));
   }
 
   @Override
@@ -956,7 +956,7 @@ public class CGenerator extends IRInstructionVisitor {
       if (arg.isFromLocation()) {
         putAssign(targetType, data(arg.getSourceLocation()).deref("struct type"));
       } else {
-        putAssign(targetType, typeInitializer(arg.getSourceTree()));
+        putAssign(targetType, typeInitializer(arg.getSourceTree(), arg.getSourceIsValue()));
       }
     }
 
@@ -1057,7 +1057,7 @@ public class CGenerator extends IRInstructionVisitor {
                                   + processId));
 
           // Now we can just compute the layout of the source type in the current process
-          return layout(arg.getSourceTree().combinations());
+          return typeLayout(arg.getSourceType());
         };
 
     CProcessLayout expProcessLayout = layout(expProcess);
@@ -1112,7 +1112,7 @@ public class CGenerator extends IRInstructionVisitor {
     for (IRWriteExponential.TypeArgument arg : typeArguments) {
       // Get a reference to the target type in the new environment and initialize itq
       String targetType = type(expProcessLayout, newEnv, arg.getTargetType());
-      putAssign(targetType, typeInitializer(arg.getSourceTree()));
+      putAssign(targetType, type(arg.getSourceType()));
     }
 
     for (IRWriteExponential.DataArgument arg : dataArguments) {
@@ -1326,13 +1326,18 @@ public class CGenerator extends IRInstructionVisitor {
     return new CLayout(CSize.expression(typeSize(type)), alignment);
   }
 
-  private String typeInitializer(IRSlotTree slots) {
+  private String typeInitializer(IRSlotTree slots, IRValueRequisites isValue) {
     CLayout layout = layout(slots.combinations());
     StringBuilder sb = new StringBuilder("(struct type)");
     sb.append("{.size=").append(layout.size);
     sb.append(",.alignment=").append(layout.alignment);
+    sb.append(",.flags=").append(isValue(isValue).ternary(Integer.toString(TYPE_FLAG_VALUE), "0"));
     sb.append("}");
     return sb.toString();
+  }
+
+  private String type(IRTypeId id) {
+    return type(currentProcessLayout, ENV, id);
   }
 
   private String type(CProcessLayout layout, String env, IRTypeId id) {
