@@ -1,18 +1,14 @@
 Profiling results:
   Thread inits: 2
   Thread stops: 2
-  Environment allocations: 6
-  Environment frees: 6
-  Environment peak: 2
-  Record allocations: 6
-  Record reallocations: 0
-  Record frees: 6
-  Record peak: 2
+  Environment allocations: 1
+  Environment frees: 1
+  Environment peak: 1
   Exponential allocations: 0
   Exponential frees: 0
   Task allocations: 3
   Task frees: 3
-  String allocations: 5
-  String frees: 5
+  String allocations: 4
+  String frees: 4
   Cell allocations: 1
   Cell frees: 1
