@@ -1,5 +1,6 @@
 package pt.inescid.cllsj.compiler.ir;
 
+import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
 import pt.inescid.cllsj.ast.ASTTypeVisitor;
@@ -94,7 +95,7 @@ public class IRValueRequisites {
     private IREnvironment env;
     private boolean polarity;
 
-    private Optional<Set<IRTypeId>> types = Optional.of(Set.of());
+    private Optional<Set<IRTypeId>> types = Optional.of(new HashSet<>());
 
     private void expectPolarity(boolean polarity) {
       if (this.polarity != polarity) {
@@ -137,17 +138,13 @@ public class IRValueRequisites {
     @Override
     public void visit(ASTIdT type) {
       // Unfold the type to check if its definition is known
-      ASTType unfolded;
-      try {
-        unfolded = type.unfoldType(env.getEp());
-      } catch (Exception e) {
-        throw new IllegalArgumentException("Error unfolding type: " + e.getMessage());
-      }
+      ASTType unfolded = type.unfoldTypeCatch(env.getEp());
       if (!(unfolded instanceof ASTIdT)) {
         // We have a type definition, just recurse on the unfolded type
         unfolded.accept(this);
         return;
       }
+      type = (ASTIdT) unfolded;
 
       // We still have a type identifier, thus this is a polymorphic session and not a value
       IREnvironment.Type typeEntry = env.getType(type.getid());

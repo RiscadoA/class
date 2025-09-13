@@ -1215,8 +1215,14 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRBranchIsValue instr) {
-    // TODO:
-    throw new UnsupportedOperationException("TODO: implement");
+    putIfElse(isValue(instr.getRequisites()), () -> {
+      putSubtractAtomic(endPoints(), instr.getMaxEndPoints() - instr.getThen().getEndPoints());
+      putConstantGoto(codeLocationLabel(instr.getThen().getLocation()));
+    }, () -> {
+      putSubtractAtomic(
+          endPoints(), instr.getMaxEndPoints() - instr.getOtherwise().getEndPoints());
+      putConstantGoto(codeLocationLabel(instr.getOtherwise().getLocation()));
+    });
   }
 
   @Override

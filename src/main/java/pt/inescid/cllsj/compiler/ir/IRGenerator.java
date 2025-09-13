@@ -683,6 +683,8 @@ public class IRGenerator extends ASTNodeVisitor {
 
     // Define new session for the channel being received
     IRSlotsFromASTType info = slotsFromType(lhsType);
+    env = env.addSession(chi, info.localCombinations());
+    IREnvironment.Channel argChannel = env.getChannel(chi);
 
     IRValueRequisites reqs = valueRequisites(lhsType, false);
     if (!compiler.optimizeSendValue.get()) {
@@ -693,18 +695,12 @@ public class IRGenerator extends ASTNodeVisitor {
         reqs,
         endPoints,
         () -> {
-          env = env.addValue(chi, info.localCombinations(), Optional.empty());
-          IREnvironment.Channel argChannel = env.getChannel(chi);
-
           // If the left type is a value, we do the send value optimization
           block.add(
               new IRMoveValue(
                   argChannel.getLocalData(), channel.getLocalData(), info.activeLocalTree));
         },
         () -> {
-          env = env.addSession(chi, info.localCombinations());
-          IREnvironment.Channel argChannel = env.getChannel(chi);
-
           // Bind the new session to the value received from the main session
           block.add(
               new IRBindSession(
@@ -854,6 +850,9 @@ public class IRGenerator extends ASTNodeVisitor {
   void addCall(String ch, String chi, ASTType type, int endPoints, Runnable cont) {
     IREnvironment.Channel channel = env.getChannel(ch);
     IRSlotsFromASTType info = slotsFromType(type);
+    env = env.addSession(chi, info.localCombinations());
+    IREnvironment.Channel argChannel = env.getChannel(chi);
+
     IRValueRequisites reqs = valueRequisites(type, false);
 
     IRBlock rhsBlock = process.createBlock("call_rhs");
@@ -862,9 +861,6 @@ public class IRGenerator extends ASTNodeVisitor {
         reqs,
         endPoints,
         () -> {
-          env = env.addValue(chi, info.localCombinations(), Optional.empty());
-          IREnvironment.Channel argChannel = env.getChannel(chi);
-
           // Just clone the exponential's data to the new channel
           block.add(
               new IRCloneValue(
@@ -874,9 +870,6 @@ public class IRGenerator extends ASTNodeVisitor {
         },
         endPoints,
         () -> {
-          env = env.addSession(chi, info.localCombinations());
-          IREnvironment.Channel argChannel = env.getChannel(chi);
-
           block.add(
               new IRCallExponential(
                   channel.getLocalData(), argChannel.getSessionId(), argChannel.getLocalDataId()));
