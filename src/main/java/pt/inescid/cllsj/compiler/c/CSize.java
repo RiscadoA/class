@@ -19,10 +19,6 @@ public abstract class CSize {
     return expression("sizeof(" + cType + ")");
   }
 
-  public static CSize ternary(String condition, CSize then, CSize otherwise) {
-    return expression("((" + condition + ") ? (" + then + ") : (" + otherwise + "))");
-  }
-
   public String advancePointer(String pointer) {
     String offset = toString();
     if (offset.equals("0")) {

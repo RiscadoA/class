@@ -1,6 +1,6 @@
 proc main() {
     cut {
-        println("affine"); affine x;
+        println("before affine"); affine x; println("affine");
         println("close"); close x
         |x: ~affine close|
         println("discard"); discard x

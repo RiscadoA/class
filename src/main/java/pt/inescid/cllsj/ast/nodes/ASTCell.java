@@ -23,7 +23,9 @@ import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.types.ASTAffineT;
 import pt.inescid.cllsj.ast.types.ASTBotT;
 import pt.inescid.cllsj.ast.types.ASTCellT;
+import pt.inescid.cllsj.ast.types.ASTCoAffineT;
 import pt.inescid.cllsj.ast.types.ASTType;
+import pt.inescid.cllsj.ast.types.ASTUsageT;
 
 // unfolded
 
@@ -35,6 +37,9 @@ public class ASTCell extends ASTNode {
   boolean linear;
   boolean statecell;
   ASTType ty_rhs;
+
+  HashMap<String, ASTType> usageSet;
+  HashMap<String, ASTType> coaffineSet;
 
   public ASTCell(String _chr, String _chc, ASTType _type, ASTNode _rhs) {
     ch = _chr;
@@ -65,6 +70,14 @@ public class ASTCell extends ASTNode {
 
   public void setChc(String chc) {
     this.chc = chc;
+  }
+
+  public Map<String, ASTType> getUsageSet() {
+    return usageSet;
+  }
+
+  public Map<String, ASTType> getCoaffineSet() {
+    return coaffineSet;
   }
 
   public void ASTInsertPipe(Function<ASTNode, ASTNode> f, ASTNode from) throws Exception {
@@ -205,6 +218,29 @@ public class ASTCell extends ASTNode {
       Env<ASTType> eglhs = eg.assoc("$DUMMY", new ASTBotT());
 
       // lhs = ASTInferLinClose(lhs,cho,ed,ep);
+
+      usageSet = new HashMap<>();
+      coaffineSet = new HashMap<>();
+      Set<String> s = rhs.fn(new HashSet<>());
+      s.remove(chc);
+      Iterator<String> it = s.iterator();
+      while (it.hasNext()) {
+        String id = it.next();
+        ASTType tyId = null;
+        try {
+          tyId = ed.find(id);
+        } catch (Exception e) {
+        }
+        if (tyId == null) {
+          continue;
+        }
+
+        if (tyId instanceof ASTUsageT) {
+          usageSet.put(id, tyId);
+        } else if (tyId instanceof ASTCoAffineT) {
+          coaffineSet.put(id, tyId);
+        }
+      }
 
       rhs.typecheck(ed, eglhs, ep);
       rhs.linclose(ed, ep);

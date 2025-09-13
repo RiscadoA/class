@@ -100,13 +100,9 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
   @Override
   public void visit(ASTBangT type) {
     IRValueRequisites reqs = IRValueRequisites.check(compiler, env, type.getin(), true);
-    if (reqs.canBeValue()) {
-      IRSlotsFromASTType inner = recurse(type.getin());
-      activeRemoteTree =
-          IRSlotTree.isValue(reqs, inner.activeRemoteTree, IRSlotTree.of(new IRExponentialS()));
-    } else {
-      remoteSlot(new IRExponentialS());
-    }
+    IRSlotsFromASTType inner = recurse(type.getin());
+    activeRemoteTree =
+        IRSlotTree.isValue(reqs, inner.activeRemoteTree, IRSlotTree.of(new IRExponentialS()));
   }
 
   @Override
@@ -211,13 +207,9 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
   @Override
   public void visit(ASTRecvT type) {
     IRValueRequisites reqs = IRValueRequisites.check(compiler, env, type.getlhs(), false);
-    if (reqs.canBeValue()) {
-      IRSlotsFromASTType lhs = recurse(type.getlhs());
-      activeLocalTree =
-          IRSlotTree.isValue(reqs, lhs.activeLocalTree, IRSlotTree.of(new IRSessionS()));
-    } else {
-      localSlot(new IRSessionS());
-    }
+    IRSlotsFromASTType lhs = recurse(type.getlhs());
+    activeLocalTree =
+        IRSlotTree.isValue(reqs, lhs.activeLocalTree, IRSlotTree.of(new IRSessionS()));
 
     // Merge with the right-hand-side
     IRSlotsFromASTType rhsResult = recurse(type.getrhs());
@@ -229,13 +221,8 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
   @Override
   public void visit(ASTSendT type) {
     IRValueRequisites reqs = IRValueRequisites.check(compiler, env, type.getlhs(), true);
-    if (reqs.canBeValue()) {
-      IRSlotsFromASTType lhs = recurse(type.getlhs());
-      activeRemoteTree =
-          IRSlotTree.isValue(reqs, lhs.activeRemoteTree, IRSlotTree.of(new IRSessionS()));
-    } else {
-      remoteSlot(new IRSessionS());
-    }
+    IRSlotsFromASTType lhs = recurse(type.getlhs());
+    activeRemoteTree = IRSlotTree.isValue(reqs, lhs.activeRemoteTree, IRSlotTree.of(new IRSessionS()));
 
     // Merge with the right-hand-side
     IRSlotsFromASTType rhsResult = recurse(type.getrhs());
@@ -247,13 +234,9 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
   @Override
   public void visit(ASTWhyT type) {
     IRValueRequisites reqs = IRValueRequisites.check(compiler, env, type.getin(), false);
-    if (reqs.canBeValue()) {
-      IRSlotsFromASTType inner = recurse(type.getin());
-      activeLocalTree =
-          IRSlotTree.isValue(reqs, inner.activeLocalTree, IRSlotTree.of(new IRExponentialS()));
-    } else {
-      localSlot(new IRExponentialS());
-    }
+    IRSlotsFromASTType inner = recurse(type.getin());
+    activeLocalTree =
+        IRSlotTree.isValue(reqs, inner.activeLocalTree, IRSlotTree.of(new IRExponentialS()));
   }
 
   @Override

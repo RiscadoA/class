@@ -3,14 +3,14 @@ proc main() {
         println("cell 1"); cell c1(x. affine x; println("close 1"); close x)
         |c1: ~state close|
         println("take 1"); take c1(x);
-        println("wait 1"); wait x;
+        wait x;
         fwd c1 e
         |e: ~statel close|
         println("put 1"); put e(x. affine x; println("close 2"); close x);
         fwd e c2
         |c2: ~state close|
         println("take 2"); take c2(x);
-        println("wait 2"); wait x;
+        wait x;
         println("put 2"); put c2(x. affine x; println("close 3"); close x);
         println("release"); release c2
     }

@@ -29,9 +29,15 @@ public abstract class IRSlotTree {
     return new Tag(cases);
   }
 
-  public static IsValue isValue(
+  public static IRSlotTree isValue(
       IRValueRequisites requisites, IRSlotTree value, IRSlotTree notValue) {
-    return new IsValue(requisites, value, notValue);
+    if (requisites.mustBeValue()) {
+      return value;
+    } else if (!requisites.canBeValue()) {
+      return notValue;
+    } else {
+      return new IsValue(requisites, value, notValue);
+    }
   }
 
   public abstract IRSlotCombinations combinations();
@@ -61,14 +67,14 @@ public abstract class IRSlotTree {
     return this instanceof IsValue;
   }
 
-  public abstract Set<IRSlot> head();
+  public abstract Optional<IRSlot> singleHead();
 
-  public Optional<IRSlot> singleHead() {
-    Set<IRSlot> heads = head();
-    if (heads.size() == 1) {
-      return Optional.of(heads.iterator().next());
+  public Set<IRSlot> head() {
+    Optional<IRSlot> single = singleHead();
+    if (single.isPresent()) {
+      return Set.of(single.get());
     } else {
-      return Optional.empty();
+      return Set.of();
     }
   }
 
@@ -81,8 +87,8 @@ public abstract class IRSlotTree {
     }
 
     @Override
-    public Set<IRSlot> head() {
-      return Set.of();
+    public Optional<IRSlot> singleHead() {
+      return Optional.empty();
     }
 
     @Override
@@ -117,8 +123,8 @@ public abstract class IRSlotTree {
     }
 
     @Override
-    public Set<IRSlot> head() {
-      return Set.of(slot);
+    public Optional<IRSlot> singleHead() {
+      return Optional.of(slot);
     }
 
     @Override
@@ -165,8 +171,8 @@ public abstract class IRSlotTree {
     }
 
     @Override
-    public Set<IRSlot> head() {
-      return Set.of(new IRTagS());
+    public Optional<IRSlot> singleHead() {
+      return Optional.of(new IRTagS());
     }
 
     @Override
@@ -221,6 +227,11 @@ public abstract class IRSlotTree {
       heads.addAll(value.head());
       heads.addAll(notValue.head());
       return heads;
+    }
+
+    @Override
+    public Optional<IRSlot> singleHead() {
+      return Optional.empty();
     }
 
     @Override

@@ -18,6 +18,7 @@ import pt.inescid.cllsj.Trail;
 import pt.inescid.cllsj.TypeError;
 import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.types.ASTBotT;
+import pt.inescid.cllsj.ast.types.ASTCoAffineT;
 import pt.inescid.cllsj.ast.types.ASTType;
 import pt.inescid.cllsj.ast.types.ASTUsageLT;
 import pt.inescid.cllsj.ast.types.ASTUsageT;
@@ -29,6 +30,9 @@ public class ASTPut extends ASTNode {
   ASTNode lhs;
   ASTNode rhs;
   ASTType tys_payl;
+
+  HashMap<String, ASTType> usageSet;
+  HashMap<String, ASTType> coaffineSet;
 
   public ASTPut(String _chs, String _cho, ASTType _type, ASTNode _lhs, ASTNode _rhs) {
     chs = _chs;
@@ -68,6 +72,14 @@ public class ASTPut extends ASTNode {
 
   public void setCho(String _cho) {
     cho = _cho;
+  }
+
+  public Map<String, ASTType> getUsageSet() {
+    return usageSet;
+  }
+
+  public Map<String, ASTType> getCoaffineSet() {
+    return coaffineSet;
   }
 
   public void ASTInsertPipe(Function<ASTNode, ASTNode> f, ASTNode from) throws Exception {
@@ -186,6 +198,29 @@ public class ASTPut extends ASTNode {
       }
 
       Env<ASTType> eglhs = eg.assoc("$DUMMY", new ASTBotT());
+
+      usageSet = new HashMap<>();
+      coaffineSet = new HashMap<>();
+      Set<String> s = lhs.fn(new HashSet<>());
+      s.remove(cho);
+      Iterator<String> it = s.iterator();
+      while (it.hasNext()) {
+        String id = it.next();
+        ASTType tyId = null;
+        try {
+          tyId = ed.find(id);
+        } catch (Exception e) {
+        }
+        if (tyId == null) {
+          continue;
+        }
+
+        if (tyId instanceof ASTUsageT) {
+          usageSet.put(id, tyId);
+        } else if (tyId instanceof ASTCoAffineT) {
+          coaffineSet.put(id, tyId);
+        }
+      }
 
       lhs.typecheck(ed, eglhs, ep);
 

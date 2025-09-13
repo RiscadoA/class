@@ -17,7 +17,7 @@ import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
 import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
 import pt.inescid.cllsj.compiler.ir.instruction.IRProcess;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotCombinations;
-import pt.inescid.cllsj.compiler.ir.slot.IRSlotOffset;
+import pt.inescid.cllsj.compiler.ir.slot.IRSlotDynamicOffset;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotTree;
 
 // Maps names to IR ids for types, sessions and local data within a process
@@ -93,7 +93,7 @@ public class IREnvironment {
         this,
         name,
         Optional.of(process.addArgSession(localDataId)),
-        IRSlotOffset.ZERO,
+        IRSlotDynamicOffset.ZERO,
         Optional.of(localDataId),
         Optional.empty(),
         Optional.empty());
@@ -105,7 +105,7 @@ public class IREnvironment {
         this,
         name,
         Optional.of(process.addSession()),
-        IRSlotOffset.ZERO,
+        IRSlotDynamicOffset.ZERO,
         Optional.of(localDataId),
         Optional.empty(),
         Optional.empty());
@@ -116,7 +116,7 @@ public class IREnvironment {
         this,
         name,
         Optional.of(process.addSession()),
-        IRSlotOffset.ZERO,
+        IRSlotDynamicOffset.ZERO,
         Optional.empty(),
         Optional.empty(),
         Optional.empty());
@@ -128,7 +128,7 @@ public class IREnvironment {
         this,
         name,
         Optional.empty(),
-        IRSlotOffset.ZERO,
+        IRSlotDynamicOffset.ZERO,
         Optional.of(process.addLocalData(combinations)),
         exponentialType,
         Optional.empty());
@@ -149,7 +149,7 @@ public class IREnvironment {
     }
   }
 
-  public IREnvironment advanceChannel(String name, IRSlotOffset offset) {
+  public IREnvironment advanceChannel(String name, IRSlotDynamicOffset offset) {
     Channel channel = getChannel(name);
     return new Channel(
         this,
@@ -167,7 +167,7 @@ public class IREnvironment {
         this,
         channel.getName(),
         channel.sessionId,
-        IRSlotOffset.ZERO,
+        IRSlotDynamicOffset.ZERO,
         channel.localDataId,
         channel.exponentialType,
         Optional.empty());
@@ -207,7 +207,7 @@ public class IREnvironment {
         this,
         accessName,
         Optional.of(sessionId),
-        IRSlotOffset.ZERO,
+        IRSlotDynamicOffset.ZERO,
         Optional.empty(),
         Optional.empty(),
         Optional.of(cell));
@@ -268,7 +268,7 @@ public class IREnvironment {
   public static class Channel extends IREnvironment {
     private String name;
     private Optional<IRSessionId> sessionId;
-    private IRSlotOffset offset;
+    private IRSlotDynamicOffset offset;
     private Optional<IRLocalDataId> localDataId;
     private Optional<IRSlotTree> exponentialType;
     private Optional<IRDataLocation> cellLocation;
@@ -277,7 +277,7 @@ public class IREnvironment {
         IREnvironment parent,
         String name,
         Optional<IRSessionId> sessionId,
-        IRSlotOffset offset,
+        IRSlotDynamicOffset offset,
         Optional<IRLocalDataId> localDataId,
         Optional<IRSlotTree> exponentialType,
         Optional<IRDataLocation> cellLocation) {
@@ -302,7 +302,7 @@ public class IREnvironment {
       return sessionId;
     }
 
-    public IRSlotOffset getOffset() {
+    public IRSlotDynamicOffset getOffset() {
       return offset;
     }
 

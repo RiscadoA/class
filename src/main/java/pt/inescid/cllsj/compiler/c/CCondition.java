@@ -34,4 +34,57 @@ public class CCondition {
   public String expression() {
     return expr.orElseThrow();
   }
+
+  public String ternary(String ifTrue, String ifFalse) {
+    if (isCertainlyTrue()) {
+      return ifTrue;
+    } else if (isCertainlyFalse()) {
+      return ifFalse;
+    } else {
+      return "(" + expression() + " ? " + ifTrue + " : " + ifFalse + ")";
+    }
+  }
+
+  public CSize ternary(CSize ifTrue, CSize ifFalse) {
+    if (ifTrue.equals(ifFalse)) {
+      return ifTrue;
+    }
+
+    if (isCertainlyTrue()) {
+      return ifTrue;
+    } else if (isCertainlyFalse()) {
+      return ifFalse;
+    } else {
+      return CSize.expression(ternary(ifTrue.toString(), ifFalse.toString()));
+    }
+  }
+
+  public CAlignment ternary(CAlignment ifTrue, CAlignment ifFalse) {
+    if (ifTrue.equals(ifFalse)) {
+      return ifTrue;
+    }
+
+    if (isCertainlyTrue()) {
+      return ifTrue;
+    } else if (isCertainlyFalse()) {
+      return ifFalse;
+    } else {
+      return CAlignment.expression(ternary(ifTrue.toString(), ifFalse.toString()));
+    }
+  }
+
+  public CLayout ternary(CLayout ifTrue, CLayout ifFalse) {
+    return new CLayout(ternary(ifTrue.size, ifFalse.size), ternary(ifTrue.alignment, ifFalse.alignment));
+  }
+
+  @Override
+  public String toString() {
+    if (isCertainlyTrue()) {
+      return "1";
+    } else if (isCertainlyFalse()) {
+      return "0";
+    } else {
+      return expression();
+    }
+  }
 }

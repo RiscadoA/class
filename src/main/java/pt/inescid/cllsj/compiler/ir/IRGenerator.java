@@ -18,7 +18,6 @@ import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.nodes.*;
 import pt.inescid.cllsj.ast.types.*;
 import pt.inescid.cllsj.compiler.Compiler;
-import pt.inescid.cllsj.compiler.Settings;
 import pt.inescid.cllsj.compiler.ir.expression.IRExpression;
 import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
 import pt.inescid.cllsj.compiler.ir.id.IRProcessId;
@@ -502,30 +501,25 @@ public class IRGenerator extends ASTNodeVisitor {
   @Override
   public void visit(ASTDiscard node) {
     IREnvironment.Channel channel = env.getChannel(node.getCh());
-    IRValueRequisites reqs = valueRequisites(node.getCoAffineT(), false);
 
-    addBranchIsValue(
-        reqs,
-        1,
-        () -> {
-          // The value is already present, we must drop it
-          block.add(
-              new IRDropValue(
-                  channel.getLocalData(), slotsFromType(node.getCoAffineT()).activeLocalTree));
-          block.add(new IRPopTask(true));
-        },
-        1,
-        () -> {
-          // Write a tag indicating the coaffine is being discarded and pass control to it
-          block.add(new IRWriteTag(channel.getRemoteData(), 0));
-          addContinue(channel.getSessionId());
-          block.add(new IRPopTask(true));
-        });
+    // Write a tag indicating the coaffine is being discarded and pass control to it
+    block.add(new IRWriteTag(channel.getRemoteData(), 0));
+    addContinue(channel.getSessionId());
+    block.add(new IRPopTask(true));
   }
 
   @Override
   public void visit(ASTCell node) {
-    addCell(node.getCh(), node.getChc(), node.getTypeRhs(), () -> node.getRhs().accept(this));
+    addCell(node.getCh(), node.getChc(), node.getTypeRhs(), () -> {
+      if (node.getTypeRhs() instanceof ASTCoBasicType || node.getTypeRhs() instanceof ASTCellT) {
+        // We need to make sure the right hand-side an affine
+        addAffine(node.getChc(), node.getTypeRhs(), node.getUsageSet(), node.getCoaffineSet(), countEndPoints(node.getRhs()), () -> {
+          node.getRhs().accept(this);
+        });
+      } else {
+        node.getRhs().accept(this);
+      }
+    });
   }
 
   @Override
@@ -534,7 +528,16 @@ public class IRGenerator extends ASTNodeVisitor {
         node.getChs(),
         node.getCho(),
         node.getLhsType(),
-        () -> node.getLhs().accept(this),
+        () -> {
+            if (node.getLhsType() instanceof ASTCoBasicType || node.getLhsType() instanceof ASTCellT) {
+          // We need to make sure the right hand-side an affine
+          addAffine(node.getCho(), node.getLhsType(), node.getUsageSet(), node.getCoaffineSet(), countEndPoints(node.getLhs()), () -> {
+            node.getLhs().accept(this);
+          });
+        } else {
+          node.getLhs().accept(this);
+        }
+        },
         () -> node.getRhs().accept(this));
   }
 
@@ -615,8 +618,11 @@ public class IRGenerator extends ASTNodeVisitor {
     IRBlock rhsBlock = process.createBlock("send_rhs");
 
     IRValueRequisites reqs = valueRequisites(lhsType, true);
+    if (!compiler.optimizeSendValue.get()) {
+      reqs = IRValueRequisites.notValue();
+    }
+
     addBranchIsValue(
-        compiler.optimizeSendValue,
         reqs,
         endPoints,
         () -> {
@@ -656,15 +662,11 @@ public class IRGenerator extends ASTNodeVisitor {
         });
 
     // Advance the main session depending on what we sent
-    if (reqs.canBeValue()) {
-      advanceOrReset(
-          ch,
-          argInfo.activeRemoteTree.combinations().merge(IRSlotCombinations.of(new IRSessionS())),
-          rhsType,
-          true);
-    } else {
-      advanceOrReset(ch, new IRSessionS(), rhsType, true);
-    }
+    advanceOrReset(
+        ch,
+        IRSlotTree.isValue(reqs, argInfo.activeRemoteTree, IRSlotTree.of(new IRSessionS())),
+        rhsType,
+        true);
 
     recurse(
         rhsBlock,
@@ -683,8 +685,11 @@ public class IRGenerator extends ASTNodeVisitor {
     IRSlotsFromASTType info = slotsFromType(lhsType);
 
     IRValueRequisites reqs = valueRequisites(lhsType, false);
+    if (!compiler.optimizeSendValue.get()) {
+      reqs = IRValueRequisites.notValue();
+    }
+
     addBranchIsValue(
-        compiler.optimizeSendValue,
         reqs,
         endPoints,
         () -> {
@@ -710,15 +715,11 @@ public class IRGenerator extends ASTNodeVisitor {
         });
 
     // Advance the main session depending on what we received
-    if (reqs.canBeValue()) {
-      advanceOrReset(
-          ch,
-          info.activeLocalTree.combinations().merge(IRSlotCombinations.of(new IRSessionS())),
-          rhsType,
-          false);
-    } else {
-      advanceOrReset(ch, new IRSessionS(), rhsType, false);
-    }
+    advanceOrReset(
+        ch,
+        IRSlotTree.isValue(reqs, info.activeLocalTree, IRSlotTree.of(new IRSessionS())),
+        rhsType,
+        false);
 
     // Recurse on the continuation
     recurse(block, cont);
@@ -898,11 +899,11 @@ public class IRGenerator extends ASTNodeVisitor {
     env =
         env.advanceChannel(
             ch,
-            IRSlotOffset.of(new IRTypeS(), IRSlotCombinations.of(new IRSessionS(), new IRTagS())));
+            IRSlotDynamicOffset.of(new IRTypeS(), IRSlotCombinations.of(new IRSessionS(), new IRTagS())));
     IRDataLocation sessionLoc = env.getChannel(ch).getRemoteData();
     env =
         env.advanceChannel(
-            ch, IRSlotOffset.of(new IRSessionS(), IRSlotCombinations.of(new IRTagS())));
+            ch, IRSlotDynamicOffset.of(new IRSessionS(), IRSlotCombinations.of(new IRTagS())));
     IRDataLocation polarityLoc = env.getChannel(ch).getRemoteData();
 
     // Overwrite the previous session with a new session of the new type
@@ -938,11 +939,11 @@ public class IRGenerator extends ASTNodeVisitor {
     env =
         env.advanceChannel(
             ch,
-            IRSlotOffset.of(new IRTypeS(), IRSlotCombinations.of(new IRSessionS(), new IRTagS())));
+            IRSlotDynamicOffset.of(new IRTypeS(), IRSlotCombinations.of(new IRSessionS(), new IRTagS())));
     IRDataLocation sessionLoc = env.getChannel(ch).getLocalData();
     env =
         env.advanceChannel(
-            ch, IRSlotOffset.of(new IRSessionS(), IRSlotCombinations.of(new IRTagS())));
+            ch, IRSlotDynamicOffset.of(new IRSessionS(), IRSlotCombinations.of(new IRTagS())));
     IRDataLocation polarityLoc = env.getChannel(ch).getLocalData();
 
     int processGenId = nextProcessGenId++;
@@ -988,7 +989,7 @@ public class IRGenerator extends ASTNodeVisitor {
           polyEnv = polyEnv.addArgSession(ch, rhsInfo.localCombinations());
           sessionArguments.add(
               new IRCallProcess.SessionArgument(
-                  sessionLoc, polyEnv.getChannel(ch).getSessionId(), IRSlotOffset.ZERO));
+                  sessionLoc, polyEnv.getChannel(ch).getSessionId(), IRSlotDynamicOffset.ZERO));
 
           // Pass captured sessions and exponentials to the polymorphic process
           // as session and data arguments
@@ -1154,17 +1155,17 @@ public class IRGenerator extends ASTNodeVisitor {
     // Store it in the cell and finish
     block.add(
         new IRWriteSession(
-            IRDataLocation.cell(channel.getRemoteData(), IRSlotOffset.ZERO),
+            IRDataLocation.cell(channel.getRemoteData(), IRSlotDynamicOffset.ZERO),
             cellSession.getSessionId()));
     block.add(new IRFinishSession(channel.getSessionId(), false));
 
     // Recurse on the cell's right-hand-side
-    recurse(cellBlock, cont);
+    recurse(cellBlock, () -> cont.run());
   }
 
   void addPut(String ch, String chc, ASTType typeLhs, Runnable contLhs, Runnable contRhs) {
     IREnvironment.Channel channel = env.getChannel(ch);
-    IRDataLocation cellDataLoc = IRDataLocation.cell(channel.getLocalData(), IRSlotOffset.ZERO);
+    IRDataLocation cellDataLoc = IRDataLocation.cell(channel.getLocalData(), IRSlotDynamicOffset.ZERO);
 
     // Define new session for the channel being stored
     IRSlotsFromASTType argInfo = slotsFromType(typeLhs);
@@ -1190,7 +1191,7 @@ public class IRGenerator extends ASTNodeVisitor {
 
   void addTake(String ch, String chc, ASTType typeLhs, Runnable cont) {
     IREnvironment.Channel channel = env.getChannel(ch);
-    IRDataLocation cellDataLoc = IRDataLocation.cell(channel.getLocalData(), IRSlotOffset.ZERO);
+    IRDataLocation cellDataLoc = IRDataLocation.cell(channel.getLocalData(), IRSlotDynamicOffset.ZERO);
 
     // Lock the cell while we're accessing it
     if (compiler.concurrency.get()) {
@@ -1205,9 +1206,13 @@ public class IRGenerator extends ASTNodeVisitor {
     // Otherwise, we bind the new session to the one stored in the cell
     block.add(new IRBindSession(cellDataLoc, argChannel.getSessionId(), argChannel.getLocalData()));
 
-    // The received session is guaranteed to an affine session
-    // We immediately mark it as used
-    addUse(chc, typeLhs, cont);
+    // The type checker doesn't place use nodes after takes of basic types
+    // and cells, so we do it ourselves
+    if (typeLhs instanceof ASTBasicType || typeLhs instanceof ASTUsageT) {
+      addUse(chc, typeLhs, cont);
+    } else {
+      recurse(block, cont);
+    }
   }
 
   void addBranchIsValue(
@@ -1233,16 +1238,11 @@ public class IRGenerator extends ASTNodeVisitor {
   }
 
   void addBranchIsValue(
-      Settings.Flag flag,
       IRValueRequisites reqs,
       int endPoints,
       Runnable ifValue,
       Runnable ifNotValue) {
-    if (flag.get()) {
-      addBranchIsValue(reqs, endPoints, ifValue, endPoints, ifNotValue);
-    } else {
-      ifNotValue.run();
-    }
+    addBranchIsValue(reqs, endPoints, ifValue, endPoints, ifNotValue);
   }
 
   void addContinue(IRSessionId sessionId) {
@@ -1267,11 +1267,11 @@ public class IRGenerator extends ASTNodeVisitor {
     advanceOrReset(ch, offset(slot, cont), cont, advancePolarity);
   }
 
-  void advanceOrReset(String ch, IRSlotCombinations slot, ASTType cont, boolean advancePolarity) {
-    advanceOrReset(ch, offset(slot, cont), cont, advancePolarity);
+  void advanceOrReset(String ch, IRSlotTree slots, ASTType cont, boolean advancePolarity) {
+    advanceOrReset(ch, offset(slots, cont), cont, advancePolarity);
   }
 
-  void advanceOrReset(String ch, IRSlotOffset offset, ASTType cont, boolean advancePolarity) {
+  void advanceOrReset(String ch, IRSlotDynamicOffset offset, ASTType cont, boolean advancePolarity) {
     if (cont instanceof ASTRecT
         || cont instanceof ASTCoRecT
         || isPositive(cont) != advancePolarity) {
@@ -1322,12 +1322,12 @@ public class IRGenerator extends ASTNodeVisitor {
                         new UnsupportedOperationException("Types in expressions must have slots")));
   }
 
-  private IRSlotOffset offset(IRSlot past, ASTType remainder) {
-    return offset(IRSlotCombinations.of(past), remainder);
+  private IRSlotDynamicOffset offset(IRSlot past, ASTType remainder) {
+    return offset(IRSlotTree.of(past), remainder);
   }
 
-  private IRSlotOffset offset(IRSlotCombinations past, ASTType remainder) {
-    return new IRSlotOffset(past, slotsFromType(remainder).activeTree().combinations());
+  private IRSlotDynamicOffset offset(IRSlotTree past, ASTType remainder) {
+    return IRSlotDynamicOffset.of(past, slotsFromType(remainder).activeTree().combinations());
   }
 
   IRSlotsFromASTType slotsFromType(ASTType type) {

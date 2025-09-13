@@ -3,7 +3,7 @@ package pt.inescid.cllsj.compiler.ir.id;
 import java.util.Optional;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlot;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotCombinations;
-import pt.inescid.cllsj.compiler.ir.slot.IRSlotOffset;
+import pt.inescid.cllsj.compiler.ir.slot.IRSlotDynamicOffset;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotSequence;
 
 public class IRDataLocation {
@@ -15,22 +15,22 @@ public class IRDataLocation {
   private Optional<IRDataLocation> cell;
 
   // Offset within the data (can be zero)
-  private IRSlotOffset offset;
+  private IRSlotDynamicOffset offset;
 
-  public static IRDataLocation local(IRLocalDataId id, IRSlotOffset offset) {
+  public static IRDataLocation local(IRLocalDataId id, IRSlotDynamicOffset offset) {
     return new IRDataLocation(id.getIndex(), false, Optional.empty(), offset);
   }
 
-  public static IRDataLocation remote(IRSessionId id, IRSlotOffset offset) {
+  public static IRDataLocation remote(IRSessionId id, IRSlotDynamicOffset offset) {
     return new IRDataLocation(id.getIndex(), true, Optional.empty(), offset);
   }
 
-  public static IRDataLocation cell(IRDataLocation cell, IRSlotOffset offset) {
+  public static IRDataLocation cell(IRDataLocation cell, IRSlotDynamicOffset offset) {
     return new IRDataLocation(0, false, Optional.of(cell), offset);
   }
 
   private IRDataLocation(
-      int index, boolean remote, Optional<IRDataLocation> cell, IRSlotOffset offset) {
+      int index, boolean remote, Optional<IRDataLocation> cell, IRSlotDynamicOffset offset) {
     this.index = index;
     this.remote = remote;
     this.cell = cell;
@@ -70,7 +70,7 @@ public class IRDataLocation {
     return cell.isPresent();
   }
 
-  public IRSlotOffset getOffset() {
+  public IRSlotDynamicOffset getOffset() {
     return offset;
   }
 
@@ -82,7 +82,7 @@ public class IRDataLocation {
     return new IRDataLocation(index, remote, cell, offset.advance(slots, future));
   }
 
-  public IRDataLocation advance(IRSlotOffset offset) {
+  public IRDataLocation advance(IRSlotDynamicOffset offset) {
     return new IRDataLocation(index, remote, cell, this.offset.advance(offset));
   }
 

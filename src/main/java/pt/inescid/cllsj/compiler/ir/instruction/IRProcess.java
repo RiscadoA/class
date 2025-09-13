@@ -13,7 +13,7 @@ import pt.inescid.cllsj.compiler.ir.id.IRProcessId;
 import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
 import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotCombinations;
-import pt.inescid.cllsj.compiler.ir.slot.IRSlotOffset;
+import pt.inescid.cllsj.compiler.ir.slot.IRSlotDynamicOffset;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotTree;
 
 public class IRProcess {
@@ -29,12 +29,12 @@ public class IRProcess {
   // Identifies a memory location to be dropped when the process ends
   public static class DropOnEnd {
     private IRLocalDataId localDataId; // Local data entry id
-    private IRSlotOffset offset; // Offset from the start of the local data entry
+    private IRSlotDynamicOffset offset; // Offset from the start of the local data entry
     private IRSlotTree slots; // Slots to drop
     private boolean always; // If false, we must store data on whether the slot needs to be dropped
 
     public DropOnEnd(
-        IRLocalDataId localDataId, IRSlotOffset offset, IRSlotTree slots, boolean always) {
+        IRLocalDataId localDataId, IRSlotDynamicOffset offset, IRSlotTree slots, boolean always) {
       this.localDataId = localDataId;
       this.offset = offset;
       this.slots = slots;
@@ -45,7 +45,7 @@ public class IRProcess {
       return localDataId;
     }
 
-    public IRSlotOffset getOffset() {
+    public IRSlotDynamicOffset getOffset() {
       return offset;
     }
 
@@ -132,7 +132,7 @@ public class IRProcess {
   }
 
   public IRDropId addDropOnEnd(
-      IRLocalDataId localDataId, IRSlotOffset offset, IRSlotTree slots, boolean always) {
+      IRLocalDataId localDataId, IRSlotDynamicOffset offset, IRSlotTree slots, boolean always) {
     dropOnEnd.add(new DropOnEnd(localDataId, offset, slots, always));
     return new IRDropId(dropOnEnd.size() - 1);
   }
