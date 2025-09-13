@@ -576,8 +576,9 @@ public class IRGenerator extends ASTNodeVisitor {
   public void visit(ASTScan node) {
     IREnvironment.Channel channel = env.getChannel(node.getCh());
     IRSlotsFromASTType info = slotsFromType(node.getType());
-    block.add(
-        new IRWriteScan(channel.getRemoteData(), info.activeRemoteTree.singleHead().orElseThrow()));
+    Set<IRSlot> heads = info.activeRemoteTree.head();
+    IRSlot head = heads.stream().filter(s -> !(s instanceof IRExponentialS)).findFirst().orElseThrow();
+    block.add(new IRWriteScan(channel.getRemoteData(), head));
     block.add(new IRFinishSession(channel.getSessionId(), true));
   }
 
