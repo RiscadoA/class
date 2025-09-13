@@ -691,6 +691,8 @@ public class IRGenerator extends ASTNodeVisitor {
       reqs = IRValueRequisites.notValue();
     }
 
+    IRBlock rhsBlock = process.createBlock("recv_rhs");
+
     addBranchIsValue(
         reqs,
         endPoints,
@@ -699,6 +701,8 @@ public class IRGenerator extends ASTNodeVisitor {
           block.add(
               new IRMoveValue(
                   argChannel.getLocalData(), channel.getLocalData(), info.activeLocalTree));
+
+          block.add(new IRJump(rhsBlock.getLocation()));
         },
         () -> {
           // Bind the new session to the value received from the main session
@@ -708,6 +712,8 @@ public class IRGenerator extends ASTNodeVisitor {
 
           // If the received session is negative, we must jump to it
           addContinueIfNegative(argChannel.getSessionId(), lhsType);
+
+          block.add(new IRJump(rhsBlock.getLocation()));
         });
 
     // Advance the main session depending on what we received
@@ -718,7 +724,7 @@ public class IRGenerator extends ASTNodeVisitor {
         false);
 
     // Recurse on the continuation
-    recurse(block, cont);
+    recurse(rhsBlock, cont);
   }
 
   void addForward(String lhs, String rhs, ASTType rhsType) {
