@@ -1,5 +1,7 @@
 package pt.inescid.cllsj.compiler.c;
 
+import java.util.function.Function;
+import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
 import pt.inescid.cllsj.compiler.ir.slot.IRBoolS;
 import pt.inescid.cllsj.compiler.ir.slot.IRCellS;
 import pt.inescid.cllsj.compiler.ir.slot.IRExponentialS;
@@ -14,11 +16,14 @@ import pt.inescid.cllsj.compiler.ir.slot.IRVarS;
 
 public class CSlotDropper extends IRSlotVisitor {
   private CGenerator gen;
+  private Function<IRTypeId, String> typeNode;
   private CAddress address;
 
-  public static void drop(CGenerator gen, CAddress address, IRSlot slot) {
+  public static void drop(
+      CGenerator gen, Function<IRTypeId, String> typeNode, CAddress address, IRSlot slot) {
     CSlotDropper dropper = new CSlotDropper();
     dropper.gen = gen;
+    dropper.typeNode = typeNode;
     dropper.address = address;
     slot.accept(dropper);
   }
@@ -59,6 +64,11 @@ public class CSlotDropper extends IRSlotVisitor {
 
   @Override
   public void visit(IRVarS slot) {
-    throw new IllegalArgumentException("Polymorphic slots cannot be dropped");
+    gen.putTypeNodeTraversal(
+        slot.getTypeId(),
+        typeNode,
+        address,
+        address -> drop(gen, typeNode, address, new IRExponentialS()),
+        address -> drop(gen, typeNode, address, new IRStringS()));
   }
 }

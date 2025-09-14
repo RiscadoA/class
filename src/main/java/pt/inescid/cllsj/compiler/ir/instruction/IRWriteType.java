@@ -8,7 +8,8 @@ public class IRWriteType extends IRWrite {
   private IRSlotTree slots;
   private IRValueRequisites valueRequisites;
 
-  public IRWriteType(IRDataLocation location, IRSlotTree typeSlots, IRValueRequisites valueRequisites) {
+  public IRWriteType(
+      IRDataLocation location, IRSlotTree typeSlots, IRValueRequisites valueRequisites) {
     super(location);
     this.slots = typeSlots;
     this.valueRequisites = valueRequisites;
@@ -34,6 +35,12 @@ public class IRWriteType extends IRWrite {
 
   @Override
   public String toString() {
-    return "writeType(" + location.toString() + ", " + slots.toString() + ", value=" + valueRequisites + ")";
+    return "writeType("
+        + location.toString()
+        + ", "
+        + slots.toString()
+        + ", value="
+        + valueRequisites
+        + ")";
   }
 }

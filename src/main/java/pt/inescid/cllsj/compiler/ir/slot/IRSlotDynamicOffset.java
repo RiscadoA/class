@@ -18,10 +18,6 @@ public class IRSlotDynamicOffset {
     return new IRSlotDynamicOffset(IRSlotTree.of(past), future);
   }
 
-  public static IRSlotDynamicOffset of(IRSlotStaticOffset offset) {
-    return IRSlotDynamicOffset.of(offset.getPast(), offset.getFuture());
-  }
-
   private IRSlotDynamicOffset() {
     this.past = IRSlotTree.LEAF;
     this.future = IRSlotCombinations.EMPTY;

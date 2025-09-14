@@ -4,7 +4,6 @@ import java.util.HashSet;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
-
 import pt.inescid.cllsj.ast.ASTTypeVisitor;
 import pt.inescid.cllsj.ast.types.ASTAffineT;
 import pt.inescid.cllsj.ast.types.ASTBangT;

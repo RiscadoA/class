@@ -1,9 +1,6 @@
 package pt.inescid.cllsj.compiler.c;
 
-import java.util.function.BiFunction;
 import java.util.function.Function;
-
-import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
 import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
 import pt.inescid.cllsj.compiler.ir.slot.*;
 
@@ -33,51 +30,67 @@ public class CLayout {
   }
 
   // Computes the current size of the given slot tree
-  public static CLayout compute(IRSlotTree tree, CArchitecture arch, Function<IRTypeId, CLayout> typeLayoutProvider, Function<IRValueRequisites, CCondition> typeIsValue,
-      BiFunction<IRSlotStaticOffset, Integer, CCondition> isTag) {
-    return compute(tree, arch, typeLayoutProvider, typeIsValue, isTag, IRSlotStaticOffset.ZERO);
-  }
+  // public static CLayout compute(
+  //     IRSlotTree tree,
+  //     CArchitecture arch,
+  //     Function<IRTypeId, CLayout> typeLayoutProvider,
+  //     Function<IRValueRequisites, CCondition> typeIsValue,
+  //     BiFunction<IRSlotStaticOffset, Integer, CCondition> isTag) {
+  //   return compute(tree, arch, typeLayoutProvider, typeIsValue, isTag, IRSlotStaticOffset.ZERO);
+  // }
 
-  private static CLayout compute(IRSlotTree tree, CArchitecture arch, Function<IRTypeId, CLayout> typeLayoutProvider, Function<IRValueRequisites, CCondition> typeIsValue,
-      BiFunction<IRSlotStaticOffset, Integer, CCondition> isTag, IRSlotStaticOffset offset) {
-    if (tree.isLeaf()) {
-      return CLayout.ZERO;
-    } else if (tree.isUnary()) {
-      // A unary node contains a single slot and a child tree
-      IRSlotTree.Unary unary = (IRSlotTree.Unary)tree;
-      IRSlot slot = unary.singleHead().get();
-      CLayout childLayout = compute(unary.child(), arch, typeLayoutProvider, typeIsValue, isTag, offset.advance(slot, unary.child().combinations()));
-      CLayout slotLayout = compute(slot, arch, typeLayoutProvider);
-      return new CLayout(
-          slotLayout.size.align(childLayout.alignment).add(childLayout.size),
-          slotLayout.alignment.max(childLayout.alignment));
-    } else if (tree.isTag()) {
-      // Branch depending on the tag value
-      IRSlotTree.Tag tag = (IRSlotTree.Tag)tree;
-      CLayout result = CLayout.ZERO;
-      for (int i = 0; i < tag.cases().size(); ++i) {
-        IRSlotTree caseTree = tag.cases().get(i);
-        CCondition condition = isTag.apply(offset, i);
-        IRSlotStaticOffset caseOffset = offset.advance(new IRTagS(), caseTree.combinations());
-        CLayout caseLayout = compute(caseTree, arch, typeLayoutProvider, typeIsValue, isTag, caseOffset);
-        result = condition.ternary(caseLayout, result);
-      }
-      return result;
-    } else if (tree.isIsValue()) {
-      // Branch depending on if the value requisites are met or not
-      IRSlotTree.IsValue isValue = (IRSlotTree.IsValue)tree;
-      CCondition condition = typeIsValue.apply(isValue.requisites());
-      IRSlotStaticOffset thenOffset = IRSlotStaticOffset.of(offset.getPast(), isValue.value().combinations());
-      IRSlotStaticOffset elseOffset = IRSlotStaticOffset.of(offset.getPast(), isValue.notValue().combinations());
-      CLayout thenLayout = compute(isValue.value(), arch, typeLayoutProvider, typeIsValue, isTag, thenOffset);
-      CLayout elseLayout = compute(isValue.notValue(), arch, typeLayoutProvider, typeIsValue, isTag, elseOffset);
-      return new CLayout(
-          condition.ternary(thenLayout.size, elseLayout.size),
-          condition.ternary(thenLayout.alignment, elseLayout.alignment));
-    } else {
-      throw new IllegalArgumentException("Unsupported slot tree: " + tree);
-    }
-  }
+  // private static CLayout compute(
+  //     IRSlotTree tree,
+  //     CArchitecture arch,
+  //     Function<IRTypeId, CLayout> typeLayoutProvider,
+  //     Function<IRValueRequisites, CCondition> typeIsValue,
+  //     BiFunction<IRSlotStaticOffset, Integer, CCondition> isTag,
+  //     IRSlotStaticOffset offset) {
+  //   if (tree.isLeaf()) {
+  //     return CLayout.ZERO;
+  //   } else if (tree.isUnary()) {
+  //     // A unary node contains a single slot and a child tree
+  //     IRSlotTree.Unary unary = (IRSlotTree.Unary) tree;
+  //     IRSlot slot = unary.singleHead().get();
+  //     CLayout childLayout =
+  //         compute(
+  //             unary.child(),
+  //             arch,
+  //             typeLayoutProvider,
+  //             typeIsValue,
+  //             isTag,
+  //             offset.advance(slot, unary.child().combinations()));
+  //     CLayout slotLayout = compute(slot, arch, typeLayoutProvider);
+  //     return new CLayout(
+  //         slotLayout.size.align(childLayout.alignment).add(childLayout.size),
+  //         slotLayout.alignment.max(childLayout.alignment));
+  //   } else if (tree.isTag()) {
+  //     // Branch depending on the tag value
+  //     IRSlotTree.Tag tag = (IRSlotTree.Tag) tree;
+  //     CLayout result = CLayout.ZERO;
+  //     for (int i = 0; i < tag.cases().size(); ++i) {
+  //       IRSlotTree caseTree = tag.cases().get(i);
+  //       CCondition condition = isTag.apply(offset, i);
+  //       IRSlotStaticOffset caseOffset = offset.advance(new IRTagS(), caseTree.combinations());
+  //       CLayout caseLayout =
+  //           compute(caseTree, arch, typeLayoutProvider, typeIsValue, isTag, caseOffset);
+  //       result = condition.ternary(caseLayout, result);
+  //     }
+  //     return result;
+  //   } else if (tree.isIsValue()) {
+  //     // Branch depending on if the value requisites are met or not
+  //     IRSlotTree.IsValue isValue = (IRSlotTree.IsValue) tree;
+  //     CCondition condition = typeIsValue.apply(isValue.requisites());
+  //     IRSlotStaticOffset contOffset =
+  //         IRSlotStaticOffset.of(offset.getPast().suffix(isValue.value().combinations().merge(isValue.notValue().combinations())),
+  //             isValue.cont().combinations());
+  //     CLayout contLayout =
+  //         compute(isValue.cont(), arch, typeLayoutProvider, typeIsValue, isTag, contOffset);
+  //     return 
+  //   } else {
+  //     throw new IllegalArgumentException("Unsupported slot tree: " + tree);
+  //   }
+  // }
 
   public static CLayout compute(
       IRSlotSequence sequence, CArchitecture arch, Function<IRTypeId, CLayout> typeLayoutProvider) {
@@ -163,12 +176,9 @@ public class CLayout {
 
   @Override
   public boolean equals(Object obj) {
-    if (this == obj)
-      return true;
-    if (obj == null)
-      return false;
-    if (getClass() != obj.getClass())
-      return false;
+    if (this == obj) return true;
+    if (obj == null) return false;
+    if (getClass() != obj.getClass()) return false;
     CLayout other = (CLayout) obj;
     return size.equals(other.size) && alignment.equals(other.alignment);
   }

@@ -39,10 +39,18 @@ public class CArchitecture {
   }
 
   public CSize typeSize() {
-    return intSize.add(unsignedCharSize.multiply(2)).align(intAlignment).add(intSize.multiply(2));
+    return pointerSize.add(intSize.multiply(2));
   }
 
   public CAlignment typeAlignment() {
+    return intAlignment;
+  }
+
+  public CSize typeNodeSize() {
+    return intSize.multiply(2);
+  }
+
+  public CAlignment typeNodeAlignment() {
     return intAlignment;
   }
 
@@ -65,6 +73,7 @@ public class CArchitecture {
         new Test("void*", pointerSize),
         new Test("struct session", sessionSize()),
         new Test("struct type", typeSize()),
+        new Test("struct type_node", typeNodeSize()),
         new Test("struct exponential", exponentialSize(CSize.zero())));
   }
 }

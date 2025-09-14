@@ -98,7 +98,10 @@ public class IRDataLocation {
       b.append(cell.get().toString());
       b.append(")");
     }
-    b.append(offset.toString());
+    if (!offset.isZero()) {
+      b.append(".");
+      b.append(offset.toString());
+    }
     return b.toString();
   }
 

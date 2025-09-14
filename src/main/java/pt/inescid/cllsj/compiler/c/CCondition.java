@@ -74,7 +74,8 @@ public class CCondition {
   }
 
   public CLayout ternary(CLayout ifTrue, CLayout ifFalse) {
-    return new CLayout(ternary(ifTrue.size, ifFalse.size), ternary(ifTrue.alignment, ifFalse.alignment));
+    return new CLayout(
+        ternary(ifTrue.size, ifFalse.size), ternary(ifTrue.alignment, ifFalse.alignment));
   }
 
   @Override

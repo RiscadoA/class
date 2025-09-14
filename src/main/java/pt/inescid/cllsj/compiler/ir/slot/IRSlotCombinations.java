@@ -75,6 +75,9 @@ public class IRSlotCombinations {
   }
 
   public IRSlotCombinations suffix(IRSlotCombinations combinations) {
+    if (combinations.sequences.isEmpty()) {
+      return this;
+    }
     if (sequences.isEmpty()) {
       return combinations;
     }

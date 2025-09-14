@@ -3,7 +3,6 @@ package pt.inescid.cllsj.compiler.ir.instruction;
 import java.util.List;
 import java.util.Optional;
 import java.util.function.Function;
-
 import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
 import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
 import pt.inescid.cllsj.compiler.ir.id.IRLocalDataId;
@@ -27,7 +26,8 @@ public class IRCallProcess extends IRInstruction {
       this.targetType = targetType;
     }
 
-    public TypeArgument(IRSlotTree sourceTree, IRValueRequisites sourceIsValue, IRTypeId targetType) {
+    public TypeArgument(
+        IRSlotTree sourceTree, IRValueRequisites sourceIsValue, IRTypeId targetType) {
       this.sourceLocation = Optional.empty();
       this.sourceTree = Optional.of(sourceTree);
       this.sourceIsValue = Optional.of(sourceIsValue);

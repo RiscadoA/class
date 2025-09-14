@@ -30,9 +30,9 @@ public abstract class IRSlotTree {
   }
 
   public static IRSlotTree isValue(
-      IRValueRequisites requisites, IRSlotTree value, IRSlotTree notValue) {
+      IRValueRequisites requisites, IRSlotTree value, IRSlotTree notValue, IRSlotTree cont) {
     if (requisites.canBeValue()) {
-      return new IsValue(requisites, value, notValue);
+      return new IsValue(requisites, value, notValue, cont);
     } else {
       return notValue;
     }
@@ -195,11 +195,14 @@ public abstract class IRSlotTree {
     private IRValueRequisites requisites;
     private IRSlotTree value;
     private IRSlotTree notValue;
+    private IRSlotTree cont;
 
-    public IsValue(IRValueRequisites requisites, IRSlotTree value, IRSlotTree notValue) {
+    public IsValue(
+        IRValueRequisites requisites, IRSlotTree value, IRSlotTree notValue, IRSlotTree cont) {
       this.requisites = requisites;
       this.value = value;
       this.notValue = notValue;
+      this.cont = cont;
     }
 
     public IRValueRequisites requisites() {
@@ -214,9 +217,13 @@ public abstract class IRSlotTree {
       return notValue;
     }
 
+    public IRSlotTree cont() {
+      return cont;
+    }
+
     @Override
     public IRSlotCombinations combinations() {
-      return value.combinations().merge(notValue.combinations());
+      return value.combinations().merge(notValue.combinations()).suffix(cont.combinations());
     }
 
     @Override
@@ -224,6 +231,9 @@ public abstract class IRSlotTree {
       Set<IRSlot> heads = new HashSet<>();
       heads.addAll(value.head());
       heads.addAll(notValue.head());
+      if (value.isLeaf() || notValue.isLeaf()) {
+        heads.addAll(cont.head());
+      }
       return heads;
     }
 
@@ -234,15 +244,26 @@ public abstract class IRSlotTree {
 
     @Override
     public IRSlotTree suffix(IRSlotTree other) {
-      return new IsValue(requisites, value.suffix(other), notValue.suffix(other));
+      return new IsValue(requisites, value, notValue, cont.suffix(other));
     }
 
     @Override
     protected void toStringHelper(StringBuilder sb) {
+      boolean started = false;
+      if (sb.isEmpty() && !cont.isLeaf()) {
+        sb.append("[");
+        started = true;
+      }
       sb.append("isValue<").append(requisites).append(">[");
       sb.append("yes: ").append(value);
       sb.append(" | no: ").append(notValue);
       sb.append("]");
+      if (!cont.isLeaf()) {
+        sb.append("; ").append(cont);
+      }
+      if (started && !cont.isLeaf()) {
+        sb.append("]");
+      }
     }
   }
 }

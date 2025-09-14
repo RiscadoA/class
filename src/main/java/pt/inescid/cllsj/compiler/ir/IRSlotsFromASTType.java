@@ -102,7 +102,8 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
     IRValueRequisites reqs = IRValueRequisites.check(compiler, env, type.getin(), true);
     IRSlotsFromASTType inner = recurse(type.getin());
     activeRemoteTree =
-        IRSlotTree.isValue(reqs, inner.activeRemoteTree, IRSlotTree.of(new IRExponentialS()));
+        IRSlotTree.isValue(
+            reqs, inner.activeRemoteTree, IRSlotTree.of(new IRExponentialS()), IRSlotTree.LEAF);
   }
 
   @Override
@@ -202,7 +203,8 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
     IRValueRequisites reqs = IRValueRequisites.check(compiler, env, type.getlhs(), false);
     IRSlotsFromASTType lhs = recurse(type.getlhs());
     activeLocalTree =
-        IRSlotTree.isValue(reqs, lhs.activeLocalTree, IRSlotTree.of(new IRSessionS()));
+        IRSlotTree.isValue(
+            reqs, lhs.activeLocalTree, IRSlotTree.of(new IRSessionS()), IRSlotTree.LEAF);
 
     // Merge with the right-hand-side
     IRSlotsFromASTType rhsResult = recurse(type.getrhs());
@@ -215,7 +217,9 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
   public void visit(ASTSendT type) {
     IRValueRequisites reqs = IRValueRequisites.check(compiler, env, type.getlhs(), true);
     IRSlotsFromASTType lhs = recurse(type.getlhs());
-    activeRemoteTree = IRSlotTree.isValue(reqs, lhs.activeRemoteTree, IRSlotTree.of(new IRSessionS()));
+    activeRemoteTree =
+        IRSlotTree.isValue(
+            reqs, lhs.activeRemoteTree, IRSlotTree.of(new IRSessionS()), IRSlotTree.LEAF);
 
     // Merge with the right-hand-side
     IRSlotsFromASTType rhsResult = recurse(type.getrhs());
@@ -229,7 +233,8 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
     IRValueRequisites reqs = IRValueRequisites.check(compiler, env, type.getin(), false);
     IRSlotsFromASTType inner = recurse(type.getin());
     activeLocalTree =
-        IRSlotTree.isValue(reqs, inner.activeLocalTree, IRSlotTree.of(new IRExponentialS()));
+        IRSlotTree.isValue(
+            reqs, inner.activeLocalTree, IRSlotTree.of(new IRExponentialS()), IRSlotTree.LEAF);
   }
 
   @Override

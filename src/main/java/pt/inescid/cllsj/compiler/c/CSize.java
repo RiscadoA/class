@@ -264,6 +264,18 @@ public abstract class CSize {
         return lhs;
       }
 
+      if (lhs instanceof CSizeMax) {
+        CSizeMax leftMax = (CSizeMax) lhs;
+        if (leftMax.rhs.equals(rhs) || leftMax.lhs.equals(rhs)) {
+          return lhs;
+        }
+      } else if (rhs instanceof CSizeMax) {
+        CSizeMax rightMax = (CSizeMax) rhs;
+        if (rightMax.rhs.equals(lhs) || rightMax.lhs.equals(lhs)) {
+          return rhs;
+        }
+      }
+
       return lhs.max(rhs);
     }
 
@@ -292,6 +304,19 @@ public abstract class CSize {
       CSize offset = this.offset.simplify(0);
       CAlignment alignment = this.alignment.simplify(0);
 
+      if (offset instanceof CSizeMax) {
+        CSizeMax max = (CSizeMax) offset;
+        return max.lhs.align(alignment).max(max.rhs.align(alignment)).simplify(remainder);
+      }
+      
+      if (offset instanceof CSizeAlign) {
+        CSizeAlign inner = (CSizeAlign) offset;
+        return inner
+            .offset
+            .align(alignment.max(inner.alignment).simplify(0))
+            .addRemainder(remainder);
+      }
+
       if (alignment.asConstant().isPresent()) {
         if (alignment.asConstant().get() == 1) {
           return offset.simplify(remainder);
@@ -309,12 +334,6 @@ public abstract class CSize {
           return constant(
                   offsetBytes
                       + ((alignmentBytes - (offsetBytes % alignmentBytes)) % alignmentBytes))
-              .addRemainder(remainder);
-        } else if (offset instanceof CSizeAlign) {
-          CSizeAlign inner = (CSizeAlign) offset;
-          return inner
-              .offset
-              .align(alignment.max(inner.alignment).simplify(0))
               .addRemainder(remainder);
         }
       }

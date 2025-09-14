@@ -1,5 +1,7 @@
 package pt.inescid.cllsj.compiler.c;
 
+import java.util.function.Function;
+import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
 import pt.inescid.cllsj.compiler.ir.slot.IRBoolS;
 import pt.inescid.cllsj.compiler.ir.slot.IRCellS;
 import pt.inescid.cllsj.compiler.ir.slot.IRExponentialS;
@@ -14,11 +16,14 @@ import pt.inescid.cllsj.compiler.ir.slot.IRVarS;
 
 public class CSlotCloner extends IRSlotVisitor {
   private CGenerator gen;
+  private Function<IRTypeId, String> typeNode;
   private CAddress address;
 
-  public static void clone(CGenerator gen, CAddress address, IRSlot slot) {
+  public static void clone(
+      CGenerator gen, Function<IRTypeId, String> typeNode, CAddress address, IRSlot slot) {
     CSlotCloner cloner = new CSlotCloner();
     cloner.gen = gen;
+    cloner.typeNode = typeNode;
     cloner.address = address;
     slot.accept(cloner);
   }
@@ -59,6 +64,11 @@ public class CSlotCloner extends IRSlotVisitor {
 
   @Override
   public void visit(IRVarS slot) {
-    throw new IllegalArgumentException("Polymorphic slots cannot be cloned");
+    gen.putTypeNodeTraversal(
+        slot.getTypeId(),
+        typeNode,
+        address,
+        address -> clone(gen, typeNode, address, new IRExponentialS()),
+        address -> clone(gen, typeNode, address, new IRStringS()));
   }
 }
