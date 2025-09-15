@@ -78,6 +78,18 @@ public class CCondition {
         ternary(ifTrue.size, ifFalse.size), ternary(ifTrue.alignment, ifFalse.alignment));
   }
 
+  public CCondition and(CCondition other) {
+    if (isCertainlyFalse() || other.isCertainlyFalse()) {
+      return certainlyFalse();
+    } else if (isCertainlyTrue()) {
+      return other;
+    } else if (other.isCertainlyTrue()) {
+      return this;
+    } else {
+      return maybe("(" + expression() + " && " + other.expression() + ")");
+    }
+  }
+
   @Override
   public String toString() {
     if (isCertainlyTrue()) {

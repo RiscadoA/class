@@ -7,9 +7,9 @@ rhs recv
 ?
 rhs send
 rhs !
-rhs close
 call
 fwd
+rhs close
 lhs recv
 lhs wait
 lhs ?

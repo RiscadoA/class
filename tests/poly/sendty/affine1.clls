@@ -1,6 +1,6 @@
 proc main() {
   cut {
-    sendty x(lint); affine x; println("use"); let x 1
+    sendty x(lint); println("affine"); affine x; println("use"); let x 1
     |x: recvty A; coaffine ~A|
     recvty x(A);
     discard x

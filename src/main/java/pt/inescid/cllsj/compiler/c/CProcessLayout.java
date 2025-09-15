@@ -2,6 +2,7 @@ package pt.inescid.cllsj.compiler.c;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 import pt.inescid.cllsj.compiler.Compiler;
 import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
@@ -102,15 +103,15 @@ public class CProcessLayout {
   }
 
   public CSizeBits dropBitOffset(IRDropId dropId) {
-    return dropBitOffsets.get(dropId);
+    return Optional.ofNullable(dropBitOffsets.get(dropId)).orElseThrow();
   }
 
   public CSize typeOffset(IRTypeId id) {
-    return typeOffsets.get(id);
+    return Optional.ofNullable(typeOffsets.get(id)).orElseThrow(() -> new IllegalArgumentException("No such type: " + id));
   }
 
   public CSize sessionOffset(IRSessionId id) {
-    return sessionOffsets.get(id);
+    return Optional.ofNullable(sessionOffsets.get(id)).orElseThrow();
   }
 
   public CSize dataOffset(

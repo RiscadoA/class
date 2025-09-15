@@ -6,8 +6,9 @@ proc main() {
     |x: recvty A; recv coaffine ~A; affine A|
     recvty x(A);
     recv x(a);
-    affine x;
     println("affine");
+    affine x;
+    println("use");
     use a;
     fwd x a
   }

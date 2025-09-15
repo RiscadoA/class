@@ -280,14 +280,12 @@ public class IRValueRequisites {
 
     @Override
     public void visit(ASTAffineT type) {
-      expectPolarity(true);
-      type.getin().accept(this);
+      types = Optional.empty();
     }
 
     @Override
     public void visit(ASTCoAffineT type) {
-      expectPolarity(false);
-      type.getin().accept(this);
+      types = Optional.empty();
     }
 
     @Override

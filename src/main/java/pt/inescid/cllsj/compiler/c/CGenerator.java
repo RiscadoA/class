@@ -6,6 +6,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -873,9 +874,27 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRWriteType instr) {
+    AtomicReference<String> node = new AtomicReference<>(NULL);
+    AtomicReference<String> nodeCount = new AtomicReference<>("0");
+    putIf(isValue(instr.getValueRequisites()), () -> {
+      // Count how many type nodes we'll need for the type
+      node.set(TMP_PTR1);
+      nodeCount.set(TMP_INT);
+      putAssign(TMP_INT, 0);
+      putAddTypeNodeCount(TMP_INT, instr.getSlots());
+
+      // Allocate the type nodes and construct them
+      putAlloc(TMP_PTR1, compiler.arch.typeNodeSize().multiply(CSize.expression(TMP_INT)));
+      putAssign(TMP_INT, 0);
+      putTypeNodeConstruction(TMP_INT, instr.getSlots(), (index, type, offset, next) -> {
+        String ref = cast(TMP_PTR1, "struct type_node*") + "[" + index + "]";
+        putAssign(ref, typeNodeInitializer(offset, type, next));
+      });
+    });
+
+
     String ref = data(instr.getLocation()).deref("struct type");
-    putAssign(ref, typeInitializer(NULL, "0", instr.getSlots(), instr.getValueRequisites()));
-    throw new UnsupportedOperationException("TODO: allocate node array here");
+    putAssign(ref, typeInitializer(node.get(), nodeCount.get(), instr.getSlots(), instr.getValueRequisites()));
   }
 
   @Override
@@ -973,7 +992,20 @@ public class CGenerator extends IRInstructionVisitor {
 
     Function<IRValueRequisites, CCondition> typeIsValue =
         r -> {
-          return isValue(r.expandTypes(t -> findArgFromTarget.apply(t).getSourceIsValue()));
+          if (!r.canBeValue()) {
+            return CCondition.certainlyFalse();
+          }
+          CCondition result = CCondition.certainlyTrue();
+          for (IRTypeId targetId : r.typesWhichMustBeValue()) {
+            IRCallProcess.TypeArgument arg = findArgFromTarget.apply(targetId);
+            if (arg.isFromLocation()) {
+              String ref = data(arg.getSourceLocation()).deref("struct type");
+              result = result.and(CCondition.maybe(typeFlags(ref) + " & " + TYPE_FLAG_VALUE));
+            } else {
+              result = result.and(isValue(arg.getSourceIsValue()));
+            }
+          }
+          return result;
         };
 
     CProcessLayout calledLayout = layout(calledProcess);
@@ -984,13 +1016,11 @@ public class CGenerator extends IRInstructionVisitor {
     }
     for (IRCallProcess.TypeArgument arg : instr.getTypeArguments()) {
       // Type nodes are only needed for value types
-      if (arg.getSourceIsValue().canBeValue()) {
-        if (arg.isFromLocation()) {
-          String sourceType = data(arg.getSourceLocation()).deref("struct type");
-          putAssign(TMP_INT, TMP_INT + " + " + typeNodeCount(sourceType));
-        } else {
-          putAddTypeNodeCount(TMP_INT, arg.getSourceTree());
-        }
+      if (arg.isFromLocation()) {
+        String sourceType = data(arg.getSourceLocation()).deref("struct type");
+        putAssign(TMP_INT, TMP_INT + " + " + typeNodeCount(sourceType));
+      } else if (arg.getSourceIsValue().canBeValue()) {
+        putAddTypeNodeCount(TMP_INT, arg.getSourceTree());
       }
     }
     CSize typeNodesSize = CSize.zero();
@@ -1021,22 +1051,25 @@ public class CGenerator extends IRInstructionVisitor {
     }
     for (IRCallProcess.TypeArgument arg : instr.getTypeArguments()) {
       // Start by initializing the type nodes and count, if needed
+      boolean canBeValue = arg.isFromLocation() || arg.getSourceIsValue().canBeValue();
       final Optional<String> typeNode =
-          arg.getSourceIsValue().canBeValue()
+          canBeValue
               ? Optional.of(cast(TMP_PTR2, "struct type_node*"))
               : Optional.empty();
       final Optional<String> typeNodeCount =
-          arg.getSourceIsValue().canBeValue() ? Optional.of(TMP_INT) : Optional.empty();
-      if (arg.getSourceIsValue().canBeValue()) {
+          canBeValue ? Optional.of(TMP_INT) : Optional.empty();
+      if (canBeValue) {
         if (arg.isFromLocation()) {
           // Copy them over from the source type, and then free the source type nodes
           String source = data(arg.getSourceLocation()).deref("struct type");
-          putAssign(TMP_INT, typeNodeCount(source));
-          putCopyMemory(
-              CAddress.of(TMP_PTR2),
-              castToAddress(typeNode(source)),
-              compiler.arch.typeNodeSize().multiply(CSize.expression(TMP_INT)));
-          putFree(typeNode(source));
+          putIf(typeNode(source) + " != " + NULL, () -> {
+            putAssign(TMP_INT, typeNodeCount(source));
+            putCopyMemory(
+                CAddress.of(TMP_PTR2),
+                castToAddress(typeNode(source)),
+                compiler.arch.typeNodeSize().multiply(CSize.expression(TMP_INT)));
+            putFree(typeNode(source));
+          });
         } else {
           // Compute them from the source type tree
           putAssign(TMP_INT, 0);
@@ -1055,7 +1088,7 @@ public class CGenerator extends IRInstructionVisitor {
       if (arg.isFromLocation()) {
         putAssign(targetType, data(arg.getSourceLocation()).deref("struct type"));
         if (typeNode.isPresent()) {
-          putAssign(typeNode(targetType), typeNode);
+          putAssign(typeNode(targetType), typeNode.get());
         }
       } else {
         putAssign(
@@ -1127,7 +1160,7 @@ public class CGenerator extends IRInstructionVisitor {
       putMoveSlots(
           arg.getSlots(),
           arg.isClone(),
-          id -> typeNode(type(id)),
+          id -> typeNode(type(calledLayout, newEnv, id)),
           id -> typeLayout(calledLayout, newEnv, id),
           req -> isValue(calledLayout, newEnv, req),
           data(arg.getSourceLocation()),
@@ -1807,15 +1840,15 @@ public class CGenerator extends IRInstructionVisitor {
         (offset, slot) -> {
           CAddress source = sourceBaseAddress.offset(offset);
           CAddress target = targetBaseAddress.offset(offset);
-          putMoveSlot(target, source, slot);
+          putMoveSlot(typeLayout, target, source, slot);
           if (clone) {
             putCloneSlot(typeNode, target, slot);
           }
         });
   }
 
-  void putMoveSlot(CAddress target, CAddress source, IRSlot slot) {
-    putCopyMemory(target, source, layout(this::typeLayout, slot).size);
+  void putMoveSlot(Function<IRTypeId, CLayout> typeLayout, CAddress target, CAddress source, IRSlot slot) {
+    putCopyMemory(target, source, layout(typeLayout, slot).size);
   }
 
   // Marks a slot as cloned, e.g., incrementing reference counts if necessary
@@ -2442,6 +2475,16 @@ public class CGenerator extends IRInstructionVisitor {
 
   void putIf(String condition, Runnable then) {
     putBlock("if (" + condition + ")", then);
+  }
+
+  void putIf(CCondition condition, Runnable then) {
+    if (condition.isCertainlyTrue()) {
+      then.run();
+    } else if (condition.isCertainlyFalse()) {
+      // Do nothing
+    } else {
+      putIf(condition.expression(), then);
+    }
   }
 
   void putIfElse(String condition, Runnable then, Runnable otherwise) {
