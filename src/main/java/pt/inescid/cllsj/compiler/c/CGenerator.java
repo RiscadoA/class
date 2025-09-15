@@ -723,12 +723,10 @@ public class CGenerator extends IRInstructionVisitor {
                   putSlotTraversal(
                       arg.getSlots(),
                       reqs -> isValue(layout, "exp_env", reqs),
-                      offset -> localData(typeLayoutProvider, layout, "exp_env", dataId, offset),
-                      (offset, slot) -> {
-                        CAddress target =
-                            localData(typeLayoutProvider, layout, "exp_env", dataId, offset);
+                      (target, slot) -> {
                         putCloneSlot(id -> typeNode(type(layout, "exp_env", id)), target, slot);
-                      });
+                      },
+                      localData(typeLayoutProvider, layout, "exp_env", dataId));
                 }
               },
               () -> {
@@ -738,12 +736,10 @@ public class CGenerator extends IRInstructionVisitor {
                   putSlotTraversal(
                       arg.getSlots(),
                       reqs -> isValue(layout, "exp_env", reqs),
-                      offset -> localData(typeLayoutProvider, layout, "exp_env", dataId, offset),
-                      (offset, slot) -> {
-                        CAddress target =
-                            localData(typeLayoutProvider, layout, "exp_env", dataId, offset);
+                      (target, slot) -> {
                         putDropSlot(id -> typeNode(type(layout, "exp_env", id)), target, slot);
-                      });
+                      },
+                      localData(typeLayoutProvider, layout, "exp_env", dataId));
                 }
               });
         });
@@ -908,7 +904,7 @@ public class CGenerator extends IRInstructionVisitor {
         instr.getSlots(),
         id -> typeNode(type(id)),
         req -> isValue(req),
-        offset -> data(instr.getLocation().advance(offset)));
+        data(instr.getLocation()));
   }
 
   @Override
@@ -1123,8 +1119,8 @@ public class CGenerator extends IRInstructionVisitor {
           arg.isClone(),
           id -> typeNode(type(id)),
           req -> isValue(calledLayout, newEnv, req),
-          offset -> data(typeLayoutProvider, calledLayout, newEnv, target.advance(offset)),
-          offset -> data(arg.getSourceLocation().advance(offset)));
+          data(typeLayoutProvider, calledLayout, newEnv, target),
+          data(arg.getSourceLocation()));
     }
 
     // Decrement the end points of the current process, if applicable
@@ -1262,8 +1258,8 @@ public class CGenerator extends IRInstructionVisitor {
           arg.isClone(),
           id -> typeNode(type(id)),
           req -> isValue(req),
-          offset -> data(typeLayoutProvider, expProcessLayout, newEnv, target.advance(offset)),
-          offset -> data(arg.getSourceLocation().advance(offset)));
+          data(typeLayoutProvider, expProcessLayout, newEnv, target),
+          data(arg.getSourceLocation()));
     }
   }
 
@@ -1542,9 +1538,17 @@ public class CGenerator extends IRInstructionVisitor {
       Function<IRTypeId, CLayout> typeLayouts,
       CProcessLayout layout,
       String env,
+      IRLocalDataId localDataId) {
+    return CAddress.of(env, layout.dataOffset(typeLayouts, localDataId));
+  }
+
+  private CAddress localData(
+      Function<IRTypeId, CLayout> typeLayouts,
+      CProcessLayout layout,
+      String env,
       IRLocalDataId localDataId,
       IRSlotDynamicOffset offset) {
-    return offset(CAddress.of(env, layout.dataOffset(typeLayouts, localDataId)), offset);
+    return offset(localData(typeLayouts, layout, env, localDataId), offset);
   }
 
   private CAddress remoteData(
@@ -1770,8 +1774,8 @@ public class CGenerator extends IRInstructionVisitor {
         clone,
         typeNode,
         typeIsValue,
-        offset -> data(targetLocation.advance(offset)),
-        offset -> data(sourceLocation.advance(offset)));
+        data(targetLocation),
+        data(sourceLocation));
   }
 
   void putMoveSlots(
@@ -1779,15 +1783,15 @@ public class CGenerator extends IRInstructionVisitor {
       boolean clone,
       Function<IRTypeId, String> typeNode,
       Function<IRValueRequisites, CCondition> typeIsValue,
-      Function<IRSlotDynamicOffset, CAddress> targetAddress,
-      Function<IRSlotDynamicOffset, CAddress> sourceAddress) {
+      CAddress sourceBaseAddress,
+      CAddress targetBaseAddress) {
     putSlotTraversal(
         slots,
         typeIsValue,
-        offset -> sourceAddress.apply(offset),
+        offset -> sourceBaseAddress.offset(offset),
         (offset, slot) -> {
-          CAddress source = sourceAddress.apply(offset);
-          CAddress target = targetAddress.apply(offset);
+          CAddress source = sourceBaseAddress.offset(offset);
+          CAddress target = targetBaseAddress.offset(offset);
           putMoveSlot(target, source, slot);
           if (clone) {
             putCloneSlot(typeNode, target, slot);
@@ -1809,12 +1813,12 @@ public class CGenerator extends IRInstructionVisitor {
       IRSlotTree slots,
       Function<IRTypeId, String> typeNode,
       Function<IRValueRequisites, CCondition> typeIsValue,
-      Function<IRSlotDynamicOffset, CAddress> addresser) {
+      CAddress baseAddress) {
     putSlotTraversal(
         slots,
         typeIsValue,
-        offset -> addresser.apply(offset),
-        (offset, slot) -> putDropSlot(typeNode, addresser.apply(offset), slot));
+        (address, slot) -> putDropSlot(typeNode, address, slot),
+        baseAddress);
   }
 
   // Drops a slot, e.g., decrementing reference counts if necessary
@@ -1833,35 +1837,50 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   void putSlotTraversal(
-      IRSlotTree slots,
-      Function<IRValueRequisites, CCondition> typeIsValue,
-      Function<IRSlotDynamicOffset, CAddress> tagAddresser,
-      BiConsumer<IRSlotDynamicOffset, IRSlot> atSlot) {
-    putSlotTraversal(slots, typeIsValue, tagAddresser, atSlot, IRSlotTree.LEAF);
+    IRSlotTree slots,
+    Function<IRValueRequisites, CCondition> typeIsValue,
+    BiConsumer<CAddress, IRSlot> atSlot,
+    CAddress baseAddress) {
+    putSlotTraversal(slots, typeIsValue, offset -> baseAddress.offset(offset), (offset, slot) -> atSlot.accept(baseAddress.offset(offset), slot));
+  }
+
+  void putSlotTraversal(
+    IRSlotTree slots,
+    Function<IRValueRequisites, CCondition> typeIsValue,
+    Function<CSize, CAddress> tagAddresser,
+    BiConsumer<CSize, IRSlot> atSlot) {
+    putSlotTraversal(slots, typeIsValue, tagAddresser, atSlot, CSize.zero());
   }
 
   void putSlotTraversal(
       IRSlotTree slots,
       Function<IRValueRequisites, CCondition> typeIsValue,
-      Function<IRSlotDynamicOffset, CAddress> tagAddresser,
-      BiConsumer<IRSlotDynamicOffset, IRSlot> atSlot,
-      IRSlotTree past) {
+      Function<CSize, CAddress> tagAddresser,
+      BiConsumer<CSize, IRSlot> atSlot,
+      CSize offset) {
     if (slots.singleHead().isPresent()) {
-      atSlot.accept(IRSlotDynamicOffset.of(past, slots.combinations()), slots.singleHead().get());
+      atSlot.accept(offset, slots.singleHead().get());
     }
 
     if (slots.isUnary()) {
+      CLayout currLayout = layout(slots.singleHead().get());
+      CLayout nextLayout = layout(((IRSlotTree.Unary) slots).child().combinations());
+      
       putSlotTraversal(
           ((IRSlotTree.Unary) slots).child(),
           typeIsValue,
           tagAddresser,
           atSlot,
-          past.suffix(IRSlotTree.of(slots.singleHead().get())));
+          offset.add(currLayout.size).align(nextLayout.alignment));
     } else if (slots.isTag()) {
       IRSlotTree.Tag tag = (IRSlotTree.Tag) slots;
       List<Runnable> cases = new ArrayList<>();
 
+      CLayout currLayout = layout(slots.singleHead().get());
+
       for (IRSlotTree child : tag.cases()) {
+        CLayout nextLayout = layout(child.combinations());
+
         cases.add(
             () ->
                 putSlotTraversal(
@@ -1869,27 +1888,25 @@ public class CGenerator extends IRInstructionVisitor {
                     typeIsValue,
                     tagAddresser,
                     atSlot,
-                    past.suffix(IRSlotTree.of(slots.singleHead().get()))));
+                    offset.add(currLayout.size).align(nextLayout.alignment)));
       }
 
-      putSwitch(
-          tagAddresser
-              .apply(IRSlotDynamicOffset.of(past, tag.combinations()))
-              .deref("unsigned char"),
-          cases);
+      putSwitch(tagAddresser.apply(offset).deref("unsigned char"), cases);
     } else if (slots.isIsValue()) {
       IRSlotTree.IsValue isValue = (IRSlotTree.IsValue) slots;
 
       putIfElse(
           typeIsValue.apply(isValue.requisites()),
           () -> {
-            putSlotTraversal(isValue.value(), typeIsValue, tagAddresser, atSlot, past);
+            putSlotTraversal(isValue.value(), typeIsValue, tagAddresser, atSlot, offset);
           },
           () -> {
-            putSlotTraversal(isValue.notValue(), typeIsValue, tagAddresser, atSlot, past);
+            putSlotTraversal(isValue.notValue(), typeIsValue, tagAddresser, atSlot, offset);
           });
 
-      putSlotTraversal(isValue.cont(), typeIsValue, tagAddresser, atSlot, past.suffix(IRSlotTree.isValue(isValue.requisites(), isValue.value(), isValue.notValue(), IRSlotTree.LEAF)));
+      CLayout pastLayout = layout(isValue.value().combinations().merge(isValue.notValue().combinations()));
+      CLayout nextLayout = layout(isValue.cont().combinations());
+      putSlotTraversal(isValue.cont(), typeIsValue, tagAddresser, atSlot, offset.add(pastLayout.size).align(nextLayout.alignment));
     } else if (!slots.isLeaf()) {
       throw new IllegalArgumentException("Unknown slot tree " + slots);
     }
@@ -2182,7 +2199,7 @@ public class CGenerator extends IRInstructionVisitor {
                   drop.getSlots(),
                   id -> typeNode(type(processLayout, var, id)),
                   reqs -> isValue(processLayout, var, reqs),
-                  offset -> localData(drop.getLocalDataId(), drop.getOffset().advance(offset)));
+                  localData(drop.getLocalDataId(), drop.getOffset()));
 
       if (drop.isAlways()) {
         putDrop.run();

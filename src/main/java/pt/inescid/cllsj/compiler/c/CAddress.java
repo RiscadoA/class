@@ -38,6 +38,10 @@ public class CAddress {
     return new CAddress(base, offset.add(delta));
   }
 
+  public CAddress alignOffset(CAlignment alignment) {
+    return new CAddress(base, offset.align(alignment));
+  }
+
   public CAddress align(CAlignment alignment) {
     if (alignment.equals(CAlignment.one())) {
       return this;
