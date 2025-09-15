@@ -1,5 +1,7 @@
 package pt.inescid.cllsj.compiler.c;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 
 public abstract class CSize {
@@ -13,6 +15,10 @@ public abstract class CSize {
 
   public static CSize expression(String expr) {
     return new CSizeExpression(expr);
+  }
+
+  public static CSize ternary(CCondition condition, CSize then, CSize otherwise) {
+    return new CSizeTernary(condition, then, otherwise);
   }
 
   public static CSize sizeOf(String cType) {
@@ -84,13 +90,13 @@ public abstract class CSize {
     }
   }
 
-  protected abstract CSize simplify(int remainder);
+  protected abstract CSize simplify(int remainder, Map<CCondition, Boolean> knownConditions);
 
   protected abstract String toExpression();
 
   @Override
   public String toString() {
-    return simplify(0).toExpression();
+    return simplify(0, Map.of()).toExpression();
   }
 
   private static class CSizeConstant extends CSize {
@@ -106,7 +112,7 @@ public abstract class CSize {
     }
 
     @Override
-    protected CSize simplify(int remainder) {
+    protected CSize simplify(int remainder, Map<CCondition, Boolean> knownConditions) {
       return constant(bytes + remainder);
     }
   }
@@ -124,7 +130,7 @@ public abstract class CSize {
     }
 
     @Override
-    protected CSize simplify(int remainder) {
+    protected CSize simplify(int remainder, Map<CCondition, Boolean> knownConditions) {
       return addRemainder(remainder);
     }
   }
@@ -139,16 +145,16 @@ public abstract class CSize {
     }
 
     @Override
-    protected CSize simplify(int remainder) {
-      CSize lhs = this.lhs.simplify(0);
-      CSize rhs = this.rhs.simplify(remainder);
+    protected CSize simplify(int remainder, Map<CCondition, Boolean> knownConditions) {
+      CSize lhs = this.lhs.simplify(0, knownConditions);
+      CSize rhs = this.rhs.simplify(remainder, knownConditions);
 
       if (lhs instanceof CSizeConstant) {
-        return rhs.simplify(((CSizeConstant) lhs).bytes);
+        return rhs.simplify(((CSizeConstant) lhs).bytes, knownConditions);
       }
 
       if (rhs instanceof CSizeConstant) {
-        return lhs.simplify(((CSizeConstant) rhs).bytes);
+        return lhs.simplify(((CSizeConstant) rhs).bytes, knownConditions);
       }
 
       return new CSizeAdd(lhs, rhs);
@@ -170,12 +176,12 @@ public abstract class CSize {
     }
 
     @Override
-    protected CSize simplify(int remainder) {
-      CSize lhs = this.lhs.simplify(remainder > 0 ? remainder : 0);
-      CSize rhs = this.rhs.simplify(remainder < 0 ? -remainder : 0);
+    protected CSize simplify(int remainder, Map<CCondition, Boolean> knownConditions) {
+      CSize lhs = this.lhs.simplify(remainder > 0 ? remainder : 0, knownConditions);
+      CSize rhs = this.rhs.simplify(remainder < 0 ? -remainder : 0, knownConditions);
 
       if (rhs instanceof CSizeConstant) {
-        return lhs.simplify(-((CSizeConstant) rhs).bytes);
+        return lhs.simplify(-((CSizeConstant) rhs).bytes, knownConditions);
       }
 
       if (lhs.equals(rhs)) {
@@ -201,14 +207,14 @@ public abstract class CSize {
     }
 
     @Override
-    protected CSize simplify(int remainder) {
-      CSize lhs = this.lhs.simplify(0);
-      CSize rhs = this.rhs.simplify(0);
+    protected CSize simplify(int remainder, Map<CCondition, Boolean> knownConditions) {
+      CSize lhs = this.lhs.simplify(0, knownConditions);
+      CSize rhs = this.rhs.simplify(0, knownConditions);
 
       if (lhs instanceof CSizeConstant) {
         int bytes = ((CSizeConstant) lhs).bytes;
         if (bytes == 1) {
-          return rhs.simplify(remainder);
+          return rhs.simplify(remainder, knownConditions);
         } else if (bytes == 0) {
           return constant(remainder);
         }
@@ -217,7 +223,7 @@ public abstract class CSize {
       if (rhs instanceof CSizeConstant) {
         int bytes = ((CSizeConstant) rhs).bytes;
         if (bytes == 1) {
-          return lhs.simplify(remainder);
+          return lhs.simplify(remainder, knownConditions);
         } else if (bytes == 0) {
           return constant(remainder);
         }
@@ -248,9 +254,9 @@ public abstract class CSize {
     }
 
     @Override
-    protected CSize simplify(int remainder) {
-      CSize lhs = this.lhs.simplify(remainder);
-      CSize rhs = this.rhs.simplify(remainder);
+    protected CSize simplify(int remainder, Map<CCondition, Boolean> knownConditions) {
+      CSize lhs = this.lhs.simplify(remainder, knownConditions);
+      CSize rhs = this.rhs.simplify(remainder, knownConditions);
 
       if (lhs instanceof CSizeConstant && rhs instanceof CSizeConstant) {
         return constant(Math.max(((CSizeConstant) lhs).bytes, ((CSizeConstant) rhs).bytes));
@@ -300,30 +306,30 @@ public abstract class CSize {
     }
 
     @Override
-    protected CSize simplify(int remainder) {
-      CSize offset = this.offset.simplify(0);
-      CAlignment alignment = this.alignment.simplify(0);
+    protected CSize simplify(int remainder, Map<CCondition, Boolean> knownConditions) {
+      CSize offset = this.offset.simplify(0, knownConditions);
+      CAlignment alignment = this.alignment.simplify(0, knownConditions);
 
       if (offset instanceof CSizeMax) {
         CSizeMax max = (CSizeMax) offset;
-        return max.lhs.align(alignment).max(max.rhs.align(alignment)).simplify(remainder);
+        return max.lhs.align(alignment).max(max.rhs.align(alignment)).simplify(remainder, knownConditions);
       }
-      
+
       if (offset instanceof CSizeAlign) {
         CSizeAlign inner = (CSizeAlign) offset;
         return inner
             .offset
-            .align(alignment.max(inner.alignment).simplify(0))
+            .align(alignment.max(inner.alignment).simplify(0, knownConditions))
             .addRemainder(remainder);
       }
 
       if (alignment.asConstant().isPresent()) {
         if (alignment.asConstant().get() == 1) {
-          return offset.simplify(remainder);
+          return offset.simplify(remainder, knownConditions);
         }
 
         if (remainder % alignment.asConstant().get() == 0) {
-          offset = offset.simplify(remainder);
+          offset = offset.simplify(remainder, knownConditions);
           remainder = 0;
         }
 
@@ -361,9 +367,9 @@ public abstract class CSize {
     }
 
     @Override
-    protected CSize simplify(int remainder) {
-      CSize offset = this.offset.simplify(0);
-      CAlignment alignment = this.alignment.simplify(0);
+    protected CSize simplify(int remainder, Map<CCondition, Boolean> knownConditions) {
+      CSize offset = this.offset.simplify(0, knownConditions);
+      CAlignment alignment = this.alignment.simplify(0, knownConditions);
 
       if (offset instanceof CSizeConstant && alignment.asConstant().isPresent()) {
         int offsetBytes = ((CSizeConstant) offset).bytes;
@@ -374,6 +380,46 @@ public abstract class CSize {
       }
 
       return offset.padding(alignment).addRemainder(remainder);
+    }
+  }
+
+  private static class CSizeTernary extends CSize {
+    private CCondition condition;
+    private CSize then;
+    private CSize otherwise;
+
+    public CSizeTernary(CCondition condition, CSize then, CSize otherwise) {
+      this.condition = condition;
+      this.then = then;
+      this.otherwise = otherwise;
+    }
+
+    @Override
+    public String toExpression() {
+      return "((" + condition + ") ? (" + then + ") : (" + otherwise + "))";
+    }
+
+    @Override
+    protected CSize simplify(int remainder, Map<CCondition, Boolean> knownConditions) {
+      if (knownConditions.containsKey(condition)) {
+        if (knownConditions.get(condition)) {
+          return then.simplify(remainder, knownConditions);
+        } else {
+          return otherwise.simplify(remainder, knownConditions);
+        }
+      } else {
+        Map<CCondition, Boolean> newKnownConditions = new HashMap<>(knownConditions);
+        newKnownConditions.put(condition, true);
+        CSize then = this.then.simplify(remainder, newKnownConditions);
+        newKnownConditions.put(condition, false);
+        CSize otherwise = this.otherwise.simplify(remainder, newKnownConditions);
+
+        if (then.equals(otherwise)) {
+          return then;
+        } else {
+          return new CSizeTernary(condition, then, otherwise);
+        }
+      }
     }
   }
 

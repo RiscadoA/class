@@ -55,7 +55,7 @@ public class CCondition {
     } else if (isCertainlyFalse()) {
       return ifFalse;
     } else {
-      return CSize.expression(ternary(ifTrue.toString(), ifFalse.toString()));
+      return CSize.ternary(this, ifTrue, ifFalse);
     }
   }
 
@@ -69,7 +69,7 @@ public class CCondition {
     } else if (isCertainlyFalse()) {
       return ifFalse;
     } else {
-      return CAlignment.expression(ternary(ifTrue.toString(), ifFalse.toString()));
+      return CAlignment.ternary(this, ifTrue, ifFalse);
     }
   }
 
@@ -87,5 +87,15 @@ public class CCondition {
     } else {
       return expression();
     }
+  }
+
+  @Override
+  public boolean equals(Object obj) {
+    return this.toString().equals(obj.toString());
+  }
+
+  @Override
+  public int hashCode() {
+    return this.toString().hashCode();
   }
 }

@@ -177,8 +177,7 @@ public abstract class IRSlotTree {
     private IRSlotTree value;
     private IRSlotTree notValue;
 
-    public IsValue(
-        IRValueRequisites requisites, IRSlotTree value, IRSlotTree notValue) {
+    public IsValue(IRValueRequisites requisites, IRSlotTree value, IRSlotTree notValue) {
       this.requisites = requisites;
       this.value = value;
       this.notValue = notValue;

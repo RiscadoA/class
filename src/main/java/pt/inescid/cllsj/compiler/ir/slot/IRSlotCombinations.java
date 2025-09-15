@@ -40,7 +40,8 @@ public class IRSlotCombinations {
   //   if (trees.isEmpty()) {
   //     return of(slot);
   //   }
-  //   return new IRSlotCombinations(trees.stream().map(tree -> IRSlotTree.of(slot).suffix(tree)).toList());
+  //   return new IRSlotCombinations(trees.stream().map(tree ->
+  // IRSlotTree.of(slot).suffix(tree)).toList());
   // }
 
   // public IRSlotCombinations prefix(IRSlotCombinations combinations) {
@@ -57,14 +58,16 @@ public class IRSlotCombinations {
     if (trees.isEmpty()) {
       return of(slot);
     }
-    return new IRSlotCombinations(trees.stream().map(tree -> tree.suffix(IRSlotTree.of(slot))).toList());
+    return new IRSlotCombinations(
+        trees.stream().map(tree -> tree.suffix(IRSlotTree.of(slot))).toList());
   }
 
   public IRSlotCombinations suffix(IRSlotSequence sequence) {
     if (trees.isEmpty()) {
       return of(IRSlotTree.of(sequence));
     }
-    return new IRSlotCombinations(trees.stream().map(tree -> tree.suffix(IRSlotTree.of(sequence))).toList());
+    return new IRSlotCombinations(
+        trees.stream().map(tree -> tree.suffix(IRSlotTree.of(sequence))).toList());
   }
 
   public IRSlotCombinations suffix(IRSlotCombinations combinations) {

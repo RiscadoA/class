@@ -2,9 +2,9 @@
 1 close x
 id recv
 id send
-id close
 fwd 1
 fwd 2
+id close
 1 recv
 1 wait id
 1 wait x
@@ -22,9 +22,9 @@ fwd 1
 3 let
 id recv
 id send
-id close
 fwd 1
 fwd 2
+id close
 3 recv
 3 wait id
 3

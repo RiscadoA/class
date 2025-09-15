@@ -741,8 +741,7 @@ public class IRGenerator extends ASTNodeVisitor {
     // Advance the main session depending on what we received
     advanceOrReset(
         ch,
-        IRSlotTree.isValue(
-            reqs, info.activeLocalTree, IRSlotTree.of(new IRSessionS())),
+        IRSlotTree.isValue(reqs, info.activeLocalTree, IRSlotTree.of(new IRSessionS())),
         rhsType,
         false);
 
@@ -831,7 +830,8 @@ public class IRGenerator extends ASTNodeVisitor {
             IREnvironment.Channel captured = env.getChannel(name);
             IRSlotTree valueSlots = captured.getExponentialType();
 
-            expEnv = expEnv.addValue(name, IRSlotCombinations.of(valueSlots), Optional.of(valueSlots));
+            expEnv =
+                expEnv.addValue(name, IRSlotCombinations.of(valueSlots), Optional.of(valueSlots));
             expEnv = expEnv.makeChannelExponential(name, valueSlots, true, id -> {});
 
             dataArguments.add(
@@ -919,13 +919,9 @@ public class IRGenerator extends ASTNodeVisitor {
     IRDataLocation typeLoc = env.getChannel(ch).getRemoteData();
     env =
         env.advanceChannel(
-            ch,
-            IRSlotOffset.of(
-                new IRTypeS(), IRSlotTree.of(new IRSessionS(), new IRTagS())));
+            ch, IRSlotOffset.of(new IRTypeS(), IRSlotTree.of(new IRSessionS(), new IRTagS())));
     IRDataLocation sessionLoc = env.getChannel(ch).getRemoteData();
-    env =
-        env.advanceChannel(
-            ch, IRSlotOffset.of(new IRSessionS(), IRSlotTree.of(new IRTagS())));
+    env = env.advanceChannel(ch, IRSlotOffset.of(new IRSessionS(), IRSlotTree.of(new IRTagS())));
     IRDataLocation polarityLoc = env.getChannel(ch).getRemoteData();
 
     // Overwrite the previous session with a new session of the new type
@@ -961,13 +957,9 @@ public class IRGenerator extends ASTNodeVisitor {
     IRDataLocation typeLoc = env.getChannel(ch).getLocalData();
     env =
         env.advanceChannel(
-            ch,
-            IRSlotOffset.of(
-                new IRTypeS(), IRSlotTree.of(new IRSessionS(), new IRTagS())));
+            ch, IRSlotOffset.of(new IRTypeS(), IRSlotTree.of(new IRSessionS(), new IRTagS())));
     IRDataLocation sessionLoc = env.getChannel(ch).getLocalData();
-    env =
-        env.advanceChannel(
-            ch, IRSlotOffset.of(new IRSessionS(), IRSlotTree.of(new IRTagS())));
+    env = env.advanceChannel(ch, IRSlotOffset.of(new IRSessionS(), IRSlotTree.of(new IRTagS())));
     IRDataLocation polarityLoc = env.getChannel(ch).getLocalData();
 
     int processGenId = nextProcessGenId++;
@@ -1028,7 +1020,9 @@ public class IRGenerator extends ASTNodeVisitor {
             if (captured.isExponential()) {
               // We captured an exponential channel, we pass it as a data argument
               IRSlotTree valueSlots = captured.getExponentialType();
-              polyEnv = polyEnv.addValue(name, IRSlotCombinations.of(valueSlots), Optional.of(valueSlots));
+              polyEnv =
+                  polyEnv.addValue(
+                      name, IRSlotCombinations.of(valueSlots), Optional.of(valueSlots));
               polyEnv = polyEnv.makeChannelExponential(name, valueSlots, true, id -> {});
               dataArguments.add(
                   new IRCallProcess.DataArgument(
@@ -1191,8 +1185,7 @@ public class IRGenerator extends ASTNodeVisitor {
 
   void addPut(String ch, String chc, ASTType typeLhs, Runnable contLhs, Runnable contRhs) {
     IREnvironment.Channel channel = env.getChannel(ch);
-    IRDataLocation cellDataLoc =
-        IRDataLocation.cell(channel.getLocalData(), IRSlotOffset.ZERO);
+    IRDataLocation cellDataLoc = IRDataLocation.cell(channel.getLocalData(), IRSlotOffset.ZERO);
 
     // Define new session for the channel being stored
     IRSlotsFromASTType argInfo = slotsFromType(typeLhs);
@@ -1218,8 +1211,7 @@ public class IRGenerator extends ASTNodeVisitor {
 
   void addTake(String ch, String chc, ASTType typeLhs, Runnable cont) {
     IREnvironment.Channel channel = env.getChannel(ch);
-    IRDataLocation cellDataLoc =
-        IRDataLocation.cell(channel.getLocalData(), IRSlotOffset.ZERO);
+    IRDataLocation cellDataLoc = IRDataLocation.cell(channel.getLocalData(), IRSlotOffset.ZERO);
 
     // Lock the cell while we're accessing it
     if (compiler.concurrency.get()) {
@@ -1296,8 +1288,7 @@ public class IRGenerator extends ASTNodeVisitor {
     advanceOrReset(ch, offset(slots, cont), cont, advancePolarity);
   }
 
-  void advanceOrReset(
-      String ch, IRSlotOffset offset, ASTType cont, boolean advancePolarity) {
+  void advanceOrReset(String ch, IRSlotOffset offset, ASTType cont, boolean advancePolarity) {
     if (cont instanceof ASTRecT
         || cont instanceof ASTCoRecT
         || isPositive(cont) != advancePolarity) {

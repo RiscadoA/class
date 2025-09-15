@@ -83,10 +83,18 @@ public class IRValueRequisites {
   }
 
   public IRValueRequisites replaceTypes(Function<IRTypeId, IRTypeId> replacer) {
+    return expandTypes(id -> IRValueRequisites.valueIf(replacer.apply(id)));
+  }
+
+  public IRValueRequisites expandTypes(Function<IRTypeId, IRValueRequisites> replacer) {
     if (types.isPresent()) {
       Set<IRTypeId> newTypes = new HashSet<>();
       for (IRTypeId t : types.get()) {
-        newTypes.add(replacer.apply(t));
+        IRValueRequisites expanded = replacer.apply(t);
+        if (!expanded.canBeValue()) {
+          return IRValueRequisites.notValue();
+        }
+        newTypes.addAll(expanded.types.get());
       }
       return IRValueRequisites.valueIf(newTypes);
     } else {

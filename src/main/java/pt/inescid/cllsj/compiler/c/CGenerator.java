@@ -26,7 +26,6 @@ import pt.inescid.cllsj.compiler.ir.slot.IRIntS;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlot;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotCombinations;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotOffset;
-import pt.inescid.cllsj.compiler.ir.slot.IRSlotStaticOffset;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotTree;
 import pt.inescid.cllsj.compiler.ir.slot.IRStringS;
 import pt.inescid.cllsj.compiler.ir.slot.IRTagS;
@@ -698,6 +697,7 @@ public class CGenerator extends IRInstructionVisitor {
     // Set up the layout and the function used to get layouts from types
     CProcessLayout layout = layout(program.get(processId));
     Function<IRTypeId, CLayout> typeLayoutProvider = id -> typeLayout(layout, "exp_env", id);
+    Function<IRValueRequisites, CCondition> isValue = r -> isValue(layout, "exp_env", r);
 
     putBlock(
         "void " + managerName(processId) + "(char* exp_env, char* src_env, int mode)",
@@ -714,7 +714,7 @@ public class CGenerator extends IRInstructionVisitor {
                   putIf(
                       source + " != NULL",
                       () -> {
-                        putAssign(target, "exp_env + (" + source + " - src_env)");
+                        putAssign(target, "(struct type_node*)(exp_env + ((char*)" + source + " - src_env))");
                       });
                 }
 
@@ -722,11 +722,12 @@ public class CGenerator extends IRInstructionVisitor {
                   IRLocalDataId dataId = arg.getTargetDataId();
                   putSlotTraversal(
                       arg.getSlots(),
+                      id -> typeLayout(layout, "exp_env", id),
                       reqs -> isValue(layout, "exp_env", reqs),
                       (target, slot) -> {
                         putCloneSlot(id -> typeNode(type(layout, "exp_env", id)), target, slot);
                       },
-                      localData(typeLayoutProvider, layout, "exp_env", dataId));
+                      localData(typeLayoutProvider, isValue, layout, "exp_env", dataId));
                 }
               },
               () -> {
@@ -735,11 +736,12 @@ public class CGenerator extends IRInstructionVisitor {
                   IRLocalDataId dataId = arg.getTargetDataId();
                   putSlotTraversal(
                       arg.getSlots(),
+                      id -> typeLayout(layout, "exp_env", id),
                       reqs -> isValue(layout, "exp_env", reqs),
                       (target, slot) -> {
                         putDropSlot(id -> typeNode(type(layout, "exp_env", id)), target, slot);
                       },
-                      localData(typeLayoutProvider, layout, "exp_env", dataId));
+                      localData(typeLayoutProvider, isValue, layout, "exp_env", dataId));
                 }
               });
         });
@@ -881,10 +883,11 @@ public class CGenerator extends IRInstructionVisitor {
     putMoveSlots(
         instr.getSlots(),
         id -> typeNode(type(id)),
-        req -> isValue(req),
+        this::typeLayout,
+        this::isValue,
         false,
-        instr.getLocation(),
-        instr.getSourceLocation());
+        instr.getSourceLocation(),
+        instr.getLocation());
   }
 
   @Override
@@ -892,19 +895,17 @@ public class CGenerator extends IRInstructionVisitor {
     putMoveSlots(
         instr.getSlots(),
         id -> typeNode(type(id)),
-        req -> isValue(req),
+        this::typeLayout,
+        this::isValue,
         true,
-        instr.getLocation(),
-        instr.getSourceLocation());
+        instr.getSourceLocation(),
+        instr.getLocation());
   }
 
   @Override
   public void visit(IRDropValue instr) {
     putDropSlots(
-        instr.getSlots(),
-        id -> typeNode(type(id)),
-        req -> isValue(req),
-        data(instr.getLocation()));
+        instr.getSlots(), id -> typeNode(type(id)), this::typeLayout, this::isValue, data(instr.getLocation()));
   }
 
   @Override
@@ -944,27 +945,35 @@ public class CGenerator extends IRInstructionVisitor {
       throw new IllegalArgumentException("Called process " + calledProcessId + " not found");
     }
 
+    Function<IRTypeId, IRCallProcess.TypeArgument> findArgFromTarget =
+        id -> {
+          return instr.getTypeArguments().stream()
+              .filter(a -> a.getTargetType().equals(id))
+              .findFirst()
+              .orElseThrow(
+                  () ->
+                      new IllegalArgumentException(
+                          "Type argument "
+                              + id
+                              + " not found in call to process "
+                              + calledProcessId));
+        };
+
     Function<IRTypeId, CLayout> typeLayoutProvider =
-        typeId -> {
+        id -> {
           // We need to find the type layout for given type identifier in the called process
           // This type was passed as an argument, so we search for it
-          IRCallProcess.TypeArgument arg =
-              instr.getTypeArguments().stream()
-                  .filter(a -> a.getTargetType().equals(typeId))
-                  .findFirst()
-                  .orElseThrow(
-                      () ->
-                          new IllegalArgumentException(
-                              "Type argument "
-                                  + typeId
-                                  + " not found in call to process "
-                                  + calledProcessId));
-
+          IRCallProcess.TypeArgument arg = findArgFromTarget.apply(id);
           if (arg.isFromLocation()) {
             return typeLayout(data(arg.getSourceLocation()).deref("struct type"));
           } else {
-            return layout(arg.getSourceTree().combinations());
+            return maxLayout(this::typeLayout, this::isValue, arg.getSourceTree());
           }
+        };
+
+    Function<IRValueRequisites, CCondition> typeIsValue =
+        r -> {
+          return isValue(r.expandTypes(t -> findArgFromTarget.apply(t).getSourceIsValue()));
         };
 
     CProcessLayout calledLayout = layout(calledProcess);
@@ -990,7 +999,7 @@ public class CGenerator extends IRInstructionVisitor {
     }
 
     // Allocate a new environment for the called process
-    putAllocEnvironment(TMP_PTR1, typeLayoutProvider, calledLayout, typeNodesSize);
+    putAllocEnvironment(TMP_PTR1, typeLayoutProvider, typeIsValue, calledLayout, typeNodesSize);
     String newEnv = cast(TMP_PTR1, "char*");
 
     // Setup the end points for the new environment
@@ -1006,7 +1015,7 @@ public class CGenerator extends IRInstructionVisitor {
       putAssign(
           TMP_PTR2,
           calledLayout
-              .size(typeLayoutProvider)
+              .size(typeLayoutProvider, typeIsValue)
               .align(compiler.arch.typeNodeAlignment())
               .advancePointer(newEnv));
     }
@@ -1025,7 +1034,7 @@ public class CGenerator extends IRInstructionVisitor {
           putAssign(TMP_INT, typeNodeCount(source));
           putCopyMemory(
               CAddress.of(TMP_PTR2),
-              CAddress.of(typeNode(source)),
+              castToAddress(typeNode(source)),
               compiler.arch.typeNodeSize().multiply(CSize.expression(TMP_INT)));
           putFree(typeNode(source));
         } else {
@@ -1099,6 +1108,7 @@ public class CGenerator extends IRInstructionVisitor {
                   sessionContData(remoteSession),
                   localData(
                       typeLayoutProvider,
+                      typeIsValue,
                       calledLayout,
                       newEnv,
                       calledLocalDataId.get(),
@@ -1118,9 +1128,10 @@ public class CGenerator extends IRInstructionVisitor {
           arg.getSlots(),
           arg.isClone(),
           id -> typeNode(type(id)),
+          id -> typeLayout(calledLayout, newEnv, id),
           req -> isValue(calledLayout, newEnv, req),
-          data(typeLayoutProvider, calledLayout, newEnv, target),
-          data(arg.getSourceLocation()));
+          data(arg.getSourceLocation()),
+          data(typeLayoutProvider, typeIsValue, calledLayout, newEnv, target));
     }
 
     // Decrement the end points of the current process, if applicable
@@ -1149,34 +1160,38 @@ public class CGenerator extends IRInstructionVisitor {
       throw new IllegalArgumentException("Exponential process " + processId + " not found");
     }
 
-    Function<IRTypeId, CLayout> typeLayoutProvider =
-        typeId -> {
-          // We need to find the type layout for given type identifier in the called process
-          // This type was passed as an argument, so we search for it
-          IRWriteExponential.TypeArgument arg =
-              typeArguments.stream()
-                  .filter(a -> a.getTargetType().equals(typeId))
-                  .findFirst()
-                  .orElseThrow(
-                      () ->
-                          new IllegalArgumentException(
-                              "Type argument "
-                                  + typeId
-                                  + " not found in call to exponential process "
-                                  + processId));
-
-          // Now we can just compute the layout of the source type in the current process
-          return typeLayout(arg.getSourceType());
+    Function<IRTypeId, IRWriteExponential.TypeArgument> findArgFromTarget =
+        id -> {
+          return typeArguments.stream()
+              .filter(a -> a.getTargetType().equals(id))
+              .findFirst()
+              .orElseThrow(
+                  () ->
+                      new IllegalArgumentException(
+                          "Type argument "
+                              + id
+                              + " not found in call to exponential process "
+                              + processId));
         };
+
+    Function<IRTypeId, CLayout> typeLayoutProvider =
+        id -> typeLayout(findArgFromTarget.apply(id).getSourceType());
+
+    Function<IRValueRequisites, CCondition> typeIsValue =
+        r -> isValue(r.replaceTypes(t -> findArgFromTarget.apply(t).getSourceType()));
 
     CProcessLayout expProcessLayout = layout(expProcess);
 
     CSize typeNodeSize = CSize.zero();
     for (IRWriteExponential.TypeArgument arg : typeArguments) {
-      String nodeCount = typeNodeCount(type(arg.getTargetType()));
+      String nodeCount = typeNodeCount(type(arg.getSourceType()));
       typeNodeSize = typeNodeSize.add(CSize.expression(nodeCount));
     }
     typeNodeSize = typeNodeSize.multiply(compiler.arch.typeNodeSize());
+    CSize fullEnvSize = expProcessLayout.size(typeLayoutProvider, typeIsValue);
+    if (!typeNodeSize.equals(CSize.zero())) {
+      fullEnvSize = fullEnvSize.align(compiler.arch.typeNodeAlignment()).add(typeNodeSize);
+    }
 
     // Data arguments passed to exponentials need to support clone and drop operations
     // When the exponential is in use, we don't have information about the data it captured
@@ -1190,7 +1205,8 @@ public class CGenerator extends IRInstructionVisitor {
     // - TMP_INT holds the operation to perform (0 = clone, 1 = drop)
 
     // Allocate a new exponential and write it to the target location
-    putAllocExponential(exponential, typeLayoutProvider, expProcessLayout, typeNodeSize);
+    putAllocExponential(
+        exponential, typeLayoutProvider, typeIsValue, expProcessLayout, typeNodeSize);
 
     // Initialize the exponential
     pendingExponentialManagers.put(processId, dataArguments);
@@ -1200,8 +1216,9 @@ public class CGenerator extends IRInstructionVisitor {
         expProcessLayout.sessionOffset(new IRSessionId(0)));
     putAssign(
         exponentialEntryDataOffset(exponential),
-        expProcessLayout.dataOffset(typeLayoutProvider, new IRLocalDataId(0)));
-    putAssign(exponentialEnvSize(exponential), expProcessLayout.size(typeLayoutProvider));
+        expProcessLayout.dataOffset(typeLayoutProvider, typeIsValue, new IRLocalDataId(0)));
+    putAssign(
+        exponentialEnvSize(exponential), fullEnvSize);
     putStatement(
         "void "
             + managerName(processId)
@@ -1228,12 +1245,14 @@ public class CGenerator extends IRInstructionVisitor {
 
     // Write the type arguments to the exponential's environment
     CSize typeNodeOffset =
-        expProcessLayout.size(typeLayoutProvider).align(compiler.arch.typeNodeAlignment());
+        expProcessLayout
+            .size(typeLayoutProvider, typeIsValue)
+            .align(compiler.arch.typeNodeAlignment());
     for (IRWriteExponential.TypeArgument arg : typeArguments) {
       // Get a reference to the target type in the new environment and initialize it
       String targetType = type(expProcessLayout, newEnv, arg.getTargetType());
       putAssign(targetType, type(arg.getSourceType()));
-      putAssign(typeNode(targetType), typeNodeOffset.advancePointer(newEnv));
+      putAssign(typeNode(targetType), CAddress.of(newEnv, typeNodeOffset).cast("struct type_node"));
 
       // Copy over the type nodes from the source type newEnv
       CSize typeNodesSize =
@@ -1257,9 +1276,10 @@ public class CGenerator extends IRInstructionVisitor {
           arg.getSlots(),
           arg.isClone(),
           id -> typeNode(type(id)),
-          req -> isValue(req),
-          data(typeLayoutProvider, expProcessLayout, newEnv, target),
-          data(arg.getSourceLocation()));
+          this::typeLayout,
+          this::isValue,
+          data(arg.getSourceLocation()),
+          data(typeLayoutProvider, typeIsValue, expProcessLayout, newEnv, target));
     }
   }
 
@@ -1284,7 +1304,8 @@ public class CGenerator extends IRInstructionVisitor {
     putCopyMemory(newEnv, oldEnv, CSize.expression(exponentialEnvSize(exponential)));
 
     // Call the exponential manager to clone the slots
-    putStatement(exponentialManager(exponential) + "(" + newEnv + ", " + oldEnv + ", 0)"); // 0 = Clone
+    putStatement(
+        exponentialManager(exponential) + "(" + newEnv + ", " + oldEnv + ", 0)"); // 0 = Clone
 
     // Setup the new session and tie it to the exponential's entry session
     CAddress remoteSessionAddress =
@@ -1374,7 +1395,7 @@ public class CGenerator extends IRInstructionVisitor {
   public void visit(IRWriteCell instr) {
     CAddress slotAddr = data(instr.getLocation());
     String cell = slotAddr.deref("struct cell*");
-    putAllocCell(cell, layout(instr.getSlots().combinations()).size);
+    putAllocCell(cell, maxLayout(this::typeLayout, this::isValue, instr.getSlots()).size);
     putAssign(cellRefCount(cell), 1);
     if (compiler.concurrency.get()) {
       putMutexInit(cellMutex(cell));
@@ -1465,7 +1486,7 @@ public class CGenerator extends IRInstructionVisitor {
 
   private String typeInitializer(
       String node, String node_count, IRSlotTree slots, IRValueRequisites isValue) {
-    CLayout layout = layout(slots.combinations());
+    CLayout layout = maxLayout(this::typeLayout, this::isValue, slots);
     StringBuilder sb = new StringBuilder("(struct type)");
     sb.append("{.node=").append(node);
     sb.append(",.size=").append(layout.size);
@@ -1527,28 +1548,31 @@ public class CGenerator extends IRInstructionVisitor {
 
   private CAddress localData(IRLocalDataId localDataId) {
     return localData(
-        this::typeLayout, currentProcessLayout, ENV, localDataId, IRSlotOffset.ZERO);
+        this::typeLayout, this::isValue, currentProcessLayout, ENV, localDataId, IRSlotOffset.ZERO);
   }
 
   private CAddress localData(IRLocalDataId localDataId, IRSlotOffset offset) {
-    return localData(this::typeLayout, currentProcessLayout, ENV, localDataId, offset);
+    return localData(
+        this::typeLayout, this::isValue, currentProcessLayout, ENV, localDataId, offset);
   }
 
   private CAddress localData(
       Function<IRTypeId, CLayout> typeLayouts,
+      Function<IRValueRequisites, CCondition> isValue,
       CProcessLayout layout,
       String env,
       IRLocalDataId localDataId) {
-    return CAddress.of(env, layout.dataOffset(typeLayouts, localDataId));
+    return CAddress.of(env, layout.dataOffset(typeLayouts, isValue, localDataId));
   }
 
   private CAddress localData(
       Function<IRTypeId, CLayout> typeLayouts,
+      Function<IRValueRequisites, CCondition> isValue,
       CProcessLayout layout,
       String env,
       IRLocalDataId localDataId,
       IRSlotOffset offset) {
-    return offset(localData(typeLayouts, layout, env, localDataId), offset);
+    return offset(localData(typeLayouts, isValue, layout, env, localDataId), offset);
   }
 
   private CAddress remoteData(
@@ -1563,20 +1587,21 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   private CAddress data(IRDataLocation data) {
-    return data(this::typeLayout, currentProcessLayout, ENV, data);
+    return data(this::typeLayout, this::isValue, currentProcessLayout, ENV, data);
   }
 
   private CAddress data(
       Function<IRTypeId, CLayout> typeLayouts,
+      Function<IRValueRequisites, CCondition> isValue,
       CProcessLayout layout,
       String env,
       IRDataLocation data) {
     if (data.isRemote()) {
       return remoteData(layout, env, data.getSessionId(), data.getOffset());
     } else if (data.isLocal()) {
-      return localData(typeLayouts, layout, env, data.getLocalDataId(), data.getOffset());
+      return localData(typeLayouts, isValue, layout, env, data.getLocalDataId(), data.getOffset());
     } else if (data.isCell()) {
-      return cellData(data(typeLayouts, layout, env, data.getCell()), data.getOffset());
+      return cellData(data(typeLayouts, isValue, layout, env, data.getCell()), data.getOffset());
     } else {
       throw new IllegalArgumentException("Unknown data location " + data);
     }
@@ -1687,38 +1712,37 @@ public class CGenerator extends IRInstructionVisitor {
     return var + "->mutex";
   }
 
-  // private CSize offset(CSize base, IRSlotDynamicOffset offset) {
-  //   if (offset.isZero()) {
-  //     return base;
-  //   } else {
-  //     CSize pastSize = layout(offset.getPast()).size;
-  //     CAlignment futureAlignment = layout(offset.getFuture()).alignment;
-  //     return base.add(pastSize).align(futureAlignment);
-  //   }
-  // }
-
   private CAddress offset(String address, IRSlotOffset offset) {
     return offset(CAddress.of(address), offset);
   }
 
   private CAddress offset(CAddress address, IRSlotOffset offset) {
-    CSize pastSize = layout(offset.getPast().combinations()).size;
-    CAlignment futureAlignment = layout(offset.getFuture()).alignment;
+    CSize pastSize = currentLayout(address, offset.getPast()).size;
+    CAlignment futureAlignment = maxLayout(this::typeLayout, this::isValue, offset.getFuture()).alignment;
     return address.offset(pastSize.align(futureAlignment));
   }
 
-  private CSize offset(IRSlotStaticOffset offset) {
-    CSize pastSize = layout(offset.getPast()).size;
-    CAlignment futureAlignment = layout(offset.getFuture()).alignment;
-    return pastSize.align(futureAlignment);
+  private CLayout currentLayout(CAddress address, IRSlotTree tree) {
+    return CLayout.computeCurrent(
+        tree,
+        compiler.arch,
+        this::typeLayout,
+        this::isValue,
+        (offset, i) -> {
+          return CCondition.maybe(address.offset(offset).deref("unsigned char") + " == " + i);
+        });
   }
 
-  private CLayout layout(IRSlotCombinations combinations) {
-    return CLayout.compute(combinations, compiler.arch, typeId -> typeLayout(typeId));
+  private CLayout maxLayout(Function<IRTypeId, CLayout> typeLayout, Function<IRValueRequisites, CCondition> isValue, IRSlotTree tree) {
+    return CLayout.computeMaximum(tree, compiler.arch, typeLayout, isValue);
   }
 
-  private CLayout layout(IRSlot slot) {
-    return CLayout.compute(slot, compiler.arch, typeId -> typeLayout(typeId));
+  private CLayout maxLayout(Function<IRTypeId, CLayout> typeLayout, Function<IRValueRequisites, CCondition> isValue, IRSlotCombinations combinations) {
+    return CLayout.computeMaximum(combinations, compiler.arch, typeLayout, isValue);
+  }
+
+  private CLayout layout(Function<IRTypeId, CLayout> typeLayout, IRSlot slot) {
+    return CLayout.compute(slot, compiler.arch, typeLayout);
   }
 
   // private CLayout layout(IRSlotTree slots, CAddress baseAddress) {
@@ -1759,28 +1783,25 @@ public class CGenerator extends IRInstructionVisitor {
   void putMoveSlots(
       IRSlotTree slots,
       Function<IRTypeId, String> typeNode,
+      Function<IRTypeId, CLayout> typeLayout,
       Function<IRValueRequisites, CCondition> typeIsValue,
       boolean clone,
-      IRDataLocation targetLocation,
-      IRDataLocation sourceLocation) {
-    putMoveSlots(
-        slots,
-        clone,
-        typeNode,
-        typeIsValue,
-        data(targetLocation),
-        data(sourceLocation));
+      IRDataLocation sourceLocation,
+      IRDataLocation targetLocation) {
+    putMoveSlots(slots, clone, typeNode, typeLayout, typeIsValue, data(sourceLocation), data(targetLocation));
   }
 
   void putMoveSlots(
       IRSlotTree slots,
       boolean clone,
       Function<IRTypeId, String> typeNode,
+      Function<IRTypeId, CLayout> typeLayout,
       Function<IRValueRequisites, CCondition> typeIsValue,
       CAddress sourceBaseAddress,
       CAddress targetBaseAddress) {
     putSlotTraversal(
         slots,
+        typeLayout,
         typeIsValue,
         offset -> sourceBaseAddress.offset(offset),
         (offset, slot) -> {
@@ -1794,7 +1815,7 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   void putMoveSlot(CAddress target, CAddress source, IRSlot slot) {
-    putCopyMemory(target, source, layout(slot).size);
+    putCopyMemory(target, source, layout(this::typeLayout, slot).size);
   }
 
   // Marks a slot as cloned, e.g., incrementing reference counts if necessary
@@ -1806,13 +1827,11 @@ public class CGenerator extends IRInstructionVisitor {
   void putDropSlots(
       IRSlotTree slots,
       Function<IRTypeId, String> typeNode,
+      Function<IRTypeId, CLayout> typeLayout,
       Function<IRValueRequisites, CCondition> typeIsValue,
       CAddress baseAddress) {
     putSlotTraversal(
-        slots,
-        typeIsValue,
-        (address, slot) -> putDropSlot(typeNode, address, slot),
-        baseAddress);
+        slots, typeLayout, typeIsValue, (address, slot) -> putDropSlot(typeNode, address, slot), baseAddress);
   }
 
   // Drops a slot, e.g., decrementing reference counts if necessary
@@ -1831,23 +1850,31 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   void putSlotTraversal(
-    IRSlotTree slots,
-    Function<IRValueRequisites, CCondition> typeIsValue,
-    BiConsumer<CAddress, IRSlot> atSlot,
-    CAddress baseAddress) {
-    putSlotTraversal(slots, typeIsValue, offset -> baseAddress.offset(offset), (offset, slot) -> atSlot.accept(baseAddress.offset(offset), slot));
-  }
-
-  void putSlotTraversal(
-    IRSlotTree slots,
-    Function<IRValueRequisites, CCondition> typeIsValue,
-    Function<CSize, CAddress> tagAddresser,
-    BiConsumer<CSize, IRSlot> atSlot) {
-    putSlotTraversal(slots, typeIsValue, tagAddresser, atSlot, CSize.zero());
+      IRSlotTree slots,
+      Function<IRTypeId, CLayout> typeLayout,
+      Function<IRValueRequisites, CCondition> typeIsValue,
+      BiConsumer<CAddress, IRSlot> atSlot,
+      CAddress baseAddress) {
+    putSlotTraversal(
+        slots,
+        typeLayout,
+        typeIsValue,
+        offset -> baseAddress.offset(offset),
+        (offset, slot) -> atSlot.accept(baseAddress.offset(offset), slot));
   }
 
   void putSlotTraversal(
       IRSlotTree slots,
+      Function<IRTypeId, CLayout> typeLayout,
+      Function<IRValueRequisites, CCondition> typeIsValue,
+      Function<CSize, CAddress> tagAddresser,
+      BiConsumer<CSize, IRSlot> atSlot) {
+    putSlotTraversal(slots, typeLayout, typeIsValue, tagAddresser, atSlot, CSize.zero());
+  }
+
+  void putSlotTraversal(
+      IRSlotTree slots,
+      Function<IRTypeId, CLayout> typeLayout,
       Function<IRValueRequisites, CCondition> typeIsValue,
       Function<CSize, CAddress> tagAddresser,
       BiConsumer<CSize, IRSlot> atSlot,
@@ -1857,11 +1884,12 @@ public class CGenerator extends IRInstructionVisitor {
     }
 
     if (slots.isUnary()) {
-      CLayout currLayout = layout(slots.singleHead().get());
-      CLayout nextLayout = layout(((IRSlotTree.Unary) slots).child().combinations());
-      
+      CLayout currLayout = layout(typeLayout, slots.singleHead().get());
+      CLayout nextLayout = maxLayout(typeLayout, typeIsValue, ((IRSlotTree.Unary) slots).child());
+
       putSlotTraversal(
           ((IRSlotTree.Unary) slots).child(),
+          typeLayout,
           typeIsValue,
           tagAddresser,
           atSlot,
@@ -1870,15 +1898,16 @@ public class CGenerator extends IRInstructionVisitor {
       IRSlotTree.Tag tag = (IRSlotTree.Tag) slots;
       List<Runnable> cases = new ArrayList<>();
 
-      CLayout currLayout = layout(slots.singleHead().get());
+      CLayout currLayout = layout(typeLayout, slots.singleHead().get());
 
       for (IRSlotTree child : tag.cases()) {
-        CLayout nextLayout = layout(child.combinations());
+        CLayout nextLayout = maxLayout(typeLayout, typeIsValue, child);
 
         cases.add(
             () ->
                 putSlotTraversal(
                     child,
+                    typeLayout,
                     typeIsValue,
                     tagAddresser,
                     atSlot,
@@ -1892,15 +1921,11 @@ public class CGenerator extends IRInstructionVisitor {
       putIfElse(
           typeIsValue.apply(isValue.requisites()),
           () -> {
-            putSlotTraversal(isValue.value(), typeIsValue, tagAddresser, atSlot, offset);
+            putSlotTraversal(isValue.value(), typeLayout, typeIsValue, tagAddresser, atSlot, offset);
           },
           () -> {
-            putSlotTraversal(isValue.notValue(), typeIsValue, tagAddresser, atSlot, offset);
+            putSlotTraversal(isValue.notValue(), typeLayout, typeIsValue, tagAddresser, atSlot, offset);
           });
-
-      CLayout pastLayout = layout(isValue.value().combinations().merge(isValue.notValue().combinations()));
-      CLayout nextLayout = layout(isValue.cont().combinations());
-      putSlotTraversal(isValue.cont(), typeIsValue, tagAddresser, atSlot, offset.add(pastLayout.size).align(nextLayout.alignment));
     } else if (!slots.isLeaf()) {
       throw new IllegalArgumentException("Unknown slot tree " + slots);
     }
@@ -1955,15 +1980,15 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   void putTypeNodeConstruction(String indexVar, IRSlotTree slots, TypeNodeConsumer consumer) {
-    putTypeNodeConstruction(indexVar, slots, consumer, IRSlotOffset.ZERO);
+    putTypeNodeConstruction(indexVar, slots, consumer, CSize.zero());
   }
 
   private void putTypeNodeConstruction(
-      String nextIndexVar, IRSlotTree slots, TypeNodeConsumer consumer, IRSlotOffset offset) {
+      String nextIndexVar, IRSlotTree slots, TypeNodeConsumer consumer, CSize offset) {
     if (slots.isUnary()) {
       IRSlot slot = slots.singleHead().get();
       IRSlotTree future = ((IRSlotTree.Unary) slots).child();
-      IRSlotOffset newOffset = offset.advance(slot, future);
+      CSize newOffset = offset.add(layout(this::typeLayout, slot).size).align(maxLayout(this::typeLayout, this::isValue, future).alignment);
 
       int type = -1;
       if (slot instanceof IRExponentialS) {
@@ -1987,7 +2012,7 @@ public class CGenerator extends IRInstructionVisitor {
               String node = typeNode(type(var.getTypeId())) + "[v_i]";
 
               String nodeType = typeNodeType(node);
-              CSize nodeOffset = offset(offset).add(CSize.expression(typeNodeOffset(node)));
+              CSize nodeOffset = offset.add(CSize.expression(typeNodeOffset(node)));
               String nodeNext =
                   typeNodeNext(node)
                       + " < 0 ? ("
@@ -2002,8 +2027,7 @@ public class CGenerator extends IRInstructionVisitor {
             });
         putAssign(nextIndexVar, newIndex);
       } else if (type != -1) {
-        consumer.accept(
-            nextIndexVar, Integer.toString(type), offset(offset), nextIndexVar + " + 1");
+        consumer.accept(nextIndexVar, Integer.toString(type), offset, nextIndexVar + " + 1");
         putIncrement(nextIndexVar);
       }
 
@@ -2011,7 +2035,7 @@ public class CGenerator extends IRInstructionVisitor {
     } else if (slots.isTag()) {
       IRSlotTree.Tag tag = (IRSlotTree.Tag) slots;
 
-      consumer.accept(nextIndexVar, Integer.toString(TYPE_NODE_TAG), offset(offset), "-1");
+      consumer.accept(nextIndexVar, Integer.toString(TYPE_NODE_TAG), offset, "-1");
 
       putBlock(
           "",
@@ -2025,7 +2049,8 @@ public class CGenerator extends IRInstructionVisitor {
                   "t_i + " + i, Integer.toString(TYPE_NODE_INDIRECT), CSize.zero(), nextIndexVar);
 
               IRSlotTree child = tag.cases().get(i - 1);
-              IRSlotStaticOffset newOffset = offset.advance(new IRTagS(), child.combinations());
+              CSize newOffset =
+                  offset.add(layout(this::typeLayout, new IRTagS()).size).align(maxLayout(this::typeLayout, this::isValue, child).alignment);
               putTypeNodeConstruction(nextIndexVar, child, consumer, newOffset);
             }
           });
@@ -2040,12 +2065,6 @@ public class CGenerator extends IRInstructionVisitor {
           () -> {
             putTypeNodeConstruction(nextIndexVar, isValue.notValue(), consumer, offset);
           });
-
-      // Construct the continuation
-      IRSlotCombinations combinations =
-          isValue.value().combinations().merge(isValue.notValue().combinations());
-      IRSlotStaticOffset newOffset = offset.advance(combinations, isValue.cont().combinations());
-      putTypeNodeConstruction(nextIndexVar, isValue.cont(), consumer, newOffset);
     } else if (slots.isLeaf()) {
       consumer.accept(nextIndexVar, Integer.toString(TYPE_NODE_INDIRECT), CSize.zero(), "-1");
       putIncrement(nextIndexVar);
@@ -2071,9 +2090,10 @@ public class CGenerator extends IRInstructionVisitor {
   void putAllocExponential(
       String var,
       Function<IRTypeId, CLayout> typeLayouts,
+      Function<IRValueRequisites, CCondition> isValue,
       CProcessLayout layout,
       CSize typeNodeSize) {
-    CSize finalSize = compiler.arch.exponentialSize(layout.size(typeLayouts));
+    CSize finalSize = compiler.arch.exponentialSize(layout.size(typeLayouts, isValue));
     if (!typeNodeSize.equals(CSize.zero())) {
       finalSize = finalSize.align(compiler.arch.typeNodeAlignment()).add(typeNodeSize);
     }
@@ -2103,7 +2123,8 @@ public class CGenerator extends IRInstructionVisitor {
           }
 
           // Call the exponential's manager
-          putStatement(exponentialManager(var) + "(" + exponentialEnv(var) + ", NULL, 1)"); // 1 = Drop
+          putStatement(
+              exponentialManager(var) + "(" + exponentialEnv(var) + ", NULL, 1)"); // 1 = Drop
           putFreeExponential(var);
         });
   }
@@ -2151,9 +2172,10 @@ public class CGenerator extends IRInstructionVisitor {
   void putAllocEnvironment(
       String var,
       Function<IRTypeId, CLayout> typeLayouts,
+      Function<IRValueRequisites, CCondition> isValue,
       CProcessLayout layout,
       CSize typeNodesSize) {
-    CSize finalSize = layout.size(typeLayouts);
+    CSize finalSize = layout.size(typeLayouts, isValue);
     if (!typeNodesSize.equals(CSize.zero())) {
       finalSize = finalSize.align(compiler.arch.typeNodeAlignment()).add(typeNodesSize);
     }
@@ -2192,6 +2214,7 @@ public class CGenerator extends IRInstructionVisitor {
               putDropSlots(
                   drop.getSlots(),
                   id -> typeNode(type(processLayout, var, id)),
+                  id -> typeLayout(processLayout, var, id),
                   reqs -> isValue(processLayout, var, reqs),
                   localData(drop.getLocalDataId(), drop.getOffset()));
 

@@ -2,7 +2,6 @@ package pt.inescid.cllsj.compiler.c;
 
 import java.util.function.BiFunction;
 import java.util.function.Function;
-
 import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
 import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
 import pt.inescid.cllsj.compiler.ir.slot.*;
@@ -24,8 +23,8 @@ public class CLayout {
       CArchitecture arch,
       Function<IRTypeId, CLayout> typeLayoutProvider,
       Function<IRValueRequisites, CCondition> typeIsValue,
-      BiFunction<IRSlotOffset, Integer, CCondition> isTag) {
-    return computeCurrent(tree, arch, typeLayoutProvider, typeIsValue, isTag, IRSlotOffset.ZERO);
+      BiFunction<CSize, Integer, CCondition> isTag) {
+    return computeCurrent(tree, arch, typeLayoutProvider, typeIsValue, isTag, CSize.zero());
   }
 
   private static CLayout computeCurrent(
@@ -33,14 +32,17 @@ public class CLayout {
       CArchitecture arch,
       Function<IRTypeId, CLayout> typeLayoutProvider,
       Function<IRValueRequisites, CCondition> typeIsValue,
-      BiFunction<IRSlotOffset, Integer, CCondition> isTag,
-      IRSlotOffset offset) {
+      BiFunction<CSize, Integer, CCondition> isTag,
+      CSize offset) {
     if (tree.isLeaf()) {
       return CLayout.ZERO;
     } else if (tree.isUnary()) {
       // A unary node contains a single slot and a child tree
       IRSlotTree.Unary unary = (IRSlotTree.Unary) tree;
       IRSlot slot = unary.singleHead().get();
+      CLayout slotLayout = compute(slot, arch, typeLayoutProvider);
+      CAlignment childAlignment =
+          computeMaximum(unary.child(), arch, typeLayoutProvider, typeIsValue).alignment;
       CLayout childLayout =
           computeCurrent(
               unary.child(),
@@ -48,24 +50,24 @@ public class CLayout {
               typeLayoutProvider,
               typeIsValue,
               isTag,
-              offset.advance(slot, unary.child()));
-      CLayout slotLayout = compute(slot, arch, typeLayoutProvider);
-      return new CLayout(
-          slotLayout.size.align(childLayout.alignment).add(childLayout.size),
-          slotLayout.alignment.max(childLayout.alignment));
+              offset.add(slotLayout.size).align(childAlignment));
+      return slotLayout.concat(childLayout);
     } else if (tree.isTag()) {
       // Branch depending on the tag value
       IRSlotTree.Tag tag = (IRSlotTree.Tag) tree;
       CLayout result = CLayout.ZERO;
+      CLayout slotLayout = compute(new IRTagS(), arch, typeLayoutProvider);
       for (int i = 0; i < tag.cases().size(); ++i) {
         IRSlotTree caseTree = tag.cases().get(i);
         CCondition condition = isTag.apply(offset, i);
-        IRSlotOffset caseOffset = offset.advance(new IRTagS(), caseTree);
+        CAlignment caseAlignment =
+            computeMaximum(caseTree, arch, typeLayoutProvider, typeIsValue).alignment;
+        CSize caseOffset = offset.add(slotLayout.size).align(caseAlignment);
         CLayout caseLayout =
             computeCurrent(caseTree, arch, typeLayoutProvider, typeIsValue, isTag, caseOffset);
         result = condition.ternary(caseLayout, result);
       }
-      return result;
+      return slotLayout.concat(result);
     } else if (tree.isIsValue()) {
       // Branch depending on if the value requisites are met or not
       IRSlotTree.IsValue isValue = (IRSlotTree.IsValue) tree;
@@ -92,35 +94,26 @@ public class CLayout {
       // A unary node contains a single slot and a child tree
       IRSlotTree.Unary unary = (IRSlotTree.Unary) tree;
       IRSlot slot = unary.singleHead().get();
-      CLayout childLayout =
-          computeMaximum(
-              unary.child(),
-              arch,
-              typeLayoutProvider,
-              typeIsValue);
+      CLayout childLayout = computeMaximum(unary.child(), arch, typeLayoutProvider, typeIsValue);
       CLayout slotLayout = compute(slot, arch, typeLayoutProvider);
-      return new CLayout(
-          slotLayout.size.align(childLayout.alignment).add(childLayout.size),
-          slotLayout.alignment.max(childLayout.alignment));
+      return slotLayout.concat(childLayout);
     } else if (tree.isTag()) {
       // Branch depending on the tag value
       IRSlotTree.Tag tag = (IRSlotTree.Tag) tree;
       CLayout result = CLayout.ZERO;
       for (int i = 0; i < tag.cases().size(); ++i) {
         IRSlotTree caseTree = tag.cases().get(i);
-        CLayout caseLayout =
-            computeMaximum(caseTree, arch, typeLayoutProvider, typeIsValue);
-        result = new CLayout(
-            result.size.max(caseLayout.size),
-            result.alignment.max(caseLayout.alignment));
+        CLayout caseLayout = computeMaximum(caseTree, arch, typeLayoutProvider, typeIsValue);
+        result =
+            new CLayout(
+                result.size.max(caseLayout.size), result.alignment.max(caseLayout.alignment));
       }
-      return result;
+      return compute(new IRTagS(), arch, typeLayoutProvider).concat(result);
     } else if (tree.isIsValue()) {
       // Branch depending on if the value requisites are met or not
       IRSlotTree.IsValue isValue = (IRSlotTree.IsValue) tree;
       CCondition condition = typeIsValue.apply(isValue.requisites());
-      CLayout valueLayout =
-          computeMaximum(isValue.value(), arch, typeLayoutProvider, typeIsValue);
+      CLayout valueLayout = computeMaximum(isValue.value(), arch, typeLayoutProvider, typeIsValue);
       CLayout notValueLayout =
           computeMaximum(isValue.notValue(), arch, typeLayoutProvider, typeIsValue);
       return condition.ternary(valueLayout, notValueLayout);
@@ -145,7 +138,8 @@ public class CLayout {
   }
 
   // public static CLayout compute(
-  //     IRSlotSequence sequence, CArchitecture arch, Function<IRTypeId, CLayout> typeLayoutProvider) {
+  //     IRSlotSequence sequence, CArchitecture arch, Function<IRTypeId, CLayout>
+  // typeLayoutProvider) {
   //   Visitor visitor = new Visitor(arch, typeLayoutProvider);
   //   for (IRSlot slot : sequence.list().reversed()) {
   //     slot.accept(visitor);
@@ -160,11 +154,9 @@ public class CLayout {
     return visitor.layout;
   }
 
-  private static CLayout concat(CLayout before, CLayout after) {
+  private CLayout concat(CLayout after) {
     return new CLayout(
-      before.size.align(after.alignment).add(after.size),
-      before.alignment.max(after.alignment)
-    );
+        this.size.align(after.alignment).add(after.size), this.alignment.max(after.alignment));
   }
 
   private static class Visitor extends IRSlotVisitor {

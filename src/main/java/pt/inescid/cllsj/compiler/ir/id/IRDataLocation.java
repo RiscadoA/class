@@ -1,11 +1,7 @@
 package pt.inescid.cllsj.compiler.ir.id;
 
 import java.util.Optional;
-import pt.inescid.cllsj.compiler.ir.slot.IRSlot;
-import pt.inescid.cllsj.compiler.ir.slot.IRSlotCombinations;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotOffset;
-import pt.inescid.cllsj.compiler.ir.slot.IRSlotSequence;
-import pt.inescid.cllsj.compiler.ir.slot.IRSlotTree;
 
 public class IRDataLocation {
   private int index;

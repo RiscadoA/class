@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.function.Function;
 import pt.inescid.cllsj.compiler.Compiler;
+import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
 import pt.inescid.cllsj.compiler.ir.id.IRDropId;
 import pt.inescid.cllsj.compiler.ir.id.IRLocalDataId;
 import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
@@ -112,26 +113,35 @@ public class CProcessLayout {
     return sessionOffsets.get(id);
   }
 
-  public CSize dataOffset(Function<IRTypeId, CLayout> typeLayoutProvider, IRLocalDataId id) {
+  public CSize dataOffset(
+      Function<IRTypeId, CLayout> typeLayout,
+      Function<IRValueRequisites, CCondition> isValue,
+      IRLocalDataId id) {
     CSize dataEnd = sessionsEnd;
     for (int i = 0; i < id.getIndex(); ++i) {
       CLayout layout =
-          CLayout.compute(
-              process.getLocalData(new IRLocalDataId(i)), compiler.arch, typeLayoutProvider);
+          CLayout.computeMaximum(
+              process.getLocalData(new IRLocalDataId(i)), compiler.arch, typeLayout, isValue);
       dataEnd = dataEnd.align(layout.alignment);
       dataEnd = dataEnd.add(layout.size);
     }
 
-    CLayout layout = CLayout.compute(process.getLocalData(id), compiler.arch, typeLayoutProvider);
+    CLayout layout =
+        CLayout.computeMaximum(process.getLocalData(id), compiler.arch, typeLayout, isValue);
     return dataEnd.align(layout.alignment);
   }
 
-  public CSize size(Function<IRTypeId, CLayout> typeLayoutProvider) {
+  public CSize size(
+      Function<IRTypeId, CLayout> typeLayoutProvider,
+      Function<IRValueRequisites, CCondition> isValue) {
     CSize dataEnd = sessionsEnd;
     for (int i = 0; i < process.getLocalDataCount(); ++i) {
       CLayout layout =
-          CLayout.compute(
-              process.getLocalData(new IRLocalDataId(i)), compiler.arch, typeLayoutProvider);
+          CLayout.computeMaximum(
+              process.getLocalData(new IRLocalDataId(i)),
+              compiler.arch,
+              typeLayoutProvider,
+              isValue);
       dataEnd = dataEnd.align(layout.alignment);
       dataEnd = dataEnd.add(layout.size);
     }

@@ -1,5 +1,7 @@
 package pt.inescid.cllsj.compiler.c;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 
 public abstract class CAlignment {
@@ -15,15 +17,15 @@ public abstract class CAlignment {
     return new CAlignmentExpression(expr);
   }
 
-  public static CAlignment ternary(String condition, CAlignment then, CAlignment otherwise) {
-    return expression("((" + condition + ") ? (" + then + ") : (" + otherwise + "))");
+  public static CAlignment ternary(CCondition condition, CAlignment then, CAlignment otherwise) {
+    return new CAlignmentTernary(condition, then, otherwise);
   }
 
   public CAlignment max(CAlignment other) {
     return new CAlignmentMax(this, other);
   }
 
-  protected abstract CAlignment simplify(int max);
+  protected abstract CAlignment simplify(int max, Map<CCondition, Boolean> knownConditions);
 
   protected abstract String toExpression();
 
@@ -37,7 +39,7 @@ public abstract class CAlignment {
 
   @Override
   public String toString() {
-    return simplify(0).toExpression();
+    return simplify(0, Map.of()).toExpression();
   }
 
   @Override
@@ -58,7 +60,7 @@ public abstract class CAlignment {
     }
 
     @Override
-    protected CAlignment simplify(int max) {
+    protected CAlignment simplify(int max, Map<CCondition, Boolean> knownConditions) {
       return constant(Math.max(bytes, max));
     }
   }
@@ -76,7 +78,7 @@ public abstract class CAlignment {
     }
 
     @Override
-    protected CAlignment simplify(int max) {
+    protected CAlignment simplify(int max, Map<CCondition, Boolean> knownConditions) {
       if (max <= 1) {
         return this;
       } else if (max >= 8) {
@@ -102,16 +104,55 @@ public abstract class CAlignment {
     }
 
     @Override
-    protected CAlignment simplify(int max) {
-      CAlignment lhs = this.lhs.simplify(max);
-      CAlignment rhs = this.rhs.simplify(0);
+    protected CAlignment simplify(int max, Map<CCondition, Boolean> knownConditions) {
+      CAlignment lhs = this.lhs.simplify(max, knownConditions);
+      CAlignment rhs = this.rhs.simplify(0, knownConditions);
 
       if (lhs instanceof CAlignmentConstant) {
-        return this.rhs.simplify(((CAlignmentConstant) lhs).bytes);
+        return this.rhs.simplify(((CAlignmentConstant) lhs).bytes, knownConditions);
       } else if (rhs instanceof CAlignmentConstant) {
-        return this.lhs.simplify(((CAlignmentConstant) rhs).bytes);
+        return this.lhs.simplify(((CAlignmentConstant) rhs).bytes, knownConditions);
       } else {
         return new CAlignmentMax(lhs, rhs);
+      }
+    }
+  }
+
+  private static class CAlignmentTernary extends CAlignment {
+    private CCondition condition;
+    private CAlignment then;
+    private CAlignment otherwise;
+
+    public CAlignmentTernary(CCondition condition, CAlignment then, CAlignment otherwise) {
+      this.condition = condition;
+      this.then = then;
+      this.otherwise = otherwise;
+    }
+
+    @Override
+    public String toExpression() {
+      return "((" + condition + ") ? (" + then + ") : (" + otherwise + "))";
+    }
+
+    @Override
+    protected CAlignment simplify(int max, Map<CCondition, Boolean> knownConditions) {
+      if (knownConditions.containsKey(condition)) {
+        if (knownConditions.get(condition)) {
+          return then.simplify(max, knownConditions);
+        } else {
+          return otherwise.simplify(max, knownConditions);
+        }
+      }
+
+      Map<CCondition, Boolean> newKnownConditions = new HashMap<>(knownConditions);
+      newKnownConditions.put(condition, true);
+      CAlignment then = this.then.simplify(max, newKnownConditions);
+      newKnownConditions.put(condition, false);
+      CAlignment otherwise = this.otherwise.simplify(max, newKnownConditions);
+      if (then.equals(otherwise)) {
+        return then;
+      } else {
+        return new CAlignmentTernary(condition, then, otherwise);
       }
     }
   }
