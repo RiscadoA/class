@@ -1,12 +1,12 @@
 proc foo<A>(out: state A; a: ~A, p: send A; wait) {
   cut {
-    cell c1(x. fwd x a)
+    cell c1(x. affine x; call a(y); fwd x y)
     |c1: usage ~A|
     share c1 {
       fwd c1 out
       ||
       take c1(x); call p(p1); use x; send p1(x); wait p1;
-      call a(x); put c1(x);
+      put c1(y. affine y; call a(x); fwd x y);
       release c1
     }
   }
