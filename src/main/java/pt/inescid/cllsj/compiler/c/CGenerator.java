@@ -25,7 +25,7 @@ import pt.inescid.cllsj.compiler.ir.slot.IRExponentialS;
 import pt.inescid.cllsj.compiler.ir.slot.IRIntS;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlot;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotCombinations;
-import pt.inescid.cllsj.compiler.ir.slot.IRSlotDynamicOffset;
+import pt.inescid.cllsj.compiler.ir.slot.IRSlotOffset;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotStaticOffset;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotTree;
 import pt.inescid.cllsj.compiler.ir.slot.IRStringS;
@@ -1113,7 +1113,7 @@ public class CGenerator extends IRInstructionVisitor {
     for (IRCallProcess.DataArgument arg : instr.getDataArguments()) {
       // Here we simply copy data from some location in the current environment to
       // a local data section in the new environment
-      IRDataLocation target = IRDataLocation.local(arg.getTargetDataId(), IRSlotDynamicOffset.ZERO);
+      IRDataLocation target = IRDataLocation.local(arg.getTargetDataId(), IRSlotOffset.ZERO);
       putMoveSlots(
           arg.getSlots(),
           arg.isClone(),
@@ -1252,7 +1252,7 @@ public class CGenerator extends IRInstructionVisitor {
     for (IRWriteExponential.DataArgument arg : dataArguments) {
       // Here we simply copy data from some location in the current environment to
       // a local data section in the new environment
-      IRDataLocation target = IRDataLocation.local(arg.getTargetDataId(), IRSlotDynamicOffset.ZERO);
+      IRDataLocation target = IRDataLocation.local(arg.getTargetDataId(), IRSlotOffset.ZERO);
       putMoveSlots(
           arg.getSlots(),
           arg.isClone(),
@@ -1527,10 +1527,10 @@ public class CGenerator extends IRInstructionVisitor {
 
   private CAddress localData(IRLocalDataId localDataId) {
     return localData(
-        this::typeLayout, currentProcessLayout, ENV, localDataId, IRSlotDynamicOffset.ZERO);
+        this::typeLayout, currentProcessLayout, ENV, localDataId, IRSlotOffset.ZERO);
   }
 
-  private CAddress localData(IRLocalDataId localDataId, IRSlotDynamicOffset offset) {
+  private CAddress localData(IRLocalDataId localDataId, IRSlotOffset offset) {
     return localData(this::typeLayout, currentProcessLayout, ENV, localDataId, offset);
   }
 
@@ -1547,16 +1547,16 @@ public class CGenerator extends IRInstructionVisitor {
       CProcessLayout layout,
       String env,
       IRLocalDataId localDataId,
-      IRSlotDynamicOffset offset) {
+      IRSlotOffset offset) {
     return offset(localData(typeLayouts, layout, env, localDataId), offset);
   }
 
   private CAddress remoteData(
-      CProcessLayout layout, String env, IRSessionId sessionId, IRSlotDynamicOffset offset) {
+      CProcessLayout layout, String env, IRSessionId sessionId, IRSlotOffset offset) {
     return offset(sessionContData(accessSession(sessionId)), offset);
   }
 
-  private CAddress cellData(CAddress cell, IRSlotDynamicOffset offset) {
+  private CAddress cellData(CAddress cell, IRSlotOffset offset) {
     CAddress base =
         CAddress.of(cell.deref("char*"), compiler.arch.cellDataOffset(compiler.concurrency.get()));
     return offset(base, offset);
@@ -1697,18 +1697,12 @@ public class CGenerator extends IRInstructionVisitor {
   //   }
   // }
 
-  private CAddress offset(String address, IRSlotDynamicOffset offset) {
+  private CAddress offset(String address, IRSlotOffset offset) {
     return offset(CAddress.of(address), offset);
   }
 
-  private CAddress offset(CAddress address, IRSlotDynamicOffset offset) {
+  private CAddress offset(CAddress address, IRSlotOffset offset) {
     CSize pastSize = layout(offset.getPast().combinations()).size;
-    CAlignment futureAlignment = layout(offset.getFuture()).alignment;
-    return address.offset(pastSize.align(futureAlignment));
-  }
-
-  private CAddress offset(CAddress address, IRSlotStaticOffset offset) {
-    CSize pastSize = layout(offset.getPast()).size;
     CAlignment futureAlignment = layout(offset.getFuture()).alignment;
     return address.offset(pastSize.align(futureAlignment));
   }
@@ -1961,15 +1955,15 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   void putTypeNodeConstruction(String indexVar, IRSlotTree slots, TypeNodeConsumer consumer) {
-    putTypeNodeConstruction(indexVar, slots, consumer, IRSlotStaticOffset.ZERO);
+    putTypeNodeConstruction(indexVar, slots, consumer, IRSlotOffset.ZERO);
   }
 
   private void putTypeNodeConstruction(
-      String nextIndexVar, IRSlotTree slots, TypeNodeConsumer consumer, IRSlotStaticOffset offset) {
+      String nextIndexVar, IRSlotTree slots, TypeNodeConsumer consumer, IRSlotOffset offset) {
     if (slots.isUnary()) {
       IRSlot slot = slots.singleHead().get();
       IRSlotTree future = ((IRSlotTree.Unary) slots).child();
-      IRSlotStaticOffset newOffset = offset.advance(slot, future.combinations());
+      IRSlotOffset newOffset = offset.advance(slot, future);
 
       int type = -1;
       if (slot instanceof IRExponentialS) {
@@ -2143,7 +2137,7 @@ public class CGenerator extends IRInstructionVisitor {
           }
 
           // To drop the cell's contents, we simply drop its affine session
-          String sessionPtr = cellData(cellAddr, IRSlotDynamicOffset.ZERO).deref("struct session*");
+          String sessionPtr = cellData(cellAddr, IRSlotOffset.ZERO).deref("struct session*");
           putDropAffine(accessSession(sessionPtr));
 
           // Now we can free the cell itself

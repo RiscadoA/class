@@ -686,8 +686,7 @@ public class IRGenerator extends ASTNodeVisitor {
     // Advance the main session depending on what we sent
     advanceOrReset(
         ch,
-        IRSlotTree.isValue(
-            reqs, argInfo.activeRemoteTree, IRSlotTree.of(new IRSessionS()), IRSlotTree.LEAF),
+        IRSlotTree.isValue(reqs, argInfo.activeRemoteTree, IRSlotTree.of(new IRSessionS())),
         rhsType,
         true);
 
@@ -743,7 +742,7 @@ public class IRGenerator extends ASTNodeVisitor {
     advanceOrReset(
         ch,
         IRSlotTree.isValue(
-            reqs, info.activeLocalTree, IRSlotTree.of(new IRSessionS()), IRSlotTree.LEAF),
+            reqs, info.activeLocalTree, IRSlotTree.of(new IRSessionS())),
         rhsType,
         false);
 
@@ -832,7 +831,7 @@ public class IRGenerator extends ASTNodeVisitor {
             IREnvironment.Channel captured = env.getChannel(name);
             IRSlotTree valueSlots = captured.getExponentialType();
 
-            expEnv = expEnv.addValue(name, valueSlots.combinations(), Optional.of(valueSlots));
+            expEnv = expEnv.addValue(name, IRSlotCombinations.of(valueSlots), Optional.of(valueSlots));
             expEnv = expEnv.makeChannelExponential(name, valueSlots, true, id -> {});
 
             dataArguments.add(
@@ -921,12 +920,12 @@ public class IRGenerator extends ASTNodeVisitor {
     env =
         env.advanceChannel(
             ch,
-            IRSlotDynamicOffset.of(
-                new IRTypeS(), IRSlotCombinations.of(new IRSessionS(), new IRTagS())));
+            IRSlotOffset.of(
+                new IRTypeS(), IRSlotTree.of(new IRSessionS(), new IRTagS())));
     IRDataLocation sessionLoc = env.getChannel(ch).getRemoteData();
     env =
         env.advanceChannel(
-            ch, IRSlotDynamicOffset.of(new IRSessionS(), IRSlotCombinations.of(new IRTagS())));
+            ch, IRSlotOffset.of(new IRSessionS(), IRSlotTree.of(new IRTagS())));
     IRDataLocation polarityLoc = env.getChannel(ch).getRemoteData();
 
     // Overwrite the previous session with a new session of the new type
@@ -963,12 +962,12 @@ public class IRGenerator extends ASTNodeVisitor {
     env =
         env.advanceChannel(
             ch,
-            IRSlotDynamicOffset.of(
-                new IRTypeS(), IRSlotCombinations.of(new IRSessionS(), new IRTagS())));
+            IRSlotOffset.of(
+                new IRTypeS(), IRSlotTree.of(new IRSessionS(), new IRTagS())));
     IRDataLocation sessionLoc = env.getChannel(ch).getLocalData();
     env =
         env.advanceChannel(
-            ch, IRSlotDynamicOffset.of(new IRSessionS(), IRSlotCombinations.of(new IRTagS())));
+            ch, IRSlotOffset.of(new IRSessionS(), IRSlotTree.of(new IRTagS())));
     IRDataLocation polarityLoc = env.getChannel(ch).getLocalData();
 
     int processGenId = nextProcessGenId++;
@@ -1016,7 +1015,7 @@ public class IRGenerator extends ASTNodeVisitor {
           polyEnv = polyEnv.addArgSession(ch, rhsInfo.localCombinations());
           sessionArguments.add(
               new IRCallProcess.SessionArgument(
-                  sessionLoc, polyEnv.getChannel(ch).getSessionId(), IRSlotDynamicOffset.ZERO));
+                  sessionLoc, polyEnv.getChannel(ch).getSessionId(), IRSlotOffset.ZERO));
 
           // Pass captured sessions and exponentials to the polymorphic process
           // as session and data arguments
@@ -1029,7 +1028,7 @@ public class IRGenerator extends ASTNodeVisitor {
             if (captured.isExponential()) {
               // We captured an exponential channel, we pass it as a data argument
               IRSlotTree valueSlots = captured.getExponentialType();
-              polyEnv = polyEnv.addValue(name, valueSlots.combinations(), Optional.of(valueSlots));
+              polyEnv = polyEnv.addValue(name, IRSlotCombinations.of(valueSlots), Optional.of(valueSlots));
               polyEnv = polyEnv.makeChannelExponential(name, valueSlots, true, id -> {});
               dataArguments.add(
                   new IRCallProcess.DataArgument(
@@ -1182,7 +1181,7 @@ public class IRGenerator extends ASTNodeVisitor {
     // Store it in the cell and finish
     block.add(
         new IRWriteSession(
-            IRDataLocation.cell(channel.getRemoteData(), IRSlotDynamicOffset.ZERO),
+            IRDataLocation.cell(channel.getRemoteData(), IRSlotOffset.ZERO),
             cellSession.getSessionId()));
     block.add(new IRFinishSession(channel.getSessionId(), false));
 
@@ -1193,7 +1192,7 @@ public class IRGenerator extends ASTNodeVisitor {
   void addPut(String ch, String chc, ASTType typeLhs, Runnable contLhs, Runnable contRhs) {
     IREnvironment.Channel channel = env.getChannel(ch);
     IRDataLocation cellDataLoc =
-        IRDataLocation.cell(channel.getLocalData(), IRSlotDynamicOffset.ZERO);
+        IRDataLocation.cell(channel.getLocalData(), IRSlotOffset.ZERO);
 
     // Define new session for the channel being stored
     IRSlotsFromASTType argInfo = slotsFromType(typeLhs);
@@ -1220,7 +1219,7 @@ public class IRGenerator extends ASTNodeVisitor {
   void addTake(String ch, String chc, ASTType typeLhs, Runnable cont) {
     IREnvironment.Channel channel = env.getChannel(ch);
     IRDataLocation cellDataLoc =
-        IRDataLocation.cell(channel.getLocalData(), IRSlotDynamicOffset.ZERO);
+        IRDataLocation.cell(channel.getLocalData(), IRSlotOffset.ZERO);
 
     // Lock the cell while we're accessing it
     if (compiler.concurrency.get()) {
@@ -1298,7 +1297,7 @@ public class IRGenerator extends ASTNodeVisitor {
   }
 
   void advanceOrReset(
-      String ch, IRSlotDynamicOffset offset, ASTType cont, boolean advancePolarity) {
+      String ch, IRSlotOffset offset, ASTType cont, boolean advancePolarity) {
     if (cont instanceof ASTRecT
         || cont instanceof ASTCoRecT
         || isPositive(cont) != advancePolarity) {
@@ -1349,12 +1348,12 @@ public class IRGenerator extends ASTNodeVisitor {
                         new UnsupportedOperationException("Types in expressions must have slots")));
   }
 
-  private IRSlotDynamicOffset offset(IRSlot past, ASTType remainder) {
+  private IRSlotOffset offset(IRSlot past, ASTType remainder) {
     return offset(IRSlotTree.of(past), remainder);
   }
 
-  private IRSlotDynamicOffset offset(IRSlotTree past, ASTType remainder) {
-    return IRSlotDynamicOffset.of(past, slotsFromType(remainder).activeTree().combinations());
+  private IRSlotOffset offset(IRSlotTree past, ASTType remainder) {
+    return IRSlotOffset.of(past, slotsFromType(remainder).activeTree());
   }
 
   IRSlotsFromASTType slotsFromType(ASTType type) {

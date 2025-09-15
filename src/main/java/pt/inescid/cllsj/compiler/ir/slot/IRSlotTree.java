@@ -9,12 +9,12 @@ import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
 public abstract class IRSlotTree {
   public static final IRSlotTree LEAF = new Leaf();
 
-  public static Unary of(IRSlot slot) {
-    return of(slot, LEAF);
-  }
-
   public static Unary of(IRSlot slot, IRSlotTree child) {
     return new Unary(slot, child);
+  }
+
+  public static IRSlotTree of(IRSlot... slots) {
+    return of(IRSlotSequence.of(slots));
   }
 
   public static IRSlotTree of(IRSlotSequence slots) {
@@ -30,15 +30,15 @@ public abstract class IRSlotTree {
   }
 
   public static IRSlotTree isValue(
-      IRValueRequisites requisites, IRSlotTree value, IRSlotTree notValue, IRSlotTree cont) {
-    if (requisites.canBeValue()) {
-      return new IsValue(requisites, value, notValue, cont);
+      IRValueRequisites requisites, IRSlotTree value, IRSlotTree notValue) {
+    if (requisites.mustBeValue()) {
+      return value;
+    } else if (requisites.canBeValue()) {
+      return new IsValue(requisites, value, notValue);
     } else {
       return notValue;
     }
   }
-
-  public abstract IRSlotCombinations combinations();
 
   protected abstract void toStringHelper(StringBuilder sb);
 
@@ -80,11 +80,6 @@ public abstract class IRSlotTree {
 
   public static class Leaf extends IRSlotTree {
     @Override
-    public IRSlotCombinations combinations() {
-      return IRSlotCombinations.EMPTY;
-    }
-
-    @Override
     public Optional<IRSlot> singleHead() {
       return Optional.empty();
     }
@@ -113,11 +108,6 @@ public abstract class IRSlotTree {
 
     public IRSlotTree child() {
       return child;
-    }
-
-    @Override
-    public IRSlotCombinations combinations() {
-      return child.combinations().prefix(slot);
     }
 
     @Override
@@ -160,15 +150,6 @@ public abstract class IRSlotTree {
     }
 
     @Override
-    public IRSlotCombinations combinations() {
-      IRSlotCombinations result = IRSlotCombinations.EMPTY;
-      for (IRSlotTree caseTree : cases) {
-        result = result.merge(caseTree.combinations());
-      }
-      return result.prefix(new IRTagS());
-    }
-
-    @Override
     public Optional<IRSlot> singleHead() {
       return Optional.of(new IRTagS());
     }
@@ -195,14 +176,12 @@ public abstract class IRSlotTree {
     private IRValueRequisites requisites;
     private IRSlotTree value;
     private IRSlotTree notValue;
-    private IRSlotTree cont;
 
     public IsValue(
-        IRValueRequisites requisites, IRSlotTree value, IRSlotTree notValue, IRSlotTree cont) {
+        IRValueRequisites requisites, IRSlotTree value, IRSlotTree notValue) {
       this.requisites = requisites;
       this.value = value;
       this.notValue = notValue;
-      this.cont = cont;
     }
 
     public IRValueRequisites requisites() {
@@ -217,23 +196,11 @@ public abstract class IRSlotTree {
       return notValue;
     }
 
-    public IRSlotTree cont() {
-      return cont;
-    }
-
-    @Override
-    public IRSlotCombinations combinations() {
-      return value.combinations().merge(notValue.combinations()).suffix(cont.combinations());
-    }
-
     @Override
     public Set<IRSlot> head() {
       Set<IRSlot> heads = new HashSet<>();
       heads.addAll(value.head());
       heads.addAll(notValue.head());
-      if (value.isLeaf() || notValue.isLeaf()) {
-        heads.addAll(cont.head());
-      }
       return heads;
     }
 
@@ -244,26 +211,15 @@ public abstract class IRSlotTree {
 
     @Override
     public IRSlotTree suffix(IRSlotTree other) {
-      return new IsValue(requisites, value, notValue, cont.suffix(other));
+      return new IsValue(requisites, value.suffix(other), notValue.suffix(other));
     }
 
     @Override
     protected void toStringHelper(StringBuilder sb) {
-      boolean started = false;
-      if (sb.isEmpty() && !cont.isLeaf()) {
-        sb.append("[");
-        started = true;
-      }
       sb.append("isValue<").append(requisites).append(">[");
       sb.append("yes: ").append(value);
       sb.append(" | no: ").append(notValue);
       sb.append("]");
-      if (!cont.isLeaf()) {
-        sb.append("; ").append(cont);
-      }
-      if (started && !cont.isLeaf()) {
-        sb.append("]");
-      }
     }
   }
 }

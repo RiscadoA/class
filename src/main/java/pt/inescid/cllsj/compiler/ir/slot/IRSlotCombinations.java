@@ -4,108 +4,101 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class IRSlotCombinations {
-  private List<IRSlotSequence> sequences;
+  private List<IRSlotTree> trees;
 
   public static final IRSlotCombinations EMPTY = new IRSlotCombinations(List.of());
 
-  public IRSlotCombinations(List<IRSlotSequence> sequences) {
-    this.sequences = sequences;
+  public IRSlotCombinations(List<IRSlotTree> trees) {
+    this.trees = trees;
   }
 
   public static IRSlotCombinations of(IRSlot slot) {
-    return new IRSlotCombinations(List.of(IRSlotSequence.of(slot)));
+    return new IRSlotCombinations(List.of(IRSlotTree.of(slot)));
   }
 
   public static IRSlotCombinations of(IRSlot... slots) {
-    return new IRSlotCombinations(List.of(IRSlotSequence.of(slots)));
+    return new IRSlotCombinations(List.of(IRSlotTree.of(slots)));
   }
 
-  public static IRSlotCombinations of(IRSlotSequence... sequences) {
-    return new IRSlotCombinations(List.of(sequences));
+  public static IRSlotCombinations of(IRSlotTree... trees) {
+    return new IRSlotCombinations(List.of(trees));
   }
 
-  public List<IRSlotSequence> list() {
-    return sequences;
+  public List<IRSlotTree> list() {
+    return trees;
   }
 
-  public IRSlotSequence get(int index) {
-    return sequences.get(index);
+  public IRSlotTree get(int index) {
+    return trees.get(index);
   }
 
   public int size() {
-    return sequences.size();
+    return trees.size();
   }
 
-  public IRSlotCombinations prefix(IRSlot slot) {
-    if (sequences.isEmpty()) {
-      return of(slot);
-    }
-    return new IRSlotCombinations(sequences.stream().map(seq -> seq.prefix(slot)).toList());
-  }
+  // public IRSlotCombinations prefix(IRSlot slot) {
+  //   if (trees.isEmpty()) {
+  //     return of(slot);
+  //   }
+  //   return new IRSlotCombinations(trees.stream().map(tree -> IRSlotTree.of(slot).suffix(tree)).toList());
+  // }
 
-  public IRSlotCombinations prefix(IRSlotSequence sequence) {
-    if (sequences.isEmpty()) {
-      return of(sequence);
-    }
-    return new IRSlotCombinations(sequences.stream().map(seq -> sequence.prefix(seq)).toList());
-  }
-
-  public IRSlotCombinations prefix(IRSlotCombinations combinations) {
-    if (sequences.isEmpty()) {
-      return combinations;
-    }
-    return new IRSlotCombinations(
-        combinations.sequences.stream()
-            .flatMap(seq1 -> sequences.stream().map(seq2 -> seq1.prefix(seq2)))
-            .toList());
-  }
+  // public IRSlotCombinations prefix(IRSlotCombinations combinations) {
+  //   if (trees.isEmpty()) {
+  //     return combinations;
+  //   }
+  //   return new IRSlotCombinations(
+  //       combinations.trees.stream()
+  //           .flatMap(seq1 -> trees.stream().map(seq2 -> seq1.prefix(seq2)))
+  //           .toList());
+  // }
 
   public IRSlotCombinations suffix(IRSlot slot) {
-    if (sequences.isEmpty()) {
+    if (trees.isEmpty()) {
       return of(slot);
     }
-    return new IRSlotCombinations(sequences.stream().map(seq -> seq.suffix(slot)).toList());
+    return new IRSlotCombinations(trees.stream().map(tree -> tree.suffix(IRSlotTree.of(slot))).toList());
   }
 
   public IRSlotCombinations suffix(IRSlotSequence sequence) {
-    if (sequences.isEmpty()) {
-      return of(sequence);
+    if (trees.isEmpty()) {
+      return of(IRSlotTree.of(sequence));
     }
-    return new IRSlotCombinations(sequences.stream().map(seq -> seq.suffix(sequence)).toList());
+    return new IRSlotCombinations(trees.stream().map(tree -> tree.suffix(IRSlotTree.of(sequence))).toList());
   }
 
   public IRSlotCombinations suffix(IRSlotCombinations combinations) {
-    if (combinations.sequences.isEmpty()) {
+    if (combinations.trees.isEmpty()) {
       return this;
     }
-    if (sequences.isEmpty()) {
+    if (trees.isEmpty()) {
       return combinations;
     }
     return new IRSlotCombinations(
-        combinations.sequences.stream()
-            .flatMap(seq1 -> sequences.stream().map(seq2 -> seq2.suffix(seq1)))
+        combinations.trees.stream()
+            .flatMap(seq1 -> trees.stream().map(seq2 -> seq2.suffix(seq1)))
             .toList());
   }
 
   public IRSlotCombinations merge(IRSlotCombinations other) {
-    List<IRSlotSequence> newSequences = new ArrayList<>(sequences);
-    newSequences.addAll(other.sequences);
-    return new IRSlotCombinations(newSequences);
+    List<IRSlotTree> newTrees = new ArrayList<>(trees);
+    newTrees.addAll(other.trees);
+    return new IRSlotCombinations(newTrees);
   }
 
   public boolean isEmpty() {
-    return sequences.isEmpty() || (sequences.size() == 1 && sequences.get(0).size() == 0);
+    return trees.isEmpty() || (trees.size() == 1 && trees.get(0).isLeaf());
   }
 
   @Override
   public String toString() {
     StringBuilder sb = new StringBuilder();
     sb.append("<");
-    if (!sequences.isEmpty()) {
-      sb.append(sequences.get(0).toString());
+    if (!trees.isEmpty()) {
+      sb.append(trees.get(0).toString());
     }
-    for (int i = 1; i < sequences.size(); i++) {
-      sb.append(" + ").append(sequences.get(i).toString());
+    for (int i = 1; i < trees.size(); i++) {
+      sb.append(" + ").append(trees.get(i).toString());
     }
     sb.append(">");
     return sb.toString();

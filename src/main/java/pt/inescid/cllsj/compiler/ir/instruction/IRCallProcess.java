@@ -9,7 +9,7 @@ import pt.inescid.cllsj.compiler.ir.id.IRLocalDataId;
 import pt.inescid.cllsj.compiler.ir.id.IRProcessId;
 import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
 import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
-import pt.inescid.cllsj.compiler.ir.slot.IRSlotDynamicOffset;
+import pt.inescid.cllsj.compiler.ir.slot.IRSlotOffset;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotTree;
 
 public class IRCallProcess extends IRInstruction {
@@ -83,10 +83,10 @@ public class IRCallProcess extends IRInstruction {
     private IRSessionId targetSessionId;
 
     // How much to offset the session's remote data in the target process
-    private IRSlotDynamicOffset dataOffset;
+    private IRSlotOffset dataOffset;
 
     public SessionArgument(
-        IRSessionId sourceSessionId, IRSessionId targetSessionId, IRSlotDynamicOffset dataOffset) {
+        IRSessionId sourceSessionId, IRSessionId targetSessionId, IRSlotOffset dataOffset) {
       this.sourceSessionLocation = Optional.empty();
       this.sourceSessionId = Optional.of(sourceSessionId);
       this.targetSessionId = targetSessionId;
@@ -96,7 +96,7 @@ public class IRCallProcess extends IRInstruction {
     public SessionArgument(
         IRDataLocation sourceSessionLocation,
         IRSessionId targetSessionId,
-        IRSlotDynamicOffset dataOffset) {
+        IRSlotOffset dataOffset) {
       this.sourceSessionLocation = Optional.of(sourceSessionLocation);
       this.sourceSessionId = Optional.empty();
       this.targetSessionId = targetSessionId;
@@ -119,7 +119,7 @@ public class IRCallProcess extends IRInstruction {
       return targetSessionId;
     }
 
-    public IRSlotDynamicOffset getDataOffset() {
+    public IRSlotOffset getDataOffset() {
       return dataOffset;
     }
 
