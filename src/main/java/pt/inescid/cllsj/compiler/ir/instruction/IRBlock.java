@@ -21,8 +21,16 @@ public class IRBlock {
     instructions.add(instr);
   }
 
+  public void add(int index, IRInstruction instr) {
+    instructions.add(index, instr);
+  }
+
   public IRInstruction get(int index) {
     return instructions.get(index);
+  }
+
+  public void set(int index, IRInstruction instr) {
+    instructions.set(index, instr);
   }
 
   public IRInstruction remove(int index) {
