@@ -874,13 +874,9 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRWriteType instr) {
-    AtomicReference<String> node = new AtomicReference<>(NULL);
-    AtomicReference<String> nodeCount = new AtomicReference<>("0");
-    putIf(isValue(instr.getValueRequisites()), () -> {
+    putAssign(TMP_INT, 0);
+    putIfElse(isValue(instr.getValueRequisites()), () -> {
       // Count how many type nodes we'll need for the type
-      node.set(TMP_PTR1);
-      nodeCount.set(TMP_INT);
-      putAssign(TMP_INT, 0);
       putAddTypeNodeCount(TMP_INT, instr.getSlots());
 
       // Allocate the type nodes and construct them
@@ -890,11 +886,12 @@ public class CGenerator extends IRInstructionVisitor {
         String ref = cast(TMP_PTR1, "struct type_node*") + "[" + index + "]";
         putAssign(ref, typeNodeInitializer(offset, type, next));
       });
+    }, () -> {
+      putAssign(TMP_PTR1, NULL);
     });
 
-
     String ref = data(instr.getLocation()).deref("struct type");
-    putAssign(ref, typeInitializer(node.get(), nodeCount.get(), instr.getSlots(), instr.getValueRequisites()));
+    putAssign(ref, typeInitializer(cast(TMP_PTR1, "struct type_node*"), TMP_INT, instr.getSlots(), instr.getValueRequisites()));
   }
 
   @Override
