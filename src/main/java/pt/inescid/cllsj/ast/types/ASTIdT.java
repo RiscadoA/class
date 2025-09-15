@@ -189,6 +189,10 @@ public class ASTIdT extends ASTType {
 
     // System.out.println("UF iDT id="+s);
 
+    if (e == null) {
+      return this;
+    }
+
     EnvEntry ass;
 
     ass = e.find(s);
