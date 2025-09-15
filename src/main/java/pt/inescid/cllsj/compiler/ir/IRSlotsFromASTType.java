@@ -5,6 +5,7 @@ import java.util.List;
 import pt.inescid.cllsj.ast.ASTTypeVisitor;
 import pt.inescid.cllsj.ast.types.*;
 import pt.inescid.cllsj.compiler.Compiler;
+import pt.inescid.cllsj.compiler.Settings;
 import pt.inescid.cllsj.compiler.ir.slot.*;
 
 // From a given AST type, this visitor generates a IR slot corresponding to the root type,
@@ -200,6 +201,10 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
   @Override
   public void visit(ASTRecvT type) {
     IRValueRequisites reqs = IRValueRequisites.check(compiler, env, type.getlhs(), false);
+    if (!compiler.optimizeSendValue.get()) {
+      reqs = IRValueRequisites.notValue();
+    }
+
     IRSlotsFromASTType lhs = recurse(type.getlhs());
     activeLocalTree =
         IRSlotTree.isValue(reqs, lhs.activeLocalTree, IRSlotTree.of(new IRSessionS()));
@@ -214,6 +219,10 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
   @Override
   public void visit(ASTSendT type) {
     IRValueRequisites reqs = IRValueRequisites.check(compiler, env, type.getlhs(), true);
+    if (!compiler.optimizeSendValue.get()) {
+      reqs = IRValueRequisites.notValue();
+    }
+
     IRSlotsFromASTType lhs = recurse(type.getlhs());
     activeRemoteTree =
         IRSlotTree.isValue(reqs, lhs.activeRemoteTree, IRSlotTree.of(new IRSessionS()));
