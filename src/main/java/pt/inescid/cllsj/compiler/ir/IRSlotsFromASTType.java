@@ -5,7 +5,6 @@ import java.util.List;
 import pt.inescid.cllsj.ast.ASTTypeVisitor;
 import pt.inescid.cllsj.ast.types.*;
 import pt.inescid.cllsj.compiler.Compiler;
-import pt.inescid.cllsj.compiler.Settings;
 import pt.inescid.cllsj.compiler.ir.slot.*;
 
 // From a given AST type, this visitor generates a IR slot corresponding to the root type,

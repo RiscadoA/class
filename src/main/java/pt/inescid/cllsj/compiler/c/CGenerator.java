@@ -6,7 +6,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -715,7 +714,9 @@ public class CGenerator extends IRInstructionVisitor {
                   putIf(
                       source + " != NULL",
                       () -> {
-                        putAssign(target, "(struct type_node*)(exp_env + ((char*)" + source + " - src_env))");
+                        putAssign(
+                            target,
+                            "(struct type_node*)(exp_env + ((char*)" + source + " - src_env))");
                       });
                 }
 
@@ -875,23 +876,35 @@ public class CGenerator extends IRInstructionVisitor {
   @Override
   public void visit(IRWriteType instr) {
     putAssign(TMP_INT, 0);
-    putIfElse(isValue(instr.getValueRequisites()), () -> {
-      // Count how many type nodes we'll need for the type
-      putAddTypeNodeCount(TMP_INT, instr.getSlots());
+    putIfElse(
+        isValue(instr.getValueRequisites()),
+        () -> {
+          // Count how many type nodes we'll need for the type
+          putAddTypeNodeCount(TMP_INT, instr.getSlots());
 
-      // Allocate the type nodes and construct them
-      putAlloc(TMP_PTR1, compiler.arch.typeNodeSize().multiply(CSize.expression(TMP_INT)));
-      putAssign(TMP_INT, 0);
-      putTypeNodeConstruction(TMP_INT, instr.getSlots(), (index, type, offset, next) -> {
-        String ref = cast(TMP_PTR1, "struct type_node*") + "[" + index + "]";
-        putAssign(ref, typeNodeInitializer(offset, type, next));
-      });
-    }, () -> {
-      putAssign(TMP_PTR1, NULL);
-    });
+          // Allocate the type nodes and construct them
+          putAlloc(TMP_PTR1, compiler.arch.typeNodeSize().multiply(CSize.expression(TMP_INT)));
+          putAssign(TMP_INT, 0);
+          putTypeNodeConstruction(
+              TMP_INT,
+              instr.getSlots(),
+              (index, type, offset, next) -> {
+                String ref = cast(TMP_PTR1, "struct type_node*") + "[" + index + "]";
+                putAssign(ref, typeNodeInitializer(offset, type, next));
+              });
+        },
+        () -> {
+          putAssign(TMP_PTR1, NULL);
+        });
 
     String ref = data(instr.getLocation()).deref("struct type");
-    putAssign(ref, typeInitializer(cast(TMP_PTR1, "struct type_node*"), TMP_INT, instr.getSlots(), instr.getValueRequisites()));
+    putAssign(
+        ref,
+        typeInitializer(
+            cast(TMP_PTR1, "struct type_node*"),
+            TMP_INT,
+            instr.getSlots(),
+            instr.getValueRequisites()));
   }
 
   @Override
@@ -921,7 +934,11 @@ public class CGenerator extends IRInstructionVisitor {
   @Override
   public void visit(IRDropValue instr) {
     putDropSlots(
-        instr.getSlots(), id -> typeNode(type(id)), this::typeLayout, this::isValue, data(instr.getLocation()));
+        instr.getSlots(),
+        id -> typeNode(type(id)),
+        this::typeLayout,
+        this::isValue,
+        data(instr.getLocation()));
   }
 
   @Override
@@ -1050,23 +1067,22 @@ public class CGenerator extends IRInstructionVisitor {
       // Start by initializing the type nodes and count, if needed
       boolean canBeValue = arg.isFromLocation() || arg.getSourceIsValue().canBeValue();
       final Optional<String> typeNode =
-          canBeValue
-              ? Optional.of(cast(TMP_PTR2, "struct type_node*"))
-              : Optional.empty();
-      final Optional<String> typeNodeCount =
-          canBeValue ? Optional.of(TMP_INT) : Optional.empty();
+          canBeValue ? Optional.of(cast(TMP_PTR2, "struct type_node*")) : Optional.empty();
+      final Optional<String> typeNodeCount = canBeValue ? Optional.of(TMP_INT) : Optional.empty();
       if (canBeValue) {
         if (arg.isFromLocation()) {
           // Copy them over from the source type, and then free the source type nodes
           String source = data(arg.getSourceLocation()).deref("struct type");
-          putIf(typeNode(source) + " != " + NULL, () -> {
-            putAssign(TMP_INT, typeNodeCount(source));
-            putCopyMemory(
-                CAddress.of(TMP_PTR2),
-                castToAddress(typeNode(source)),
-                compiler.arch.typeNodeSize().multiply(CSize.expression(TMP_INT)));
-            putFree(typeNode(source));
-          });
+          putIf(
+              typeNode(source) + " != " + NULL,
+              () -> {
+                putAssign(TMP_INT, typeNodeCount(source));
+                putCopyMemory(
+                    CAddress.of(TMP_PTR2),
+                    castToAddress(typeNode(source)),
+                    compiler.arch.typeNodeSize().multiply(CSize.expression(TMP_INT)));
+                putFree(typeNode(source));
+              });
         } else {
           // Compute them from the source type tree
           putAssign(TMP_INT, 0);
@@ -1247,8 +1263,7 @@ public class CGenerator extends IRInstructionVisitor {
     putAssign(
         exponentialEntryDataOffset(exponential),
         expProcessLayout.dataOffset(typeLayoutProvider, typeIsValue, new IRLocalDataId(0)));
-    putAssign(
-        exponentialEnvSize(exponential), fullEnvSize);
+    putAssign(exponentialEnvSize(exponential), fullEnvSize);
     putStatement(
         "void "
             + managerName(processId)
@@ -1748,7 +1763,8 @@ public class CGenerator extends IRInstructionVisitor {
 
   private CAddress offset(CAddress address, IRSlotOffset offset) {
     CSize pastSize = currentLayout(address, offset.getPast()).size;
-    CAlignment futureAlignment = maxLayout(this::typeLayout, this::isValue, offset.getFuture()).alignment;
+    CAlignment futureAlignment =
+        maxLayout(this::typeLayout, this::isValue, offset.getFuture()).alignment;
     return address.offset(pastSize.align(futureAlignment));
   }
 
@@ -1763,11 +1779,17 @@ public class CGenerator extends IRInstructionVisitor {
         });
   }
 
-  private CLayout maxLayout(Function<IRTypeId, CLayout> typeLayout, Function<IRValueRequisites, CCondition> isValue, IRSlotTree tree) {
+  private CLayout maxLayout(
+      Function<IRTypeId, CLayout> typeLayout,
+      Function<IRValueRequisites, CCondition> isValue,
+      IRSlotTree tree) {
     return CLayout.computeMaximum(tree, compiler.arch, typeLayout, isValue);
   }
 
-  private CLayout maxLayout(Function<IRTypeId, CLayout> typeLayout, Function<IRValueRequisites, CCondition> isValue, IRSlotCombinations combinations) {
+  private CLayout maxLayout(
+      Function<IRTypeId, CLayout> typeLayout,
+      Function<IRValueRequisites, CCondition> isValue,
+      IRSlotCombinations combinations) {
     return CLayout.computeMaximum(combinations, compiler.arch, typeLayout, isValue);
   }
 
@@ -1818,7 +1840,14 @@ public class CGenerator extends IRInstructionVisitor {
       boolean clone,
       IRDataLocation sourceLocation,
       IRDataLocation targetLocation) {
-    putMoveSlots(slots, clone, typeNode, typeLayout, typeIsValue, data(sourceLocation), data(targetLocation));
+    putMoveSlots(
+        slots,
+        clone,
+        typeNode,
+        typeLayout,
+        typeIsValue,
+        data(sourceLocation),
+        data(targetLocation));
   }
 
   void putMoveSlots(
@@ -1844,7 +1873,8 @@ public class CGenerator extends IRInstructionVisitor {
         });
   }
 
-  void putMoveSlot(Function<IRTypeId, CLayout> typeLayout, CAddress target, CAddress source, IRSlot slot) {
+  void putMoveSlot(
+      Function<IRTypeId, CLayout> typeLayout, CAddress target, CAddress source, IRSlot slot) {
     putCopyMemory(target, source, layout(typeLayout, slot).size);
   }
 
@@ -1861,7 +1891,11 @@ public class CGenerator extends IRInstructionVisitor {
       Function<IRValueRequisites, CCondition> typeIsValue,
       CAddress baseAddress) {
     putSlotTraversal(
-        slots, typeLayout, typeIsValue, (address, slot) -> putDropSlot(typeNode, address, slot), baseAddress);
+        slots,
+        typeLayout,
+        typeIsValue,
+        (address, slot) -> putDropSlot(typeNode, address, slot),
+        baseAddress);
   }
 
   // Drops a slot, e.g., decrementing reference counts if necessary
@@ -1951,10 +1985,12 @@ public class CGenerator extends IRInstructionVisitor {
       putIfElse(
           typeIsValue.apply(isValue.requisites()),
           () -> {
-            putSlotTraversal(isValue.value(), typeLayout, typeIsValue, tagAddresser, atSlot, offset);
+            putSlotTraversal(
+                isValue.value(), typeLayout, typeIsValue, tagAddresser, atSlot, offset);
           },
           () -> {
-            putSlotTraversal(isValue.notValue(), typeLayout, typeIsValue, tagAddresser, atSlot, offset);
+            putSlotTraversal(
+                isValue.notValue(), typeLayout, typeIsValue, tagAddresser, atSlot, offset);
           });
     } else if (!slots.isLeaf()) {
       throw new IllegalArgumentException("Unknown slot tree " + slots);
@@ -2018,7 +2054,10 @@ public class CGenerator extends IRInstructionVisitor {
     if (slots.isUnary()) {
       IRSlot slot = slots.singleHead().get();
       IRSlotTree future = ((IRSlotTree.Unary) slots).child();
-      CSize newOffset = offset.add(layout(this::typeLayout, slot).size).align(maxLayout(this::typeLayout, this::isValue, future).alignment);
+      CSize newOffset =
+          offset
+              .add(layout(this::typeLayout, slot).size)
+              .align(maxLayout(this::typeLayout, this::isValue, future).alignment);
 
       int type = -1;
       if (slot instanceof IRExponentialS) {
@@ -2080,7 +2119,9 @@ public class CGenerator extends IRInstructionVisitor {
 
               IRSlotTree child = tag.cases().get(i - 1);
               CSize newOffset =
-                  offset.add(layout(this::typeLayout, new IRTagS()).size).align(maxLayout(this::typeLayout, this::isValue, child).alignment);
+                  offset
+                      .add(layout(this::typeLayout, new IRTagS()).size)
+                      .align(maxLayout(this::typeLayout, this::isValue, child).alignment);
               putTypeNodeConstruction(nextIndexVar, child, consumer, newOffset);
             }
           });

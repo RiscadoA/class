@@ -4,7 +4,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-
 import pt.inescid.cllsj.compiler.ir.instruction.IRBlock;
 import pt.inescid.cllsj.compiler.ir.instruction.IRInstruction;
 

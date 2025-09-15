@@ -312,7 +312,10 @@ public abstract class CSize {
 
       if (offset instanceof CSizeMax) {
         CSizeMax max = (CSizeMax) offset;
-        return max.lhs.align(alignment).max(max.rhs.align(alignment)).simplify(remainder, knownConditions);
+        return max.lhs
+            .align(alignment)
+            .max(max.rhs.align(alignment))
+            .simplify(remainder, knownConditions);
       }
 
       if (offset instanceof CSizeAlign) {

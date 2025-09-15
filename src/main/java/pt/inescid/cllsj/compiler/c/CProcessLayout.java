@@ -107,7 +107,8 @@ public class CProcessLayout {
   }
 
   public CSize typeOffset(IRTypeId id) {
-    return Optional.ofNullable(typeOffsets.get(id)).orElseThrow(() -> new IllegalArgumentException("No such type: " + id));
+    return Optional.ofNullable(typeOffsets.get(id))
+        .orElseThrow(() -> new IllegalArgumentException("No such type: " + id));
   }
 
   public CSize sessionOffset(IRSessionId id) {

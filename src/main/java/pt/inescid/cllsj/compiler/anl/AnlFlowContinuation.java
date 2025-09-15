@@ -1,7 +1,6 @@
 package pt.inescid.cllsj.compiler.anl;
 
 import java.util.Optional;
-
 import pt.inescid.cllsj.compiler.ir.id.IRCodeLocation;
 import pt.inescid.cllsj.compiler.ir.instruction.IRContinueSession;
 import pt.inescid.cllsj.compiler.ir.instruction.IRFinishSession;

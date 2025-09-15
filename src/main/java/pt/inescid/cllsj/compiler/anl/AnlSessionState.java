@@ -1,7 +1,6 @@
 package pt.inescid.cllsj.compiler.anl;
 
 import java.util.Optional;
-
 import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
 
 public class AnlSessionState {

@@ -13,7 +13,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.BiFunction;
 import java.util.function.Function;
-
 import pt.inescid.cllsj.compiler.anl.AnlFlowContinuation;
 import pt.inescid.cllsj.compiler.anl.AnlFlowLocation;
 import pt.inescid.cllsj.compiler.anl.AnlFlowRecord;
@@ -23,11 +22,6 @@ import pt.inescid.cllsj.compiler.ir.IRProcess;
 import pt.inescid.cllsj.compiler.ir.IRProgram;
 import pt.inescid.cllsj.compiler.ir.IRTypeVisitor;
 import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
-import pt.inescid.cllsj.compiler.ir.flow.OptFlow;
-import pt.inescid.cllsj.compiler.ir.flow.IRFlowContinuation;
-import pt.inescid.cllsj.compiler.ir.flow.IRFlowLocation;
-import pt.inescid.cllsj.compiler.ir.flow.IRFlowRecord;
-import pt.inescid.cllsj.compiler.ir.flow.IRFlowState;
 import pt.inescid.cllsj.compiler.ir.instructions.*;
 import pt.inescid.cllsj.compiler.ir.type.IRBoolT;
 import pt.inescid.cllsj.compiler.ir.type.IRCellT;
@@ -501,7 +495,8 @@ public class Optimizer {
       if (newType instanceof IRCloseT) {
         // We might be able to remove the session entirely
         AtomicReference<Optional<AnlFlowLocation>> newLoc = new AtomicReference<>(Optional.empty());
-        AtomicReference<Optional<AnlFlowLocation>> freeLoc = new AtomicReference<>(Optional.empty());
+        AtomicReference<Optional<AnlFlowLocation>> freeLoc =
+            new AtomicReference<>(Optional.empty());
 
         pushLoc.forEachBefore(
             loc -> {

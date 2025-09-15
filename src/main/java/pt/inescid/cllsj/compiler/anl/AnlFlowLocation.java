@@ -2,7 +2,6 @@ package pt.inescid.cllsj.compiler.anl;
 
 import java.util.Optional;
 import java.util.function.Function;
-
 import pt.inescid.cllsj.compiler.ir.instruction.IRInstruction;
 
 public class AnlFlowLocation {

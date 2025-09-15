@@ -4,7 +4,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-
 import pt.inescid.cllsj.compiler.ir.instruction.IRBlock;
 import pt.inescid.cllsj.compiler.ir.instruction.IRInstructionVisitor;
 

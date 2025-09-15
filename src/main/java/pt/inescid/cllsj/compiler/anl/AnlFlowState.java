@@ -1,14 +1,11 @@
 package pt.inescid.cllsj.compiler.anl;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Stack;
-import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
 import pt.inescid.cllsj.compiler.ir.id.IRCodeLocation;
 import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
-import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
 
 public class AnlFlowState {
   private Map<IRSessionId, AnlSessionState> sessions = new HashMap<>();
@@ -23,7 +20,8 @@ public class AnlFlowState {
     pendingContinuations.push(cont);
   }
 
-  public void pushPendingContinuation(Analyzer analyzer, IRCodeLocation cLocation, AnlFlowLocation fLocation) {
+  public void pushPendingContinuation(
+      Analyzer analyzer, IRCodeLocation cLocation, AnlFlowLocation fLocation) {
     pushPendingContinuation(analyzer, new AnlFlowContinuation(cLocation, fLocation));
   }
 
@@ -67,7 +65,11 @@ public class AnlFlowState {
     StringBuilder sb = new StringBuilder();
 
     for (Map.Entry<IRSessionId, AnlSessionState> entry : sessions.entrySet()) {
-      sb.append("session ").append(entry.getKey()).append(": ").append(entry.getValue()).append("\n");
+      sb.append("session ")
+          .append(entry.getKey())
+          .append(": ")
+          .append(entry.getValue())
+          .append("\n");
     }
 
     if (pendingContinuations.isEmpty()) {
