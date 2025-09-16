@@ -10,12 +10,18 @@ public class AnlLocalDataState {
   // Known slots by their offset
   private Map<Integer, AnlSlot> slots = new TreeMap<>();
 
-  public Stream<AnlSlot> read(IRSlotTree offset, Optional<IRSlotTree> size) {
+  public Stream<AnlSlot> read(IRSlotTree offset, Optional<IRSlotTree> size, boolean move) {
     int start = AnlSlot.count(offset);
     int end = start + size.map(s -> AnlSlot.count(s)).orElse(1);
     return Stream.iterate(start, i -> i + 1)
         .limit(end - start)
-        .map(i -> slots.computeIfAbsent(i, k -> AnlSlot.UNKNOWN));
+        .map(i -> {
+          if (move) {
+            return Optional.ofNullable(slots.remove(i)).orElse(AnlSlot.UNKNOWN);
+          } else {
+            return slots.computeIfAbsent(i, k -> AnlSlot.UNKNOWN);
+          }
+        });
   }
 
   public void write(IRSlotTree offset, Stream<AnlSlot> slots) {
@@ -57,6 +63,9 @@ public class AnlLocalDataState {
     StringBuilder sb = new StringBuilder();
     for (Map.Entry<Integer, AnlSlot> entry : slots.entrySet()) {
       sb.append(entry.getKey()).append("=").append(entry.getValue().toString());
+    }
+    if (sb.length() == 0) {
+      sb.append("empty");
     }
     return sb.toString();
   }

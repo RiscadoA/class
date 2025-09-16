@@ -121,29 +121,27 @@ public class Analyzer extends IRInstructionVisitor {
 
   @Override
   public void visit(IRContinueSession instr) {
-    AnlSessionState session;
-    if (instr.isById()) {
-      session = state.session(instr.getSessionId());
+    AnlSessionState session = state.session(instr.getSessionId());
+    Optional<AnlSessionState> remote = session.remote.map(id -> state.session(id));
+
+    Optional<IRCodeLocation> oldCont = session.cont.map(c -> c.getLocation());
+    session.cont = Optional.empty();
+    AnlFlowContinuation newCont = new AnlFlowContinuation(instr.getContinuation(), flowLoc);
+
+    // If the remote is known, set its continuation to our old continuation
+    if (remote.isPresent()) {
+      remote.get().cont = Optional.of(newCont);
     } else {
-      Optional<AnlSlot.Session> slot = state.read(instr.getSessionLocation()).assumeSession();
-      if (slot.isEmpty()) {
-        // Unknown session
-        visitNextPending();
-        return;
-      }
-      session = state.session(slot.get().id());
+      // Otherwise, push our continuation to the pending stack
+      state.pushPendingContinuation(this, newCont);
     }
 
-    Optional<IRCodeLocation> cont = session.cont.map(c -> c.getLocation());
-    if (cont.isPresent()) {
-      // Certain continuation
-      session.cont = Optional.of(new AnlFlowContinuation(instr.getContinuation(), flowLoc));
-      visit(cont.get(), VisitType.BRANCH);
+    if (oldCont.isPresent()) {
+      // If we had a known continuation, jump to it
+      visit(oldCont.get(), VisitType.BRANCH);
     } else {
-      // Unknown continuation, may write to unknown locations
-      session.cont = Optional.empty();
-      state.handleUnknownWrites(this);
-      visit(instr.getContinuation(), VisitType.DETACHED);
+      // Unknown continuation
+      visitNextPending();
     }
   }
 
@@ -154,6 +152,8 @@ public class Analyzer extends IRInstructionVisitor {
     session.cont = Optional.empty();
     if (session.remote.isPresent()) {
       AnlSessionState remote = state.session(session.remote.get());
+      remote.cont = Optional.empty();
+      remote.data = Optional.empty();
       remote.remote = Optional.empty();
     }
     if (cont.isPresent()) {
@@ -167,7 +167,7 @@ public class Analyzer extends IRInstructionVisitor {
   @Override
   public void visit(IRBindSession instr) {
     AnlSessionState session = state.session(instr.getSessionId());
-    Optional<AnlSlot.Session> slot = state.read(instr.getLocation()).assumeSession();
+    Optional<AnlSlot.Session> slot = state.read(instr.getLocation(), true).assumeSession();
     if (slot.isEmpty()) {
       // We're binding an unknown session
       // The data we bound will be written to by unknown writes
@@ -213,12 +213,12 @@ public class Analyzer extends IRInstructionVisitor {
 
   @Override
   public void visit(IRMoveValue instr) {
-    state.write(this, instr.getLocation(), state.read(instr.getSourceLocation(), instr.getSlots()));
+    state.write(this, instr.getLocation(), state.read(instr.getSourceLocation(), instr.getSlots(), true));
   }
 
   @Override
   public void visit(IRCloneValue instr) {
-    state.write(this, instr.getLocation(), state.read(instr.getSourceLocation(), instr.getSlots()));
+    state.write(this, instr.getLocation(), state.read(instr.getSourceLocation(), instr.getSlots(), false));
   }
 
   @Override
@@ -245,7 +245,7 @@ public class Analyzer extends IRInstructionVisitor {
   public void visit(IRCallProcess instr) {
     for (IRCallProcess.SessionArgument arg : instr.getSessionArguments()) {
       if (arg.isFromLocation()) {
-        state.read(arg.getSourceSessionLocation()).markAsUnknown(this, state);
+        state.read(arg.getSourceSessionLocation(), true).markAsUnknown(this, state);
       } else {
         state.session(arg.getSourceSessionId()).markAsUnknown(this, state);
       }
@@ -272,42 +272,31 @@ public class Analyzer extends IRInstructionVisitor {
   public void visit(IRForwardSessions instr) {
     AnlSessionState neg = state.session(instr.getNegId());
     AnlSessionState pos = state.session(instr.getPosId());
+    AnlSessionState oldNeg = neg.clone();
+    AnlSessionState oldPos = pos.clone();
 
-    Optional<IRSessionId> negRemoteId = neg.remote;
-    Optional<IRSessionId> posRemoteId = pos.remote;
-
-    Optional<AnlFlowContinuation> negCont = neg.cont;
-    Optional<IRDataLocation> negData = neg.data;
-    Optional<AnlSessionState> negRemote = negRemoteId.map(id -> state.session(id));
-
-    Optional<AnlFlowContinuation> posCont = pos.cont;
-    Optional<IRDataLocation> posData = pos.data;
-    Optional<AnlSessionState> posRemote = posRemoteId.map(id -> state.session(id));
+    Optional<AnlSessionState> negRemote = oldNeg.remote.map(id -> state.session(id));
+    Optional<AnlSessionState> posRemote = oldPos.remote.map(id -> state.session(id));
 
     if (negRemote.isPresent()) {
-      negRemote.get().cont = posCont;
-      negRemote.get().data = posData;
-      negRemote.get().remote = posRemoteId;
+      negRemote.get().cont = oldPos.cont;
+      negRemote.get().data = oldPos.data;
+      negRemote.get().remote = oldPos.remote;
     } else {
-      pos.markAsUnknown(this, state);
+      oldPos.markAsUnknown(this, state);
     }
 
     if (posRemote.isPresent()) {
-      posRemote.get().cont = negCont;
-      posRemote.get().data = negData;
-      posRemote.get().remote = negRemoteId;
+      posRemote.get().cont = oldNeg.cont;
+      posRemote.get().data = oldNeg.data;
+      posRemote.get().remote = oldNeg.remote;
     } else {
-      neg.markAsUnknown(this, state);
+      oldNeg.markAsUnknown(this, state);
     }
 
-    neg.cont = Optional.empty();
-    neg.remote = Optional.empty();
-    pos.cont = Optional.empty();
-    pos.remote = Optional.empty();
-
     if (instr.shouldJump()) {
-      if (posCont.isPresent()) {
-        visit(posCont.get().getLocation(), VisitType.BRANCH);
+      if (oldPos.cont.isPresent()) {
+        visit(oldPos.cont.get().getLocation(), VisitType.BRANCH);
       } else {
         visitNextPending();
       }
@@ -316,7 +305,7 @@ public class Analyzer extends IRInstructionVisitor {
 
   @Override
   public void visit(IRBranchTag instr) {
-    Optional<AnlSlot.Tag> slot = state.read(instr.getLocation()).assumeTag();
+    Optional<AnlSlot.Tag> slot = state.read(instr.getLocation(), false).assumeTag();
     if (slot.isPresent()) {
       visit(instr.getCases().get(slot.get().tag()).getLocation(), VisitType.BRANCH);
     } else {

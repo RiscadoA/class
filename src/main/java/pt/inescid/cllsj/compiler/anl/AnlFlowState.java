@@ -33,22 +33,22 @@ public class AnlFlowState {
     return localData.computeIfAbsent(id, k -> new AnlLocalDataState());
   }
 
-  public AnlSlot read(IRDataLocation location) {
-    return read(location, Optional.empty()).findFirst().orElse(AnlSlot.UNKNOWN);
+  public AnlSlot read(IRDataLocation location, boolean move) {
+    return read(location, Optional.empty(), move).findFirst().orElse(AnlSlot.UNKNOWN);
   }
 
-  public Stream<AnlSlot> read(IRDataLocation location, IRSlotTree size) {
-    return read(location, Optional.of(size));
+  public Stream<AnlSlot> read(IRDataLocation location, IRSlotTree size, boolean move) {
+    return read(location, Optional.of(size), move);
   }
 
-  public Stream<AnlSlot> read(IRDataLocation location, Optional<IRSlotTree> size) {
+  public Stream<AnlSlot> read(IRDataLocation location, Optional<IRSlotTree> size, boolean move) {
     if (location.isLocal()) {
-      return localData(location.getLocalDataId()).read(location.getOffset().getPast(), size);
+      return localData(location.getLocalDataId()).read(location.getOffset().getPast(), size, move);
     } else if (location.isRemote()) {
       AnlSessionState session = session(location.getSessionId());
       if (session.data.isPresent()) {
         // We're reading from a known location
-        return read(session.data.get().advance(location.getOffset()), size);
+        return read(session.data.get().advance(location.getOffset()), size, move);
       }
     }
 

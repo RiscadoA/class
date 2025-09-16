@@ -28,6 +28,10 @@ public class IRInitializeSession extends IRInstruction {
     return continuation;
   }
 
+  public void setContinuation(Optional<IRCodeLocation> continuation) {
+    this.continuation = continuation;
+  }
+
   public IRDataLocation getContinuationData() {
     return continuationData;
   }

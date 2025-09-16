@@ -42,11 +42,6 @@ public class AnlFlowContinuation {
     IRInstruction instruction = writer.getInstruction();
     if (instruction instanceof IRContinueSession) {
       IRContinueSession cont = (IRContinueSession) instruction;
-      if (!cont.isById()) {
-        throw new IllegalArgumentException(
-            "Cannot replace continuation for instruction " + instruction + " at " + this);
-      }
-
       if (location.isEmpty()) {
         writer.replaceInstruction(new IRFinishSession(cont.getSessionId(), false));
       } else {
@@ -54,11 +49,7 @@ public class AnlFlowContinuation {
       }
     } else if (instruction instanceof IRInitializeSession) {
       IRInitializeSession init = (IRInitializeSession) instruction;
-      if (location.isEmpty()) {
-        init.removeContinuation();
-      } else {
-        init.replaceCodeLocations(r -> location.get());
-      }
+      init.setContinuation(location);
     } else {
       throw new IllegalArgumentException(
           "Cannot replace continuation for instruction " + instruction + " at " + this);

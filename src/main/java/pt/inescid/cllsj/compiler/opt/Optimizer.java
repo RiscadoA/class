@@ -129,15 +129,10 @@ public class Optimizer {
       // We need to look for the last time this session's continuation was set and
       // change it to the label stored in this continue.
       IRContinueSession i = (IRContinueSession) last;
-      IRSessionId id;
-      if (i.isById()) {
-        id = i.getSessionId();
-      } else {
-        id = prev.getStates().getLast().read(i.getSessionLocation()).assumeSession().get().id();
-      }
-
+      IRSessionId id = i.getSessionId();
+      Optional<IRSessionId> remote = prev.getStates().getLast().session(id).remote;
       AnlFlowContinuation contBefore = prev.getStates().getLast().session(id).cont.get();
-      AnlFlowContinuation contAfter = next.getStates().getFirst().session(id).cont.get();
+      AnlFlowContinuation contAfter = next.getStates().getFirst().session(remote.orElseThrow()).cont.get();
 
       contBefore.replaceWritten(Optional.of(i.getContinuation()));
       contAfter.setOverride(contBefore);
