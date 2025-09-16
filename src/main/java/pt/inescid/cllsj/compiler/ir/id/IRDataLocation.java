@@ -3,6 +3,7 @@ package pt.inescid.cllsj.compiler.ir.id;
 import java.util.Optional;
 import java.util.function.Function;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotOffset;
+import pt.inescid.cllsj.compiler.ir.slot.IRSlotTree;
 
 public class IRDataLocation {
   private int index;
@@ -94,6 +95,10 @@ public class IRDataLocation {
     } else {
       return this;
     }
+  }
+
+  public IRDataLocation replaceSlots(Function<IRSlotTree, IRSlotTree> replacer) {
+    return new IRDataLocation(index, remote, cell, offset.replaceSlots(replacer));
   }
 
   @Override

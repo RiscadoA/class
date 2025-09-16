@@ -1,6 +1,7 @@
 package pt.inescid.cllsj.compiler.ir.instruction;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -93,6 +94,10 @@ public class IRProcess {
     return sessionCount;
   }
 
+  public Collection<IRSessionId> sessions() {
+    return Stream.iterate(0, i -> i + 1).limit(sessionCount).map(IRSessionId::new).toList();
+  }
+
   public IRSessionId addSession() {
     return new IRSessionId(sessionCount++);
   }
@@ -126,6 +131,15 @@ public class IRProcess {
     return Optional.ofNullable(argSessionLocalDataId.get(sessionId));
   }
 
+  public Optional<IRSessionId> getArgLocalDataSessionId(IRLocalDataId localDataId) {
+    for (Map.Entry<IRSessionId, IRLocalDataId> entry : argSessionLocalDataId.entrySet()) {
+      if (entry.getValue().equals(localDataId)) {
+        return Optional.of(entry.getKey());
+      }
+    }
+    return Optional.empty();
+  }
+
   public void replaceSessionsOnHeader(Function<IRSessionId, IRSessionId> replacer) {
     Map<IRSessionId, IRLocalDataId> newArgSessionLocalDataId = new HashMap<>();
     for (Map.Entry<IRSessionId, IRLocalDataId> entry : argSessionLocalDataId.entrySet()) {
@@ -140,6 +154,10 @@ public class IRProcess {
 
   public IRSlotCombinations getLocalData(IRLocalDataId id) {
     return localData.get(id.getIndex());
+  }
+
+  public Collection<IRLocalDataId> localData() {
+    return Stream.iterate(0, i -> i + 1).limit(localData.size()).map(IRLocalDataId::new).toList();
   }
 
   public IRLocalDataId addLocalData(IRSlotCombinations combinations) {
@@ -196,11 +214,19 @@ public class IRProcess {
     return blocks.stream().filter(b -> b.getLocation().equals(location)).findFirst().get();
   }
 
+  public IRBlock getBlock(int index) {
+    return blocks.get(index);
+  }
+
+  public int getBlockCount() {
+    return blocks.size();
+  }
+
   public Stream<IRBlock> streamBlocks() {
     return blocks.stream();
   }
 
-  public Stream<IRInstruction> getInstructions() {
+  public Stream<IRInstruction> streamInstructions() {
     return streamBlocks().flatMap(b -> b.stream());
   }
 
@@ -259,5 +285,16 @@ public class IRProcess {
     }
 
     return b.toString();
+  }
+
+  public boolean isRecursive() {
+    for (IRBlock block : blocks) {
+      for (IRInstruction instr : block.stream().toList()) {
+        if (instr.usesProcess(id)) {
+          return true;
+        }
+      }
+    }
+    return false;
   }
 }

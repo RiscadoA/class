@@ -43,4 +43,10 @@ public class IRCloneValue extends IRWrite {
     super.replaceDataLocations(replacer);
     sourceLocation = replacer.apply(sourceLocation);
   }
+
+  @Override
+  public void replaceSlots(Function<IRSlotTree, IRSlotTree> replacer) {
+    super.replaceSlots(replacer);
+    slots = replacer.apply(slots);
+  }
 }

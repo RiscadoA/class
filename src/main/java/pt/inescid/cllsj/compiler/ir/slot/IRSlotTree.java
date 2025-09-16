@@ -4,7 +4,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.Function;
+
 import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
+import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
 
 public abstract class IRSlotTree {
   public static final IRSlotTree LEAF = new Leaf();
@@ -41,6 +44,8 @@ public abstract class IRSlotTree {
   }
 
   protected abstract void toStringHelper(StringBuilder sb);
+
+  public abstract IRSlotTree replaceType(Function<IRTypeId, IRSlotTree> slotReplacer, Function<IRTypeId, IRValueRequisites> reqReplacer);
 
   @Override
   public String toString() {
@@ -100,6 +105,13 @@ public abstract class IRSlotTree {
     }
 
     @Override
+    public IRSlotTree replaceType(
+        Function<IRTypeId, IRSlotTree> slotReplacer,
+        Function<IRTypeId, IRValueRequisites> reqReplacer) {
+      return this;
+    }
+
+    @Override
     protected void toStringHelper(StringBuilder sb) {
       if (sb.isEmpty()) {
         sb.append("[]");
@@ -128,6 +140,18 @@ public abstract class IRSlotTree {
     @Override
     public IRSlotTree suffix(IRSlotTree other) {
       return new Unary(slot, child.suffix(other));
+    }
+
+    @Override
+    public IRSlotTree replaceType(Function<IRTypeId, IRSlotTree> slotReplacer,
+        Function<IRTypeId, IRValueRequisites> reqReplacer) {
+      if (!(slot instanceof IRVarS)) {
+        return new Unary(slot, child.replaceType(slotReplacer, reqReplacer));
+      } else {
+        IRVarS var = (IRVarS) slot;
+        IRSlotTree replacement = slotReplacer.apply(var.getTypeId());
+        return replacement.suffix(child.replaceType(slotReplacer, reqReplacer));
+      }
     }
 
     @Override
@@ -167,6 +191,12 @@ public abstract class IRSlotTree {
     @Override
     public IRSlotTree suffix(IRSlotTree other) {
       return new Tag(cases.stream().map(c -> c.suffix(other)).toList());
+    }
+
+    @Override
+    public IRSlotTree replaceType(Function<IRTypeId, IRSlotTree> slotReplacer,
+        Function<IRTypeId, IRValueRequisites> reqReplacer) {
+      return new Tag(cases.stream().map(c -> c.replaceType(slotReplacer, reqReplacer)).toList());
     }
 
     @Override
@@ -221,6 +251,15 @@ public abstract class IRSlotTree {
     @Override
     public IRSlotTree suffix(IRSlotTree other) {
       return new IsValue(requisites, value.suffix(other), notValue.suffix(other));
+    }
+
+    @Override
+    public IRSlotTree replaceType(Function<IRTypeId, IRSlotTree> slotReplacer,
+        Function<IRTypeId, IRValueRequisites> reqReplacer) {
+      return new IsValue(
+          requisites.expandTypes(reqReplacer),
+          value.replaceType(slotReplacer, reqReplacer),
+          notValue.replaceType(slotReplacer, reqReplacer));
     }
 
     @Override

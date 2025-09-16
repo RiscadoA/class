@@ -129,6 +129,14 @@ public class IRWriteExponential extends IRWrite {
   }
 
   @Override
+  public void replaceSlots(Function<IRSlotTree, IRSlotTree> replacer) {
+    super.replaceSlots(replacer);
+    for (DataArgument arg : dataArguments) {
+      arg.slots = replacer.apply(arg.slots);
+    }
+  }
+
+  @Override
   public void replaceDataLocations(Function<IRDataLocation, IRDataLocation> replacer) {
     super.replaceDataLocations(replacer);
     for (DataArgument arg : dataArguments) {

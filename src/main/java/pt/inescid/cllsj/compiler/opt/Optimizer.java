@@ -1,29 +1,26 @@
 package pt.inescid.cllsj.compiler.opt;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
+import java.util.function.BiFunction;
+import java.util.function.Function;
+
 import pt.inescid.cllsj.compiler.anl.AnlFlow;
 import pt.inescid.cllsj.compiler.anl.AnlFlowContinuation;
-import pt.inescid.cllsj.compiler.ir.id.IRCodeLocation;
-import pt.inescid.cllsj.compiler.ir.id.IRLocalDataId;
-import pt.inescid.cllsj.compiler.ir.id.IRProcessId;
-import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
-import pt.inescid.cllsj.compiler.ir.instruction.IRBlock;
-import pt.inescid.cllsj.compiler.ir.instruction.IRBranch;
-import pt.inescid.cllsj.compiler.ir.instruction.IRCallProcess;
-import pt.inescid.cllsj.compiler.ir.instruction.IRContinueSession;
-import pt.inescid.cllsj.compiler.ir.instruction.IRFinishSession;
-import pt.inescid.cllsj.compiler.ir.instruction.IRForwardSessions;
-import pt.inescid.cllsj.compiler.ir.instruction.IRInstruction;
-import pt.inescid.cllsj.compiler.ir.instruction.IRJump;
-import pt.inescid.cllsj.compiler.ir.instruction.IRPopTask;
-import pt.inescid.cllsj.compiler.ir.instruction.IRProcess;
-import pt.inescid.cllsj.compiler.ir.instruction.IRProgram;
+import pt.inescid.cllsj.compiler.ir.IRUsesTypeVar;
+import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
+import pt.inescid.cllsj.compiler.ir.id.*;
+import pt.inescid.cllsj.compiler.ir.instruction.*;
+import pt.inescid.cllsj.compiler.ir.slot.IRSlotCombinations;
+import pt.inescid.cllsj.compiler.ir.slot.IRSlotOffset;
+import pt.inescid.cllsj.compiler.ir.slot.IRSlotTree;
 
 public class Optimizer {
   private Map<IRProcessId, Map<IRBlock, AnlFlow>> processFlows = new HashMap<>();
@@ -832,308 +829,235 @@ public class Optimizer {
   //   }
   // }
 
-  // public void inlineProcesses(IRProgram ir, int maxComplexity, boolean allowLoops) {
-  //   Map<String, Integer> evaluated = new HashMap<>();
-  //   Set<String> visited = new HashSet<>();
-  //   ir.forEachProcess(
-  //       (name, proc) -> inlineProcesses(ir, maxComplexity, name, allowLoops, evaluated,
-  // visited));
-  // }
+  public void inlineProcesses(IRProgram ir, int blockThreshold, boolean allowLoops) {
+    if (blockThreshold <= 0) {
+      return;
+    }
 
-  // private void inlineProcesses(
-  //     IRProgram ir,
-  //     int maxComplexity,
-  //     String name,
-  //     boolean allowLoops,
-  //     Map<String, Integer> evaluated,
-  //     Set<String> visited) {
-  //   if (!visited.add(name)) {
-  //     return;
-  //   }
-  //   IRProcess proc = ir.getProcesses().get(name);
+    Set<IRProcessId> visited = new HashSet<>();
+    ir.stream().forEach(p -> inlineProcesses(ir, blockThreshold, p.getId(), allowLoops, visited));
+  }
 
-  //   // Search for process calls which we can inline
-  //   for (int i = 0, end = proc.getBlocksIncludingEntry().size(); i < end; ++i) {
-  //     IRBlock block = proc.getBlocksIncludingEntry().get(i);
-  //     IRInstruction instr = block.getInstructions().getLast();
-  //     if (!(instr instanceof IRCallProcess)) {
-  //       continue; // Not a process call
-  //     }
+  private void inlineProcesses(
+      IRProgram ir,
+      int blockThreshold,
+      IRProcessId procId,
+      boolean allowLoops,
+      Set<IRProcessId> visited) {
+    if (!visited.add(procId)) {
+      return;
+    }
+    IRProcess proc = ir.get(procId);
 
-  //     // First visit the process we'll inline
-  //     IRCallProcess call = (IRCallProcess) instr;
-  //     String callName = call.getProcessName();
-  //     inlineProcesses(ir, maxComplexity, callName, allowLoops, evaluated, visited);
-  //     IRProcess callProc = ir.getProcesses().get(callName);
-  //     if (!callProc.isInlineable() || (!allowLoops && callProc.isRecursive())) {
-  //       continue;
-  //     }
+    // Search for process calls which we can inline
+    for (int i = 0, end = proc.getBlockCount(); i < end; ++i) {
+      IRBlock block = proc.getBlock(i);
+      IRInstruction instr = block.last();
+      if (!(instr instanceof IRCallProcess)) {
+        continue; // Not a process call
+      }
 
-  //     if (callName.equals(name)) {
-  //       continue; // We can't inline a process into itself
-  //     }
+      // First visit the process we'll inline
+      IRCallProcess call = (IRCallProcess) instr;
+      IRProcessId callId = call.getProcessId();
+      inlineProcesses(ir, blockThreshold, callId, allowLoops, visited);
+      IRProcess callProc = ir.get(callId);
+      if (!allowLoops && callProc.isRecursive()) {
+        continue;
+      }
+      if (callId.equals(procId)) {
+        continue; // We can't inline a process into itself
+      }
+      if (callProc.getBlockCount() > blockThreshold) {
+        continue; // Skip, too complex
+      }
+      // Inlined processes must not have type variables dependent on data
+      boolean skip = false;
+      for (IRCallProcess.TypeArgument arg : call.getTypeArguments()) {
+        if (arg.isFromLocation()) {
+          skip = true;
+          break;
+        }
+      }
+      if (skip) {
+        continue;
+      }
 
-  //     // If the process is recursive, we need to check if we can turn it into a loop
-  //     if (callProc.isRecursive()) {
-  //       // It must have a single end point - otherwise, tail calls are not guaranteed
-  //       if (callProc.getEndPoints() != 1) {
-  //         continue;
-  //       }
+      // If the process is recursive, we need to check if we can turn it into a loop
+      if (callProc.isRecursive()) {
+        // It must have a single end point - otherwise, tail calls are not guaranteed
+        if (callProc.getEndPoints() != 1) {
+          continue;
+        }
 
-  //       // All recursive calls must be end points, and thus, be tail calls
-  //       boolean valid = true;
-  //       for (IRInstruction innerInstr : callProc.getInstructions()) {
-  //         if (innerInstr instanceof IRCallProcess) {
-  //           IRCallProcess innerCall = (IRCallProcess) innerInstr;
-  //           if (innerCall.getProcessName().equals(callName) && !innerCall.isEndPoint()) {
-  //             valid = false;
-  //             break;
-  //           }
+        // All recursive calls must be end points, and thus, be tail calls
+        boolean valid = true;
+        for (IRInstruction innerInstr : callProc.streamInstructions().toList()) {
+          if (innerInstr instanceof IRCallProcess) {
+            IRCallProcess innerCall = (IRCallProcess) innerInstr;
+            if (innerCall.getProcessId().equals(callId) && !innerCall.isEndPoint()) {
+              valid = false;
+              break;
+            }
 
-  //           // We must also be able to turn the call into a loop
-  //           if (!IRCallLoop.canGetFromCallProcess(innerCall)) {
-  //             valid = false;
-  //             break;
-  //           }
-  //         }
-  //       }
-  //       if (!valid) {
-  //         continue;
-  //       }
-  //     }
+            // We must also be able to turn the call into a loop
+            throw new UnsupportedOperationException("TODO: implement IRCallLoop");
+            // if (!IRCallLoop.canGetFromCallProcess(innerCall)) {
+            //   valid = false;
+            //   break;
+            // }
+          }
+        }
+        if (!valid) {
+          continue;
+        }
+      }
 
-  //     int complexity = evaluated.computeIfAbsent(callName, k -> complexity(callProc));
-  //     if (complexity > maxComplexity) {
-  //       continue; // Skip too complex
-  //     }
+      // Remove the call instruction
+      block.remove(block.size() - 1);
 
-  //     // Remove the call instruction
-  //     block.getInstructions().removeLast();
+      // Functions for substituting type variables
+      Function<IRTypeId, IRSlotTree> slotReplacer = id -> {
+        for (IRCallProcess.TypeArgument arg : call.getTypeArguments()) {
+          if (arg.getTargetType().equals(id)) {
+            return arg.getSourceTree();
+          }
+        }
+        throw new IllegalStateException("Unbound type variable: " + id);
+      };
+      Function<IRTypeId, IRValueRequisites> reqReplacer = id -> {
+        for (IRCallProcess.TypeArgument arg : call.getTypeArguments()) {
+          if (arg.getTargetType().equals(id)) {
+            return arg.getSourceIsValue();
+          }
+        }
+        throw new IllegalStateException("Unbound type variable: " + id);
+      };
 
-  //     // Add new type variables to the current process
-  //     Map<Integer, Integer> typeMap = new HashMap<>();
-  //     for (int j = call.getTypeArguments().size(); j < callProc.getTypeVariableCount(); ++j) {
-  //       typeMap.put(j, proc.addType(callProc.isTypeVariablePositive(j)));
-  //     }
+      // Start by adding the called processes' local data to the current process
+      // We must add move instructions to copy the data from the caller to callee
+      Map<IRLocalDataId, IRLocalDataId> localDataMap = new HashMap<>();
+      for (IRLocalDataId id : callProc.localData()) {
+        IRSlotCombinations combinations = callProc.getLocalData(id).replaceType(slotReplacer, reqReplacer);
+        localDataMap.put(id, proc.addLocalData(combinations));
+      }
+      for (IRCallProcess.DataArgument arg : call.getDataArguments()) {
+        // We need to add move instructions to copy the data from the caller to callee
+        IRLocalDataId targetId = localDataMap.get(arg.getTargetDataId());
+        if (arg.isClone()) {
+          block.add(new IRCloneValue(IRDataLocation.local(targetId, IRSlotOffset.ZERO), arg.getSourceLocation(), arg.getSlots()));
+        } else {
+          block.add(new IRMoveValue(IRDataLocation.local(targetId, IRSlotOffset.ZERO), arg.getSourceLocation(), arg.getSlots()));
+        }
+      }
 
-  //     // Functions which perform variable substitution on the types of the called process.
-  //     BiFunction<Integer, IRValueRequisites, IRValueRequisites> substituteValueReqs =
-  //         (offset, reqs) -> {
-  //           if (reqs.mustBeValue() || !reqs.canBeValue()) {
-  //             return reqs;
-  //           }
+      // Add the called processes' sessions to the current process
+      // We must add bind instructions to link the sessions from caller to callee
+      Map<IRSessionId, IRSessionId> sessionMap = new HashMap<>();
+      for (IRCallProcess.SessionArgument arg : call.getSessionArguments()) {
+        IRSessionId newId = proc.addSession();
+        sessionMap.put(arg.getTargetSessionId(), newId);
+        IRLocalDataId dataId = callProc.getArgSessionLocalDataId(arg.getTargetSessionId()).get();
+        dataId = localDataMap.get(dataId);
+        block.add(new IRBindSession(newId, arg.getSourceSessionId(), arg.getDataOffset(), IRDataLocation.local(dataId, IRSlotOffset.ZERO)));
+      }
+      for (IRSessionId id : callProc.sessions()) {
+        if (sessionMap.containsKey(id)) {
+          continue; // Already handled above
+        }
+        sessionMap.put(id, proc.addSession());
+      }
 
-  //           Map<Integer, Boolean> reqPolarities = new HashMap<>();
-  //           List<Integer> reqValues = new ArrayList<>();
+      // Add the drop on end markers
+      for (IRProcess.DropOnEnd drop : callProc.getDropOnEnd()) {
+        IRDropId dId = proc.addDropOnEnd(localDataMap.get(drop.getLocalDataId()), drop.getOffset().replaceSlots(t -> t.replaceType(slotReplacer, reqReplacer)), drop.getSlots().replaceType(slotReplacer, reqReplacer), false);
+        if (drop.isAlways()) {
+          block.add(new IRDeferDrop(dId));
+        }
+      }
 
-  //           for (int t : reqs.getRequiredTypePolarities().keySet()) {
-  //             boolean p = reqs.getRequiredTypePolarities().get(t);
-  //             if (t < offset) {
-  //               reqPolarities.put(t, p);
-  //               continue;
-  //             }
-  //             t -= offset;
+      // Identify the block we'll be adding the inlined process' entry instructions
+      // If the process is recursive (and thus, a loop), we need to create a new block
+      IRBlock entryBlock;
+      if (callProc.isRecursive()) {
+        entryBlock = proc.createBlock(call.getProcessId().toString());
+        throw new UnsupportedOperationException("TODO: implement IRCallLoop");
+        // block.add(
+        //     IRCallLoop.fromCallProcess(
+        //             entryBlock.getLabel(), call, recordMap::get, exponentialMap::get)
+        //         .get());
+      } else {
+        entryBlock = block;
+      }
 
-  //             boolean found = false;
-  //             for (IRCallProcess.TypeArgument arg : call.getTypeArguments()) {
-  //               if (arg.getTargetType() == t) {
-  //                 if (arg.getSourceTypePolarity() == p) {
-  //                   found = true;
-  //                   break;
-  //                 } else {
-  //                   return IRValueRequisites.notValue();
-  //                 }
-  //               }
-  //             }
-  //             if (!found) {
-  //               if (!typeMap.containsKey(t)) {
-  //                 throw new IllegalStateException(
-  //                     "Type " + t + " not found in type map for process call " + callName);
-  //               }
-  //               reqPolarities.put(typeMap.get(t) + offset, p);
-  //             }
-  //           }
+      // Create a mapping from locations in the inlined process to locations in the current process
+      Map<IRCodeLocation, IRCodeLocation> locationMap = new HashMap<>();
+      for (IRBlock callBlock : callProc.streamBlocks().toList()) {
+        locationMap.put(
+            callBlock.getLocation(),
+            proc.createBlock(call.getProcessId() + "_" + callBlock.getLocation().toString()).getLocation());
+      }
 
-  //           for (int t : reqs.getTypesWhichMustBeValues()) {
-  //             if (t < offset) {
-  //               reqValues.add(t);
-  //               continue;
-  //             }
-  //             t -= offset;
+      // Function for converting an instruction from the inlined process to the current process
+      Function<IRInstruction, IRInstruction> convertInstruction =
+          callInstr -> {
+            IRInstruction newInstr = callInstr.clone();
+            newInstr.replaceSessions(sessionMap::get);
+            newInstr.replaceLocalData(localDataMap::get);
+            newInstr.replaceCodeLocations(locationMap::get);
+            newInstr.replaceType(slotReplacer, reqReplacer);
 
-  //             boolean found = false;
-  //             for (IRCallProcess.TypeArgument arg : call.getTypeArguments()) {
-  //               if (arg.getTargetType() == t) {
-  //                 found = true;
-  //                 if (arg.getSourceTypeValueRequisites().mustBeValue()) {
-  //                   break;
-  //                 } else if (!arg.getSourceTypeValueRequisites().canBeValue()) {
-  //                   return IRValueRequisites.notValue();
-  //                 } else {
-  //                   for (Map.Entry<Integer, Boolean> e :
+            // If it is a recursive call, turn into a IRCallLoop instruction
+            if (callProc.isRecursive() && newInstr instanceof IRCallProcess) {
+              IRCallProcess newCall = (IRCallProcess) newInstr;
+              if (newCall.getProcessId().equals(callId)) {
+                throw new UnsupportedOperationException("TODO: implement IRCallLoop");
+                // newInstr =
+                //     IRCallLoop.fromCallProcess(
+                //             entryBlock.getLabel(), newCall, recordMap::get, exponentialMap::get)
+                //         .get();
+              }
+            }
 
-  // arg.getSourceTypeValueRequisites().getRequiredTypePolarities().entrySet()) {
-  //                     reqPolarities.put(e.getKey() + offset, e.getValue());
-  //                   }
-  //                   for (int t2 : arg.getSourceTypeValueRequisites().getTypesWhichMustBeValues())
-  // {
-  //                     reqValues.add(t2 + offset);
-  //                   }
-  //                   break;
-  //                 }
-  //               }
-  //             }
-  //             if (!found) {
-  //               reqValues.add(typeMap.get(t) + offset);
-  //             }
-  //           }
+            // We might need to remove the end point from the instruction
+            // if (!call.isEndPoint()) {
+            //   if (newInstr instanceof IRCallProcess) {
+            //     ((IRCallProcess) newInstr).removeEndPoint();
+            //   } else if (newInstr instanceof IRForward) {
+            //     ((IRForward) newInstr).removeEndPoint();
+            //   } else if (newInstr instanceof IRFlipForward) {
+            //     ((IRFlipForward) newInstr).removeEndPoint();
+            //   } else if (newInstr instanceof IRReturn) {
+            //     ((IRReturn) newInstr).removeEndPoint();
+            //   } else if (newInstr instanceof IRNextTask) {
+            //     ((IRNextTask) newInstr).removeEndPoint();
+            //   }
+            // }
 
-  //           return IRValueRequisites.value(reqPolarities, reqValues);
-  //         };
-  //     Function<IRType, IRType> substituteTypeVars =
-  //         type -> {
-  //           IRType result = type.substituteReqs(0, substituteValueReqs);
-  //           for (IRCallProcess.TypeArgument arg : call.getTypeArguments()) {
-  //             result =
-  //                 result.substituteVar(
-  //                     arg.getTargetType(),
-  //                     0,
-  //                     (offset, var) -> {
-  //                       if (var.hasPrecedingFlip(arg.getSourceTypePolarity())) {
-  //                         return new IRFlipT(arg.getSourceType());
-  //                       } else {
-  //                         return arg.getSourceType();
-  //                       }
-  //                     });
-  //           }
-  //           for (int original : typeMap.keySet()) {
-  //             result =
-  //                 result.substituteVar(
-  //                     original,
-  //                     0,
-  //                     (offset, var) -> {
-  //                       return new IRVarT(typeMap.get(original) + offset, var.getFlipPolarity());
-  //                     });
-  //           }
-  //           return result;
-  //         };
+            return newInstr;
+          };
 
-  //     // Start by adding new records, exponentials and types to the current process
-  //     Map<Integer, Integer> recordMap = new HashMap<>();
-  //     for (IRCallProcess.LinearArgument arg : call.getLinearArguments()) {
-  //       if (callProc.isRecursive()) {
-  //         // If the process is recursive, we need to keep arguments separate, as
-  //         // the process will call itself on those same arguments which would overwrite ours
-  //         recordMap.put(
-  //             arg.getTargetRecord(),
-  //             proc.addRecord(
-  //                 substituteTypeVars.apply(callProc.getRecordType(arg.getTargetRecord()))));
-  //       } else {
-  //         recordMap.put(arg.getTargetRecord(), arg.getSourceRecord());
-  //       }
-  //     }
-  //     for (int j = callProc.getRecordArgumentCount(); j < callProc.getRecordCount(); ++j) {
-  //       recordMap.put(j, proc.addRecord(substituteTypeVars.apply(callProc.getRecordType(j))));
-  //     }
-  //     Map<Integer, Integer> exponentialMap = new HashMap<>();
-  //     for (IRCallProcess.ExponentialArgument arg : call.getExponentialArguments()) {
-  //       if (callProc.isRecursive()) {
-  //         // Same thing as above
-  //         exponentialMap.put(
-  //             arg.getTargetExponential(),
-  //             proc.addExponential(
-  //                 substituteTypeVars.apply(
-  //                     callProc.getExponentialType(arg.getTargetExponential()))));
-  //       } else {
-  //         exponentialMap.put(arg.getTargetExponential(), arg.getSourceExponential());
-  //       }
-  //     }
-  //     for (int j = callProc.getExponentialArgumentCount();
-  //         j < callProc.getExponentialCount();
-  //         ++j) {
-  //       exponentialMap.put(
-  //           j, proc.addExponential(substituteTypeVars.apply(callProc.getExponentialType(j))));
-  //     }
+      // Add instructions from the entry block into the entryBlock
+      for (IRInstruction callInstr : callProc.getEntry().stream().toList()) {
+        entryBlock.add(convertInstruction.apply(callInstr));
+      }
 
-  //     // Identify the block we'll be adding the inlined process' entry instructions
-  //     // If the process is recursive (and thus, a loop), we need to create a new block
-  //     IRBlock entryBlock;
-  //     if (callProc.isRecursive()) {
-  //       entryBlock = proc.addBlock(call.getProcessName());
-  //       block.add(
-  //           IRCallLoop.fromCallProcess(
-  //                   entryBlock.getLabel(), call, recordMap::get, exponentialMap::get)
-  //               .get());
-  //     } else {
-  //       entryBlock = block;
-  //     }
+      // Add all blocks of the process to the current process
+      for (IRBlock callBlock : callProc.streamBlocks().toList()) {
+        IRBlock newBlock = proc.getBlock(locationMap.get(callBlock.getLocation()));
+        for (IRInstruction callInstr : callBlock.stream().toList()) {
+          newBlock.add(convertInstruction.apply(callInstr));
+        }
+      }
 
-  //     // Create a mapping from labels in the inlined process to labels in the current process
-  //     Map<String, String> labelMap = new HashMap<>();
-  //     for (IRBlock callBlock : callProc.getBlocks()) {
-  //       labelMap.put(
-  //           callBlock.getLabel(),
-  //           proc.addBlock(call.getProcessName() + "_" + callBlock.getLabel()).getLabel());
-  //     }
-
-  //     // Function for converting an instruction from the inlined process to the current process
-  //     Function<IRInstruction, IRInstruction> convertInstruction =
-  //         callInstr -> {
-  //           IRInstruction newInstr = callInstr.clone();
-  //           newInstr.renameRecords(recordMap::get);
-  //           newInstr.renameExponentials(exponentialMap::get);
-  //           newInstr.renameLabels(labelMap::get);
-  //           newInstr.substituteTypes(
-  //               substituteTypeVars, reqs -> substituteValueReqs.apply(0, reqs));
-
-  //           // If it is a recursive call, turn into a IRCallLoop instruction
-  //           if (callProc.isRecursive() && newInstr instanceof IRCallProcess) {
-  //             IRCallProcess newCall = (IRCallProcess) newInstr;
-  //             if (newCall.getProcessName().equals(callName)) {
-  //               newInstr =
-  //                   IRCallLoop.fromCallProcess(
-  //                           entryBlock.getLabel(), newCall, recordMap::get, exponentialMap::get)
-  //                       .get();
-  //             }
-  //           }
-
-  //           // We might need to remove the end point from the instruction
-  //           if (!call.isEndPoint()) {
-  //             if (newInstr instanceof IRCallProcess) {
-  //               ((IRCallProcess) newInstr).removeEndPoint();
-  //             } else if (newInstr instanceof IRForward) {
-  //               ((IRForward) newInstr).removeEndPoint();
-  //             } else if (newInstr instanceof IRFlipForward) {
-  //               ((IRFlipForward) newInstr).removeEndPoint();
-  //             } else if (newInstr instanceof IRReturn) {
-  //               ((IRReturn) newInstr).removeEndPoint();
-  //             } else if (newInstr instanceof IRNextTask) {
-  //               ((IRNextTask) newInstr).removeEndPoint();
-  //             }
-  //           }
-
-  //           return newInstr;
-  //         };
-
-  //     // Add instructions from the entry block into the entryBlock
-  //     for (IRInstruction callInstr : callProc.getEntry().getInstructions()) {
-  //       entryBlock.add(convertInstruction.apply(callInstr));
-  //     }
-
-  //     // Add all blocks of the process to the current process
-  //     for (IRBlock callBlock : callProc.getBlocks()) {
-  //       IRBlock newBlock = proc.getBlock(labelMap.get(callBlock.getLabel()));
-  //       for (IRInstruction callInstr : callBlock.getInstructions()) {
-  //         newBlock.add(convertInstruction.apply(callInstr));
-  //       }
-  //     }
-
-  //     // Modify the end point count of the current block
-  //     if (call.isEndPoint()) {
-  //       modifyEndPoints(proc, block, callProc.getEndPoints() - 1);
-  //     }
-  //   }
-  // }
+      // Modify the end point count of the current block
+      if (call.isEndPoint()) {
+        modifyEndPoints(proc, block, callProc.getEndPoints() - 1);
+      } else {
+        modifyEndPoints(proc, block, callProc.getEndPoints());
+      }
+    }
+  }
 
   public void removeUnusedProcesses(IRProgram ir, IRProcessId entryProcess) {
     // BFS to find all processes which are used by the entry process
@@ -1162,9 +1086,4 @@ public class Optimizer {
     // Now, we remove all processes which are not used
     ir.removeIf(p -> !used.contains(p.getId()));
   }
-
-  // // Heuristic for process complexity
-  // private int complexity(IRProcess process) {
-  //   return process.streamBlocks().toList().size();
-  // }
 }

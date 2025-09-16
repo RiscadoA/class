@@ -2,6 +2,10 @@ package pt.inescid.cllsj.compiler.ir.slot;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
+
+import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
+import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
 
 public class IRSlotCombinations {
   private List<IRSlotTree> trees;
@@ -36,23 +40,12 @@ public class IRSlotCombinations {
     return trees.size();
   }
 
-  // public IRSlotCombinations prefix(IRSlot slot) {
-  //   if (trees.isEmpty()) {
-  //     return of(slot);
-  //   }
-  //   return new IRSlotCombinations(trees.stream().map(tree ->
-  // IRSlotTree.of(slot).suffix(tree)).toList());
-  // }
-
-  // public IRSlotCombinations prefix(IRSlotCombinations combinations) {
-  //   if (trees.isEmpty()) {
-  //     return combinations;
-  //   }
-  //   return new IRSlotCombinations(
-  //       combinations.trees.stream()
-  //           .flatMap(seq1 -> trees.stream().map(seq2 -> seq1.prefix(seq2)))
-  //           .toList());
-  // }
+  public IRSlotCombinations replaceType(Function<IRTypeId, IRSlotTree> slotReplacer, Function<IRTypeId, IRValueRequisites> reqReplacer) {
+    return new IRSlotCombinations(
+        trees.stream()
+            .map(tree -> tree.replaceType(slotReplacer, reqReplacer))
+            .toList());
+  }
 
   public IRSlotCombinations suffix(IRSlot slot) {
     if (trees.isEmpty()) {

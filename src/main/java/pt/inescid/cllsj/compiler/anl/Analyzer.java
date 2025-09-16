@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.Optional;
 import pt.inescid.cllsj.compiler.ir.id.IRCodeLocation;
 import pt.inescid.cllsj.compiler.ir.id.IRProcessId;
+import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
 import pt.inescid.cllsj.compiler.ir.instruction.*;
 
 // Visitor which analyses the IR of a given process and generates a control and data flow graph.
@@ -164,23 +165,29 @@ public class Analyzer extends IRInstructionVisitor {
 
   @Override
   public void visit(IRBindSession instr) {
-    AnlSessionState session = state.session(instr.getSessionId());
-    Optional<AnlSlot.Session> slot = state.read(instr.getLocation(), true).assumeSession();
-    if (slot.isEmpty()) {
+    AnlSessionState targetSession = state.session(instr.getTargetSessionId());
+    Optional<IRSessionId> sourceSessionId;
+    if (instr.isFromLocation()) {
+      sourceSessionId = state.read(instr.getSourceLocation(), true).assumeSession().map(s -> s.id());
+    } else {
+      sourceSessionId = Optional.of(instr.getSourceSessionId());
+    }
+
+    if (sourceSessionId.isEmpty()) {
       // We're binding an unknown session
       // The data we bound will be written to by unknown writes
-      session.cont = Optional.empty();
-      session.data = Optional.empty();
-      session.remote = Optional.empty();
-      state.markDataAsUnknown(this, instr.getContinuationData());
+      targetSession.cont = Optional.empty();
+      targetSession.data = Optional.empty();
+      targetSession.remote = Optional.empty();
+      state.markDataAsUnknown(this, instr.getLocalData());
     } else {
       // We're binding a known session
-      AnlSessionState slotSession = state.session(slot.get().id());
-      session.cont = slotSession.cont;
-      session.data = slotSession.data;
-      session.remote = Optional.of(slot.get().id());
-      slotSession.data = Optional.of(instr.getContinuationData());
-      slotSession.remote = Optional.of(instr.getSessionId());
+      AnlSessionState sourceSession = state.session(sourceSessionId.get());
+      targetSession.cont = sourceSession.cont;
+      targetSession.data = sourceSession.data.map(d -> d.advance(instr.getRemoteDataOffset()));
+      targetSession.remote = sourceSession.remote;
+      sourceSession.data = Optional.of(instr.getLocalData());
+      sourceSession.remote = Optional.of(instr.getTargetSessionId());
     }
   }
 

@@ -1,5 +1,7 @@
 package pt.inescid.cllsj.compiler.ir.instruction;
 
+import java.util.function.Function;
+
 import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotTree;
 
@@ -32,5 +34,11 @@ public class IRWriteCell extends IRWrite {
     sb.append(location).append(", ");
     sb.append(slots).append(")");
     return sb.toString();
+  }
+
+  @Override
+  public void replaceSlots(Function<IRSlotTree, IRSlotTree> replacer) {
+    super.replaceSlots(replacer);
+    slots = replacer.apply(slots);
   }
 }

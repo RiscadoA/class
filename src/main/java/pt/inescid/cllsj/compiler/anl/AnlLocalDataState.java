@@ -63,6 +63,9 @@ public class AnlLocalDataState {
   public String toString() {
     StringBuilder sb = new StringBuilder();
     for (Map.Entry<Integer, AnlSlot> entry : slots.entrySet()) {
+      if (sb.length() > 0) {
+        sb.append(" ");
+      }
       sb.append(entry.getKey()).append("=").append(entry.getValue().toString());
     }
     if (sb.length() == 0) {

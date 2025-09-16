@@ -147,9 +147,9 @@ public class IRCallProcess extends IRInstruction {
     @Override
     public String toString() {
       if (sourceSessionLocation.isPresent()) {
-        return targetSessionId + " <- " + sourceSessionLocation.get() + dataOffset;
+        return targetSessionId + " <- " + sourceSessionLocation.get() + "." + dataOffset;
       } else {
-        return targetSessionId + " <- " + sourceSessionId.get() + dataOffset;
+        return targetSessionId + " <- " + sourceSessionId.get() + "." + dataOffset;
       }
     }
   }
@@ -262,6 +262,14 @@ public class IRCallProcess extends IRInstruction {
     super.replaceSessions(replacer);
     for (SessionArgument arg : sessionArguments) {
       arg.replaceSessions(replacer);
+    }
+  }
+
+  @Override
+  public void replaceSlots(Function<IRSlotTree, IRSlotTree> replacer) {
+    super.replaceSlots(replacer);
+    for (DataArgument arg : dataArguments) {
+      arg.slots = replacer.apply(arg.slots);
     }
   }
 

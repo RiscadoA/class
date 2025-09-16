@@ -41,4 +41,10 @@ public class IRDropValue extends IRInstruction {
     super.replaceDataLocations(replacer);
     location = replacer.apply(location);
   }
+
+  @Override
+  public void replaceSlots(Function<IRSlotTree, IRSlotTree> replacer) {
+    super.replaceSlots(replacer);
+    slots = replacer.apply(slots);
+  }
 }

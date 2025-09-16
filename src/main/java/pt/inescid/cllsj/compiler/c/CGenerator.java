@@ -815,15 +815,30 @@ public class CGenerator extends IRInstructionVisitor {
   @Override
   public void visit(IRBindSession instr) {
     // Copy the session into this environment
-    String source = data(instr.getLocation()).deref("struct session*");
-    CAddress target = sessionAddress(instr.getSessionId());
-    putCopyMemory(target, CAddress.of(source), compiler.arch.sessionSize());
+    String source;
+    if (instr.isFromLocation()) {
+      source = data(instr.getSourceLocation()).deref("struct session*");
+    } else {
+      source = sessionAddress(instr.getSourceSessionId()).cast("struct session");
+    }
+    CAddress targetAddr = sessionAddress(instr.getTargetSessionId());
+    putCopyMemory(targetAddr, CAddress.of(source), compiler.arch.sessionSize());
 
-    // Modify the remote session to point to our environment
-    String remoteSession = accessRemoteSession(instr.getSessionId());
-    putAssign(sessionContEnv(remoteSession), ENV);
-    putAssign(sessionContSession(remoteSession), target);
-    putAssign(sessionContData(remoteSession), data(instr.getContinuationData()));
+    // Apply an offset on the data pointer, if necessary
+    if (!instr.getRemoteDataOffset().isZero()) {
+      String target = targetAddr.deref("struct session");
+      putAssign(
+          sessionContData(target),
+          offset(sessionContData(target), instr.getRemoteDataOffset()));
+    }
+
+    // Modify the remote session to point to the target session
+    String remoteSession = accessRemoteSession(instr.getTargetSessionId());
+    if (instr.isFromLocation()) {
+      putAssign(sessionContEnv(remoteSession), ENV);
+    }
+    putAssign(sessionContSession(remoteSession), targetAddr);
+    putAssign(sessionContData(remoteSession), data(instr.getLocalData()));
   }
 
   @Override

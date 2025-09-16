@@ -1,5 +1,7 @@
 package pt.inescid.cllsj.compiler.ir.slot;
 
+import java.util.function.Function;
+
 public class IRSlotOffset {
   public static final IRSlotOffset ZERO = new IRSlotOffset();
 
@@ -50,6 +52,10 @@ public class IRSlotOffset {
 
   public IRSlotOffset advance(IRSlotOffset offset) {
     return new IRSlotOffset(past.suffix(offset.past), offset.future);
+  }
+
+  public IRSlotOffset replaceSlots(Function<IRSlotTree, IRSlotTree> replacer) {
+    return new IRSlotOffset(replacer.apply(past), replacer.apply(future));
   }
 
   @Override

@@ -5,35 +5,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import pt.inescid.cllsj.ast.ASTTypeVisitor;
-import pt.inescid.cllsj.ast.types.ASTAffineT;
-import pt.inescid.cllsj.ast.types.ASTBangT;
-import pt.inescid.cllsj.ast.types.ASTBotT;
-import pt.inescid.cllsj.ast.types.ASTCaseT;
-import pt.inescid.cllsj.ast.types.ASTCellLT;
-import pt.inescid.cllsj.ast.types.ASTCellT;
-import pt.inescid.cllsj.ast.types.ASTCoAffineT;
-import pt.inescid.cllsj.ast.types.ASTCoLboolT;
-import pt.inescid.cllsj.ast.types.ASTCoLstringT;
-import pt.inescid.cllsj.ast.types.ASTCoRecT;
-import pt.inescid.cllsj.ast.types.ASTCointT;
-import pt.inescid.cllsj.ast.types.ASTIdT;
-import pt.inescid.cllsj.ast.types.ASTLCointT;
-import pt.inescid.cllsj.ast.types.ASTLboolT;
-import pt.inescid.cllsj.ast.types.ASTLintT;
-import pt.inescid.cllsj.ast.types.ASTLstringT;
-import pt.inescid.cllsj.ast.types.ASTNotT;
-import pt.inescid.cllsj.ast.types.ASTOfferT;
-import pt.inescid.cllsj.ast.types.ASTOneT;
-import pt.inescid.cllsj.ast.types.ASTRecT;
-import pt.inescid.cllsj.ast.types.ASTRecvT;
-import pt.inescid.cllsj.ast.types.ASTRecvTT;
-import pt.inescid.cllsj.ast.types.ASTSendT;
-import pt.inescid.cllsj.ast.types.ASTSendTT;
-import pt.inescid.cllsj.ast.types.ASTType;
-import pt.inescid.cllsj.ast.types.ASTUsageLT;
-import pt.inescid.cllsj.ast.types.ASTUsageT;
-import pt.inescid.cllsj.ast.types.ASTWhyT;
-import pt.inescid.cllsj.ast.types.ASTintT;
+import pt.inescid.cllsj.ast.types.*;
 import pt.inescid.cllsj.compiler.Compiler;
 import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
 
@@ -107,9 +79,7 @@ public class IRValueRequisites {
     if (mustBeValue()) {
       return "yes";
     } else if (canBeValue()) {
-      return "if("
-          + types.get().stream().map(Object::toString).reduce((a, b) -> a + ", " + b).orElse("")
-          + ")";
+      return types.get().stream().map(Object::toString).reduce((a, b) -> a + ", " + b).orElseThrow();
     } else {
       return "no";
     }

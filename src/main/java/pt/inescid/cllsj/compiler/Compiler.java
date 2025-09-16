@@ -61,6 +61,8 @@ public class Compiler {
   private Settings.Int pointerSize;
   private Settings.Int pointerAlignment;
 
+  public Settings.Int inliningThreshold;
+
   public Settings.Flag analyzeIR;
   public Settings.Flag optimizeSingleEndpoint;
   public Settings.Flag optimizeTailCalls;
@@ -129,6 +131,12 @@ public class Compiler {
     pointerAlignment =
         settings.addInt("pointer-alignment", "Alignment of pointer C type in bytes", 8);
 
+    inliningThreshold =
+        settings.addInt(
+            "inlining-threshold",
+            "Maximum number of blocks in a process to be inlined into its callers",
+            8);
+
     analyzeIR = settings.addFlag("analyze-ir", "Enables analysis of the IR after generation", true);
     optimizeSingleEndpoint =
         settings.addFlag(
@@ -167,6 +175,7 @@ public class Compiler {
         "no-optimization",
         "Disables all optimization flags",
         () -> {
+          inliningThreshold.set(0);
           analyzeIR.set(false);
           optimizeSingleEndpoint.set(false);
           optimizeTailCalls.set(false);
@@ -266,7 +275,10 @@ public class Compiler {
     // Output the initial IR if requested
     openFileForOutput(outputInitialIRFile, stream -> stream.print(ir));
 
+    // Perform initial inlining
     Optimizer optimizer = new Optimizer();
+    optimizer.inlineProcesses(ir, inliningThreshold.get(), false);
+
     if (analyzeIR.get()) {
       // Analyze the IR
       Map<IRProcessId, Map<IRBlock, AnlFlow>> flows = Analyzer.analyze(ir);
@@ -284,7 +296,7 @@ public class Compiler {
       optimizer.feedAnalysis(flows);
     }
 
-    // Optimize the IR
+    // Optimize the IR using the analysis results
     if (analyzeIR.get() && optimizeKnownJumps.get()) {
       optimizer.optimizeKnownJumps(ir);
     }
@@ -294,6 +306,9 @@ public class Compiler {
     if (analyzeIR.get()) {
       optimizer.removeUnreachableBlocks(ir);
     }
+
+    optimizer.inlineProcesses(ir, inliningThreshold.get(), false);
+    // optimizer.inlineProcesses(ir, inliningThreshold.get(), true);
 
     optimizer.removeUnusedProcesses(ir, new IRProcessId(entryProcess.get()));
     optimizer.removeUnusedSessionsAndData(ir);
