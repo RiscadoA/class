@@ -1,7 +1,6 @@
 package pt.inescid.cllsj.compiler.ir.instruction;
 
 import java.util.function.Function;
-
 import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
 
 public abstract class IRAccess extends IRInstruction {

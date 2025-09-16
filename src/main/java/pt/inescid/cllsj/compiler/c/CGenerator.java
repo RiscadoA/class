@@ -3,33 +3,20 @@ package pt.inescid.cllsj.compiler.c;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import pt.inescid.cllsj.compiler.Compiler;
 import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
 import pt.inescid.cllsj.compiler.ir.expression.IRExpression;
-import pt.inescid.cllsj.compiler.ir.id.IRCodeLocation;
-import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
-import pt.inescid.cllsj.compiler.ir.id.IRDropId;
-import pt.inescid.cllsj.compiler.ir.id.IRLocalDataId;
-import pt.inescid.cllsj.compiler.ir.id.IRProcessId;
-import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
-import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
+import pt.inescid.cllsj.compiler.ir.id.*;
 import pt.inescid.cllsj.compiler.ir.instruction.*;
-import pt.inescid.cllsj.compiler.ir.slot.IRBoolS;
-import pt.inescid.cllsj.compiler.ir.slot.IRExponentialS;
-import pt.inescid.cllsj.compiler.ir.slot.IRIntS;
-import pt.inescid.cllsj.compiler.ir.slot.IRSlot;
-import pt.inescid.cllsj.compiler.ir.slot.IRSlotCombinations;
-import pt.inescid.cllsj.compiler.ir.slot.IRSlotOffset;
-import pt.inescid.cllsj.compiler.ir.slot.IRSlotTree;
-import pt.inescid.cllsj.compiler.ir.slot.IRStringS;
-import pt.inescid.cllsj.compiler.ir.slot.IRTagS;
-import pt.inescid.cllsj.compiler.ir.slot.IRVarS;
+import pt.inescid.cllsj.compiler.ir.slot.*;
 
 public class CGenerator extends IRInstructionVisitor {
   // Auxiliary registers used in the execution of a single instruction
@@ -1029,168 +1016,308 @@ public class CGenerator extends IRInstructionVisitor {
           return result;
         };
 
-    CProcessLayout calledLayout = layout(calledProcess);
+    Runnable ifTailCall =
+        () -> {
+          // TODO: reinitialize env in place
+          // - set end points
+          // - handle session args
+          // - handle data args
+          // - handle drop bits (must drop old ones first)
 
-    // Figure out how much space we need for the type nodes
-    if (!instr.getTypeArguments().isEmpty()) {
-      putAssign(TMP_INT, 0);
-    }
-    for (IRCallProcess.TypeArgument arg : instr.getTypeArguments()) {
-      // Type nodes are only needed for value types
-      if (arg.isFromLocation()) {
-        String sourceType = data(arg.getSourceLocation()).deref("struct type");
-        putAssign(TMP_INT, TMP_INT + " + " + typeNodeCount(sourceType));
-      } else if (arg.getSourceIsValue().canBeValue()) {
-        putAddTypeNodeCount(TMP_INT, arg.getSourceTree());
-      }
-    }
-    CSize typeNodesSize = CSize.zero();
-    if (!instr.getTypeArguments().isEmpty()) {
-      typeNodesSize = compiler.arch.typeNodeSize().multiply(CSize.expression(TMP_INT));
-    }
-
-    // Allocate a new environment for the called process
-    putAllocEnvironment(TMP_PTR1, typeLayoutProvider, typeIsValue, calledLayout, typeNodesSize);
-    String newEnv = cast(TMP_PTR1, "char*");
-
-    // Setup the end points for the new environment
-    if (!compiler.optimizeSingleEndpoint.get() || calledProcess.getEndPoints() != 1) {
-      putAssign(endPoints(calledLayout, newEnv), calledProcess.getEndPoints());
-    }
-
-    // Zero out any drop bits
-    putZeroEnvironmentDropBits(calledLayout, newEnv);
-
-    // Initialize the type arguments in the new environment
-    if (!instr.getTypeArguments().isEmpty()) {
-      putAssign(
-          TMP_PTR2,
-          calledLayout
-              .size(typeLayoutProvider, typeIsValue)
-              .align(compiler.arch.typeNodeAlignment())
-              .advancePointer(newEnv));
-    }
-    for (IRCallProcess.TypeArgument arg : instr.getTypeArguments()) {
-      // Start by initializing the type nodes and count, if needed
-      boolean canBeValue = arg.isFromLocation() || arg.getSourceIsValue().canBeValue();
-      final Optional<String> typeNode =
-          canBeValue ? Optional.of(cast(TMP_PTR2, "struct type_node*")) : Optional.empty();
-      final Optional<String> typeNodeCount = canBeValue ? Optional.of(TMP_INT) : Optional.empty();
-      if (canBeValue) {
-        if (arg.isFromLocation()) {
-          // Copy them over from the source type, and then free the source type nodes
-          String source = data(arg.getSourceLocation()).deref("struct type");
-          putIf(
-              typeNode(source) + " != " + NULL,
-              () -> {
-                putAssign(TMP_INT, typeNodeCount(source));
-                putCopyMemory(
-                    CAddress.of(TMP_PTR2),
-                    castToAddress(typeNode(source)),
-                    compiler.arch.typeNodeSize().multiply(CSize.expression(TMP_INT)));
-                putFree(typeNode(source));
+          // Drop data that would have been dropped on deallocation
+          Set<IRCallProcess.DataArgument> wouldHaveBeenDropped = new HashSet<>();
+          putDoDeferredEnvironmentDrops(
+              currentProcess,
+              currentProcessLayout,
+              ENV,
+              d -> {
+                // If the data that would be dropped is passed as a data argument, do not drop it
+                for (IRCallProcess.DataArgument arg : instr.getTailCallDataArgumentOrder().get()) {
+                  if (arg.getSourceLocation()
+                      .equals(IRDataLocation.local(d.getLocalDataId(), d.getOffset()))) {
+                    wouldHaveBeenDropped.add(arg);
+                    return false;
+                  }
+                }
+                return true;
               });
-        } else {
-          // Compute them from the source type tree
-          putAssign(TMP_INT, 0);
-          putTypeNodeConstruction(
-              TMP_INT,
-              arg.getSourceTree(),
-              (index, type, offset, next) -> {
-                String ref = typeNode.get() + "[" + index + "]";
-                putAssign(ref, typeNodeInitializer(offset, type, next));
-              });
-        }
-      }
 
-      // Get a reference to the target type in the new environment and initialize it
-      String targetType = type(calledLayout, newEnv, arg.getTargetType());
-      if (arg.isFromLocation()) {
-        putAssign(targetType, data(arg.getSourceLocation()).deref("struct type"));
-        if (typeNode.isPresent()) {
-          putAssign(typeNode(targetType), typeNode.get());
-        }
-      } else {
-        putAssign(
-            targetType,
-            typeInitializer(
-                typeNode.orElse(NULL),
-                typeNodeCount.orElse("0"),
-                arg.getSourceTree(),
-                arg.getSourceIsValue()));
-      }
+          // Setup the end points for the new environment
+          if (!compiler.optimizeSingleEndpoint.get() || currentProcess.getEndPoints() != 1) {
+            putAssign(endPoints(), currentProcess.getEndPoints());
+          }
 
-      if (typeNode.isPresent()) {
-        // Move the TMP_PTR2 pointer forward for the next type argument
-        putAssign(
-            TMP_PTR2,
-            castToAddress(TMP_PTR2)
-                .offset(
-                    compiler.arch.typeNodeSize().multiply(CSize.expression(typeNodeCount.get()))));
-      }
-    }
+          putZeroEnvironmentDropBits(currentProcessLayout, ENV);
 
-    for (IRCallProcess.SessionArgument arg : instr.getSessionArguments()) {
-      // Get references to the source and target sessions
-      String source;
-      if (arg.isFromLocation()) {
-        source = "(*" + data(arg.getSourceSessionLocation()).deref("struct session*") + ")";
-      } else {
-        source = accessSession(arg.getSourceSessionId());
-      }
-      String target = accessSession(calledLayout, newEnv, arg.getTargetSessionId());
-
-      // Copy the session data
-      putAssign(target, source);
-
-      // We must also compute the new continuation data address for the target session
-      // This is necessary as the caller may apply an offset to the data
-      putAssign(sessionContData(target), offset(sessionContData(target), arg.getDataOffset()));
-
-      // Update the remote session's continuation to match the new environment
-      Optional<IRLocalDataId> calledLocalDataId =
-          calledProcess.getArgSessionLocalDataId(arg.getTargetSessionId());
-      String remoteSessionAddress = remoteSessionAddress(source);
-      putIf(
-          remoteSessionAddress + " != " + NULL,
-          () -> {
-            String remoteSession = accessSession(remoteSessionAddress);
-            putAssign(sessionContEnv(remoteSession), newEnv);
-            if (calledLocalDataId.isPresent()) {
-              putAssign(
-                  sessionContData(remoteSession),
-                  localData(
-                      typeLayoutProvider,
-                      typeIsValue,
-                      calledLayout,
-                      newEnv,
-                      calledLocalDataId.get(),
-                      arg.getDataOffset()));
+          for (IRCallProcess.SessionArgument arg : instr.getTailCallSessionArgumentOrder().get()) {
+            if (!arg.isFromLocation()
+                && arg.getSourceSessionId().equals(arg.getTargetSessionId())) {
+              // No need to do anything!
+              continue;
             }
+
+            // Get references to the source and target sessions
+            String source;
+            if (arg.isFromLocation()) {
+              source = data(arg.getSourceSessionLocation()).deref("struct session*");
+            } else {
+              source = accessSession(arg.getSourceSessionId());
+            }
+            String target = accessSession(arg.getTargetSessionId());
+
+            // Copy the session data
+            putAssign(target, source);
+
+            // We must also compute the new continuation data address for the target session
+            // This is necessary as the caller may apply an offset to the data
             putAssign(
-                sessionContSession(remoteSession),
-                sessionAddress(calledLayout, newEnv, arg.getTargetSessionId()));
-          });
+                sessionContData(target), offset(sessionContData(target), arg.getDataOffset()));
+
+            // Update the remote session's continuation
+            Optional<IRLocalDataId> calledLocalDataId =
+                calledProcess.getArgSessionLocalDataId(arg.getTargetSessionId());
+            String remoteSessionAddress = remoteSessionAddress(source);
+            putIf(
+                remoteSessionAddress + " != " + NULL,
+                () -> {
+                  String remoteSession = accessSession(remoteSessionAddress);
+                  if (calledLocalDataId.isPresent()) {
+                    putAssign(
+                        sessionContData(remoteSession),
+                        localData(calledLocalDataId.get(), arg.getDataOffset()));
+                  }
+                  putAssign(
+                      sessionContSession(remoteSession), sessionAddress(arg.getTargetSessionId()));
+                });
+          }
+
+          for (IRCallProcess.DataArgument arg : instr.getTailCallDataArgumentOrder().get()) {
+            // Here we simply copy data from some location in the current environment to
+            // a local data section in the new environment
+            IRDataLocation target = IRDataLocation.local(arg.getTargetDataId(), IRSlotOffset.ZERO);
+            if (arg.getSourceLocation().equals(target)) {
+              // No need to do anything!
+              continue;
+            }
+
+            // If this data would have been dropped, we don't clone it and instead just move it
+            putMoveSlots(
+                arg.getSlots(),
+                arg.isClone() && !wouldHaveBeenDropped.contains(arg),
+                id -> typeNode(type(id)),
+                this::typeLayout,
+                this::isValue,
+                data(arg.getSourceLocation()),
+                data(target));
+          }
+        };
+
+    Runnable ifNotTailCall =
+        () -> {
+          CProcessLayout calledLayout = layout(calledProcess);
+
+          // Figure out how much space we need for the type nodes
+          if (!instr.getTypeArguments().isEmpty()) {
+            putAssign(TMP_INT, 0);
+          }
+          for (IRCallProcess.TypeArgument arg : instr.getTypeArguments()) {
+            // Type nodes are only needed for value types
+            if (arg.isFromLocation()) {
+              String sourceType = data(arg.getSourceLocation()).deref("struct type");
+              putAssign(TMP_INT, TMP_INT + " + " + typeNodeCount(sourceType));
+            } else if (arg.getSourceIsValue().canBeValue()) {
+              putAddTypeNodeCount(TMP_INT, arg.getSourceTree());
+            }
+          }
+          CSize typeNodesSize = CSize.zero();
+          if (!instr.getTypeArguments().isEmpty()) {
+            typeNodesSize = compiler.arch.typeNodeSize().multiply(CSize.expression(TMP_INT));
+          }
+
+          // Allocate a new environment for the called process
+          putAllocEnvironment(
+              TMP_PTR1, typeLayoutProvider, typeIsValue, calledLayout, typeNodesSize);
+          String newEnv = cast(TMP_PTR1, "char*");
+
+          // Setup the end points for the new environment
+          if (!compiler.optimizeSingleEndpoint.get() || calledProcess.getEndPoints() != 1) {
+            putAssign(endPoints(calledLayout, newEnv), calledProcess.getEndPoints());
+          }
+
+          // Zero out any drop bits
+          putZeroEnvironmentDropBits(calledLayout, newEnv);
+
+          // Initialize the type arguments in the new environment
+          if (!instr.getTypeArguments().isEmpty()) {
+            putAssign(
+                TMP_PTR2,
+                calledLayout
+                    .size(typeLayoutProvider, typeIsValue)
+                    .align(compiler.arch.typeNodeAlignment())
+                    .advancePointer(newEnv));
+          }
+          for (IRCallProcess.TypeArgument arg : instr.getTypeArguments()) {
+            // Start by initializing the type nodes and count, if needed
+            boolean canBeValue = arg.isFromLocation() || arg.getSourceIsValue().canBeValue();
+            final Optional<String> typeNode =
+                canBeValue ? Optional.of(cast(TMP_PTR2, "struct type_node*")) : Optional.empty();
+            final Optional<String> typeNodeCount =
+                canBeValue ? Optional.of(TMP_INT) : Optional.empty();
+            if (canBeValue) {
+              if (arg.isFromLocation()) {
+                // Copy them over from the source type, and then free the source type nodes
+                String source = data(arg.getSourceLocation()).deref("struct type");
+                putIf(
+                    typeNode(source) + " != " + NULL,
+                    () -> {
+                      putAssign(TMP_INT, typeNodeCount(source));
+                      putCopyMemory(
+                          CAddress.of(TMP_PTR2),
+                          castToAddress(typeNode(source)),
+                          compiler.arch.typeNodeSize().multiply(CSize.expression(TMP_INT)));
+                      putFree(typeNode(source));
+                    });
+              } else {
+                // Compute them from the source type tree
+                putAssign(TMP_INT, 0);
+                putTypeNodeConstruction(
+                    TMP_INT,
+                    arg.getSourceTree(),
+                    (index, type, offset, next) -> {
+                      String ref = typeNode.get() + "[" + index + "]";
+                      putAssign(ref, typeNodeInitializer(offset, type, next));
+                    });
+              }
+            }
+
+            // Get a reference to the target type in the new environment and initialize it
+            String targetType = type(calledLayout, newEnv, arg.getTargetType());
+            if (arg.isFromLocation()) {
+              putAssign(targetType, data(arg.getSourceLocation()).deref("struct type"));
+              if (typeNode.isPresent()) {
+                putAssign(typeNode(targetType), typeNode.get());
+              }
+            } else {
+              putAssign(
+                  targetType,
+                  typeInitializer(
+                      typeNode.orElse(NULL),
+                      typeNodeCount.orElse("0"),
+                      arg.getSourceTree(),
+                      arg.getSourceIsValue()));
+            }
+
+            if (typeNode.isPresent()) {
+              // Move the TMP_PTR2 pointer forward for the next type argument
+              putAssign(
+                  TMP_PTR2,
+                  castToAddress(TMP_PTR2)
+                      .offset(
+                          compiler
+                              .arch
+                              .typeNodeSize()
+                              .multiply(CSize.expression(typeNodeCount.get()))));
+            }
+          }
+
+          for (IRCallProcess.SessionArgument arg : instr.getSessionArguments()) {
+            // Get references to the source and target sessions
+            String source;
+            if (arg.isFromLocation()) {
+              source = "(*" + data(arg.getSourceSessionLocation()).deref("struct session*") + ")";
+            } else {
+              source = accessSession(arg.getSourceSessionId());
+            }
+            String target = accessSession(calledLayout, newEnv, arg.getTargetSessionId());
+
+            // Copy the session data
+            putAssign(target, source);
+
+            // We must also compute the new continuation data address for the target session
+            // This is necessary as the caller may apply an offset to the data
+            putAssign(
+                sessionContData(target), offset(sessionContData(target), arg.getDataOffset()));
+
+            // Update the remote session's continuation to match the new environment
+            Optional<IRLocalDataId> calledLocalDataId =
+                calledProcess.getArgSessionLocalDataId(arg.getTargetSessionId());
+            String remoteSessionAddress = remoteSessionAddress(source);
+            putIf(
+                remoteSessionAddress + " != " + NULL,
+                () -> {
+                  String remoteSession = accessSession(remoteSessionAddress);
+                  putAssign(sessionContEnv(remoteSession), newEnv);
+                  if (calledLocalDataId.isPresent()) {
+                    putAssign(
+                        sessionContData(remoteSession),
+                        localData(
+                            typeLayoutProvider,
+                            typeIsValue,
+                            calledLayout,
+                            newEnv,
+                            calledLocalDataId.get(),
+                            arg.getDataOffset()));
+                  }
+                  putAssign(
+                      sessionContSession(remoteSession),
+                      sessionAddress(calledLayout, newEnv, arg.getTargetSessionId()));
+                });
+          }
+
+          for (IRCallProcess.DataArgument arg : instr.getDataArguments()) {
+            // Here we simply copy data from some location in the current environment to
+            // a local data section in the new environment
+            IRDataLocation target = IRDataLocation.local(arg.getTargetDataId(), IRSlotOffset.ZERO);
+            putMoveSlots(
+                arg.getSlots(),
+                arg.isClone(),
+                id -> typeNode(type(calledLayout, newEnv, id)),
+                id -> typeLayout(calledLayout, newEnv, id),
+                req -> isValue(calledLayout, newEnv, req),
+                data(arg.getSourceLocation()),
+                data(typeLayoutProvider, typeIsValue, calledLayout, newEnv, target));
+          }
+
+          // Decrement the end points of the current process, if applicable
+          putDecrementEndPoints(instr.isEndPoint());
+
+          putAssign(ENV, cast(TMP_PTR1, "char*"));
+        };
+
+    CCondition isTailCall = CCondition.certainlyFalse();
+    if (currentProcess != null && compiler.optimizeTailCalls.get()
+        && calledProcessId.equals(currentProcess.getId())
+        && instr.isEndPoint()) {
+      // This is a recursive call to the same process, and we are an end point
+      // To make sure this can be a tail call, we must ensure the type arguments are not different
+      // Additionally, we must not require any swaps on session and data arguments
+      boolean validArgs = true;
+      for (IRCallProcess.TypeArgument arg : instr.getTypeArguments()) {
+        if (arg.isFromLocation()
+            || !arg.getSourceTree().equals(IRSlotTree.of(new IRVarS(arg.getTargetType())))) {
+        System.err.println("Invalid type args");
+          validArgs = false;
+          break;
+        }
+      }
+      if (instr.getTailCallSessionArgumentOrder().isEmpty()) {
+        validArgs = false;
+      } else if (instr.getTailCallDataArgumentOrder().isEmpty()) {
+        validArgs = false;
+      }
+
+      if (validArgs) {
+        if (compiler.optimizeSingleEndpoint.get() && currentProcess.getEndPoints() == 1) {
+          isTailCall = CCondition.certainlyTrue();
+        } else {
+          // No need to worry about data races. Worst case, we miss a potential tail call
+          // optimization
+          isTailCall = CCondition.maybe(endPoints() + " == 1");
+        }
+      }
     }
 
-    for (IRCallProcess.DataArgument arg : instr.getDataArguments()) {
-      // Here we simply copy data from some location in the current environment to
-      // a local data section in the new environment
-      IRDataLocation target = IRDataLocation.local(arg.getTargetDataId(), IRSlotOffset.ZERO);
-      putMoveSlots(
-          arg.getSlots(),
-          arg.isClone(),
-          id -> typeNode(type(calledLayout, newEnv, id)),
-          id -> typeLayout(calledLayout, newEnv, id),
-          req -> isValue(calledLayout, newEnv, req),
-          data(arg.getSourceLocation()),
-          data(typeLayoutProvider, typeIsValue, calledLayout, newEnv, target));
-    }
-
-    // Decrement the end points of the current process, if applicable
-    putDecrementEndPoints(instr.isEndPoint());
-
-    putAssign(ENV, cast(TMP_PTR1, "char*"));
+    putIfElse(isTailCall, ifTailCall, ifNotTailCall);
     putConstantGoto(codeLocationLabel(calledProcess, IRCodeLocation.entry()));
   }
 
@@ -1793,26 +1920,9 @@ public class CGenerator extends IRInstructionVisitor {
     return CLayout.computeMaximum(tree, compiler.arch, typeLayout, isValue);
   }
 
-  private CLayout maxLayout(
-      Function<IRTypeId, CLayout> typeLayout,
-      Function<IRValueRequisites, CCondition> isValue,
-      IRSlotCombinations combinations) {
-    return CLayout.computeMaximum(combinations, compiler.arch, typeLayout, isValue);
-  }
-
   private CLayout layout(Function<IRTypeId, CLayout> typeLayout, IRSlot slot) {
     return CLayout.compute(slot, compiler.arch, typeLayout);
   }
-
-  // private CLayout layout(IRSlotTree slots, CAddress baseAddress) {
-  //   return CLayout.compute(
-  //       slots.combinations(),
-  //       compiler.arch,
-  //       this::typeLayout,
-  //       this::isValue,
-  //       (offset, tag) ->
-  //           CCondition.maybe(offset(baseAddress, offset).deref("unsigned char") + " == " + tag));
-  // }
 
   private CProcessLayout layout(IRProcess process) {
     return CProcessLayout.compute(compiler, process);
@@ -2266,7 +2376,7 @@ public class CGenerator extends IRInstructionVisitor {
     if (compiler.tracing.get()) {
       putDebugLn("[endCall(" + process.getId() + ")]");
     }
-    putDoDeferredEnvironmentDrops(process, processLayout, var);
+    putDoDeferredEnvironmentDrops(process, processLayout, var, d -> true);
     putFree(var);
     if (compiler.profiling.get()) {
       putIncrementAtomic("env_frees");
@@ -2277,10 +2387,18 @@ public class CGenerator extends IRInstructionVisitor {
     putZeroMemory(CAddress.of(var, processLayout.dropByteStart()), processLayout.dropByteCount());
   }
 
-  void putDoDeferredEnvironmentDrops(IRProcess process, CProcessLayout processLayout, String var) {
+  void putDoDeferredEnvironmentDrops(
+      IRProcess process,
+      CProcessLayout processLayout,
+      String var,
+      Function<IRProcess.DropOnEnd, Boolean> filter) {
     for (int i = 0; i < process.getDropOnEnd().size(); ++i) {
       IRDropId dropId = new IRDropId(i);
       IRProcess.DropOnEnd drop = process.getDropOnEnd(dropId);
+      if (!filter.apply(drop)) {
+        continue;
+      }
+
       Runnable putDrop =
           () ->
               putDropSlots(

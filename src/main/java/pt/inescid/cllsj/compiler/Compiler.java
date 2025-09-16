@@ -63,6 +63,7 @@ public class Compiler {
 
   public Settings.Flag analyzeIR;
   public Settings.Flag optimizeSingleEndpoint;
+  public Settings.Flag optimizeTailCalls;
   public Settings.Flag optimizeSendValue;
   public Settings.Flag optimizeKnownJumps;
   public Settings.Flag optimizeKnownEndPoints;
@@ -134,6 +135,11 @@ public class Compiler {
             "optimize-single-endpoint",
             "Optimizes away reference counting for processes with a single end point",
             true);
+    optimizeTailCalls =
+        settings.addFlag(
+            "optimize-tail-calls",
+            "Avoids allocating new environments when a recursive call is the last instruction in a process",
+            true);
     optimizeSendValue =
         settings.addFlag(
             "optimize-send-value",
@@ -163,6 +169,7 @@ public class Compiler {
         () -> {
           analyzeIR.set(false);
           optimizeSingleEndpoint.set(false);
+          optimizeTailCalls.set(false);
           optimizeSendValue.set(false);
           optimizeKnownJumps.set(false);
           optimizeKnownEndPoints.set(false);

@@ -96,5 +96,9 @@ proc primesNC(primes:IntStream)
  };;
 
 proc main() {
-	  	main_ss(;100000)
+	cut {
+		scan(n)
+		|n: ?colint|
+		main_ss(;n)
+	}
 };;

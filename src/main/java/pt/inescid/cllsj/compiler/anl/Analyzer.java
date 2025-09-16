@@ -4,9 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
 import pt.inescid.cllsj.compiler.ir.id.IRCodeLocation;
-import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
 import pt.inescid.cllsj.compiler.ir.id.IRProcessId;
-import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
 import pt.inescid.cllsj.compiler.ir.instruction.*;
 
 // Visitor which analyses the IR of a given process and generates a control and data flow graph.
@@ -213,12 +211,14 @@ public class Analyzer extends IRInstructionVisitor {
 
   @Override
   public void visit(IRMoveValue instr) {
-    state.write(this, instr.getLocation(), state.read(instr.getSourceLocation(), instr.getSlots(), true));
+    state.write(
+        this, instr.getLocation(), state.read(instr.getSourceLocation(), instr.getSlots(), true));
   }
 
   @Override
   public void visit(IRCloneValue instr) {
-    state.write(this, instr.getLocation(), state.read(instr.getSourceLocation(), instr.getSlots(), false));
+    state.write(
+        this, instr.getLocation(), state.read(instr.getSourceLocation(), instr.getSlots(), false));
   }
 
   @Override

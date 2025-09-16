@@ -132,7 +132,8 @@ public class Optimizer {
       IRSessionId id = i.getSessionId();
       Optional<IRSessionId> remote = prev.getStates().getLast().session(id).remote;
       AnlFlowContinuation contBefore = prev.getStates().getLast().session(id).cont.get();
-      AnlFlowContinuation contAfter = next.getStates().getFirst().session(remote.orElseThrow()).cont.get();
+      AnlFlowContinuation contAfter =
+          next.getStates().getFirst().session(remote.orElseThrow()).cont.get();
 
       contBefore.replaceWritten(Optional.of(i.getContinuation()));
       contAfter.setOverride(contBefore);
@@ -560,7 +561,8 @@ public class Optimizer {
 
       for (IRBlock block : ir.streamBlocks().toList()) {
         if (!flows.containsKey(block)
-          || (!block.getLocation().equals(IRCodeLocation.entry()) && flows.get(block).getSources().isEmpty())) {
+            || (!block.getLocation().equals(IRCodeLocation.entry())
+                && flows.get(block).getSources().isEmpty())) {
           toRemove = Optional.of(block);
           break;
         }
@@ -969,7 +971,7 @@ public class Optimizer {
   //                   return IRValueRequisites.notValue();
   //                 } else {
   //                   for (Map.Entry<Integer, Boolean> e :
-  //
+
   // arg.getSourceTypeValueRequisites().getRequiredTypePolarities().entrySet()) {
   //                     reqPolarities.put(e.getKey() + offset, e.getValue());
   //                   }
@@ -1160,4 +1162,9 @@ public class Optimizer {
     // Now, we remove all processes which are not used
     ir.removeIf(p -> !used.contains(p.getId()));
   }
+
+  // // Heuristic for process complexity
+  // private int complexity(IRProcess process) {
+  //   return process.streamBlocks().toList().size();
+  // }
 }

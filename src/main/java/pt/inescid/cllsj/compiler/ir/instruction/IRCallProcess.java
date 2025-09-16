@@ -1,7 +1,12 @@
 package pt.inescid.cllsj.compiler.ir.instruction;
 
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
 import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
@@ -308,5 +313,94 @@ public class IRCallProcess extends IRInstruction {
     }
     sb.append(")");
     return sb.toString();
+  }
+
+  // Orders the arguments to allow tail-call optimization, if possible
+  // Returns empty if not possible
+  public Optional<List<SessionArgument>> getTailCallSessionArgumentOrder() {
+    // Our goal is to reorder the session arguments so that all sessions are
+    // used as sources before being used as targets.
+    //
+    // We do this through a simple topological sort
+
+    Map<IRSessionId, Set<IRSessionId>> mustBeSourceBefore = new HashMap<>();
+    for (SessionArgument arg : sessionArguments) {
+      if (!arg.isFromLocation() && !arg.getSourceSessionId().equals(arg.getTargetSessionId())) {
+        mustBeSourceBefore
+            .computeIfAbsent(arg.getTargetSessionId(), k -> new HashSet<>())
+            .add(arg.getSourceSessionId());
+      }
+    }
+
+    List<SessionArgument> ordered = new ArrayList<>();
+    Set<IRSessionId> used = new HashSet<>();
+
+    while (ordered.size() < sessionArguments.size()) {
+      boolean progress = false;
+      for (SessionArgument arg : sessionArguments) {
+        if (ordered.contains(arg)) {
+          continue;
+        }
+
+        Set<IRSessionId> before = mustBeSourceBefore.getOrDefault(arg.getTargetSessionId(), Set.of());
+        if (used.containsAll(before)) {
+          ordered.add(arg);
+          if (!arg.isFromLocation()) {
+            used.add(arg.getSourceSessionId());
+          }
+          progress = true;
+        }
+      }
+      if (!progress) {
+        // We couldn't make any progress, so there's a cycle
+        return Optional.empty();
+      }
+    }
+
+    return Optional.of(ordered);
+  }
+
+  // Orders the arguments to allow tail-call optimization, if possible
+  // Returns empty if not possible
+  public Optional<List<DataArgument>> getTailCallDataArgumentOrder() {
+    // Same as for sessions
+    // Obvious code duplication, but I don't have time to abstract it!
+
+    Map<IRLocalDataId, Set<IRLocalDataId>> mustBeUsedBefore = new HashMap<>();
+    for (DataArgument arg : dataArguments) {
+      // We only care about local data, so skip if source is not local
+      if (!arg.getSourceLocation().isLocal() || arg.getSourceLocation().getLocalDataId().equals(arg.getTargetDataId())) {
+        continue;
+      }
+      IRLocalDataId sourceId = arg.getSourceLocation().getLocalDataId();
+      mustBeUsedBefore.computeIfAbsent(arg.getTargetDataId(), k -> new HashSet<>()).add(sourceId);
+    }
+    List<DataArgument> ordered = new ArrayList<>();
+    Set<IRLocalDataId> used = new HashSet<>();
+
+    while (ordered.size() < dataArguments.size()) {
+      boolean progress = false;
+      for (DataArgument arg : dataArguments) {
+        if (ordered.contains(arg)) {
+          continue;
+        }
+        Set<IRLocalDataId> before = mustBeUsedBefore.getOrDefault(arg.getTargetDataId(), Set.of());
+        if (used.containsAll(before)) {
+          ordered.add(arg);
+          // We only care about local data, so skip if source is not local
+          if (arg.getSourceLocation().isLocal()) {
+            used.add(arg.getSourceLocation().getLocalDataId());
+          }
+          used.add(arg.getTargetDataId());
+          progress = true;
+        }
+      }
+      if (!progress) {
+        // We couldn't make any progress, so there's a cycle
+        return Optional.empty();
+      }
+    }
+
+    return Optional.of(ordered);
   }
 }

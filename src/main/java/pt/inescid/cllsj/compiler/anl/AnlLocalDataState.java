@@ -15,13 +15,14 @@ public class AnlLocalDataState {
     int end = start + size.map(s -> AnlSlot.count(s)).orElse(1);
     return Stream.iterate(start, i -> i + 1)
         .limit(end - start)
-        .map(i -> {
-          if (move) {
-            return Optional.ofNullable(slots.remove(i)).orElse(AnlSlot.UNKNOWN);
-          } else {
-            return slots.computeIfAbsent(i, k -> AnlSlot.UNKNOWN);
-          }
-        });
+        .map(
+            i -> {
+              if (move) {
+                return Optional.ofNullable(slots.remove(i)).orElse(AnlSlot.UNKNOWN);
+              } else {
+                return slots.computeIfAbsent(i, k -> AnlSlot.UNKNOWN);
+              }
+            });
   }
 
   public void write(IRSlotTree offset, Stream<AnlSlot> slots) {
