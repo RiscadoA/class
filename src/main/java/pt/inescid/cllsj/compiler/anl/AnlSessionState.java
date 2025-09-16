@@ -39,7 +39,7 @@ public class AnlSessionState {
       cont = Optional.empty();
     }
     if (data.isPresent()) {
-      state.markDataAsUnknown(data.get());
+      state.markDataAsUnknown(analyzer, data.get());
       data = Optional.empty();
     }
     if (remote.isPresent()) {

@@ -564,8 +564,8 @@ public class Optimizer {
       Optional<IRBlock> toRemove = Optional.empty();
 
       for (IRBlock block : ir.streamBlocks().toList()) {
-        if (!block.getLocation().equals(IRCodeLocation.entry())
-            && (!flows.containsKey(block) || flows.get(block).getSources().isEmpty())) {
+        if (!flows.containsKey(block)
+          || (!block.getLocation().equals(IRCodeLocation.entry()) && flows.get(block).getSources().isEmpty())) {
           toRemove = Optional.of(block);
           break;
         }

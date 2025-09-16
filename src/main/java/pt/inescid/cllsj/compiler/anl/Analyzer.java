@@ -174,7 +174,7 @@ public class Analyzer extends IRInstructionVisitor {
       session.cont = Optional.empty();
       session.data = Optional.empty();
       session.remote = Optional.empty();
-      state.markDataAsUnknown(instr.getContinuationData());
+      state.markDataAsUnknown(this, instr.getContinuationData());
     } else {
       // We're binding a known session
       AnlSessionState slotSession = state.session(slot.get().id());
@@ -250,6 +250,9 @@ public class Analyzer extends IRInstructionVisitor {
         state.session(arg.getSourceSessionId()).markAsUnknown(this, state);
       }
     }
+    for (IRCallProcess.DataArgument arg : instr.getDataArguments()) {
+      state.markDataAsUnknown(this, arg.getSourceLocation());
+    }
     visitNextPending();
   }
 
@@ -276,18 +279,25 @@ public class Analyzer extends IRInstructionVisitor {
     Optional<AnlFlowContinuation> negCont = neg.cont;
     Optional<IRDataLocation> negData = neg.data;
     Optional<AnlSessionState> negRemote = negRemoteId.map(id -> state.session(id));
-    Optional<AnlSessionState> posRemote = posRemoteId.map(id -> state.session(id));
+
     Optional<AnlFlowContinuation> posCont = pos.cont;
+    Optional<IRDataLocation> posData = pos.data;
+    Optional<AnlSessionState> posRemote = posRemoteId.map(id -> state.session(id));
 
     if (negRemote.isPresent()) {
-      negRemote.get().cont = pos.cont;
-      negRemote.get().data = pos.data;
+      negRemote.get().cont = posCont;
+      negRemote.get().data = posData;
       negRemote.get().remote = posRemoteId;
+    } else {
+      pos.markAsUnknown(this, state);
     }
+
     if (posRemote.isPresent()) {
       posRemote.get().cont = negCont;
       posRemote.get().data = negData;
       posRemote.get().remote = negRemoteId;
+    } else {
+      neg.markAsUnknown(this, state);
     }
 
     neg.cont = Optional.empty();

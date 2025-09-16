@@ -84,14 +84,16 @@ public class AnlFlowState {
 
   // Called on a data location when a reference to it is lost
   // Basically means we can no longer assume that it won't change when writing to unknown spots
-  public void markDataAsUnknown(IRDataLocation loc) {
+  public void markDataAsUnknown(Analyzer analyzer, IRDataLocation loc) {
     if (loc.isLocal()) {
+      AnlLocalDataState data = localData(loc.getLocalDataId());
+      data.markAsUnknown(analyzer, this);
       passedLocalData.add(loc.getLocalDataId());
     } else if (loc.isRemote()) {
       AnlSessionState session = session(loc.getSessionId());
       if (session.data.isPresent()) {
         IRDataLocation dataLoc = session.data.get().advance(loc.getOffset());
-        markDataAsUnknown(dataLoc);
+        markDataAsUnknown(analyzer, dataLoc);
       }
     }
   }
