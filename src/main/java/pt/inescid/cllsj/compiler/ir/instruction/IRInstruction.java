@@ -5,6 +5,7 @@ import java.util.function.Function;
 import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
 import pt.inescid.cllsj.compiler.ir.id.IRCodeLocation;
 import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
+import pt.inescid.cllsj.compiler.ir.id.IRDropId;
 import pt.inescid.cllsj.compiler.ir.id.IRLocalDataId;
 import pt.inescid.cllsj.compiler.ir.id.IRProcessId;
 import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
@@ -39,6 +40,8 @@ public abstract class IRInstruction {
   public void replaceDataLocations(Function<IRDataLocation, IRDataLocation> replacer) {}
 
   public void replaceProcesses(Function<IRProcessId, IRProcessId> replacer) {}
+
+  public void replaceDropIds(Function<IRDropId, IRDropId> replacer) {}
 
   public boolean usesSession(IRSessionId sessionId) {
     AtomicBoolean uses = new AtomicBoolean(false);

@@ -980,15 +980,19 @@ public class Optimizer {
       }
 
       // Add the drop on end markers
-      for (IRProcess.DropOnEnd drop : callProc.getDropOnEnd()) {
-        IRDropId dId =
+      Map<IRDropId, IRDropId> dropMap = new HashMap<>();
+      for (int old = 0; old < callProc.getDropOnEnd().size(); ++old) {
+        IRDropId oldId = new IRDropId(old);
+        IRProcess.DropOnEnd drop = callProc.getDropOnEnd(oldId);
+        IRDropId newId =
             proc.addDropOnEnd(
                 localDataMap.get(drop.getLocalDataId()),
                 drop.getOffset().replaceSlots(t -> t.replaceType(slotReplacer, reqReplacer)),
                 drop.getSlots().replaceType(slotReplacer, reqReplacer),
                 false);
+        dropMap.put(oldId, newId);
         if (drop.isAlways()) {
-          block.add(new IRDeferDrop(dId));
+          block.add(new IRDeferDrop(newId));
         }
       }
 
@@ -1022,6 +1026,7 @@ public class Optimizer {
             newInstr.replaceSessions(sessionMap::get);
             newInstr.replaceLocalData(localDataMap::get);
             newInstr.replaceCodeLocations(locationMap::get);
+            newInstr.replaceDropIds(dropMap::get);
             newInstr.replaceType(slotReplacer, reqReplacer);
 
             // If it is a recursive call, turn into a IRCallLoop instruction
