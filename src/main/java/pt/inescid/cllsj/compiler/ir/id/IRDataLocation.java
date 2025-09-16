@@ -71,6 +71,10 @@ public class IRDataLocation {
     return offset;
   }
 
+  public IRDataLocation advance(IRSlotOffset newOffset) {
+    return new IRDataLocation(index, remote, cell, offset.advance(newOffset));
+  }
+
   @Override
   public String toString() {
     StringBuilder b = new StringBuilder();

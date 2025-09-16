@@ -78,6 +78,16 @@ public abstract class IRSlotTree {
 
   public abstract IRSlotTree suffix(IRSlotTree other);
 
+  @Override
+  public boolean equals(Object obj) {
+    return this.toString().equals(obj.toString());
+  }
+
+  @Override
+  public int hashCode() {
+    return this.toString().hashCode();
+  }
+
   public static class Leaf extends IRSlotTree {
     @Override
     public Optional<IRSlot> singleHead() {
