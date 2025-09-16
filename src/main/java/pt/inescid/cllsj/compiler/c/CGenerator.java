@@ -828,8 +828,7 @@ public class CGenerator extends IRInstructionVisitor {
     if (!instr.getRemoteDataOffset().isZero()) {
       String target = targetAddr.deref("struct session");
       putAssign(
-          sessionContData(target),
-          offset(sessionContData(target), instr.getRemoteDataOffset()));
+          sessionContData(target), offset(sessionContData(target), instr.getRemoteDataOffset()));
     }
 
     // Modify the remote session to point to the target session
@@ -1300,7 +1299,8 @@ public class CGenerator extends IRInstructionVisitor {
         };
 
     CCondition isTailCall = CCondition.certainlyFalse();
-    if (currentProcess != null && compiler.optimizeTailCalls.get()
+    if (currentProcess != null
+        && compiler.optimizeTailCalls.get()
         && calledProcessId.equals(currentProcess.getId())
         && instr.isEndPoint()) {
       // This is a recursive call to the same process, and we are an end point
@@ -1310,7 +1310,7 @@ public class CGenerator extends IRInstructionVisitor {
       for (IRCallProcess.TypeArgument arg : instr.getTypeArguments()) {
         if (arg.isFromLocation()
             || !arg.getSourceTree().equals(IRSlotTree.of(new IRVarS(arg.getTargetType())))) {
-        System.err.println("Invalid type args");
+          System.err.println("Invalid type args");
           validArgs = false;
           break;
         }

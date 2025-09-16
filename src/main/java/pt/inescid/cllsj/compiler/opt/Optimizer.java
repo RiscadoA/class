@@ -1,20 +1,15 @@
 package pt.inescid.cllsj.compiler.opt;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
-import java.util.function.BiFunction;
 import java.util.function.Function;
-
 import pt.inescid.cllsj.compiler.anl.AnlFlow;
 import pt.inescid.cllsj.compiler.anl.AnlFlowContinuation;
-import pt.inescid.cllsj.compiler.ir.IRUsesTypeVar;
 import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
 import pt.inescid.cllsj.compiler.ir.id.*;
 import pt.inescid.cllsj.compiler.ir.instruction.*;
@@ -917,37 +912,48 @@ public class Optimizer {
       block.remove(block.size() - 1);
 
       // Functions for substituting type variables
-      Function<IRTypeId, IRSlotTree> slotReplacer = id -> {
-        for (IRCallProcess.TypeArgument arg : call.getTypeArguments()) {
-          if (arg.getTargetType().equals(id)) {
-            return arg.getSourceTree();
-          }
-        }
-        throw new IllegalStateException("Unbound type variable: " + id);
-      };
-      Function<IRTypeId, IRValueRequisites> reqReplacer = id -> {
-        for (IRCallProcess.TypeArgument arg : call.getTypeArguments()) {
-          if (arg.getTargetType().equals(id)) {
-            return arg.getSourceIsValue();
-          }
-        }
-        throw new IllegalStateException("Unbound type variable: " + id);
-      };
+      Function<IRTypeId, IRSlotTree> slotReplacer =
+          id -> {
+            for (IRCallProcess.TypeArgument arg : call.getTypeArguments()) {
+              if (arg.getTargetType().equals(id)) {
+                return arg.getSourceTree();
+              }
+            }
+            throw new IllegalStateException("Unbound type variable: " + id);
+          };
+      Function<IRTypeId, IRValueRequisites> reqReplacer =
+          id -> {
+            for (IRCallProcess.TypeArgument arg : call.getTypeArguments()) {
+              if (arg.getTargetType().equals(id)) {
+                return arg.getSourceIsValue();
+              }
+            }
+            throw new IllegalStateException("Unbound type variable: " + id);
+          };
 
       // Start by adding the called processes' local data to the current process
       // We must add move instructions to copy the data from the caller to callee
       Map<IRLocalDataId, IRLocalDataId> localDataMap = new HashMap<>();
       for (IRLocalDataId id : callProc.localData()) {
-        IRSlotCombinations combinations = callProc.getLocalData(id).replaceType(slotReplacer, reqReplacer);
+        IRSlotCombinations combinations =
+            callProc.getLocalData(id).replaceType(slotReplacer, reqReplacer);
         localDataMap.put(id, proc.addLocalData(combinations));
       }
       for (IRCallProcess.DataArgument arg : call.getDataArguments()) {
         // We need to add move instructions to copy the data from the caller to callee
         IRLocalDataId targetId = localDataMap.get(arg.getTargetDataId());
         if (arg.isClone()) {
-          block.add(new IRCloneValue(IRDataLocation.local(targetId, IRSlotOffset.ZERO), arg.getSourceLocation(), arg.getSlots()));
+          block.add(
+              new IRCloneValue(
+                  IRDataLocation.local(targetId, IRSlotOffset.ZERO),
+                  arg.getSourceLocation(),
+                  arg.getSlots()));
         } else {
-          block.add(new IRMoveValue(IRDataLocation.local(targetId, IRSlotOffset.ZERO), arg.getSourceLocation(), arg.getSlots()));
+          block.add(
+              new IRMoveValue(
+                  IRDataLocation.local(targetId, IRSlotOffset.ZERO),
+                  arg.getSourceLocation(),
+                  arg.getSlots()));
         }
       }
 
@@ -959,7 +965,12 @@ public class Optimizer {
         sessionMap.put(arg.getTargetSessionId(), newId);
         IRLocalDataId dataId = callProc.getArgSessionLocalDataId(arg.getTargetSessionId()).get();
         dataId = localDataMap.get(dataId);
-        block.add(new IRBindSession(newId, arg.getSourceSessionId(), arg.getDataOffset(), IRDataLocation.local(dataId, IRSlotOffset.ZERO)));
+        block.add(
+            new IRBindSession(
+                newId,
+                arg.getSourceSessionId(),
+                arg.getDataOffset(),
+                IRDataLocation.local(dataId, IRSlotOffset.ZERO)));
       }
       for (IRSessionId id : callProc.sessions()) {
         if (sessionMap.containsKey(id)) {
@@ -970,7 +981,12 @@ public class Optimizer {
 
       // Add the drop on end markers
       for (IRProcess.DropOnEnd drop : callProc.getDropOnEnd()) {
-        IRDropId dId = proc.addDropOnEnd(localDataMap.get(drop.getLocalDataId()), drop.getOffset().replaceSlots(t -> t.replaceType(slotReplacer, reqReplacer)), drop.getSlots().replaceType(slotReplacer, reqReplacer), false);
+        IRDropId dId =
+            proc.addDropOnEnd(
+                localDataMap.get(drop.getLocalDataId()),
+                drop.getOffset().replaceSlots(t -> t.replaceType(slotReplacer, reqReplacer)),
+                drop.getSlots().replaceType(slotReplacer, reqReplacer),
+                false);
         if (drop.isAlways()) {
           block.add(new IRDeferDrop(dId));
         }
@@ -995,7 +1011,8 @@ public class Optimizer {
       for (IRBlock callBlock : callProc.streamBlocks().toList()) {
         locationMap.put(
             callBlock.getLocation(),
-            proc.createBlock(call.getProcessId() + "_" + callBlock.getLocation().toString()).getLocation());
+            proc.createBlock(call.getProcessId() + "_" + callBlock.getLocation().toString())
+                .getLocation());
       }
 
       // Function for converting an instruction from the inlined process to the current process

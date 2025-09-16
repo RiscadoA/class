@@ -350,7 +350,8 @@ public class IRCallProcess extends IRInstruction {
           continue;
         }
 
-        Set<IRSessionId> before = mustBeSourceBefore.getOrDefault(arg.getTargetSessionId(), Set.of());
+        Set<IRSessionId> before =
+            mustBeSourceBefore.getOrDefault(arg.getTargetSessionId(), Set.of());
         if (used.containsAll(before)) {
           ordered.add(arg);
           if (!arg.isFromLocation()) {
@@ -377,7 +378,8 @@ public class IRCallProcess extends IRInstruction {
     Map<IRLocalDataId, Set<IRLocalDataId>> mustBeUsedBefore = new HashMap<>();
     for (DataArgument arg : dataArguments) {
       // We only care about local data, so skip if source is not local
-      if (!arg.getSourceLocation().isLocal() || arg.getSourceLocation().getLocalDataId().equals(arg.getTargetDataId())) {
+      if (!arg.getSourceLocation().isLocal()
+          || arg.getSourceLocation().getLocalDataId().equals(arg.getTargetDataId())) {
         continue;
       }
       IRLocalDataId sourceId = arg.getSourceLocation().getLocalDataId();

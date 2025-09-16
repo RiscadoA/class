@@ -14,7 +14,11 @@ public class IRBindSession extends IRInstruction {
   private IRSlotOffset remoteDataOffset;
   private IRDataLocation localData;
 
-  public IRBindSession(IRSessionId targetSessionId, IRDataLocation sourceLocation, IRSlotOffset remoteDataOffset, IRDataLocation localData) {
+  public IRBindSession(
+      IRSessionId targetSessionId,
+      IRDataLocation sourceLocation,
+      IRSlotOffset remoteDataOffset,
+      IRDataLocation localData) {
     this.targetSessionId = targetSessionId;
     this.sourceLocation = Optional.of(sourceLocation);
     this.sourceSessionId = Optional.empty();
@@ -22,7 +26,11 @@ public class IRBindSession extends IRInstruction {
     this.localData = localData;
   }
 
-  public IRBindSession(IRSessionId targetSessionId, IRSessionId sourceSessionId, IRSlotOffset remoteDataOffset, IRDataLocation localData) {
+  public IRBindSession(
+      IRSessionId targetSessionId,
+      IRSessionId sourceSessionId,
+      IRSlotOffset remoteDataOffset,
+      IRDataLocation localData) {
     this.targetSessionId = targetSessionId;
     this.sourceLocation = Optional.empty();
     this.sourceSessionId = Optional.of(sourceSessionId);

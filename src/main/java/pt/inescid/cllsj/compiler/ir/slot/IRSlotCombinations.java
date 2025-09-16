@@ -3,7 +3,6 @@ package pt.inescid.cllsj.compiler.ir.slot;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Function;
-
 import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
 import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
 
@@ -40,11 +39,11 @@ public class IRSlotCombinations {
     return trees.size();
   }
 
-  public IRSlotCombinations replaceType(Function<IRTypeId, IRSlotTree> slotReplacer, Function<IRTypeId, IRValueRequisites> reqReplacer) {
+  public IRSlotCombinations replaceType(
+      Function<IRTypeId, IRSlotTree> slotReplacer,
+      Function<IRTypeId, IRValueRequisites> reqReplacer) {
     return new IRSlotCombinations(
-        trees.stream()
-            .map(tree -> tree.replaceType(slotReplacer, reqReplacer))
-            .toList());
+        trees.stream().map(tree -> tree.replaceType(slotReplacer, reqReplacer)).toList());
   }
 
   public IRSlotCombinations suffix(IRSlot slot) {

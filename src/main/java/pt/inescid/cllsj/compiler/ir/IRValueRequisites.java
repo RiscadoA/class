@@ -79,7 +79,10 @@ public class IRValueRequisites {
     if (mustBeValue()) {
       return "yes";
     } else if (canBeValue()) {
-      return types.get().stream().map(Object::toString).reduce((a, b) -> a + ", " + b).orElseThrow();
+      return types.get().stream()
+          .map(Object::toString)
+          .reduce((a, b) -> a + ", " + b)
+          .orElseThrow();
     } else {
       return "no";
     }

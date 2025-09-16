@@ -2,7 +2,6 @@ package pt.inescid.cllsj.compiler.ir.instruction;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Function;
-
 import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
 import pt.inescid.cllsj.compiler.ir.id.IRCodeLocation;
 import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
@@ -29,7 +28,9 @@ public abstract class IRInstruction {
     replaceDataLocations(loc -> loc.replaceSlots(replacer));
   }
 
-  public void replaceType(Function<IRTypeId, IRSlotTree> slotReplacer, Function<IRTypeId, IRValueRequisites> reqReplacer) {
+  public void replaceType(
+      Function<IRTypeId, IRSlotTree> slotReplacer,
+      Function<IRTypeId, IRValueRequisites> reqReplacer) {
     replaceSlots(t -> t.replaceType(slotReplacer, reqReplacer));
   }
 

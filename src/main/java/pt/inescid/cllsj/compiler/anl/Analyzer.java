@@ -168,7 +168,8 @@ public class Analyzer extends IRInstructionVisitor {
     AnlSessionState targetSession = state.session(instr.getTargetSessionId());
     Optional<IRSessionId> sourceSessionId;
     if (instr.isFromLocation()) {
-      sourceSessionId = state.read(instr.getSourceLocation(), true).assumeSession().map(s -> s.id());
+      sourceSessionId =
+          state.read(instr.getSourceLocation(), true).assumeSession().map(s -> s.id());
     } else {
       sourceSessionId = Optional.of(instr.getSourceSessionId());
     }
