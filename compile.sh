@@ -5,12 +5,12 @@ Cflags="$C_FLAGS -std=c11"
 dumpast=false
 dumpiir=false
 dumpfir=false
-dumpflow=false
+dumpanl=false
 debug=false
 run=false
 ofile=""
 
-while getopts ":aiIfOdro:" opt; do
+while getopts ":aiIAOdro:" opt; do
     case $opt in
         a)
             dumpast=true
@@ -21,8 +21,8 @@ while getopts ":aiIfOdro:" opt; do
         I)
             dumpfir=true
             ;;
-        f)
-            dumpflow=true
+        A)
+            dumpanl=true
             ;;
         O)
             Cflags="$Cflags -O2"
@@ -51,11 +51,11 @@ done
 shift $((OPTIND-1))
 
 if [ -z $1 ]; then
-    echo "Usage: $0 [-a] [-i] [-I] [-O] [-d]  [-r] [-o <output>] <input>" >&2
+    echo "Usage: $0 [-a] [-i] [-I] [-A] [-O] [-d]  [-r] [-o <output>] <input>" >&2
     echo "    -a: Dump AST" >&2
     echo "    -i: Dump initial IR code" >&2
     echo "    -I: Dump final IR code" >&2
-    echo "    -f: Dump flow analysis" >&2
+    echo "    -A: Dump IR analysis" >&2
     echo "    -O: Compile with GCC optimization flags" >&2
     echo "    -d: Compile with GCC debug flags / Run with gdb" >&2
     echo "    -r: Run the compiled program after compilation" >&2
@@ -69,14 +69,14 @@ if [ -z $ofile ]; then
     cfile=bin/${basename%.*}.c
     astfile=bin/${basename%.*}.ast
     irfile=bin/${basename%.*}.ir
-    flowfile=bin/${basename%.*}.flow
+    anlfile=bin/${basename%.*}.anl
     pfile=bin/${basename%.*}
     mkdir -p bin
 else
     cfile=$ofile.c
     astfile=$ofile.ast
     irfile=$ofile.ir
-    flowfile=$ofile.flow
+    anlfile=$ofile.anl
     pfile=$ofile
 fi
 
@@ -88,12 +88,12 @@ if [ $dumpiir = true ]; then
     echo "@@@@@@ Dumping initial IR code to $irfile..." >&2
     CLLSflags="$CLLSflags --output-initial-ir=$irfile"
 elif [ $dumpfir = true ]; then
-    echo "@@@@@@ Dumping initial IR code to $irfile..." >&2
+    echo "@@@@@@ Dumping final IR code to $irfile..." >&2
     CLLSflags="$CLLSflags --output-final-ir=$irfile"
 fi
-if [ $dumpflow = true ]; then
-    echo "@@@@@@ Dumping flow analysis to $flowfile..." >&2
-    CLLSflags="$CLLSflags --output-flow=$flowfile"
+if [ $dumpanl = true ]; then
+    echo "@@@@@@ Dumping IR analysis to $anlfile..." >&2
+    CLLSflags="$CLLSflags --output-analysis=$anlfile"
 fi
 CLLSflags="$CLLSflags --input=$1 --output-c=$cfile"
 

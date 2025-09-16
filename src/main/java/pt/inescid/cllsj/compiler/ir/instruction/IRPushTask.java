@@ -1,5 +1,7 @@
 package pt.inescid.cllsj.compiler.ir.instruction;
 
+import java.util.function.Function;
+
 import pt.inescid.cllsj.compiler.ir.id.IRCodeLocation;
 
 public class IRPushTask extends IRInstruction {
@@ -32,5 +34,10 @@ public class IRPushTask extends IRInstruction {
   @Override
   public IRInstruction clone() {
     return new IRPushTask(location, concurrent);
+  }
+
+  @Override
+  public void replaceCodeLocations(Function<IRCodeLocation, IRCodeLocation> replacer) {
+    location = replacer.apply(location);
   }
 }

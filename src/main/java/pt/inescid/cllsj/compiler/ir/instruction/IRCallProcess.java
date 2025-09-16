@@ -244,6 +244,10 @@ public class IRCallProcess extends IRInstruction {
     return isEndPoint;
   }
 
+  public void removeEndPoint() {
+    this.isEndPoint = false;
+  }
+
   @Override
   public void accept(IRInstructionVisitor visitor) {
     visitor.visit(this);

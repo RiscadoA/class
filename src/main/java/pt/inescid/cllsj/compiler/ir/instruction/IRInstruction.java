@@ -28,4 +28,16 @@ public abstract class IRInstruction {
         });
     return uses.get();
   }
+
+  public boolean usesCodeLocation(IRCodeLocation location) {
+    AtomicBoolean uses = new AtomicBoolean(false);
+    replaceCodeLocations(
+        loc -> {
+          if (loc.equals(location)) {
+            uses.set(true);
+          }
+          return loc;
+        });
+    return uses.get();
+  }
 }

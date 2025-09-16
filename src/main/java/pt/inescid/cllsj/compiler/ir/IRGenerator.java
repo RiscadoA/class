@@ -242,7 +242,7 @@ public class IRGenerator extends ASTNodeVisitor {
     // Initialize the new session with the negative block as its continuation
     block.add(
         new IRInitializeSession(
-            channel.getSessionId(), negBlock.getLocation(), channel.getLocalData()));
+            channel.getSessionId(), Optional.of(negBlock.getLocation()), channel.getLocalData()));
 
     // Recurse on both sides
     recurse(block, pos);
@@ -659,7 +659,7 @@ public class IRGenerator extends ASTNodeVisitor {
           // Initialize the new session so that its data points to the main session's data
           block.add(
               new IRInitializeSession(
-                  argSession.getSessionId(), rhsBlock.getLocation(), channel.getRemoteData()));
+                  argSession.getSessionId(), Optional.of(rhsBlock.getLocation()), channel.getRemoteData()));
           recurse(block, lhsCont);
         },
         () -> {
@@ -674,7 +674,7 @@ public class IRGenerator extends ASTNodeVisitor {
           block.add(
               new IRInitializeSession(
                   argSession.getSessionId(),
-                  closureBlock.getLocation(),
+                  Optional.of(closureBlock.getLocation()),
                   argSession.getLocalData()));
 
           block.add(new IRWriteSession(channel.getRemoteData(), argSession.getSessionId()));
@@ -774,7 +774,7 @@ public class IRGenerator extends ASTNodeVisitor {
 
     // If the type still has a continuation, we must forward two sessions to each other
     if (mayHaveContinuation(negChType)) {
-      block.add(new IRForwardSessions(neg.getSessionId(), pos.getSessionId(), true));
+      block.add(new IRForwardSessions(neg.getSessionId(), pos.getSessionId(), true, true));
     } else {
       // Jump to the positive session's continuation
       block.add(new IRFinishSession(pos.getSessionId(), true));
@@ -931,7 +931,7 @@ public class IRGenerator extends ASTNodeVisitor {
     IREnvironment.Channel channel = env.getChannel(ch);
     block.add(
         new IRInitializeSession(
-            channel.getSessionId(), rhsBlock.getLocation(), channel.getLocalData()));
+            channel.getSessionId(), Optional.of(rhsBlock.getLocation()), channel.getLocalData()));
 
     // Write the type, the right-hand-side session and the type's polarity to the main channel
     IRSlotsFromASTType varInfo = slotsFromType(type);
@@ -1170,7 +1170,7 @@ public class IRGenerator extends ASTNodeVisitor {
     IRBlock cellBlock = process.createBlock("cell_rhs");
     block.add(
         new IRInitializeSession(
-            cellSession.getSessionId(), cellBlock.getLocation(), cellSession.getLocalData()));
+            cellSession.getSessionId(), Optional.of(cellBlock.getLocation()), cellSession.getLocalData()));
 
     // Store it in the cell and finish
     block.add(
@@ -1198,7 +1198,7 @@ public class IRGenerator extends ASTNodeVisitor {
     recurse(closureBlock, contLhs);
     block.add(
         new IRInitializeSession(
-            argSession.getSessionId(), closureBlock.getLocation(), argSession.getLocalData()));
+            argSession.getSessionId(), Optional.of(closureBlock.getLocation()), argSession.getLocalData()));
 
     block.add(new IRWriteSession(cellDataLoc, argSession.getSessionId()));
 

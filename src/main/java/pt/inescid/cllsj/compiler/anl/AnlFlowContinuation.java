@@ -54,7 +54,11 @@ public class AnlFlowContinuation {
       }
     } else if (instruction instanceof IRInitializeSession) {
       IRInitializeSession init = (IRInitializeSession) instruction;
-      init.replaceCodeLocations(r -> location.get());
+      if (location.isEmpty()) {
+        init.removeContinuation();
+      } else {
+        init.replaceCodeLocations(r -> location.get());
+      }
     } else {
       throw new IllegalArgumentException(
           "Cannot replace continuation for instruction " + instruction + " at " + this);

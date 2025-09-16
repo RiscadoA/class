@@ -6,8 +6,10 @@ import java.io.InputStream;
 import java.io.PrintStream;
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.function.Consumer;
 import pt.inescid.cllsj.CLLSj;
@@ -18,6 +20,8 @@ import pt.inescid.cllsj.ast.nodes.ASTInclude;
 import pt.inescid.cllsj.ast.nodes.ASTPList;
 import pt.inescid.cllsj.ast.nodes.ASTProgram;
 import pt.inescid.cllsj.ast.nodes.ASTProgramWithIncludes;
+import pt.inescid.cllsj.compiler.anl.Analyzer;
+import pt.inescid.cllsj.compiler.anl.AnlFlow;
 import pt.inescid.cllsj.compiler.ast.ASTPrinter;
 import pt.inescid.cllsj.compiler.ast.ASTSessionRenamer;
 import pt.inescid.cllsj.compiler.c.CAlignment;
@@ -25,7 +29,10 @@ import pt.inescid.cllsj.compiler.c.CArchitecture;
 import pt.inescid.cllsj.compiler.c.CGenerator;
 import pt.inescid.cllsj.compiler.c.CSize;
 import pt.inescid.cllsj.compiler.ir.IRGenerator;
+import pt.inescid.cllsj.compiler.ir.id.IRProcessId;
+import pt.inescid.cllsj.compiler.ir.instruction.IRBlock;
 import pt.inescid.cllsj.compiler.ir.instruction.IRProgram;
+import pt.inescid.cllsj.compiler.opt.Optimizer;
 
 public class Compiler {
   private Settings settings = new Settings();
@@ -34,6 +41,7 @@ public class Compiler {
   public Settings.Path outputASTFile;
   public Settings.Path outputInitialIRFile;
   public Settings.Path outputFinalIRFile;
+  public Settings.Path outputAnalysisFile;
   public Settings.Path outputCFile;
 
   public Settings.Name entryProcess;
@@ -54,8 +62,11 @@ public class Compiler {
   private Settings.Int pointerSize;
   private Settings.Int pointerAlignment;
 
+  public Settings.Flag analyzeIR;
   public Settings.Flag optimizeSingleEndpoint;
   public Settings.Flag optimizeSendValue;
+  public Settings.Flag optimizeKnownJumps;
+  public Settings.Flag optimizeKnownEndPoints;
 
   public Compiler() {
     // Compiler operation settings
@@ -74,6 +85,9 @@ public class Compiler {
             "output-final-ir",
             "File to output the final (optimized) IR representation",
             null);
+    outputAnalysisFile =
+        settings.addPath(
+            "oA", "output-analysis", "File to output the IR analysis information", null);
     outputCFile =
         settings.addPath(
             "o", "output-c", "File to output the generated C code (omit for stdout)", null);
@@ -115,6 +129,8 @@ public class Compiler {
     pointerAlignment =
         settings.addInt("pointer-alignment", "Alignment of pointer C type in bytes", 8);
 
+    analyzeIR =
+        settings.addFlag("analyze-ir", "Enables analysis of the IR after generation", true);
     optimizeSingleEndpoint =
         settings.addFlag(
             "optimize-single-endpoint",
@@ -124,6 +140,16 @@ public class Compiler {
         settings.addFlag(
             "optimize-send-value",
             "Optimizes sends of closures into sends of values where possible",
+            true);
+    optimizeKnownJumps =
+        settings.addFlag(
+            "optimize-known-jumps",
+            "Concatenates blocks when jumps have a known target",
+            true);
+    optimizeKnownEndPoints =
+        settings.addFlag(
+            "optimize-known-endpoints",
+            "Optimizes away end points when they are known to not be the last instruction in a process",
             true);
 
     settings.addMode(
@@ -139,8 +165,11 @@ public class Compiler {
         "no-optimization",
         "Disables all optimization flags",
         () -> {
+          analyzeIR.set(false);
           optimizeSingleEndpoint.set(false);
           optimizeSendValue.set(false);
+          optimizeKnownJumps.set(false);
+          optimizeKnownEndPoints.set(false);
         });
 
     settings.addMode(
@@ -234,7 +263,28 @@ public class Compiler {
     // Output the initial IR if requested
     openFileForOutput(outputInitialIRFile, stream -> stream.print(ir));
 
-    // TODO: optimize the IR
+    Optimizer optimizer = new Optimizer();
+    if (analyzeIR.get()) {
+      // Analyze the IR
+      Map<IRProcessId, Map<IRBlock, AnlFlow>> flows = Analyzer.analyze(ir);
+
+      openFileForOutput(outputAnalysisFile, stream -> {
+        for (IRProcessId id : flows.keySet()) {
+          stream.println("===========================[ " + id + " ]===========================");
+          stream.println(flows.get(id).get(ir.get(id).getEntry()));
+        }
+      });
+
+      optimizer.feedAnalysis(flows);
+    }
+
+    // Optimize the IR
+    if (analyzeIR.get() && optimizeKnownJumps.get()) {
+      optimizer.optimizeKnownJumps(ir);
+    }
+    if (analyzeIR.get() && optimizeKnownEndPoints.get()) {
+      optimizer.optimizeKnownEndPoints(ir);
+    }
 
     // Output the final IR if requested
     openFileForOutput(outputFinalIRFile, stream -> stream.print(ir));

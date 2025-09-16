@@ -134,7 +134,20 @@ public class AnlFlowState {
 
     AnlFlowState merged = this.clone();
     for (Map.Entry<IRSessionId, AnlSessionState> entry : other.sessions.entrySet()) {
-      merged.sessions.put(entry.getKey(), session(entry.getKey()).merge(entry.getValue()));
+      if (merged.sessions.containsKey(entry.getKey())) {
+        merged.sessions.put(
+            entry.getKey(), merged.sessions.get(entry.getKey()).merge(entry.getValue()));
+      } else {
+        merged.sessions.put(entry.getKey(), entry.getValue().clone());
+      }
+    }
+    for (Map.Entry<IRLocalDataId, AnlLocalDataState> entry : other.localData.entrySet()) {
+      if (merged.localData.containsKey(entry.getKey())) {
+        merged.localData.put(
+            entry.getKey(), merged.localData.get(entry.getKey()).merge(entry.getValue()));
+      } else {
+        merged.localData.put(entry.getKey(), entry.getValue().clone());
+      }
     }
     if (!this.pendingContinuations.equals(other.pendingContinuations)) {
       merged.pendingContinuations.clear();
@@ -146,6 +159,9 @@ public class AnlFlowState {
     AnlFlowState clone = new AnlFlowState();
     for (Map.Entry<IRSessionId, AnlSessionState> entry : this.sessions.entrySet()) {
       clone.sessions.put(entry.getKey(), entry.getValue().clone());
+    }
+    for (Map.Entry<IRLocalDataId, AnlLocalDataState> entry : this.localData.entrySet()) {
+      clone.localData.put(entry.getKey(), entry.getValue().clone());
     }
     clone.pendingContinuations.addAll(this.pendingContinuations);
     return clone;

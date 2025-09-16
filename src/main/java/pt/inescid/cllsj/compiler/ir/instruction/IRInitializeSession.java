@@ -1,5 +1,6 @@
 package pt.inescid.cllsj.compiler.ir.instruction;
 
+import java.util.Optional;
 import java.util.function.Function;
 import pt.inescid.cllsj.compiler.ir.id.IRCodeLocation;
 import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
@@ -7,11 +8,11 @@ import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
 
 public class IRInitializeSession extends IRInstruction {
   private IRSessionId sessionId;
-  private IRCodeLocation continuation;
+  private Optional<IRCodeLocation> continuation;
   private IRDataLocation continuationData;
 
   public IRInitializeSession(
-      IRSessionId sessionId, IRCodeLocation continuation, IRDataLocation continuationData) {
+      IRSessionId sessionId, Optional<IRCodeLocation> continuation, IRDataLocation continuationData) {
     this.sessionId = sessionId;
     this.continuation = continuation;
     this.continuationData = continuationData;
@@ -21,7 +22,7 @@ public class IRInitializeSession extends IRInstruction {
     return sessionId;
   }
 
-  public IRCodeLocation getContinuation() {
+  public Optional<IRCodeLocation> getContinuation() {
     return continuation;
   }
 
@@ -46,7 +47,7 @@ public class IRInitializeSession extends IRInstruction {
 
   @Override
   public void replaceCodeLocations(Function<IRCodeLocation, IRCodeLocation> replacer) {
-    continuation = replacer.apply(continuation);
+    continuation = continuation.map(replacer);
   }
 
   @Override
@@ -54,8 +55,19 @@ public class IRInitializeSession extends IRInstruction {
     continuationData = replacer.apply(continuationData);
   }
 
+  public void removeContinuation() {
+    continuation = Optional.empty();
+  }
+
   @Override
   public String toString() {
-    return "initializeSession(" + sessionId + ", " + continuation + ", " + continuationData + ")";
+    StringBuilder sb = new StringBuilder();
+    sb.append("initializeSession(");
+    sb.append(sessionId).append(", ");
+    if (continuation.isPresent()) {
+      sb.append(continuation.get()).append(", ");
+    }
+    sb.append(continuationData).append(")");
+    return sb.toString();
   }
 }

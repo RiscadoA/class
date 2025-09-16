@@ -19,8 +19,10 @@ public class AnlSessionState {
 
   public AnlSessionState merge(AnlSessionState other) {
     AnlSessionState clone = this.clone();
-    if (!this.cont.equals(other.cont)) {
+    if (this.cont.isEmpty() || other.cont.isEmpty()) {
       clone.cont = Optional.empty();
+    } else {
+      clone.cont = this.cont.get().merge(other.cont.get());
     }
     if (!this.data.equals(other.data)) {
       clone.data = Optional.empty();
@@ -41,8 +43,11 @@ public class AnlSessionState {
       data = Optional.empty();
     }
     if (remote.isPresent()) {
-      state.session(remote.get()).markAsUnknown(analyzer, state);
-      remote = Optional.empty();
+      state.session(remote.get()).remote = Optional.empty();
+      if (remote.isPresent()) {
+        state.session(remote.get()).markAsUnknown(analyzer, state);
+        remote = Optional.empty();
+      }
     }
   }
 

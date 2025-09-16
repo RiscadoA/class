@@ -29,6 +29,10 @@ public class IRBlock {
     return instructions.get(index);
   }
 
+  public IRInstruction last() {
+    return instructions.getLast();
+  }
+
   public void set(int index, IRInstruction instr) {
     instructions.set(index, instr);
   }

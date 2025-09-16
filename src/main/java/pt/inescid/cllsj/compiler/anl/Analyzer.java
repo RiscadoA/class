@@ -5,6 +5,7 @@ import java.util.Map;
 import java.util.Optional;
 import pt.inescid.cllsj.compiler.ir.id.IRCodeLocation;
 import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
+import pt.inescid.cllsj.compiler.ir.id.IRProcessId;
 import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
 import pt.inescid.cllsj.compiler.ir.instruction.*;
 
@@ -15,6 +16,12 @@ public class Analyzer extends IRInstructionVisitor {
   private AnlFlowState state;
   private IRProcess process;
   private AnlFlowLocation flowLoc;
+
+  public static Map<IRProcessId, Map<IRBlock, AnlFlow>> analyze(IRProgram process) {
+    Map<IRProcessId, Map<IRBlock, AnlFlow>> result = new HashMap<>();
+    process.stream().forEach(p -> result.put(p.getId(), analyze(p)));
+    return result;
+  }
 
   public static Map<IRBlock, AnlFlow> analyze(IRProcess process) {
     Analyzer analyzer = new Analyzer(process);
@@ -55,6 +62,7 @@ public class Analyzer extends IRInstructionVisitor {
   }
 
   private void visitNextPending() {
+    state.handleUnknownWrites(this);
     Optional<AnlFlowContinuation> cont = state.popPendingContinuation();
     if (cont.isPresent()) {
       visit(cont.get().getLocation(), VisitType.PENDING);
@@ -102,24 +110,40 @@ public class Analyzer extends IRInstructionVisitor {
   @Override
   public void visit(IRInitializeSession instr) {
     AnlSessionState session = state.session(instr.getSessionId());
-    session.cont = Optional.of(new AnlFlowContinuation(instr.getContinuation(), flowLoc));
+    if (instr.getContinuation().isPresent()) {
+      session.cont = Optional.of(new AnlFlowContinuation(instr.getContinuation().get(), flowLoc));
+    } else {
+      session.cont = Optional.empty();
+    }
     session.data = Optional.of(instr.getContinuationData());
     session.remote = Optional.of(instr.getSessionId());
   }
 
   @Override
   public void visit(IRContinueSession instr) {
-    AnlSessionState session = state.session(instr.getSessionId());
+    AnlSessionState session;
+    if (instr.isById()) {
+      session = state.session(instr.getSessionId());
+    } else {
+      Optional<AnlSlot.Session> slot = state.read(instr.getSessionLocation()).assumeSession();
+      if (slot.isEmpty()) {
+        // Unknown session
+        visitNextPending();
+        return;
+      }
+      session = state.session(slot.get().id());
+    }
+
     Optional<IRCodeLocation> cont = session.cont.map(c -> c.getLocation());
-    session.cont = Optional.of(new AnlFlowContinuation(instr.getContinuation(), flowLoc));
     if (cont.isPresent()) {
       // Certain continuation
+      session.cont = Optional.of(new AnlFlowContinuation(instr.getContinuation(), flowLoc));
       visit(cont.get(), VisitType.BRANCH);
     } else {
       // Unknown continuation, may write to unknown locations
+      session.cont = Optional.empty();
       state.handleUnknownWrites(this);
-      visit(session.cont.get().getLocation(), VisitType.DETACHED);
-      throw new UnsupportedOperationException("Unimplemented method 'visit'");
+      visit(instr.getContinuation(), VisitType.DETACHED);
     }
   }
 
@@ -127,6 +151,7 @@ public class Analyzer extends IRInstructionVisitor {
   public void visit(IRFinishSession instr) {
     AnlSessionState session = state.session(instr.getSessionId());
     Optional<IRCodeLocation> cont = session.cont.map(c -> c.getLocation());
+    session.cont = Optional.empty();
     if (session.remote.isPresent()) {
       AnlSessionState remote = state.session(session.remote.get());
       remote.remote = Optional.empty();
@@ -135,7 +160,6 @@ public class Analyzer extends IRInstructionVisitor {
       visit(cont.get(), VisitType.BRANCH);
     } else {
       // Unknown continuation, may write to unknown locations
-      state.handleUnknownWrites(this);
       visitNextPending();
     }
   }
@@ -220,7 +244,11 @@ public class Analyzer extends IRInstructionVisitor {
   @Override
   public void visit(IRCallProcess instr) {
     for (IRCallProcess.SessionArgument arg : instr.getSessionArguments()) {
-      state.session(arg.getSourceSessionId()).markAsUnknown(this, state);
+      if (arg.isFromLocation()) {
+        state.read(arg.getSourceSessionLocation()).markAsUnknown(this, state);
+      } else {
+        state.session(arg.getSourceSessionId()).markAsUnknown(this, state);
+      }
     }
     visitNextPending();
   }
@@ -262,10 +290,17 @@ public class Analyzer extends IRInstructionVisitor {
       posRemote.get().remote = negRemoteId;
     }
 
-    if (posCont.isPresent()) {
-      visit(posCont.get().getLocation(), VisitType.BRANCH);
-    } else {
-      visitNextPending();
+    neg.cont = Optional.empty();
+    neg.remote = Optional.empty();
+    pos.cont = Optional.empty();
+    pos.remote = Optional.empty();
+
+    if (instr.shouldJump()) {
+      if (posCont.isPresent()) {
+        visit(posCont.get().getLocation(), VisitType.BRANCH);
+      } else {
+        visitNextPending();
+      }
     }
   }
 

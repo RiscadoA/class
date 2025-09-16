@@ -789,7 +789,7 @@ public class CGenerator extends IRInstructionVisitor {
     CAddress contData = data(instr.getContinuationData());
 
     StringBuilder sb = new StringBuilder("(struct session)");
-    sb.append("{.cont=").append(codeLocationAddress(instr.getContinuation()));
+    sb.append("{.cont=").append(instr.getContinuation().map(this::codeLocationAddress).orElse(NULL));
     sb.append(",.cont_env=").append(ENV);
     sb.append(",.cont_data=").append(contData);
     sb.append(",.cont_session=").append(session);
@@ -959,15 +959,19 @@ public class CGenerator extends IRInstructionVisitor {
         () -> {
           putAssign(accessRemoteSession(TMP_SESSION), accessSession(instr.getPosId()));
         });
-    putAssign(TMP_PTR1, sessionCont(accessSession(instr.getPosId())));
-    putAssign(TMP_PTR2, sessionContEnv(accessSession(instr.getPosId())));
+    if (instr.shouldJump()) {
+      putAssign(TMP_PTR1, sessionCont(accessSession(instr.getPosId())));
+      putAssign(TMP_PTR2, sessionContEnv(accessSession(instr.getPosId())));
+    }
     putAssign(accessRemoteSession(instr.getPosId()), TMP_SESSION);
 
     if (instr.isEndPoint()) {
       putDecrementEndPoints(true);
     }
-    putAssign(ENV, cast(TMP_PTR2, "char*"));
-    putComputedGoto(TMP_PTR1);
+    if (instr.shouldJump()) {
+      putAssign(ENV, cast(TMP_PTR2, "char*"));
+      putComputedGoto(TMP_PTR1);
+    }
   }
 
   @Override

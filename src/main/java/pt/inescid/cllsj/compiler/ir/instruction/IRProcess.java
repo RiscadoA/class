@@ -168,6 +168,10 @@ public class IRProcess {
     return block;
   }
 
+  public void removeBlock(IRBlock block) {
+    blocks.remove(block);
+  }
+
   @Override
   public String toString() {
     StringBuilder b = new StringBuilder();
