@@ -271,6 +271,19 @@ public class IRCallProcess extends IRInstruction {
     for (DataArgument arg : dataArguments) {
       arg.slots = replacer.apply(arg.slots);
     }
+    for (TypeArgument arg : typeArguments) {
+      arg.sourceTree = arg.sourceTree.map(replacer);
+    }
+  }
+
+  @Override
+  public void replaceType(
+      Function<IRTypeId, IRSlotTree> slotReplacer,
+      Function<IRTypeId, IRValueRequisites> reqReplacer) {
+    super.replaceType(slotReplacer, reqReplacer);
+    for (TypeArgument arg : typeArguments) {
+      arg.sourceIsValue = arg.sourceIsValue.map(r -> r.expandTypes(reqReplacer));
+    }
   }
 
   @Override
@@ -335,8 +348,8 @@ public class IRCallProcess extends IRInstruction {
     for (SessionArgument arg : sessionArguments) {
       if (!arg.isFromLocation() && !arg.getSourceSessionId().equals(arg.getTargetSessionId())) {
         mustBeSourceBefore
-            .computeIfAbsent(arg.getTargetSessionId(), k -> new HashSet<>())
-            .add(arg.getSourceSessionId());
+            .computeIfAbsent(arg.getSourceSessionId(), k -> new HashSet<>())
+            .add(arg.getTargetSessionId());
       }
     }
 
@@ -383,7 +396,7 @@ public class IRCallProcess extends IRInstruction {
         continue;
       }
       IRLocalDataId sourceId = arg.getSourceLocation().getLocalDataId();
-      mustBeUsedBefore.computeIfAbsent(arg.getTargetDataId(), k -> new HashSet<>()).add(sourceId);
+      mustBeUsedBefore.computeIfAbsent(sourceId, k -> new HashSet<>()).add(arg.getTargetDataId());
     }
     List<DataArgument> ordered = new ArrayList<>();
     Set<IRLocalDataId> used = new HashSet<>();
@@ -397,11 +410,9 @@ public class IRCallProcess extends IRInstruction {
         Set<IRLocalDataId> before = mustBeUsedBefore.getOrDefault(arg.getTargetDataId(), Set.of());
         if (used.containsAll(before)) {
           ordered.add(arg);
-          // We only care about local data, so skip if source is not local
           if (arg.getSourceLocation().isLocal()) {
             used.add(arg.getSourceLocation().getLocalDataId());
           }
-          used.add(arg.getTargetDataId());
           progress = true;
         }
       }
