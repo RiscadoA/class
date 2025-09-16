@@ -45,6 +45,7 @@ public class IRBranchExpression extends IRBranch {
 
   @Override
   public void replaceDataLocations(Function<IRDataLocation, IRDataLocation> replacer) {
+    super.replaceDataLocations(replacer);
     expression.replaceDataLocations(replacer);
   }
 

@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.stream.Stream;
 import pt.inescid.cllsj.compiler.ir.id.IRCodeLocation;
 import pt.inescid.cllsj.compiler.ir.id.IRDropId;
@@ -102,6 +103,13 @@ public class IRProcess {
     return sessionId;
   }
 
+  public void removeSession(IRSessionId sessionId) {
+    if (argSessionLocalDataId.containsKey(sessionId)) {
+      throw new IllegalArgumentException("Cannot remove argument session " + sessionId);
+    }
+    sessionCount -= 1;
+  }
+
   public IRTypeId addType() {
     return new IRTypeId(typeCount++);
   }
@@ -110,8 +118,24 @@ public class IRProcess {
     return typeCount;
   }
 
+  public boolean isArgSession(IRSessionId sessionId) {
+    return argSessionLocalDataId.containsKey(sessionId);
+  }
+
   public Optional<IRLocalDataId> getArgSessionLocalDataId(IRSessionId sessionId) {
     return Optional.ofNullable(argSessionLocalDataId.get(sessionId));
+  }
+
+  public void replaceSessionsOnHeader(Function<IRSessionId, IRSessionId> replacer) {
+    Map<IRSessionId, IRLocalDataId> newArgSessionLocalDataId = new HashMap<>();
+    for (Map.Entry<IRSessionId, IRLocalDataId> entry : argSessionLocalDataId.entrySet()) {
+      newArgSessionLocalDataId.put(replacer.apply(entry.getKey()), entry.getValue());
+    }
+    argSessionLocalDataId = newArgSessionLocalDataId;
+  }
+
+  public boolean isArgData(IRLocalDataId localDataId) {
+    return argSessionLocalDataId.containsValue(localDataId);
   }
 
   public IRSlotCombinations getLocalData(IRLocalDataId id) {
@@ -121,6 +145,25 @@ public class IRProcess {
   public IRLocalDataId addLocalData(IRSlotCombinations combinations) {
     localData.add(combinations);
     return new IRLocalDataId(localData.size() - 1);
+  }
+
+  public void removeLocalData(IRLocalDataId id) {
+    localData.remove(id.getIndex());
+    if (argSessionLocalDataId.containsValue(id)) {
+      throw new IllegalArgumentException("Cannot remove argument data " + id);
+    }
+  }
+
+  public void replaceLocalDataOnHeader(Function<IRLocalDataId, IRLocalDataId> replacer) {
+    Map<IRSessionId, IRLocalDataId> newArgSessionLocalDataId = new HashMap<>();
+    for (Map.Entry<IRSessionId, IRLocalDataId> entry : argSessionLocalDataId.entrySet()) {
+      newArgSessionLocalDataId.put(entry.getKey(), replacer.apply(entry.getValue()));
+    }
+    argSessionLocalDataId = newArgSessionLocalDataId;
+
+    for (DropOnEnd drop : dropOnEnd) {
+      drop.localDataId = replacer.apply(drop.localDataId);
+    }
   }
 
   public int getLocalDataCount() {

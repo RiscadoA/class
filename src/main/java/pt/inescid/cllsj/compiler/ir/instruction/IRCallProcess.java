@@ -129,7 +129,6 @@ public class IRCallProcess extends IRInstruction {
 
     public void replaceSessions(Function<IRSessionId, IRSessionId> replacer) {
       sourceSessionId = sourceSessionId.map(replacer);
-      targetSessionId = replacer.apply(targetSessionId);
     }
 
     public SessionArgument clone() {
@@ -255,6 +254,7 @@ public class IRCallProcess extends IRInstruction {
 
   @Override
   public void replaceSessions(Function<IRSessionId, IRSessionId> replacer) {
+    super.replaceSessions(replacer);
     for (SessionArgument arg : sessionArguments) {
       arg.replaceSessions(replacer);
     }
@@ -262,6 +262,7 @@ public class IRCallProcess extends IRInstruction {
 
   @Override
   public void replaceDataLocations(Function<IRDataLocation, IRDataLocation> replacer) {
+    super.replaceDataLocations(replacer);
     for (TypeArgument arg : typeArguments) {
       arg.sourceLocation = arg.sourceLocation.map(replacer);
     }
@@ -271,6 +272,12 @@ public class IRCallProcess extends IRInstruction {
     for (SessionArgument arg : sessionArguments) {
       arg.replaceDataLocations(replacer);
     }
+  }
+
+  @Override
+  public void replaceProcesses(Function<IRProcessId, IRProcessId> replacer) {
+    super.replaceProcesses(replacer);
+    processId = replacer.apply(processId);
   }
 
   @Override

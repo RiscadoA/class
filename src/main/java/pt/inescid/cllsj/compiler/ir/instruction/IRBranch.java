@@ -44,6 +44,7 @@ public abstract class IRBranch extends IRInstruction {
 
   @Override
   public void replaceCodeLocations(Function<IRCodeLocation, IRCodeLocation> replacer) {
+    super.replaceCodeLocations(replacer);
     for (Case c : getCases()) {
       c.location = replacer.apply(c.location);
     }

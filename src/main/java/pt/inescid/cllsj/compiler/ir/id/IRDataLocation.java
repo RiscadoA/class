@@ -1,6 +1,7 @@
 package pt.inescid.cllsj.compiler.ir.id;
 
 import java.util.Optional;
+import java.util.function.Function;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotOffset;
 
 public class IRDataLocation {
@@ -73,6 +74,26 @@ public class IRDataLocation {
 
   public IRDataLocation advance(IRSlotOffset newOffset) {
     return new IRDataLocation(index, remote, cell, offset.advance(newOffset));
+  }
+
+  public IRDataLocation replaceSessions(Function<IRSessionId, IRSessionId> replacer) {
+    if (isRemote()) {
+      return IRDataLocation.remote(replacer.apply(getSessionId()), offset);
+    } else if (isCell()) {
+      return IRDataLocation.cell(getCell().replaceSessions(replacer), offset);
+    } else {
+      return this;
+    }
+  }
+
+  public IRDataLocation replaceLocalData(Function<IRLocalDataId, IRLocalDataId> replacer) {
+    if (isLocal()) {
+      return IRDataLocation.local(replacer.apply(getLocalDataId()), offset);
+    } else if (isCell()) {
+      return IRDataLocation.cell(getCell().replaceLocalData(replacer), offset);
+    } else {
+      return this;
+    }
   }
 
   @Override

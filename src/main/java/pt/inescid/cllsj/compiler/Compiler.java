@@ -6,7 +6,6 @@ import java.io.InputStream;
 import java.io.PrintStream;
 import java.nio.file.Path;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -129,8 +128,7 @@ public class Compiler {
     pointerAlignment =
         settings.addInt("pointer-alignment", "Alignment of pointer C type in bytes", 8);
 
-    analyzeIR =
-        settings.addFlag("analyze-ir", "Enables analysis of the IR after generation", true);
+    analyzeIR = settings.addFlag("analyze-ir", "Enables analysis of the IR after generation", true);
     optimizeSingleEndpoint =
         settings.addFlag(
             "optimize-single-endpoint",
@@ -143,9 +141,7 @@ public class Compiler {
             true);
     optimizeKnownJumps =
         settings.addFlag(
-            "optimize-known-jumps",
-            "Concatenates blocks when jumps have a known target",
-            true);
+            "optimize-known-jumps", "Concatenates blocks when jumps have a known target", true);
     optimizeKnownEndPoints =
         settings.addFlag(
             "optimize-known-endpoints",
@@ -268,12 +264,15 @@ public class Compiler {
       // Analyze the IR
       Map<IRProcessId, Map<IRBlock, AnlFlow>> flows = Analyzer.analyze(ir);
 
-      openFileForOutput(outputAnalysisFile, stream -> {
-        for (IRProcessId id : flows.keySet()) {
-          stream.println("===========================[ " + id + " ]===========================");
-          stream.println(flows.get(id).get(ir.get(id).getEntry()));
-        }
-      });
+      openFileForOutput(
+          outputAnalysisFile,
+          stream -> {
+            for (IRProcessId id : flows.keySet()) {
+              stream.println(
+                  "===========================[ " + id + " ]===========================");
+              stream.println(flows.get(id).get(ir.get(id).getEntry()));
+            }
+          });
 
       optimizer.feedAnalysis(flows);
     }
@@ -285,6 +284,12 @@ public class Compiler {
     if (analyzeIR.get() && optimizeKnownEndPoints.get()) {
       optimizer.optimizeKnownEndPoints(ir);
     }
+    if (analyzeIR.get()) {
+      optimizer.removeUnreachableBlocks(ir);
+    }
+
+    optimizer.removeUnusedProcesses(ir, new IRProcessId(entryProcess.get()));
+    optimizer.removeUnusedSessionsAndData(ir);
 
     // Output the final IR if requested
     openFileForOutput(outputFinalIRFile, stream -> stream.print(ir));

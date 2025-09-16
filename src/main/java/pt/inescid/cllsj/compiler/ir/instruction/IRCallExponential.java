@@ -49,6 +49,13 @@ public class IRCallExponential extends IRAccess {
 
   @Override
   public void replaceSessions(Function<IRSessionId, IRSessionId> replacer) {
+    super.replaceSessions(replacer);
     sessionId = replacer.apply(sessionId);
+  }
+
+  @Override
+  public void replaceLocalData(Function<IRLocalDataId, IRLocalDataId> replacer) {
+    super.replaceLocalData(replacer);
+    localDataId = replacer.apply(localDataId);
   }
 }

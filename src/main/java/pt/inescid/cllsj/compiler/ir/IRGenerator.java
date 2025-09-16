@@ -133,10 +133,7 @@ public class IRGenerator extends ASTNodeVisitor {
       ASTType type = procDef.getArgTypes().get(i);
 
       IRSlotsFromASTType info = slotsFromType(type);
-      if (!info.hasLocalData()) {
-        // Completely positive type: no need to store local data
-        env = env.addSession(name);
-      } else if (IRContinuationChecker.cannotHaveContinuation(compiler, env, type)) {
+      if (IRContinuationChecker.cannotHaveContinuation(compiler, env, type)) {
         // Type has no continuation: no need to store session
         env = env.addValue(name, info.localCombinations(), Optional.empty());
       } else {
@@ -659,7 +656,9 @@ public class IRGenerator extends ASTNodeVisitor {
           // Initialize the new session so that its data points to the main session's data
           block.add(
               new IRInitializeSession(
-                  argSession.getSessionId(), Optional.of(rhsBlock.getLocation()), channel.getRemoteData()));
+                  argSession.getSessionId(),
+                  Optional.of(rhsBlock.getLocation()),
+                  channel.getRemoteData()));
           recurse(block, lhsCont);
         },
         () -> {
@@ -1170,7 +1169,9 @@ public class IRGenerator extends ASTNodeVisitor {
     IRBlock cellBlock = process.createBlock("cell_rhs");
     block.add(
         new IRInitializeSession(
-            cellSession.getSessionId(), Optional.of(cellBlock.getLocation()), cellSession.getLocalData()));
+            cellSession.getSessionId(),
+            Optional.of(cellBlock.getLocation()),
+            cellSession.getLocalData()));
 
     // Store it in the cell and finish
     block.add(
@@ -1198,7 +1199,9 @@ public class IRGenerator extends ASTNodeVisitor {
     recurse(closureBlock, contLhs);
     block.add(
         new IRInitializeSession(
-            argSession.getSessionId(), Optional.of(closureBlock.getLocation()), argSession.getLocalData()));
+            argSession.getSessionId(),
+            Optional.of(closureBlock.getLocation()),
+            argSession.getLocalData()));
 
     block.add(new IRWriteSession(cellDataLoc, argSession.getSessionId()));
 

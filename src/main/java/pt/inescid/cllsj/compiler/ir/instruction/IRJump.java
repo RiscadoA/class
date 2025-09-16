@@ -16,6 +16,7 @@ public class IRJump extends IRInstruction {
 
   @Override
   public void replaceCodeLocations(Function<IRCodeLocation, IRCodeLocation> replacer) {
+    super.replaceCodeLocations(replacer);
     location = replacer.apply(location);
   }
 

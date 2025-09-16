@@ -1,24 +1,16 @@
 package pt.inescid.cllsj.compiler.opt;
 
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
-import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.BiFunction;
-import java.util.function.Function;
-
 import pt.inescid.cllsj.compiler.anl.AnlFlow;
 import pt.inescid.cllsj.compiler.anl.AnlFlowContinuation;
-import pt.inescid.cllsj.compiler.anl.AnlFlowLocation;
-import pt.inescid.cllsj.compiler.anl.AnlFlowState;
 import pt.inescid.cllsj.compiler.ir.id.IRCodeLocation;
+import pt.inescid.cllsj.compiler.ir.id.IRLocalDataId;
 import pt.inescid.cllsj.compiler.ir.id.IRProcessId;
 import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
 import pt.inescid.cllsj.compiler.ir.instruction.IRBlock;
@@ -144,10 +136,8 @@ public class Optimizer {
         id = prev.getStates().getLast().read(i.getSessionLocation()).assumeSession().get().id();
       }
 
-      AnlFlowContinuation contBefore =
-          prev.getStates().getLast().session(id).cont.get();
-      AnlFlowContinuation contAfter =
-          next.getStates().getFirst().session(id).cont.get();
+      AnlFlowContinuation contBefore = prev.getStates().getLast().session(id).cont.get();
+      AnlFlowContinuation contAfter = next.getStates().getFirst().session(id).cont.get();
 
       contBefore.replaceWritten(Optional.of(i.getContinuation()));
       contAfter.setOverride(contBefore);
@@ -170,8 +160,7 @@ public class Optimizer {
 
       // We need to remove the label from the previous continuation writer, as it won't be used
       // anymore
-      AnlFlowContinuation contBefore =
-          prev.getStates().getLast().session(i.getPosId()).cont.get();
+      AnlFlowContinuation contBefore = prev.getStates().getLast().session(i.getPosId()).cont.get();
       contBefore.replaceWritten(Optional.empty());
 
       // We're removing a single end point of the process, if we didn't end up creating a new finish
@@ -310,7 +299,8 @@ public class Optimizer {
   //         continue; // Not what we're looking for
   //       }
   //       IRPop pop = (IRPop) instruction;
-  //       if (pop instanceof IRPopSession && ((IRPopSession) pop).getValueRequisites().canBeValue()) {
+  //       if (pop instanceof IRPopSession && ((IRPopSession)
+  // pop).getValueRequisites().canBeValue()) {
   //         continue; // This code currently doesn't handle value session pushes and pops.
   //       }
   //       if (pop instanceof IRPopUnfold) {
@@ -346,7 +336,8 @@ public class Optimizer {
   //     // We must go through each location and ensure that there's a single execution
   //     // path from the push to the pop.
   //     if (!pushLoc.hasSinglePathUntil(popLoc)) {
-  //       continue; // We could optimize this across many branches but it is currently unimplemented
+  //       continue; // We could optimize this across many branches but it is currently
+  // unimplemented
   //     }
 
   //     // Depending on the type of pop instruction, we'll try merging their argument data,
@@ -358,7 +349,8 @@ public class Optimizer {
   //       if (push instanceof IRPushExponential) {
   //         int pushed = ((IRPushExponential) push).getExponential();
 
-  //         // We need to remove any IRDetachExponential instructions found for the pushed exponential
+  //         // We need to remove any IRDetachExponential instructions found for the pushed
+  // exponential
   //         pushLoc.forEachAfter(
   //             loc -> {
   //               if (loc.getInstruction() instanceof IRDetachExponential) {
@@ -413,7 +405,8 @@ public class Optimizer {
 
   //     if (newType instanceof IRCloseT) {
   //       // We might be able to remove the session entirely
-  //       AtomicReference<Optional<AnlFlowLocation>> newLoc = new AtomicReference<>(Optional.empty());
+  //       AtomicReference<Optional<AnlFlowLocation>> newLoc = new
+  // AtomicReference<>(Optional.empty());
   //       AtomicReference<Optional<AnlFlowLocation>> freeLoc =
   //           new AtomicReference<>(Optional.empty());
 
@@ -469,182 +462,128 @@ public class Optimizer {
   //   }
   // }
 
-  // public void removeUnusedRecords(IRProgram ir) {
-  //   for (Map.Entry<String, IRProcess> e : ir.getProcesses().entrySet()) {
-  //     removeUnusedRecords(e.getValue());
-  //   }
-  // }
+  public void removeUnusedSessionsAndData(IRProgram ir) {
+    for (IRProcess p : ir.stream().toList()) {
+      removeUnusedSessions(p);
+      removeUnusedData(p);
+    }
+  }
 
-  // private void removeUnusedRecords(IRProcess ir) {
-  //   // First, figure out which records are unused
-  //   Set<Integer> unusedRecords = new HashSet<>();
-  //   for (int i = ir.getRecordArgumentCount(); i < ir.getRecordCount(); ++i) {
-  //     unusedRecords.add(i);
-  //   }
+  private void removeUnusedSessions(IRProcess ir) {
+    // First, figure out which sessions are unused
+    Set<IRSessionId> unusedSessions = new HashSet<>();
+    for (int i = 0; i < ir.getSessionCount(); ++i) {
+      IRSessionId id = new IRSessionId(i);
+      if (!ir.isArgSession(id)) {
+        unusedSessions.add(id);
+      }
+    }
 
-  //   for (IRBlock block : ir.getBlocksIncludingEntry()) {
-  //     for (IRInstruction instr : block.getInstructions()) {
-  //       unusedRecords.removeIf(r -> instr.usesRecord(r));
-  //     }
-  //   }
+    for (IRBlock block : ir.streamBlocks().toList()) {
+      for (IRInstruction instr : block.stream().toList()) {
+        unusedSessions.removeIf(s -> instr.usesSession(s));
+      }
+    }
 
-  //   // Then, remove these records from the process
-  //   Map<Integer, Integer> recordRebindings = new HashMap<>();
-  //   for (int delta = 0, i = 0; i < ir.getRecordCount(); ++i) {
-  //     if (unusedRecords.contains(i)) {
-  //       delta += 1;
-  //     } else {
-  //       recordRebindings.put(i, i - delta);
-  //     }
-  //   }
-  //   for (int i = ir.getRecordCount() - 1; i >= 0; --i) {
-  //     if (unusedRecords.contains(i)) {
-  //       ir.removeRecord(i);
-  //     }
-  //   }
+    // Then, remove these sessions from the process
+    Map<IRSessionId, IRSessionId> sessionRebindings = new HashMap<>();
+    for (int delta = 0, i = 0; i < ir.getSessionCount(); ++i) {
+      if (unusedSessions.contains(new IRSessionId(i))) {
+        delta += 1;
+      } else {
+        sessionRebindings.put(new IRSessionId(i), new IRSessionId(i - delta));
+      }
+    }
+    for (int i = ir.getSessionCount() - 1; i >= 0; --i) {
+      if (unusedSessions.contains(new IRSessionId(i))) {
+        ir.removeSession(new IRSessionId(i));
+      }
+    }
 
-  //   // Finally, rename all records in the instructions
-  //   for (IRBlock block : ir.getBlocksIncludingEntry()) {
-  //     for (IRInstruction instr : block.getInstructions()) {
-  //       instr.renameRecords(recordRebindings::get);
-  //     }
-  //   }
-  // }
+    // Finally, rename all sessions in the instructions
+    ir.replaceSessionsOnHeader(sessionRebindings::get);
+    for (IRBlock block : ir.streamBlocks().toList()) {
+      for (IRInstruction instr : block.stream().toList()) {
+        instr.replaceSessions(sessionRebindings::get);
+      }
+    }
+  }
 
-  // public void removeUnusedExponentials(IRProgram ir) {
-  //   for (Map.Entry<String, IRProcess> e : ir.getProcesses().entrySet()) {
-  //     removeUnusedExponentials(e.getValue());
-  //   }
-  // }
+  private void removeUnusedData(IRProcess ir) {
+    // First, figure out which local data entries are unused
+    Set<IRLocalDataId> unusedData = new HashSet<>();
+    for (int i = 0; i < ir.getLocalDataCount(); ++i) {
+      IRLocalDataId id = new IRLocalDataId(i);
+      if (!ir.isArgData(id)) {
+        unusedData.add(id);
+      }
+    }
 
-  // private void removeUnusedExponentials(IRProcess ir) {
-  //   // First, figure out which exponentials are unused
-  //   Set<Integer> unusedExponentials = new HashSet<>();
-  //   for (int i = ir.getExponentialArgumentCount(); i < ir.getExponentialCount(); ++i) {
-  //     unusedExponentials.add(i);
-  //   }
+    for (IRProcess.DropOnEnd drop : ir.getDropOnEnd()) {
+      unusedData.remove(drop.getLocalDataId());
+    }
 
-  //   for (IRBlock block : ir.getBlocksIncludingEntry()) {
-  //     for (IRInstruction instr : block.getInstructions()) {
-  //       unusedExponentials.removeIf(r -> instr.usesExponential(r));
-  //     }
-  //   }
+    for (IRBlock block : ir.streamBlocks().toList()) {
+      for (IRInstruction instr : block.stream().toList()) {
+        unusedData.removeIf(s -> instr.usesLocalData(s));
+      }
+    }
 
-  //   // Then, remove these exponentials from the process
-  //   Map<Integer, Integer> exponentialRebindings = new HashMap<>();
-  //   for (int delta = 0, i = 0; i < ir.getExponentialCount(); ++i) {
-  //     if (unusedExponentials.contains(i)) {
-  //       delta += 1;
-  //     } else {
-  //       exponentialRebindings.put(i, i - delta);
-  //     }
-  //   }
-  //   for (int i = ir.getExponentialCount() - 1; i >= 0; --i) {
-  //     if (unusedExponentials.contains(i)) {
-  //       ir.removeExponential(i);
-  //     }
-  //   }
+    // Then, remove these local data entries from the process
+    Map<IRLocalDataId, IRLocalDataId> dataRebindings = new HashMap<>();
+    for (int delta = 0, i = 0; i < ir.getLocalDataCount(); ++i) {
+      if (unusedData.contains(new IRLocalDataId(i))) {
+        delta += 1;
+      } else {
+        dataRebindings.put(new IRLocalDataId(i), new IRLocalDataId(i - delta));
+      }
+    }
+    for (int i = ir.getLocalDataCount() - 1; i >= 0; --i) {
+      if (unusedData.contains(new IRLocalDataId(i))) {
+        ir.removeLocalData(new IRLocalDataId(i));
+      }
+    }
 
-  //   // Finally, rename all records in the instructions
-  //   for (IRBlock block : ir.getBlocksIncludingEntry()) {
-  //     for (IRInstruction instr : block.getInstructions()) {
-  //       instr.renameExponentials(exponentialRebindings::get);
-  //     }
-  //   }
-  // }
+    // Finally, rename all local data entries in the instructions
+    ir.replaceLocalDataOnHeader(dataRebindings::get);
+    for (IRBlock block : ir.streamBlocks().toList()) {
+      for (IRInstruction instr : block.stream().toList()) {
+        instr.replaceLocalData(dataRebindings::get);
+      }
+    }
+  }
 
-  // public void removeUnreachableBlocks(IRProgram ir) {
-  //   for (Map.Entry<String, IRProcess> e : ir.getProcesses().entrySet()) {
-  //     removeUnreachableBlocks(e.getValue(), processFlows.get(e.getKey()));
-  //   }
-  // }
+  public void removeUnreachableBlocks(IRProgram ir) {
+    for (IRProcess p : ir.stream().toList()) {
+      removeUnreachableBlocks(p, processFlows.get(p.getId()));
+    }
+  }
 
-  // private void removeUnreachableBlocks(IRProcess ir, Map<IRBlock, AnlFlow> flows) {
-  //   while (true) {
-  //     Optional<IRBlock> toRemove = Optional.empty();
+  private void removeUnreachableBlocks(IRProcess ir, Map<IRBlock, AnlFlow> flows) {
+    while (true) {
+      Optional<IRBlock> toRemove = Optional.empty();
 
-  //     for (IRBlock block : ir.getBlocks()) {
-  //       if (!flows.containsKey(block) || flows.get(block).getSources().isEmpty()) {
-  //         toRemove = Optional.of(block);
-  //         break;
-  //       }
-  //     }
+      for (IRBlock block : ir.streamBlocks().toList()) {
+        if (!block.getLocation().equals(IRCodeLocation.entry())
+            && (!flows.containsKey(block) || flows.get(block).getSources().isEmpty())) {
+          toRemove = Optional.of(block);
+          break;
+        }
+      }
 
-  //     if (toRemove.isEmpty()) {
-  //       break;
-  //     }
+      if (toRemove.isEmpty()) {
+        break;
+      }
 
-  //     ir.getBlocks().remove(toRemove.get());
-  //     AnlFlow flow = flows.remove(toRemove.get());
-  //     if (flow != null) {
-  //       for (AnlFlow target : flow.getTargets()) {
-  //         target.removeSource(flow);
-  //       }
-  //     }
-  //   }
-  // }
-
-  // public void optimizeFlipForward(IRProgram ir) {
-  //   for (Map.Entry<String, IRProcess> e : ir.getProcesses().entrySet()) {
-  //     Map<IRBlock, AnlFlow> flows = processFlows.get(e.getKey());
-  //     Set<IRBlock> blocksToRemove = new HashSet<>();
-
-  //     for (IRBlock flipBlock : e.getValue().getBlocksIncludingEntry()) {
-  //       if (!flows.containsKey(flipBlock)) {
-  //         continue;
-  //       }
-  //       AnlFlow flipFlow = flows.get(flipBlock);
-
-  //       IRInstruction maybeFlip = flipBlock.getInstructions().getLast();
-  //       if (!(maybeFlip instanceof IRFlip)) {
-  //         continue; // Not what we're looking for
-  //       }
-  //       IRFlip flip = (IRFlip) maybeFlip;
-  //       IRBlock forwardBlock = e.getValue().getBlock(flip.getContLabel());
-  //       IRInstruction maybeForward = forwardBlock.getInstructions().getFirst();
-  //       if (!(maybeForward instanceof IRForward)) {
-  //         continue; // Not what we're looking for
-  //       }
-  //       IRForward forward = (IRForward) maybeForward;
-  //       if (flip.getRecord() != forward.getNegRecord() || !forward.shouldReturn()) {
-  //         continue; // Not what we're looking for
-  //       }
-  //       int x = forward.getNegRecord();
-  //       int y = forward.getPosRecord();
-
-  //       // We've found two blocks of the form:
-  //       //
-  //       //     ...
-  //       //     flip(x, cont)
-  //       // cont:
-  //       //     forward(-x, +y)
-  //       //
-  //       // Our goal is to avoid the flip entirely by executing the forward earlier
-  //       // The tradeoff here is that we might need to allocate more memory for the merged record
-  //       // What we gain is that we deallocate unnecessary memory earlier and avoid a costly flip.
-
-  //       AnlFlow forwardFlow = flows.get(forwardBlock);
-  //       flipBlock.getInstructions().removeLast();
-  //       IRFlipForward flipForward = new IRFlipForward(x, y);
-  //       if (!forward.isEndPoint()) {
-  //         flipForward.removeEndPoint();
-  //       }
-  //       flipBlock.getInstructions().add(flipForward);
-  //       flipFlow.getStates().removeLast();
-  //       flipFlow.getStates().add(forwardFlow.getStates().get(1));
-  //       flipFlow.removeTarget(forwardFlow);
-  //       blocksToRemove.add(forwardBlock);
-  //     }
-
-  //     for (IRBlock block : blocksToRemove) {
-  //       AnlFlow flow = flows.remove(block);
-  //       for (AnlFlow source : flow.getSources()) {
-  //         source.removeTarget(flow);
-  //       }
-  //       e.getValue().getBlocks().remove(block);
-  //     }
-  //   }
-  // }
+      ir.removeBlock(toRemove.get());
+      AnlFlow flow = flows.remove(toRemove.get());
+      if (flow != null) {
+        for (AnlFlow target : flow.getTargets()) {
+          target.removeSource(flow);
+        }
+      }
+    }
+  }
 
   // // Searches for blocks of code like:
   // //
@@ -725,11 +664,13 @@ public class Optimizer {
   //                   // then we can avoid moving the push instruction and just change the record
   //                   // target
   //                   //
-  //                   // This requires us moving the push session instruction before this instruction
+  //                   // This requires us moving the push session instruction before this
+  // instruction
   //                   pushSessionLoc.moveInstructionBefore(loc);
   //                   push.setRecord(pushSession.getRecord());
   //                 } else {
-  //                   // If it was modified, then we have no choice but to move the push instruction
+  //                   // If it was modified, then we have no choice but to move the push
+  // instruction
   //                   // ahead
 
   //                   if (push instanceof IRScan) {
@@ -743,9 +684,11 @@ public class Optimizer {
   //                     return false;
   //                   }
 
-  //                   // If we pushed an exponential and later detached it, we must move the detach to
+  //                   // If we pushed an exponential and later detached it, we must move the detach
+  // to
   //                   // after the new push.
-  //                   // Additionally, if we decremented the reference count of exponential, we must
+  //                   // Additionally, if we decremented the reference count of exponential, we
+  // must
   //                   // move it too.
   //                   if (push instanceof IRPushExponential) {
   //                     IRPushExponential pushExponential = (IRPushExponential) push;
@@ -896,7 +839,8 @@ public class Optimizer {
   //   Map<String, Integer> evaluated = new HashMap<>();
   //   Set<String> visited = new HashSet<>();
   //   ir.forEachProcess(
-  //       (name, proc) -> inlineProcesses(ir, maxComplexity, name, allowLoops, evaluated, visited));
+  //       (name, proc) -> inlineProcesses(ir, maxComplexity, name, allowLoops, evaluated,
+  // visited));
   // }
 
   // private void inlineProcesses(
@@ -1030,10 +974,12 @@ public class Optimizer {
   //                   return IRValueRequisites.notValue();
   //                 } else {
   //                   for (Map.Entry<Integer, Boolean> e :
-  //                       arg.getSourceTypeValueRequisites().getRequiredTypePolarities().entrySet()) {
+  //
+  // arg.getSourceTypeValueRequisites().getRequiredTypePolarities().entrySet()) {
   //                     reqPolarities.put(e.getKey() + offset, e.getValue());
   //                   }
-  //                   for (int t2 : arg.getSourceTypeValueRequisites().getTypesWhichMustBeValues()) {
+  //                   for (int t2 : arg.getSourceTypeValueRequisites().getTypesWhichMustBeValues())
+  // {
   //                     reqValues.add(t2 + offset);
   //                   }
   //                   break;
@@ -1192,239 +1138,31 @@ public class Optimizer {
   //   }
   // }
 
-  // public void removeUnusedProcesses(IRProgram ir, String entryProcess) {
-  //   // BFS to find all processes which are used by the entry process
-  //   Set<String> used = new HashSet<>();
-  //   Queue<String> queue = new LinkedList<>();
-  //   used.add(entryProcess);
-  //   queue.add(entryProcess);
+  public void removeUnusedProcesses(IRProgram ir, IRProcessId entryProcess) {
+    // BFS to find all processes which are used by the entry process
+    Set<IRProcessId> used = new HashSet<>();
+    Queue<IRProcessId> queue = new LinkedList<>();
+    used.add(entryProcess);
+    queue.add(entryProcess);
 
-  //   while (!queue.isEmpty()) {
-  //     String procName = queue.poll();
-  //     IRProcess proc = ir.getProcesses().get(procName);
+    while (!queue.isEmpty()) {
+      IRProcessId procName = queue.poll();
+      IRProcess proc = ir.get(procName);
 
-  //     for (IRBlock block : proc.getBlocksIncludingEntry()) {
-  //       for (IRInstruction instr : block.getInstructions()) {
-  //         if (instr instanceof IRCallProcess) {
-  //           IRCallProcess call = (IRCallProcess) instr;
-  //           if (!used.contains(call.getProcessName())) {
-  //             used.add(call.getProcessName());
-  //             queue.add(call.getProcessName());
-  //           }
-  //         }
-  //       }
-  //     }
-  //   }
+      for (IRBlock block : proc.streamBlocks().toList()) {
+        for (IRInstruction instr : block.stream().toList()) {
+          instr.replaceProcesses(
+              id -> {
+                if (used.add(id)) {
+                  queue.add(id);
+                }
+                return id;
+              });
+        }
+      }
+    }
 
-  //   // Now, we remove all processes which are not used
-  //   ir.getProcesses().entrySet().removeIf(e -> !used.contains(e.getKey()));
-  // }
-
-  // public static class TypeModifier extends IRTypeVisitor {
-  //   private static enum Modification {
-  //     REMOVE_NTH,
-  //     REMOVE_LAST,
-  //   }
-
-  //   private AnlFlowState state;
-  //   private IRType result;
-  //   private Modification modification;
-  //   private int index;
-
-  //   public static IRType removeFirst(AnlFlowState state, IRType type) {
-  //     return removeNth(state, type, 0);
-  //   }
-
-  //   public static IRType removeNth(AnlFlowState state, IRType type, int index) {
-  //     TypeModifier modifier = new TypeModifier(state, Modification.REMOVE_NTH, index);
-  //     return modifier.recurse(type, 0);
-  //   }
-
-  //   public static IRType removeLast(AnlFlowState state, IRType type) {
-  //     TypeModifier modifier = new TypeModifier(state, Modification.REMOVE_LAST, 0);
-  //     return modifier.recurse(type, 0);
-  //   }
-
-  //   public TypeModifier(AnlFlowState state, Modification modification, int index) {
-  //     this.state = state;
-  //     this.modification = modification;
-  //     this.index = index;
-  //   }
-
-  //   private IRType recurse(IRType type, int offset) {
-  //     TypeModifier m = new TypeModifier(state, modification, index - offset);
-  //     type.accept(m);
-  //     return m.result;
-  //   }
-
-  //   @Override
-  //   public void visit(IRType type) {
-  //     throw new UnsupportedOperationException(
-  //         "TypeModifier does not yet support type: " + type.getClass().getSimpleName());
-  //   }
-
-  //   @Override
-  //   public void visit(IRTypeT type) {
-  //     if (index == 0) {
-  //       result = new IRCloseT();
-  //     } else {
-  //       result = type;
-  //     }
-  //   }
-
-  //   @Override
-  //   public void visit(IRStringT type) {
-  //     result = new IRCloseT();
-  //   }
-
-  //   @Override
-  //   public void visit(IRBoolT type) {
-  //     result = new IRCloseT();
-  //   }
-
-  //   @Override
-  //   public void visit(IRIntT type) {
-  //     result = new IRCloseT();
-  //   }
-
-  //   @Override
-  //   public void visit(IRExponentialT type) {
-  //     result = new IRCloseT();
-  //   }
-
-  //   @Override
-  //   public void visit(IRCloseT type) {
-  //     result = new IRCloseT();
-  //   }
-
-  //   @Override
-  //   public void visit(IRCellT type) {
-  //     result = new IRCloseT();
-  //   }
-
-  //   @Override
-  //   public void visit(IRSessionT type) {
-  //     Optional<Boolean> isValue = state.isValue(type.getValueRequisites());
-
-  //     if (isValue.isPresent() && isValue.get() == true) {
-  //       if (modification == Modification.REMOVE_NTH) {
-  //         int argCount = TypeSlotCounter.count(type.getArg());
-  //         if (index < argCount) {
-  //           // Remove from the argument side
-  //           IRType arg = recurse(type.getArg(), 0);
-  //           if (arg instanceof IRCloseT) {
-  //             result = type.getCont();
-  //           } else {
-  //             result = new IRSessionT(arg, type.getCont(), type.getValueRequisites());
-  //           }
-  //         } else {
-  //           // Remove from the continuation side
-  //           IRType cont = recurse(type.getCont(), argCount);
-  //           if (cont instanceof IRCloseT) {
-  //             result = type.getArg();
-  //           } else {
-  //             result = new IRSessionT(type.getArg(), cont, type.getValueRequisites());
-  //           }
-  //         }
-  //       } else if (modification == Modification.REMOVE_LAST) {
-  //         IRType cont = recurse(type.getCont(), 0);
-  //         if (cont instanceof IRCloseT) {
-  //           result = type.getArg();
-  //         } else {
-  //           result = new IRSessionT(type.getArg(), cont, type.getValueRequisites());
-  //         }
-  //       }
-  //     } else if (isValue.isPresent() && isValue.get() == false) {
-  //       if (modification == Modification.REMOVE_NTH) {
-  //         if (index == 0) {
-  //           result = type.getCont();
-  //         } else {
-  //           result =
-  //               new IRSessionT(
-  //                   type.getArg(), recurse(type.getCont(), 1), type.getValueRequisites());
-  //         }
-  //       } else if (modification == Modification.REMOVE_LAST) {
-  //         if (type.getCont() instanceof IRCloseT) {
-  //           result = new IRCloseT();
-  //         } else {
-  //           result =
-  //               new IRSessionT(
-  //                   type.getArg(), recurse(type.getCont(), 0), type.getValueRequisites());
-  //         }
-  //       }
-  //     } else {
-  //       throw new UnsupportedOperationException(
-  //           "Sessions with uncertain value requisites are not supported yet");
-  //     }
-  //   }
-
-  //   @Override
-  //   public void visit(IRTagT type) {
-  //     List<IRType> choices = new ArrayList<>();
-  //     boolean allClose = true;
-  //     for (IRType choice : type.getChoices()) {
-  //       if (!(choice instanceof IRCloseT)) {
-  //         allClose = false;
-  //       }
-  //       choices.add(recurse(choice, 1));
-  //     }
-
-  //     if (allClose) {
-  //       result = new IRCloseT();
-  //     } else {
-  //       result = new IRTagT(choices);
-  //     }
-  //   }
-
-  //   @Override
-  //   public void visit(IRFlipT type) {
-  //     type.getCont().accept(this);
-  //   }
-  // }
-
-  // public static class TypeSlotCounter extends IRTypeVisitor {
-  //   private int result;
-
-  //   public static int count(IRType type) {
-  //     TypeSlotCounter counter = new TypeSlotCounter();
-  //     type.accept(counter);
-  //     return counter.result;
-  //   }
-
-  //   @Override
-  //   public void visit(IRType type) {
-  //     result = 1;
-  //   }
-
-  //   @Override
-  //   public void visit(IRSessionT type) {
-  //     if (type.getValueRequisites().mustBeValue()) {
-  //       result = count(type.getArg());
-  //     } else if (!type.getValueRequisites().canBeValue()) {
-  //       result = 1;
-  //     } else {
-  //       throw new UnsupportedOperationException(
-  //           "Sessions with uncertain value requisites are not supported yet");
-  //     }
-  //     result += count(type.getCont());
-  //   }
-
-  //   @Override
-  //   public void visit(IRTagT type) {
-  //     result = 1;
-  //     for (IRType choice : type.getChoices()) {
-  //       result = Integer.max(result, 1 + count(choice));
-  //     }
-  //   }
-
-  //   @Override
-  //   public void visit(IRFlipT type) {
-  //     type.getCont().accept(this);
-  //   }
-  // }
-
-  // // Heuristic for how complex a process is
-  // private int complexity(IRProcess process) {
-  //   return process.getBlocks().size();
-  // }
+    // Now, we remove all processes which are not used
+    ir.removeIf(p -> !used.contains(p.getId()));
+  }
 }

@@ -36,6 +36,7 @@ public class IRFinishSession extends IRInstruction {
 
   @Override
   public void replaceSessions(Function<IRSessionId, IRSessionId> replacer) {
+    super.replaceSessions(replacer);
     sessionId = replacer.apply(sessionId);
   }
 

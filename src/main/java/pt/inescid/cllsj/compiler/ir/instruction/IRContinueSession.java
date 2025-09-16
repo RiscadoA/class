@@ -13,10 +13,12 @@ public class IRContinueSession extends IRInstruction {
 
   public IRContinueSession(IRSessionId sessionId, IRCodeLocation continuation) {
     this.sessionId = Optional.of(sessionId);
+    this.sessionLocation = Optional.empty();
     this.continuation = continuation;
   }
 
   public IRContinueSession(IRDataLocation sessionLocation, IRCodeLocation continuation) {
+    this.sessionId = Optional.empty();
     this.sessionLocation = Optional.of(sessionLocation);
     this.continuation = continuation;
   }
@@ -53,16 +55,19 @@ public class IRContinueSession extends IRInstruction {
 
   @Override
   public void replaceSessions(Function<IRSessionId, IRSessionId> replacer) {
+    super.replaceSessions(replacer);
     sessionId = sessionId.map(replacer);
   }
 
   @Override
   public void replaceDataLocations(Function<IRDataLocation, IRDataLocation> replacer) {
+    super.replaceDataLocations(replacer);
     sessionLocation = sessionLocation.map(replacer);
   }
 
   @Override
   public void replaceCodeLocations(Function<IRCodeLocation, IRCodeLocation> replacer) {
+    super.replaceCodeLocations(replacer);
     continuation = replacer.apply(continuation);
   }
 

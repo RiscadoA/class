@@ -33,6 +33,7 @@ public class IRWriteSession extends IRWrite {
 
   @Override
   public void replaceSessions(Function<IRSessionId, IRSessionId> replacer) {
+    super.replaceSessions(replacer);
     sessionId = replacer.apply(sessionId);
   }
 }

@@ -124,11 +124,22 @@ public class IRWriteExponential extends IRWrite {
   }
 
   @Override
+  public void replaceLocalData(Function<IRLocalDataId, IRLocalDataId> replacer) {
+    super.replaceLocalData(replacer);
+  }
+
+  @Override
   public void replaceDataLocations(Function<IRDataLocation, IRDataLocation> replacer) {
     super.replaceDataLocations(replacer);
     for (DataArgument arg : dataArguments) {
       arg.sourceLocation = replacer.apply(arg.sourceLocation);
     }
+  }
+
+  @Override
+  public void replaceProcesses(Function<IRProcessId, IRProcessId> replacer) {
+    super.replaceProcesses(replacer);
+    processId = replacer.apply(processId);
   }
 
   @Override

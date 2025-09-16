@@ -789,7 +789,8 @@ public class CGenerator extends IRInstructionVisitor {
     CAddress contData = data(instr.getContinuationData());
 
     StringBuilder sb = new StringBuilder("(struct session)");
-    sb.append("{.cont=").append(instr.getContinuation().map(this::codeLocationAddress).orElse(NULL));
+    sb.append("{.cont=")
+        .append(instr.getContinuation().map(this::codeLocationAddress).orElse(NULL));
     sb.append(",.cont_env=").append(ENV);
     sb.append(",.cont_data=").append(contData);
     sb.append(",.cont_session=").append(session);
@@ -801,7 +802,8 @@ public class CGenerator extends IRInstructionVisitor {
   public void visit(IRContinueSession instr) {
     String session = accessSession(instr.getSessionId());
     putAssign(TMP_PTR1, sessionCont(session));
-    putAssign(sessionCont(accessRemoteSession(session)), codeLocationAddress(instr.getContinuation()));
+    putAssign(
+        sessionCont(accessRemoteSession(session)), codeLocationAddress(instr.getContinuation()));
     putAssign(ENV, sessionContEnv(session));
     putComputedGoto(TMP_PTR1);
   }

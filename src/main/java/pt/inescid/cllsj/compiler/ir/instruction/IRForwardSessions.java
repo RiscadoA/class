@@ -9,7 +9,8 @@ public class IRForwardSessions extends IRInstruction {
   private boolean isEndPoint;
   private boolean shouldJump;
 
-  public IRForwardSessions(IRSessionId negId, IRSessionId posId, boolean isEndPoint, boolean shouldJump) {
+  public IRForwardSessions(
+      IRSessionId negId, IRSessionId posId, boolean isEndPoint, boolean shouldJump) {
     this.negId = negId;
     this.posId = posId;
     this.isEndPoint = isEndPoint;
@@ -52,6 +53,7 @@ public class IRForwardSessions extends IRInstruction {
 
   @Override
   public void replaceSessions(Function<IRSessionId, IRSessionId> replacer) {
+    super.replaceSessions(replacer);
     negId = replacer.apply(negId);
     posId = replacer.apply(posId);
   }

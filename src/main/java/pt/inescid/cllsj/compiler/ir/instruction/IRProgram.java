@@ -2,6 +2,7 @@ package pt.inescid.cllsj.compiler.ir.instruction;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Function;
 import java.util.stream.Stream;
 import pt.inescid.cllsj.compiler.ir.id.IRProcessId;
 
@@ -18,6 +19,10 @@ public class IRProgram {
 
   public Stream<IRProcess> stream() {
     return processes.values().stream();
+  }
+
+  public void removeIf(Function<IRProcess, Boolean> predicate) {
+    processes.values().removeIf(p -> predicate.apply(p));
   }
 
   @Override

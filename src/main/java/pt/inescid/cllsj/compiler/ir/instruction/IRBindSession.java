@@ -40,6 +40,7 @@ public class IRBindSession extends IRAccess {
 
   @Override
   public void replaceSessions(java.util.function.Function<IRSessionId, IRSessionId> replacer) {
+    super.replaceSessions(replacer);
     sessionId = replacer.apply(sessionId);
   }
 

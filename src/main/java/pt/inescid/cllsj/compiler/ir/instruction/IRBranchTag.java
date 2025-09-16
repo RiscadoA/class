@@ -34,6 +34,7 @@ public class IRBranchTag extends IRBranch {
 
   @Override
   public void replaceDataLocations(Function<IRDataLocation, IRDataLocation> replacer) {
+    super.replaceDataLocations(replacer);
     location = replacer.apply(location);
   }
 

@@ -10,6 +10,7 @@ public abstract class IRWrite extends IRAccess {
 
   @Override
   public void replaceDataLocations(Function<IRDataLocation, IRDataLocation> replacer) {
+    super.replaceDataLocations(replacer);
     location = replacer.apply(location);
   }
 }

@@ -12,7 +12,9 @@ public class IRInitializeSession extends IRInstruction {
   private IRDataLocation continuationData;
 
   public IRInitializeSession(
-      IRSessionId sessionId, Optional<IRCodeLocation> continuation, IRDataLocation continuationData) {
+      IRSessionId sessionId,
+      Optional<IRCodeLocation> continuation,
+      IRDataLocation continuationData) {
     this.sessionId = sessionId;
     this.continuation = continuation;
     this.continuationData = continuationData;
@@ -42,16 +44,19 @@ public class IRInitializeSession extends IRInstruction {
 
   @Override
   public void replaceSessions(Function<IRSessionId, IRSessionId> replacer) {
+    super.replaceSessions(replacer);
     sessionId = replacer.apply(sessionId);
   }
 
   @Override
   public void replaceCodeLocations(Function<IRCodeLocation, IRCodeLocation> replacer) {
+    super.replaceCodeLocations(replacer);
     continuation = continuation.map(replacer);
   }
 
   @Override
   public void replaceDataLocations(Function<IRDataLocation, IRDataLocation> replacer) {
+    super.replaceDataLocations(replacer);
     continuationData = replacer.apply(continuationData);
   }
 
