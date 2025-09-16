@@ -174,6 +174,9 @@ public class AnlFlowState {
     for (Map.Entry<IRSessionId, AnlSessionState> entry : sessions.entrySet()) {
       sb.append(entry.getKey()).append(": ").append(entry.getValue()).append("\n");
     }
+    for (Map.Entry<IRLocalDataId, AnlLocalDataState> entry : localData.entrySet()) {
+      sb.append(entry.getKey()).append(": ").append(entry.getValue()).append("\n");
+    }
     for (AnlFlowContinuation pending : pendingContinuations) {
       sb.append("pending: ").append(pending).append("\n");
     }

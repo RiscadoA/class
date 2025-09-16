@@ -48,7 +48,7 @@ public class AnlFlowContinuation {
       }
 
       if (location.isEmpty()) {
-        writer.replaceInstruction(new IRFinishSession(cont.getSessionId(), true));
+        writer.replaceInstruction(new IRFinishSession(cont.getSessionId(), false));
       } else {
         cont.replaceCodeLocations(r -> location.get());
       }

@@ -187,13 +187,10 @@ public class Optimizer {
       contBefore.replaceWritten(Optional.empty());
 
       // We're removing a single end point of the process
-      modifyEndPoints(ir, prev.getBlock(), -1);
-
-      // We might have also just created a new finish instruction,
-      // in which case we'll need to add an end point there
-      if (contBefore.getWriter().getInstruction() instanceof IRFinishSession) {
-        modifyEndPoints(ir, contBefore.getWriter().getFlow().getBlock(), 1);
+      if (i.isEndPoint()) {
+        modifyEndPoints(ir, prev.getBlock(), -1);
       }
+
       removeLast.run();
     } else {
       throw new UnsupportedOperationException(
@@ -284,17 +281,17 @@ public class Optimizer {
   }
 
   // public void optimizeKnownSlots(IRProgram ir) {
-  //   for (Map.Entry<String, IRProcess> e : ir.getProcesses().entrySet()) {
-  //     if (!processFlows.containsKey(e.getKey())) {
+  //   for (IRProcess p : ir.stream().toList()) {
+  //     if (!processFlows.containsKey(p.getId())) {
   //       throw new IllegalStateException(
   //           "Analysis must be enabled to perform known slots optimization");
   //     }
-  //     optimizeKnownSlots(e.getValue(), processFlows.get(e.getKey()));
+  //     optimizeKnownSlots(p, processFlows.get(p.getId()));
   //   }
   // }
 
   // private void optimizeKnownSlots(IRProcess ir, Map<IRBlock, AnlFlow> flows) {
-  //   // Slost which have already been removed of types.
+  //   // Slots which have already been removed of types.
   //   Map<Integer, Set<Integer>> removedSlots = new HashMap<>();
 
   //   // Will store, for a given push instruction, the instructions which pop their data

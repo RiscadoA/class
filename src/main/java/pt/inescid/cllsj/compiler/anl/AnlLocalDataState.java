@@ -1,14 +1,14 @@
 package pt.inescid.cllsj.compiler.anl;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.Optional;
+import java.util.TreeMap;
 import java.util.stream.Stream;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotTree;
 
 public class AnlLocalDataState {
   // Known slots by their offset
-  private Map<Integer, AnlSlot> slots = new HashMap<>();
+  private Map<Integer, AnlSlot> slots = new TreeMap<>();
 
   public Stream<AnlSlot> read(IRSlotTree offset, Optional<IRSlotTree> size) {
     int start = AnlSlot.count(offset);
@@ -50,5 +50,14 @@ public class AnlLocalDataState {
       }
     }
     return merged;
+  }
+
+  @Override
+  public String toString() {
+    StringBuilder sb = new StringBuilder();
+    for (Map.Entry<Integer, AnlSlot> entry : slots.entrySet()) {
+      sb.append(entry.getKey()).append("=").append(entry.getValue().toString());
+    }
+    return sb.toString();
   }
 }
