@@ -1,8 +1,10 @@
 package pt.inescid.cllsj.compiler.anl;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import pt.inescid.cllsj.compiler.ir.instruction.IRBlock;
 import pt.inescid.cllsj.compiler.ir.instruction.IRInstruction;
@@ -20,7 +22,8 @@ public class AnlFlow {
   private Set<AnlFlow> sources = new HashSet<>();
 
   // Blocks introduced here which can execute any time after this one
-  private Set<AnlFlow> detached = new HashSet<>();
+  // Also stores how many traces the flow was detached on
+  private Map<AnlFlow, Integer> detached = new HashMap<>();
 
   // Blocks into which this one must immediately diverge
   private Set<AnlFlow> branches = new HashSet<>();
@@ -30,11 +33,22 @@ public class AnlFlow {
   // represent one possible trace
   private Set<AnlFlow> targets = new HashSet<>();
 
+  // How many times this flow was traced
+  private int traceCount = 0;
+
   public AnlFlow(IRBlock block) {
     this.block = block;
     for (int i = 0; i < block.size(); ++i) {
       locations.add(new AnlFlowLocation(this, i));
     }
+  }
+
+  public void addTrace() {
+    traceCount += 1;
+  }
+
+  public int getTraceCount() {
+    return traceCount;
   }
 
   public IRBlock getBlock() {
@@ -49,8 +63,12 @@ public class AnlFlow {
     return sources;
   }
 
-  public Set<AnlFlow> getDetached() {
+  public Map<AnlFlow, Integer> getDetached() {
     return detached;
+  }
+
+  public boolean hasDetachesInAllTraces() {
+    return detached.values().stream().anyMatch(v -> v >= traceCount);
   }
 
   public Set<AnlFlow> getBranches() {
@@ -96,7 +114,7 @@ public class AnlFlow {
   }
 
   public void addDetached(AnlFlow detached) {
-    this.detached.add(detached);
+    this.detached.compute(detached, (k, v) -> (v == null) ? 1 : v + 1);
   }
 
   public void removeBranch(AnlFlow branch) {
@@ -155,7 +173,7 @@ public class AnlFlow {
     seen.add(this);
 
     for (AnlFlow source : sources) {
-      if (!source.getDetached().contains(this) && source.getBranches().size() > 1) {
+      if (!source.getDetached().keySet().contains(this) && source.getBranches().size() > 1) {
         return false;
       }
       if (!source.guaranteedToRun(seen)) {
@@ -163,6 +181,19 @@ public class AnlFlow {
       }
     }
     return true;
+  }
+
+  private void printLabels(StringBuffer sb, Map<AnlFlow, Integer> flows) {
+    if (flows.isEmpty()) {
+      sb.append("none");
+    } else {
+      sb.append(
+          String.join(
+              ", ",
+              flows.entrySet().stream()
+                .map(e -> e.getKey() + (e.getValue() > 1 ? " (x" + e.getValue() + ")" : ""))
+                  .toList()));
+    }
   }
 
   private void printLabels(StringBuffer sb, Set<AnlFlow> flows) {
@@ -201,6 +232,7 @@ public class AnlFlow {
     }
 
     StringBuffer sb = new StringBuffer();
+    sb.append("    [traces: " + traceCount + "]\n");
     sb.append(block.getLocation() + ":\n");
     sb.append("    [sources: ");
     printLabels(sb, sources);

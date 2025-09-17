@@ -54,14 +54,6 @@ public class IRSlotCombinations {
         trees.stream().map(tree -> tree.suffix(IRSlotTree.of(slot))).toList());
   }
 
-  public IRSlotCombinations suffix(IRSlotSequence sequence) {
-    if (trees.isEmpty()) {
-      return of(IRSlotTree.of(sequence));
-    }
-    return new IRSlotCombinations(
-        trees.stream().map(tree -> tree.suffix(IRSlotTree.of(sequence))).toList());
-  }
-
   public IRSlotCombinations suffix(IRSlotCombinations combinations) {
     if (combinations.trees.isEmpty()) {
       return this;

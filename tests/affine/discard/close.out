@@ -1,2 +1,4 @@
-discard
 before affine
+affine
+close
+discard

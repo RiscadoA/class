@@ -68,6 +68,7 @@ public class Compiler {
   public Settings.Flag optimizeSingleEndpoint;
   public Settings.Flag optimizeTailCalls;
   public Settings.Flag optimizeSendValue;
+  public Settings.Flag optimizeAffineValue;
   public Settings.Flag optimizeKnownJumps;
   public Settings.Flag optimizeKnownEndPoints;
   public Settings.Flag optimizeKnownLocations;
@@ -159,6 +160,11 @@ public class Compiler {
             "optimize-send-value",
             "Optimizes sends of closures into sends of values where possible",
             true);
+    optimizeAffineValue =
+        settings.addFlag(
+            "optimize-affine-value",
+            "Optimizes affine closures into affine values where possible",
+            true);
     optimizeKnownJumps =
         settings.addFlag(
             "optimize-known-jumps", "Concatenates blocks when jumps have a known target", true);
@@ -204,6 +210,7 @@ public class Compiler {
           optimizeSingleEndpoint.set(false);
           optimizeTailCalls.set(false);
           optimizeSendValue.set(false);
+          optimizeAffineValue.set(false);
           optimizeKnownJumps.set(false);
           optimizeKnownEndPoints.set(false);
           optimizeKnownLocations.set(false);

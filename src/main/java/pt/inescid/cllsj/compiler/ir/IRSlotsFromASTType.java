@@ -283,49 +283,91 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTSendTT type) {
-    activeRemoteTree =
-        IRSlotTree.of(IRSlotSequence.of(new IRTypeS(), new IRSessionS(), new IRTagS()));
+    activeRemoteTree = IRSlotTree.of(new IRTypeS(), new IRSessionS(), new IRTagS());
   }
 
   @Override
   public void visit(ASTRecvTT type) {
-    activeLocalTree =
-        IRSlotTree.of(IRSlotSequence.of(new IRTypeS(), new IRSessionS(), new IRTagS()));
+    activeLocalTree = IRSlotTree.of(new IRTypeS(), new IRSessionS(), new IRTagS());
   }
 
   @Override
   public void visit(ASTAffineT type) {
+    IRValueRequisites reqs = IRValueRequisites.check(compiler, env, type.getin(), true);
+    if (!compiler.optimizeAffineValue.get()) {
+      reqs = IRValueRequisites.notValue();
+    }
+
     IRSlotsFromASTType inner = recurse(type.getin());
-    activeLocalTree = new IRSlotTree.Tag(List.of(IRSlotTree.LEAF, inner.activeLocalTree));
-    remainderLocalCombinations = inner.remainderLocalCombinations;
+    activeLocalTree =
+        IRSlotTree.isValue(
+            reqs,
+            IRSlotTree.LEAF,
+            new IRSlotTree.Tag(List.of(IRSlotTree.LEAF, inner.activeLocalTree)));
+    activeRemoteTree = IRSlotTree.isValue(reqs, inner.activeRemoteTree, IRSlotTree.LEAF);
+    remainderLocalCombinations = inner.localCombinations();
     remainderRemoteCombinations = inner.remoteCombinations();
   }
 
   @Override
   public void visit(ASTCoAffineT type) {
+    IRValueRequisites reqs = IRValueRequisites.check(compiler, env, type.getin(), false);
+    if (!compiler.optimizeAffineValue.get()) {
+      reqs = IRValueRequisites.notValue();
+    }
+
     IRSlotsFromASTType inner = recurse(type.getin());
-    activeRemoteTree = new IRSlotTree.Tag(List.of(IRSlotTree.LEAF, inner.activeRemoteTree));
+    activeLocalTree = IRSlotTree.isValue(reqs, inner.activeLocalTree, IRSlotTree.LEAF);
+    activeRemoteTree =
+        IRSlotTree.isValue(
+            reqs,
+            IRSlotTree.LEAF,
+            new IRSlotTree.Tag(List.of(IRSlotTree.LEAF, inner.activeRemoteTree)));
     remainderLocalCombinations = inner.localCombinations();
-    remainderRemoteCombinations = inner.remainderRemoteCombinations;
+    remainderRemoteCombinations = inner.remoteCombinations();
   }
 
   @Override
   public void visit(ASTCellT type) {
-    remoteSlot(new IRCellS());
+    if (compiler.optimizeAffineValue.get()) {
+      IRValueRequisites reqs = IRValueRequisites.check(compiler, env, type.getin(), true);
+      IRSlotsFromASTType inner = recurse(type.getin());
+      remoteSlot(new IRCellS(inner.activeRemoteTree, reqs));
+    } else {
+      remoteSlot(new IRCellS(IRSlotTree.of(new IRSessionS()), IRValueRequisites.notValue()));
+    }
   }
 
   @Override
   public void visit(ASTUsageT type) {
-    localSlot(new IRCellS());
+    if (compiler.optimizeAffineValue.get()) {
+      IRValueRequisites reqs = IRValueRequisites.check(compiler, env, type.getin(), false);
+      IRSlotsFromASTType inner = recurse(type.getin());
+      localSlot(new IRCellS(inner.activeLocalTree, reqs));
+    } else {
+      localSlot(new IRCellS(IRSlotTree.of(new IRSessionS()), IRValueRequisites.notValue()));
+    }
   }
 
   @Override
   public void visit(ASTCellLT type) {
-    remoteSlot(new IRCellS());
+    if (compiler.optimizeAffineValue.get()) {
+      IRValueRequisites reqs = IRValueRequisites.check(compiler, env, type.getin(), true);
+      IRSlotsFromASTType inner = recurse(type.getin());
+      remoteSlot(new IRCellS(inner.activeRemoteTree, reqs));
+    } else {
+      remoteSlot(new IRCellS(IRSlotTree.of(new IRSessionS()), IRValueRequisites.notValue()));
+    }
   }
 
   @Override
   public void visit(ASTUsageLT type) {
-    localSlot(new IRCellS());
+    if (compiler.optimizeAffineValue.get()) {
+      IRValueRequisites reqs = IRValueRequisites.check(compiler, env, type.getin(), false);
+      IRSlotsFromASTType inner = recurse(type.getin());
+      localSlot(new IRCellS(inner.activeLocalTree, reqs));
+    } else {
+      localSlot(new IRCellS(IRSlotTree.of(new IRSessionS()), IRValueRequisites.notValue()));
+    }
   }
 }

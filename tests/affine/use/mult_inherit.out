@@ -1,7 +1,7 @@
-use 2
-affine 2
-use 1
 affine 1
+affine 2
+use 2
+use 1
 send 1
 close 1
 recv 1

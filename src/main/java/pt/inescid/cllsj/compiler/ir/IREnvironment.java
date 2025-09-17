@@ -4,8 +4,6 @@ import java.util.Optional;
 import java.util.function.Consumer;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
-import pt.inescid.cllsj.ast.types.ASTAffineT;
-import pt.inescid.cllsj.ast.types.ASTCoAffineT;
 import pt.inescid.cllsj.ast.types.ASTIdT;
 import pt.inescid.cllsj.ast.types.ASTNotT;
 import pt.inescid.cllsj.ast.types.ASTType;
@@ -230,12 +228,6 @@ public class IREnvironment {
 
     if (type instanceof ASTIdT) {
       return getType(((ASTIdT) type).getid()).isPositive();
-    } else if (type instanceof ASTAffineT) {
-      // This and the below edge case are necessary due to us compiling affine
-      // as an offer and coaffine as a choice
-      return false;
-    } else if (type instanceof ASTCoAffineT) {
-      return true;
     } else {
       return type.isPosCatch(ep);
     }

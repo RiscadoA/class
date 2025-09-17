@@ -27,19 +27,20 @@ import pt.inescid.cllsj.compiler.ir.instruction.*;
 import pt.inescid.cllsj.compiler.ir.slot.*;
 
 public class IRGenerator extends ASTNodeVisitor {
-  Compiler compiler;
+  private Compiler compiler;
 
   private IRProgram program = new IRProgram();
   private Map<IRProcessId, ASTProcDef> procDefs = new HashMap<>();
-  Map<IRProcessId, Runnable> procGens = new HashMap<>();
-  Map<IRProcessId, IREnvironment> procEnvs = new HashMap<>();
-  Queue<IRProcessId> procUsed = new LinkedList<>();
+  private Map<IRProcessId, Runnable> procGens = new HashMap<>();
+  private Map<IRProcessId, IREnvironment> procEnvs = new HashMap<>();
+  private Queue<IRProcessId> procUsed = new LinkedList<>();
+  private Map<IRValueRequisites, Boolean> valueRequisitesCache = new HashMap<>();
 
-  IRProcess process;
-  IRBlock block;
+  private IRProcess process;
+  private IRBlock block;
   private int nextProcessGenId = 0;
 
-  IREnvironment env;
+  private IREnvironment env;
 
   public static IRProgram generate(Compiler compiler, Env<EnvEntry> ep, ASTProgram ast) {
     IRGenerator gen = new IRGenerator();
@@ -495,17 +496,36 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTUse node) {
-    addUse(node.getCh(), node.getContType(), () -> node.getRhs().accept(this));
+    addUse(
+        node.getCh(),
+        node.getContType(),
+        countEndPoints(node.getRhs()),
+        () -> node.getRhs().accept(this));
   }
 
   @Override
   public void visit(ASTDiscard node) {
     IREnvironment.Channel channel = env.getChannel(node.getCh());
 
-    // Write a tag indicating the coaffine is being discarded and pass control to it
-    block.add(new IRWriteTag(channel.getRemoteData(), 0));
-    addContinue(channel.getSessionId());
-    block.add(new IRPopTask(true));
+    IRValueRequisites reqs = valueRequisites(node.getCoAffineT().getin(), false);
+    if (!compiler.optimizeAffineValue.get()) {
+      reqs = IRValueRequisites.notValue();
+    }
+    addBranchIsValue(
+        reqs,
+        1,
+        () -> {
+          // Drop the slots associated with the coaffine
+          IRSlotsFromASTType info = slotsFromType(node.getCoAffineT().getin());
+          block.add(new IRDropSlots(channel.getLocalData(), info.activeLocalTree));
+          block.add(new IRPopTask(true));
+        },
+        () -> {
+          // Write a tag indicating the coaffine is being discarded and pass control to it
+          block.add(new IRWriteTag(channel.getRemoteData(), 0));
+          addContinue(channel.getSessionId());
+          block.add(new IRPopTask(true));
+        });
   }
 
   @Override
@@ -514,6 +534,7 @@ public class IRGenerator extends ASTNodeVisitor {
         node.getCh(),
         node.getChc(),
         node.getTypeRhs(),
+        countEndPoints(node.getRhs()),
         () -> {
           if (node.getTypeRhs() instanceof ASTCoBasicType
               || node.getTypeRhs() instanceof ASTCellT) {
@@ -539,6 +560,7 @@ public class IRGenerator extends ASTNodeVisitor {
         node.getChs(),
         node.getCho(),
         node.getLhsType(),
+        countEndPoints(node.getLhs()),
         () -> {
           if (node.getLhsType() instanceof ASTCoBasicType
               || node.getLhsType() instanceof ASTCellT) {
@@ -561,7 +583,12 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTTake node) {
-    addTake(node.getChr(), node.getChi(), node.getChiType(), () -> node.getRhs().accept(this));
+    addTake(
+        node.getChr(),
+        node.getChi(),
+        node.getChiType(),
+        countEndPoints(node.getRhs()),
+        () -> node.getRhs().accept(this));
   }
 
   @Override
@@ -1114,51 +1141,88 @@ public class IRGenerator extends ASTNodeVisitor {
       Runnable cont) {
     IREnvironment.Channel channel = env.getChannel(ch);
 
-    // We branch on whether the affine is used or not
-    IRBlock usedBlock = process.createBlock("affine_used");
-    IRBlock unusedBlock = process.createBlock("affine_unused");
-    IRBranch.Case used = new IRBranch.Case(usedBlock.getLocation(), contEndPoints);
-    IRBranch.Case unused = new IRBranch.Case(unusedBlock.getLocation(), 1);
-
-    block.add(new IRBranchTag(channel.getLocalData(), List.of(unused, used)));
-    recurse(usedBlock, cont);
-    recurse(
-        unusedBlock,
+    IRValueRequisites reqs = valueRequisites(contType, true);
+    if (!compiler.optimizeAffineValue.get()) {
+      reqs = IRValueRequisites.notValue();
+    }
+    addBranchIsValue(
+        reqs,
+        contEndPoints,
         () -> {
-          // If the affine is unused, we must discard any data associated with it
-          // This includes both references to cells and coaffine channels
+          // If the affine is a value, we generate the continuation in place
+          recurse(block, cont);
+        },
+        () -> {
+          // Affine types are positive, but if the inner type is not a value, since a choice
+          // must be made, we must pass control to the other side
+          addContinue(channel.getSessionId());
 
-          for (String name : usageSet.keySet()) {
-            ASTType type = usageSet.get(name);
-            if (!(type instanceof ASTUsageT)) {
-              throw new RuntimeException(
-                  "Internal error: affine usage set contains non-usage type");
-            }
-            addRelease(name, (ASTUsageT) usageSet.get(name), false);
-          }
+          // We branch on whether the affine is used or not
+          IRBlock usedBlock = process.createBlock("affine_used");
+          IRBlock unusedBlock = process.createBlock("affine_unused");
+          IRBranch.Case used = new IRBranch.Case(usedBlock.getLocation(), contEndPoints);
+          IRBranch.Case unused = new IRBranch.Case(unusedBlock.getLocation(), 1);
 
-          for (String name : coaffineSet.keySet()) {
-            // We must write a drop tag and jump to the closure
-            IREnvironment.Channel capturedChannel = env.getChannel(name);
-            block.add(new IRWriteTag(capturedChannel.getRemoteData(), 0));
-            addContinue(capturedChannel.getSessionId());
-          }
+          block.add(new IRBranchTag(channel.getLocalData(), List.of(unused, used)));
+          recurse(usedBlock, cont);
+          recurse(
+              unusedBlock,
+              () -> {
+                // If the affine is unused, we must discard any data associated with it
+                // This includes both references to cells and coaffine channels
 
-          block.add(new IRFinishSession(channel.getSessionId(), true));
+                for (String name : usageSet.keySet()) {
+                  ASTType type = usageSet.get(name);
+                  if (!(type instanceof ASTUsageT)) {
+                    throw new RuntimeException(
+                        "Internal error: affine usage set contains non-usage type");
+                  }
+                  addRelease(name, (ASTUsageT) usageSet.get(name), false);
+                }
+
+                for (String name : coaffineSet.keySet()) {
+                  // We must write a drop tag and jump to the closure
+                  IREnvironment.Channel capturedChannel = env.getChannel(name);
+                  block.add(new IRWriteTag(capturedChannel.getRemoteData(), 0));
+                  addContinue(capturedChannel.getSessionId());
+                }
+
+                block.add(new IRFinishSession(channel.getSessionId(), true));
+              });
         });
   }
 
-  void addUse(String ch, ASTType contType, Runnable cont) {
-    // Write a tag indicating the affine is being used and pass control to it if it's negative
+  void addUse(String ch, ASTType contType, int contEndPoints, Runnable cont) {
     IREnvironment.Channel channel = env.getChannel(ch);
-    block.add(new IRWriteTag(channel.getRemoteData(), 1));
-    addContinueIfNegative(channel.getSessionId(), contType);
 
-    recurse(block, cont);
+    IRBlock rhsBlock = process.createBlock("use_rhs");
+
+    IRValueRequisites reqs = valueRequisites(contType, false);
+    if (!compiler.optimizeAffineValue.get()) {
+      reqs = IRValueRequisites.notValue();
+    }
+    addBranchIsValue(
+        reqs,
+        contEndPoints,
+        () -> {
+          // If the continuation is a value, we do nothing
+          block.add(new IRJump(rhsBlock.getLocation()));
+        },
+        () -> {
+          // Write a tag indicating the affine is being used and pass control to it if it's negative
+          block.add(new IRWriteTag(channel.getRemoteData(), 1));
+          addContinueIfNegative(channel.getSessionId(), contType);
+          block.add(new IRJump(rhsBlock.getLocation()));
+        });
+
+    recurse(rhsBlock, cont);
   }
 
   void addRelease(String ch, ASTUsageT type, boolean popTask) {
-    block.add(new IRDecrementCell(env.getChannel(ch).getLocalData()));
+    IRSlotsFromASTType info = slotsFromType(type);
+    block.add(
+        new IRDecrementCell(
+            env.getChannel(ch).getLocalData(), (IRCellS) info.activeLocalTree.singleHead().get()));
     if (popTask) {
       block.add(new IRPopTask(true));
     }
@@ -1173,62 +1237,136 @@ public class IRGenerator extends ASTNodeVisitor {
     recurse(rhsBlock, rhsCont);
   }
 
-  void addCell(String ch, String chc, ASTType typeRhs, Runnable cont) {
+  void addCell(String ch, String chc, ASTType typeRhs, int contEndPoints, Runnable cont) {
     IREnvironment.Channel channel = env.getChannel(ch);
 
-    // The cell will store a pointer to a session
-    block.add(new IRWriteCell(channel.getRemoteData(), IRSlotTree.of(new IRSessionS())));
+    IRValueRequisites reqs = valueRequisites(typeRhs, true);
+    if (!compiler.optimizeAffineValue.get()) {
+      reqs = IRValueRequisites.notValue();
+    }
 
-    // Initialize the session we'll store in the cell
-    env = env.addSession(chc, slotsFromType(typeRhs).localCombinations());
-    IREnvironment.Channel cellSession = env.getChannel(chc);
-    IRBlock cellBlock = process.createBlock("cell_rhs");
-    block.add(
-        new IRInitializeSession(
-            cellSession.getSessionId(),
-            Optional.of(cellBlock.getLocation()),
-            cellSession.getLocalData()));
+    addBranchIsValue(
+        reqs,
+        contEndPoints + 1,
+        () -> {
+          // The cell will store a value, so we can just write the data there immediately
+          IRSlotsFromASTType info = slotsFromType(typeRhs);
+          block.add(new IRWriteCell(channel.getRemoteData(), info.activeRemoteTree));
 
-    // Store it in the cell and finish
-    block.add(
-        new IRWriteSession(
-            IRDataLocation.cell(channel.getRemoteData(), IRSlotOffset.ZERO),
-            cellSession.getSessionId()));
-    block.add(new IRFinishSession(channel.getSessionId(), false));
+          // Initialize the session to write to the cell
+          env = env.addSession(chc);
+          IREnvironment.Channel cellSession = env.getChannel(chc);
+          IRBlock retBlock = process.createBlock("cell_ret");
+          block.add(
+              new IRInitializeSession(
+                  cellSession.getSessionId(),
+                  Optional.of(retBlock.getLocation()),
+                  IRDataLocation.cell(channel.getRemoteData(), IRSlotOffset.ZERO)));
 
-    // Recurse on the cell's right-hand-side
-    recurse(cellBlock, () -> cont.run());
+          // Generate the right-hand-side in place
+          recurse(block, cont);
+          recurse(
+              retBlock,
+              () -> {
+                block.add(new IRFinishSession(channel.getSessionId(), true));
+              });
+        },
+        contEndPoints,
+        () -> {
+          // The cell will store a pointer to a session
+          block.add(new IRWriteCell(channel.getRemoteData(), IRSlotTree.of(new IRSessionS())));
+
+          // Initialize the session we'll store in the cell
+          env = env.addSession(chc, slotsFromType(typeRhs).localCombinations());
+          IREnvironment.Channel cellSession = env.getChannel(chc);
+          IRBlock cellBlock = process.createBlock("cell_rhs");
+          block.add(
+              new IRInitializeSession(
+                  cellSession.getSessionId(),
+                  Optional.of(cellBlock.getLocation()),
+                  cellSession.getLocalData()));
+
+          // We must pass control to the cell session as it is an affine session
+          addContinue(cellSession.getSessionId());
+
+          // Store it in the cell and finish
+          block.add(
+              new IRWriteSession(
+                  IRDataLocation.cell(channel.getRemoteData(), IRSlotOffset.ZERO),
+                  cellSession.getSessionId()));
+          block.add(new IRFinishSession(channel.getSessionId(), false));
+
+          // Recurse on the cell's right-hand-side
+          recurse(cellBlock, () -> cont.run());
+        });
   }
 
-  void addPut(String ch, String chc, ASTType typeLhs, Runnable contLhs, Runnable contRhs) {
+  void addPut(
+      String ch,
+      String chc,
+      ASTType typeLhs,
+      int contLhsEndPoints,
+      Runnable contLhs,
+      Runnable contRhs) {
     IREnvironment.Channel channel = env.getChannel(ch);
     IRDataLocation cellDataLoc = IRDataLocation.cell(channel.getLocalData(), IRSlotOffset.ZERO);
 
-    // Define new session for the channel being stored
-    IRSlotsFromASTType argInfo = slotsFromType(typeLhs);
-    env = env.addSession(chc, argInfo.localCombinations());
-    IREnvironment.Channel argSession = env.getChannel(chc);
+    IRBlock rhsBlock = process.createBlock("put_rhs");
 
-    // Initialize the new session with a new closure block for the left-hand-side
-    // as its continuation.
-    IRBlock closureBlock = process.createBlock("put_lhs");
-    recurse(closureBlock, contLhs);
-    block.add(
-        new IRInitializeSession(
-            argSession.getSessionId(),
-            Optional.of(closureBlock.getLocation()),
-            argSession.getLocalData()));
-
-    block.add(new IRWriteSession(cellDataLoc, argSession.getSessionId()));
-
-    // Recurse on the continuation
-    if (compiler.concurrency.get()) {
-      block.add(new IRUnlockCell(channel.getLocalData()));
+    IRValueRequisites reqs = valueRequisites(typeLhs, true);
+    if (!compiler.optimizeAffineValue.get()) {
+      reqs = IRValueRequisites.notValue();
     }
-    recurse(block, contRhs);
+    addBranchIsValue(
+        reqs,
+        contLhsEndPoints,
+        () -> {
+          // Since the cell stores a value, we can just write it directly to the cell
+          env = env.addSession(chc);
+          IREnvironment.Channel argSession = env.getChannel(chc);
+
+          // Initialize the new session so that its data points to the cell's data
+          block.add(
+              new IRInitializeSession(
+                  argSession.getSessionId(), Optional.of(rhsBlock.getLocation()), cellDataLoc));
+
+          // Generate the left-hand-side in place
+          recurse(block, contLhs);
+        },
+        () -> {
+          // Define new session for the channel being stored
+          IRSlotsFromASTType argInfo = slotsFromType(typeLhs);
+          env = env.addSession(chc, argInfo.localCombinations());
+          IREnvironment.Channel argSession = env.getChannel(chc);
+
+          // Initialize the new session with a new closure block for the left-hand-side
+          // as its continuation.
+          IRBlock closureBlock = process.createBlock("put_lhs");
+          recurse(closureBlock, contLhs);
+          block.add(
+              new IRInitializeSession(
+                  argSession.getSessionId(),
+                  Optional.of(closureBlock.getLocation()),
+                  argSession.getLocalData()));
+
+          // We must pass control to the cell session as it is an affine session
+          addContinue(argSession.getSessionId());
+
+          block.add(new IRWriteSession(cellDataLoc, argSession.getSessionId()));
+          block.add(new IRJump(rhsBlock.getLocation()));
+        });
+
+    recurse(
+        rhsBlock,
+        () -> {
+          if (compiler.concurrency.get()) {
+            block.add(new IRUnlockCell(channel.getLocalData()));
+          }
+          contRhs.run();
+        });
   }
 
-  void addTake(String ch, String chc, ASTType typeLhs, Runnable cont) {
+  void addTake(String ch, String chc, ASTType typeLhs, int contEndPoints, Runnable cont) {
     IREnvironment.Channel channel = env.getChannel(ch);
     IRDataLocation cellDataLoc = IRDataLocation.cell(channel.getLocalData(), IRSlotOffset.ZERO);
 
@@ -1242,16 +1380,38 @@ public class IRGenerator extends ASTNodeVisitor {
     env = env.addSession(chc, info.localCombinations());
     IREnvironment.Channel argChannel = env.getChannel(chc);
 
-    // Otherwise, we bind the new session to the one stored in the cell
-    block.add(new IRBindSession(argChannel.getSessionId(), cellDataLoc, argChannel.getLocalData()));
+    IRBlock rhsBlock = process.createBlock("take_rhs");
 
-    // The type checker doesn't place use nodes after takes of basic types
-    // and cells, so we do it ourselves
-    if (typeLhs instanceof ASTBasicType || typeLhs instanceof ASTUsageT) {
-      addUse(chc, typeLhs, cont);
-    } else {
-      recurse(block, cont);
+    IRValueRequisites reqs = valueRequisites(typeLhs, false);
+    if (!compiler.optimizeAffineValue.get()) {
+      reqs = IRValueRequisites.notValue();
     }
+    addBranchIsValue(
+        reqs,
+        contEndPoints,
+        () -> {
+          // Since the cell stores a value, we can just move it directly from the cell
+          block.add(new IRMoveSlots(argChannel.getLocalData(), cellDataLoc, info.activeLocalTree));
+          block.add(new IRJump(rhsBlock.getLocation()));
+        },
+        () -> {
+          // Otherwise, we bind the new session to the one stored in the cell
+          block.add(
+              new IRBindSession(argChannel.getSessionId(), cellDataLoc, argChannel.getLocalData()));
+          block.add(new IRJump(rhsBlock.getLocation()));
+        });
+
+    recurse(
+        rhsBlock,
+        () -> {
+          // The type checker doesn't place use nodes after takes of basic types
+          // and cells, so we do it ourselves
+          if (typeLhs instanceof ASTBasicType || typeLhs instanceof ASTUsageT) {
+            addUse(chc, typeLhs, contEndPoints, cont);
+          } else {
+            cont.run();
+          }
+        });
   }
 
   void addBranchIsValue(
@@ -1260,6 +1420,36 @@ public class IRGenerator extends ASTNodeVisitor {
       Runnable ifValue,
       int ifNotValueEndPoints,
       Runnable ifNotValue) {
+    if (valueRequisitesCache.containsKey(reqs)) {
+      if (ifValueEndPoints != ifNotValueEndPoints) {
+        // Then we need to a dummy branch to make the end points match
+        IRBlock valueBlock = process.createBlock("value_dummy");
+        IRBlock notValueBlock = process.createBlock("not_value_dummy");
+        IRBranch.Case valueCase = new IRBranch.Case(valueBlock.getLocation(), ifValueEndPoints);
+        IRBranch.Case notValueCase = new IRBranch.Case(notValueBlock.getLocation(), ifNotValueEndPoints);
+        block.add(new IRBranchIsValue(valueRequisitesCache.get(reqs) ? IRValueRequisites.value() : IRValueRequisites.notValue(), valueCase, notValueCase));
+
+        if (valueRequisitesCache.get(reqs)) {
+          recurse(valueBlock, ifValue);
+          recurse(notValueBlock, () -> {
+            block.add(new IRPanic("Unreachable block"));
+          });
+        } else {
+          recurse(valueBlock, () -> {
+            block.add(new IRPanic("Unreachable block"));
+          });
+          recurse(notValueBlock, ifNotValue);
+        }
+      } else {
+        if (valueRequisitesCache.get(reqs)) {
+          ifValue.run();
+        } else {
+          ifNotValue.run();
+        }
+      }
+      return;
+    }
+
     if (reqs.mustBeValue()) {
       ifValue.run();
     } else if (reqs.canBeValue()) {
@@ -1269,8 +1459,11 @@ public class IRGenerator extends ASTNodeVisitor {
       IRBranch.Case notValueCase =
           new IRBranch.Case(notValueBlock.getLocation(), ifNotValueEndPoints);
       block.add(new IRBranchIsValue(reqs, valueCase, notValueCase));
+      valueRequisitesCache.put(reqs, true);
       recurse(valueBlock, ifValue);
+      valueRequisitesCache.put(reqs, false);
       recurse(notValueBlock, ifNotValue);
+      valueRequisitesCache.remove(reqs);
     } else {
       ifNotValue.run();
     }

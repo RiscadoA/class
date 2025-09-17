@@ -1624,7 +1624,7 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRDecrementCell instr) {
-    putDecrementCell(data(instr.getLocation()));
+    putDecrementCell(data(instr.getLocation()), instr.getCell());
   }
 
   @Override
@@ -2408,7 +2408,7 @@ public class CGenerator extends IRInstructionVisitor {
     putIncrementAtomic(cellRefCount(var));
   }
 
-  void putDecrementCell(CAddress cellAddr) {
+  void putDecrementCell(CAddress cellAddr, IRCellS cell) {
     String ref = cellAddr.deref("struct cell*");
 
     putIf(
@@ -2418,20 +2418,35 @@ public class CGenerator extends IRInstructionVisitor {
             putDebugLn("[freeCell]");
           }
 
-          // To drop the cell's contents, we simply drop its affine session
-          String sessionPtr = cellData(cellAddr, IRSlotOffset.ZERO).deref("struct session*");
-          String session = accessSession(sessionPtr);
+          putIfElse(
+              isValue(cell.getIsValue()),
+              () -> {
+                // Since the cell contains a value, we drop its slots directly
+                putDropSlots(
+                    cell.getSlots(),
+                    id -> typeNodeCount(type(id)),
+                    id -> typeNode(type(id)),
+                    this::typeLayout,
+                    this::isValue,
+                    cellData(cellAddr, IRSlotOffset.ZERO));
+              },
+              () -> {
+                // To drop the cell's contents, we drop its affine session
+                String sessionPtr = cellData(cellAddr, IRSlotOffset.ZERO).deref("struct session*");
+                String session = accessSession(sessionPtr);
+                String remoteSession = accessRemoteSession(session);
 
-          String tagRef = CAddress.of(sessionContData(session)).deref("unsigned char");
-          putAssign(tagRef, 0); // 0 means discard
-          String label = makeLabel("drop_affine");
-          putAssign(TMP_PTR1, sessionCont(session));
-          putAssign(TMP_PTR2, sessionContEnv(session));
-          putAssign(sessionCont(session), labelAddress(label));
-          putAssign(sessionContEnv(session), ENV);
-          putAssign(ENV, cast(TMP_PTR2, "char*"));
-          putComputedGoto(TMP_PTR1);
-          putLabel(label);
+                String tagRef = CAddress.of(sessionContData(session)).deref("unsigned char");
+                putAssign(tagRef, 0); // 0 means discard
+                String label = makeLabel("drop_affine");
+                putAssign(TMP_PTR1, sessionCont(session));
+                putAssign(TMP_PTR2, sessionContEnv(session));
+                putAssign(sessionCont(remoteSession), labelAddress(label));
+                putAssign(sessionContEnv(remoteSession), ENV);
+                putAssign(ENV, cast(TMP_PTR2, "char*"));
+                putComputedGoto(TMP_PTR1);
+                putLabel(label);
+              });
 
           // Now we can free the cell itself
           if (compiler.concurrency.get()) {

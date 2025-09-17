@@ -78,7 +78,7 @@ public class Optimizer {
       // We want to find the blocks which have at least one outgoing flow.
       // Those blocks should never be end points.
       // Thus, we skip any which do not have an outgoing flow - these are real endpoints.
-      if (flow.getBranches().isEmpty() && flow.getDetached().isEmpty()) {
+      if (flow.getBranches().isEmpty() && !flow.hasDetachesInAllTraces()) {
         continue;
       }
 
@@ -192,7 +192,7 @@ public class Optimizer {
       branch.addSource(prev);
       prev.addBranch(branch);
     }
-    for (AnlFlow detached : next.getDetached()) {
+    for (AnlFlow detached : next.getDetached().keySet()) {
       prev.addDetached(detached);
     }
     for (AnlFlow target : next.getTargets()) {

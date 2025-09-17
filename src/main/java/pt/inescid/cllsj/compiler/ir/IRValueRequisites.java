@@ -92,6 +92,16 @@ public class IRValueRequisites {
     }
   }
 
+  @Override
+  public boolean equals(Object obj) {
+    return toString().equals(obj.toString());
+  }
+
+  @Override
+  public int hashCode() {
+    return toString().hashCode();
+  }
+
   private static class Visitor extends ASTTypeVisitor {
     private Compiler compiler;
     private IREnvironment env;
@@ -257,12 +267,22 @@ public class IRValueRequisites {
 
     @Override
     public void visit(ASTAffineT type) {
-      types = Optional.empty();
+      if (compiler.optimizeAffineValue.get()) {
+        expectPolarity(true);
+        recurse(type.getin());
+      } else {
+        types = Optional.empty();
+      }
     }
 
     @Override
     public void visit(ASTCoAffineT type) {
-      types = Optional.empty();
+      if (compiler.optimizeAffineValue.get()) {
+        expectPolarity(false);
+        recurse(type.getin());
+      } else {
+        types = Optional.empty();
+      }
     }
 
     @Override

@@ -137,16 +137,6 @@ public class CLayout {
     return layout;
   }
 
-  // public static CLayout compute(
-  //     IRSlotSequence sequence, CArchitecture arch, Function<IRTypeId, CLayout>
-  // typeLayoutProvider) {
-  //   Visitor visitor = new Visitor(arch, typeLayoutProvider);
-  //   for (IRSlot slot : sequence.list().reversed()) {
-  //     slot.accept(visitor);
-  //   }
-  //   return visitor.layout;
-  // }
-
   public static CLayout compute(
       IRSlot slot, CArchitecture arch, Function<IRTypeId, CLayout> typeLayoutProvider) {
     Visitor visitor = new Visitor(arch, typeLayoutProvider);

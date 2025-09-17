@@ -177,6 +177,9 @@ public class IREndPointCounter extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTCell node) {
+    if (IRValueRequisites.check(compiler, env, node.getTypeRhs(), true).canBeValue()) {
+      count += 1;
+    }
     node.getRhs().accept(this);
   }
 

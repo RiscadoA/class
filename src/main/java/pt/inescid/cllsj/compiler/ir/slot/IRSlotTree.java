@@ -17,13 +17,9 @@ public abstract class IRSlotTree {
   }
 
   public static IRSlotTree of(IRSlot... slots) {
-    return of(IRSlotSequence.of(slots));
-  }
-
-  public static IRSlotTree of(IRSlotSequence slots) {
     IRSlotTree result = LEAF;
-    for (int i = slots.size() - 1; i >= 0; i--) {
-      result = of(slots.get(i), result);
+    for (int i = slots.length - 1; i >= 0; i--) {
+      result = of(slots[i], result);
     }
     return result;
   }
@@ -162,13 +158,8 @@ public abstract class IRSlotTree {
     public IRSlotTree replaceTypes(
         Function<IRTypeId, IRSlotTree> slotReplacer,
         Function<IRTypeId, IRValueRequisites> reqReplacer) {
-      if (!(slot instanceof IRVarS)) {
-        return new Unary(slot, child.replaceTypes(slotReplacer, reqReplacer));
-      } else {
-        IRVarS var = (IRVarS) slot;
-        IRSlotTree replacement = slotReplacer.apply(var.getTypeId());
-        return replacement.suffix(child.replaceTypes(slotReplacer, reqReplacer));
-      }
+      return slot.replaceTypes(slotReplacer, reqReplacer)
+          .suffix(child.replaceTypes(slotReplacer, reqReplacer));
     }
 
     @Override

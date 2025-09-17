@@ -1,8 +1,8 @@
 send 1
 close 1
+affine
 recv 1
 wait 1
 discard
-affine
 close 4
 wait 4

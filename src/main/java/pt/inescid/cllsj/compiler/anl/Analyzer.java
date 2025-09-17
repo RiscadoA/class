@@ -92,6 +92,9 @@ public class Analyzer extends IRInstructionVisitor {
       currentFlow.addSource(previousFlow);
     }
 
+    // Mark that we've passed through this block.
+    currentFlow.addTrace();
+
     // Visit each instruction in the block, one by one.
     int index = 0;
     currentFlow.addState(index, this, flowLoc, state);

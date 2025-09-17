@@ -8,7 +8,7 @@ Profiling results:
   Exponential frees: 0
   Task allocations: 3
   Task frees: 3
-  String allocations: 4
-  String frees: 4
+  String allocations: 5
+  String frees: 5
   Cell allocations: 1
   Cell frees: 1

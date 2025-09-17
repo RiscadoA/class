@@ -12,10 +12,6 @@ public class IRSlotOffset {
     return new IRSlotOffset(past, future);
   }
 
-  public static IRSlotOffset of(IRSlotSequence past, IRSlotTree future) {
-    return new IRSlotOffset(IRSlotTree.of(past), future);
-  }
-
   public static IRSlotOffset of(IRSlot past, IRSlotTree future) {
     return new IRSlotOffset(IRSlotTree.of(past), future);
   }
@@ -44,10 +40,6 @@ public class IRSlotOffset {
 
   public IRSlotOffset advance(IRSlot slot, IRSlotTree future) {
     return new IRSlotOffset(past.suffix(IRSlotTree.of(slot)), future);
-  }
-
-  public IRSlotOffset advance(IRSlotSequence slots, IRSlotTree future) {
-    return new IRSlotOffset(past.suffix(IRSlotTree.of(slots)), future);
   }
 
   public IRSlotOffset advance(IRSlotOffset offset) {
