@@ -50,6 +50,10 @@ public class IRValueRequisites {
     return types.isPresent() && types.get().isEmpty();
   }
 
+  public boolean isUncertain() {
+    return types.isPresent() && !types.get().isEmpty();
+  }
+
   public Set<IRTypeId> typesWhichMustBeValue() {
     return types.orElseThrow();
   }

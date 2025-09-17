@@ -29,10 +29,10 @@ public abstract class IRInstruction {
     replaceDataLocations(loc -> loc.replaceSlots(replacer));
   }
 
-  public void replaceType(
+  public void replaceTypes(
       Function<IRTypeId, IRSlotTree> slotReplacer,
       Function<IRTypeId, IRValueRequisites> reqReplacer) {
-    replaceSlots(t -> t.replaceType(slotReplacer, reqReplacer));
+    replaceSlots(t -> t.replaceTypes(slotReplacer, reqReplacer));
   }
 
   public void replaceCodeLocations(Function<IRCodeLocation, IRCodeLocation> replacer) {}

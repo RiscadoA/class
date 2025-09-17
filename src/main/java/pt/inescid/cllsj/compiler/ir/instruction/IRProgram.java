@@ -17,6 +17,10 @@ public class IRProgram {
     return processes.get(id);
   }
 
+  public boolean contains(IRProcessId id) {
+    return processes.containsKey(id);
+  }
+
   public Stream<IRProcess> stream() {
     return processes.values().stream();
   }

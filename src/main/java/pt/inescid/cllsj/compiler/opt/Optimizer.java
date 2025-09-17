@@ -1,8 +1,11 @@
 package pt.inescid.cllsj.compiler.opt;
 
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Queue;
@@ -936,7 +939,7 @@ public class Optimizer {
       Map<IRLocalDataId, IRLocalDataId> localDataMap = new HashMap<>();
       for (IRLocalDataId id : callProc.localData()) {
         IRSlotCombinations combinations =
-            callProc.getLocalData(id).replaceType(slotReplacer, reqReplacer);
+            callProc.getLocalData(id).replaceTypes(slotReplacer, reqReplacer);
         localDataMap.put(id, proc.addLocalData(combinations));
       }
       for (IRCallProcess.DataArgument arg : call.getDataArguments()) {
@@ -987,8 +990,8 @@ public class Optimizer {
         IRDropId newId =
             proc.addDropOnEnd(
                 localDataMap.get(drop.getLocalDataId()),
-                drop.getOffset().replaceSlots(t -> t.replaceType(slotReplacer, reqReplacer)),
-                drop.getSlots().replaceType(slotReplacer, reqReplacer),
+                drop.getOffset().replaceSlots(t -> t.replaceTypes(slotReplacer, reqReplacer)),
+                drop.getSlots().replaceTypes(slotReplacer, reqReplacer),
                 false);
         dropMap.put(oldId, newId);
         if (drop.isAlways()) {
@@ -1027,7 +1030,7 @@ public class Optimizer {
             newInstr.replaceLocalData(localDataMap::get);
             newInstr.replaceCodeLocations(locationMap::get);
             newInstr.replaceDropIds(dropMap::get);
-            newInstr.replaceType(slotReplacer, reqReplacer);
+            newInstr.replaceTypes(slotReplacer, reqReplacer);
 
             // If it is a recursive call, turn into a IRCallLoop instruction
             if (callProc.isRecursive() && newInstr instanceof IRCallProcess) {
@@ -1107,5 +1110,120 @@ public class Optimizer {
 
     // Now, we remove all processes which are not used
     ir.removeIf(p -> !used.contains(p.getId()));
+  }
+
+  private static class MonomorphizationArgs {
+    Map<IRTypeId, IRSlotTree> typeTrees = new HashMap<>();
+    Map<IRTypeId, Boolean> typeIsValue = new HashMap<>();
+  };
+
+  public void monomorphizeProcesses(IRProgram ir) {
+    // While there are process calls / exponential writes with concrete type arguments
+    // keep monomorphizing them
+    while (true) {
+      Map<IRProcessId, Map<IRProcessId, MonomorphizationArgs>> toMonomorphize = new HashMap<>();
+
+      // Search for process calls / exponential writes to monomorphize
+      for (IRProcess proc : ir.stream().toList()) {
+        for (IRInstruction instr : proc.streamInstructions().toList()) {
+          if (instr instanceof IRCallProcess) {
+            IRCallProcess call = (IRCallProcess) instr;
+            MonomorphizationArgs args = new MonomorphizationArgs();
+            boolean candidate = !call.getTypeArguments().isEmpty();
+            for (IRCallProcess.TypeArgument arg : call.getTypeArguments()) {
+              if (arg.isFromLocation() || arg.getSourceTree().isPolymorphic() || arg.getSourceIsValue().isUncertain()) {
+                candidate = false;
+                break;
+              }
+              args.typeTrees.put(arg.getTargetType(), arg.getSourceTree());
+              args.typeIsValue.put(arg.getTargetType(), arg.getSourceIsValue().mustBeValue());
+            }
+            if (!candidate) {
+              // No type arguments or not all concrete, not a valid candidate
+              continue;
+            }
+
+            IRProcessId newId = monomorphize(call.getProcessId(), args);
+            if (!ir.contains(newId)) {
+              toMonomorphize
+                  .computeIfAbsent(call.getProcessId(), k -> new HashMap<>())
+                  .putIfAbsent(newId, args);
+            }
+
+            // Modify the call instruction to use the monomorphized process
+            call.setProcessId(newId);
+            call.removeTypeArguments();
+          } else if (instr instanceof IRWriteExponential) {
+            IRWriteExponential write = (IRWriteExponential) instr;
+            MonomorphizationArgs args = new MonomorphizationArgs();
+            boolean candidate = !write.getTypeArguments().isEmpty();
+            for (IRWriteExponential.TypeArgument arg : write.getTypeArguments()) {
+              if (arg.getSourceTree().isPolymorphic() || arg.getSourceIsValue().isUncertain()) {
+                candidate = false;
+                break;
+              }
+              args.typeTrees.put(arg.getTargetType(), arg.getSourceTree());
+              args.typeIsValue.put(arg.getTargetType(), arg.getSourceIsValue().mustBeValue());
+            }
+            if (!candidate) {
+              // No type arguments or not all concrete, not a valid candidate
+              continue;
+            }
+
+            IRProcessId newId = monomorphize(write.getProcessId(), args);
+            if (!ir.contains(newId)) {
+              toMonomorphize
+                  .computeIfAbsent(write.getProcessId(), k -> new HashMap<>())
+                  .putIfAbsent(newId, args);
+            }
+
+            // Modify the write instruction to use the monomorphized process
+            write.setProcessId(newId);
+            write.removeTypeArguments();
+          }
+        }
+      }
+
+      if (toMonomorphize.isEmpty()) {
+        break;
+      }
+
+      // We now have a list of processes to monomorphize
+      for (IRProcessId originalId : toMonomorphize.keySet()) {
+        for (IRProcessId newId : toMonomorphize.get(originalId).keySet()) {
+          // Clone the old process, remove all type variables, and replace types on instructions
+          MonomorphizationArgs args = toMonomorphize.get(originalId).get(newId);
+          IRProcess originalProc = ir.get(originalId);
+          IRProcess newProc = originalProc.clone(newId);
+          newProc.removeTypes();
+          newProc.replaceTypes(
+            id -> args.typeTrees.get(id),
+            id -> args.typeIsValue.get(id) ? IRValueRequisites.value() : IRValueRequisites.notValue()
+          );
+          ir.add(newProc);
+        }
+      }
+    }
+  }
+
+  private IRProcessId monomorphize(IRProcessId baseId, MonomorphizationArgs args) {
+    StringBuilder sb = new StringBuilder();
+    sb.append(baseId.toString());
+    sb.append("_monomorphized");
+    List<IRTypeId> keys = new ArrayList<>(args.typeTrees.keySet());
+    keys.sort(Comparator.comparing(IRTypeId::toString));
+
+    for (IRTypeId key : keys) {
+      sb.append("_");
+      sb.append(key);
+      sb.append("_");
+      sb.append(args.typeIsValue.get(key) ? "v" : "n");
+      if (!args.typeTrees.get(key).isLeaf()) {
+        sb.append("_");
+        sb.append(args.typeTrees.get(key).toString().replaceAll("[ ,;\\[\\]\\(\\){}\\|]", ""));
+      }
+    }
+
+    return new IRProcessId(sb.toString());
   }
 }

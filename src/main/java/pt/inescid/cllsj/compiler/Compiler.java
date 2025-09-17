@@ -62,6 +62,7 @@ public class Compiler {
   private Settings.Int pointerAlignment;
 
   public Settings.Int inliningThreshold;
+  public Settings.Flag monomorphization;
 
   public Settings.Flag analyzeIR;
   public Settings.Flag optimizeSingleEndpoint;
@@ -136,6 +137,11 @@ public class Compiler {
             "inlining-threshold",
             "Maximum number of blocks in a process to be inlined into its callers",
             8);
+    monomorphization =
+        settings.addFlag(
+            "monomorphization",
+            "Enables monomorphization of polymorphic processes",
+            true);
 
     analyzeIR = settings.addFlag("analyze-ir", "Enables analysis of the IR after generation", true);
     optimizeSingleEndpoint =
@@ -183,6 +189,7 @@ public class Compiler {
         "Disables all optimization flags",
         () -> {
           inliningThreshold.set(0);
+          monomorphization.set(false);
           analyzeIR.set(false);
           optimizeSingleEndpoint.set(false);
           optimizeTailCalls.set(false);
@@ -282,8 +289,12 @@ public class Compiler {
     // Output the initial IR if requested
     openFileForOutput(outputInitialIRFile, stream -> stream.print(ir));
 
-    // Perform initial inlining
+    // Perform inlining and monomorphization before analysis
     Optimizer optimizer = new Optimizer();
+    optimizer.removeUnusedProcesses(ir, new IRProcessId(entryProcess.get()));
+    if (monomorphization.get()) {
+      optimizer.monomorphizeProcesses(ir);
+    }
     optimizer.inlineProcesses(ir, inliningThreshold.get(), false);
 
     if (analyzeIR.get()) {

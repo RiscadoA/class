@@ -8,6 +8,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Stream;
+
+import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
 import pt.inescid.cllsj.compiler.ir.id.IRCodeLocation;
 import pt.inescid.cllsj.compiler.ir.id.IRDropId;
 import pt.inescid.cllsj.compiler.ir.id.IRLocalDataId;
@@ -239,6 +241,37 @@ public class IRProcess {
 
   public void removeBlock(IRBlock block) {
     blocks.remove(block);
+  }
+
+  public void removeTypes() {
+    typeCount = 0;
+  }
+
+  public IRProcess clone(IRProcessId id) {
+    IRProcess newProcess = new IRProcess(id);
+    newProcess.setEndPoints(endPoints);
+    newProcess.typeCount = typeCount;
+    newProcess.sessionCount = sessionCount;
+    newProcess.argSessionLocalDataId = new HashMap<>(argSessionLocalDataId);
+    newProcess.dropOnEnd = new ArrayList<>(dropOnEnd.stream()
+        .map(d -> new DropOnEnd(d.localDataId, d.offset, d.slots, d.always))
+        .toList());
+    newProcess.localData = new ArrayList<>(localData);
+    newProcess.blocks.clear();
+    for (IRBlock block : blocks) {
+      newProcess.blocks.add(block.clone());
+    }
+    return newProcess;
+  }
+
+  public void replaceTypes(Function<IRTypeId, IRSlotTree> slotReplacer,
+      Function<IRTypeId, IRValueRequisites> reqReplacer) {
+    localData = new ArrayList<>(
+        localData.stream()
+            .map(c -> c.replaceTypes(slotReplacer, reqReplacer))
+            .toList());
+    dropOnEnd.forEach(d -> d.slots = d.slots.replaceTypes(slotReplacer, reqReplacer));
+    streamInstructions().forEach(instr -> instr.replaceTypes(slotReplacer, reqReplacer));
   }
 
   @Override

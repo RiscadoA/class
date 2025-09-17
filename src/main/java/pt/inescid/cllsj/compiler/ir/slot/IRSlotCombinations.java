@@ -39,11 +39,11 @@ public class IRSlotCombinations {
     return trees.size();
   }
 
-  public IRSlotCombinations replaceType(
+  public IRSlotCombinations replaceTypes(
       Function<IRTypeId, IRSlotTree> slotReplacer,
       Function<IRTypeId, IRValueRequisites> reqReplacer) {
     return new IRSlotCombinations(
-        trees.stream().map(tree -> tree.replaceType(slotReplacer, reqReplacer)).toList());
+        trees.stream().map(tree -> tree.replaceTypes(slotReplacer, reqReplacer)).toList());
   }
 
   public IRSlotCombinations suffix(IRSlot slot) {

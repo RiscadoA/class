@@ -49,6 +49,14 @@ public class IRBlock {
     return instructions.stream();
   }
 
+  public IRBlock clone() {
+    IRBlock newBlock = new IRBlock(location);
+    newBlock.instructions = new ArrayList<>(instructions.stream()
+        .map(instr -> instr.clone())
+        .toList());
+    return newBlock;
+  }
+
   @Override
   public String toString() {
     StringBuilder b = new StringBuilder();

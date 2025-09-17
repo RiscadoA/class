@@ -126,6 +126,14 @@ public class IRWriteExponential extends IRWrite {
     return dataArguments;
   }
 
+  public void setProcessId(IRProcessId processId) {
+    this.processId = processId;
+  }
+
+  public void removeTypeArguments() {
+    this.typeArguments = List.of();
+  }
+
   @Override
   public void accept(IRInstructionVisitor visitor) {
     visitor.visit(this);
@@ -148,10 +156,10 @@ public class IRWriteExponential extends IRWrite {
   }
 
   @Override
-  public void replaceType(
+  public void replaceTypes(
       Function<IRTypeId, IRSlotTree> slotReplacer,
       Function<IRTypeId, IRValueRequisites> reqReplacer) {
-    super.replaceType(slotReplacer, reqReplacer);
+    super.replaceTypes(slotReplacer, reqReplacer);
     for (TypeArgument arg : typeArguments) {
       arg.sourceIsValue = reqReplacer.apply(arg.targetType);
     }

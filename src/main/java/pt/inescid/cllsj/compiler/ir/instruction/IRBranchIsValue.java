@@ -50,10 +50,10 @@ public class IRBranchIsValue extends IRBranch {
   }
 
   @Override
-  public void replaceType(
+  public void replaceTypes(
       Function<IRTypeId, IRSlotTree> slotReplacer,
       Function<IRTypeId, IRValueRequisites> reqReplacer) {
-    super.replaceType(slotReplacer, reqReplacer);
+    super.replaceTypes(slotReplacer, reqReplacer);
     requisites = requisites.expandTypes(reqReplacer);
   }
 }
