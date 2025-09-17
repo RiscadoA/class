@@ -774,15 +774,17 @@ public class IRGenerator extends ASTNodeVisitor {
       block.add(new IRMoveValue(pos.getRemoteData(), neg.getLocalData(), info.activeLocalTree));
     }
 
-    Runnable withContinuation = () -> {
-      // If the type still has a continuation, we must forward two sessions to each other
-      block.add(new IRForwardSessions(neg.getSessionId(), pos.getSessionId(), true, true));
-    };
+    Runnable withContinuation =
+        () -> {
+          // If the type still has a continuation, we must forward two sessions to each other
+          block.add(new IRForwardSessions(neg.getSessionId(), pos.getSessionId(), true, true));
+        };
 
-    Runnable withoutContinuation = () -> {
-      // If the type has no continuation, we just finish the positive session
-      block.add(new IRFinishSession(pos.getSessionId(), true));
-    };
+    Runnable withoutContinuation =
+        () -> {
+          // If the type has no continuation, we just finish the positive session
+          block.add(new IRFinishSession(pos.getSessionId(), true));
+        };
 
     if (mayHaveContinuation(negChType)) {
       IRValueRequisites reqs = valueRequisites(negChType, false);

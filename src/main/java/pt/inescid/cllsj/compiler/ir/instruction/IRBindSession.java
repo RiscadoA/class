@@ -97,7 +97,7 @@ public class IRBindSession extends IRInstruction {
       sb.append("+");
       sb.append(remoteDataOffset);
     }
-    
+
     sb.append(", ");
     sb.append(localData);
     sb.append(")");

@@ -2,7 +2,6 @@ package pt.inescid.cllsj.compiler.ir.instruction;
 
 import java.util.List;
 import java.util.function.Function;
-
 import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
 import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotTree;
@@ -51,7 +50,8 @@ public class IRBranchIsValue extends IRBranch {
   }
 
   @Override
-  public void replaceType(Function<IRTypeId, IRSlotTree> slotReplacer,
+  public void replaceType(
+      Function<IRTypeId, IRSlotTree> slotReplacer,
       Function<IRTypeId, IRValueRequisites> reqReplacer) {
     super.replaceType(slotReplacer, reqReplacer);
     requisites = requisites.expandTypes(reqReplacer);

@@ -167,8 +167,7 @@ public class Compiler {
         "Disables inlining of processes into their callers",
         () -> {
           inliningThreshold.set(0);
-        }
-    );
+        });
 
     settings.addMode(
         "Os",

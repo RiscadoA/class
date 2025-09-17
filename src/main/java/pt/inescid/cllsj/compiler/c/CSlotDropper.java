@@ -16,13 +16,19 @@ import pt.inescid.cllsj.compiler.ir.slot.IRVarS;
 
 public class CSlotDropper extends IRSlotVisitor {
   private CGenerator gen;
+  private Function<IRTypeId, String> typeNodeCount;
   private Function<IRTypeId, String> typeNode;
   private CAddress address;
 
   public static void drop(
-      CGenerator gen, Function<IRTypeId, String> typeNode, CAddress address, IRSlot slot) {
+      CGenerator gen,
+      Function<IRTypeId, String> typeNodeCount,
+      Function<IRTypeId, String> typeNode,
+      CAddress address,
+      IRSlot slot) {
     CSlotDropper dropper = new CSlotDropper();
     dropper.gen = gen;
+    dropper.typeNodeCount = typeNodeCount;
     dropper.typeNode = typeNode;
     dropper.address = address;
     slot.accept(dropper);
@@ -66,9 +72,10 @@ public class CSlotDropper extends IRSlotVisitor {
   public void visit(IRVarS slot) {
     gen.putTypeNodeTraversal(
         slot.getTypeId(),
+        typeNodeCount,
         typeNode,
         address,
-        address -> drop(gen, typeNode, address, new IRExponentialS()),
-        address -> drop(gen, typeNode, address, new IRStringS()));
+        address -> drop(gen, typeNodeCount, typeNode, address, new IRExponentialS()),
+        address -> drop(gen, typeNodeCount, typeNode, address, new IRStringS()));
   }
 }

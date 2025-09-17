@@ -78,6 +78,21 @@ public class CCondition {
         ternary(ifTrue.size, ifFalse.size), ternary(ifTrue.alignment, ifFalse.alignment));
   }
 
+  public CCondition ternary(CCondition ifTrue, CCondition ifFalse) {
+    if (ifTrue.equals(ifFalse)) {
+      return ifTrue;
+    }
+
+    if (isCertainlyTrue()) {
+      return ifTrue;
+    } else if (isCertainlyFalse()) {
+      return ifFalse;
+    } else {
+      return maybe(
+          "(" + expression() + " ? " + ifTrue.expression() + " : " + ifFalse.expression() + ")");
+    }
+  }
+
   public CCondition and(CCondition other) {
     if (isCertainlyFalse() || other.isCertainlyFalse()) {
       return certainlyFalse();
@@ -87,6 +102,26 @@ public class CCondition {
       return this;
     } else {
       return maybe("(" + expression() + " && " + other.expression() + ")");
+    }
+  }
+
+  public CCondition and(boolean other) {
+    if (other) {
+      return this;
+    } else {
+      return certainlyFalse();
+    }
+  }
+
+  public CCondition or(CCondition other) {
+    if (isCertainlyTrue() || other.isCertainlyTrue()) {
+      return certainlyTrue();
+    } else if (isCertainlyFalse()) {
+      return other;
+    } else if (other.isCertainlyFalse()) {
+      return this;
+    } else {
+      return maybe("(" + expression() + " || " + other.expression() + ")");
     }
   }
 
