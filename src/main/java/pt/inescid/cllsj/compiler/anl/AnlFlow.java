@@ -144,6 +144,18 @@ public class AnlFlow {
     getLocations().removeLast().markRemoved();
   }
 
+  public boolean guaranteedToRun() {
+    for (AnlFlow source : sources) {
+      if (!source.getDetached().contains(this) && source.getBranches().size() > 1) {
+        return false;
+      }
+      if (!source.guaranteedToRun()) {
+        return false;
+      }
+    }
+    return true;
+  }
+
   private void printLabels(StringBuffer sb, Set<AnlFlow> flows) {
     if (flows.isEmpty()) {
       sb.append("none");

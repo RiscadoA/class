@@ -306,6 +306,35 @@ public class Optimizer {
     }
   }
 
+  public void optimizeAlwaysDrop(IRProgram ir) {
+    for (IRProcess p : ir.stream().toList()) {
+      if (!processFlows.containsKey(p.getId())) {
+        throw new IllegalStateException(
+            "Analysis must be enabled to perform always drop optimization");
+      }
+      optimizeAlwaysDrop(p, processFlows.get(p.getId()));
+    }
+  }
+
+  private void optimizeAlwaysDrop(IRProcess ir, Map<IRBlock, AnlFlow> flows) {
+    for (IRBlock block : ir.streamBlocks().toList()) {
+      AnlFlow flow = flows.get(block);
+      if (flow == null || !flow.guaranteedToRun()) {
+        continue; // Either unreachable or not guaranteed to run
+      }
+
+      for (int i = 0; i < block.size(); ++i) {
+        if (!(block.get(i) instanceof IRDeferDrop)) {
+          continue; // Not what we're looking for
+        }
+        IRDeferDrop defer = (IRDeferDrop) block.get(i);
+        ir.markAlwaysDropOnEnd(defer.getDropId());
+        flow.getLocations().get(i).removeInstruction();
+        i -= 1;
+      }
+    }
+  }
+
   // public void optimizeKnownSlots(IRProgram ir) {
   //   for (IRProcess p : ir.stream().toList()) {
   //     if (!processFlows.containsKey(p.getId())) {

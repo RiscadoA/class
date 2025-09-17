@@ -71,6 +71,7 @@ public class Compiler {
   public Settings.Flag optimizeKnownJumps;
   public Settings.Flag optimizeKnownEndPoints;
   public Settings.Flag optimizeKnownLocations;
+  public Settings.Flag optimizeAlwaysDrop;
 
   public Compiler() {
     // Compiler operation settings
@@ -173,6 +174,11 @@ public class Compiler {
             "optimize-known-locations",
             "Optimizes away remote locations to local ones when they are known to be the same",
             true);
+    optimizeAlwaysDrop =
+        settings.addFlag(
+            "optimize-always-drop",
+            "Optimizes defer drops away if they are known to always be dropped",
+            true);
 
     settings.addMode(
         "no-inlining",
@@ -203,6 +209,7 @@ public class Compiler {
           optimizeKnownJumps.set(false);
           optimizeKnownEndPoints.set(false);
           optimizeKnownLocations.set(false);
+          optimizeAlwaysDrop.set(false);
         });
 
     settings.addMode(
@@ -333,6 +340,10 @@ public class Compiler {
 
       if (optimizeKnownLocations.get()) {
         optimizer.optimizeKnownLocations(ir);
+      }
+
+      if (optimizeAlwaysDrop.get()) {
+        optimizer.optimizeAlwaysDrop(ir);
       }
 
       optimizer.removeUnreachableBlocks(ir);

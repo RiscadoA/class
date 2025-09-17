@@ -200,6 +200,10 @@ public class IRProcess {
     return new IRDropId(dropOnEnd.size() - 1);
   }
 
+  public void markAlwaysDropOnEnd(IRDropId id) {
+    dropOnEnd.get(id.getIndex()).always = true;
+  }
+
   public List<DropOnEnd> getDropOnEnd() {
     return dropOnEnd;
   }
