@@ -2,6 +2,7 @@ package pt.inescid.cllsj.ast.types;
 
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
+import pt.inescid.cllsj.ast.ASTTypeVisitor;
 
 public class ASTCointT extends ASTCoBasicType {
 
@@ -31,5 +32,10 @@ public class ASTCointT extends ASTCoBasicType {
   public int SetOffsets(int base, Env<EnvEntry> e) throws Exception {
     // offset = base;
     return base;
+  }
+
+  @Override
+  public void accept(ASTTypeVisitor visitor) {
+    visitor.visit(this);
   }
 }
