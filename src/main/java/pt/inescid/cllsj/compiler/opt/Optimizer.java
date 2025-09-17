@@ -681,20 +681,19 @@ public class Optimizer {
     }
   }
 
-  public void inlineProcesses(IRProgram ir, int blockThreshold, boolean allowLoops) {
+  public void inlineProcesses(IRProgram ir, int blockThreshold) {
     if (blockThreshold <= 0) {
       return;
     }
 
     Set<IRProcessId> visited = new HashSet<>();
-    ir.stream().forEach(p -> inlineProcesses(ir, blockThreshold, p.getId(), allowLoops, visited));
+    ir.stream().forEach(p -> inlineProcesses(ir, blockThreshold, p.getId(), visited));
   }
 
   private void inlineProcesses(
       IRProgram ir,
       int blockThreshold,
       IRProcessId procId,
-      boolean allowLoops,
       Set<IRProcessId> visited) {
     if (!visited.add(procId)) {
       return;
@@ -712,9 +711,9 @@ public class Optimizer {
       // First visit the process we'll inline
       IRCallProcess call = (IRCallProcess) instr;
       IRProcessId callId = call.getProcessId();
-      inlineProcesses(ir, blockThreshold, callId, allowLoops, visited);
+      inlineProcesses(ir, blockThreshold, callId, visited);
       IRProcess callProc = ir.get(callId);
-      if (!allowLoops && callProc.isRecursive()) {
+      if (callProc.isRecursive()) {
         continue;
       }
       if (callId.equals(procId)) {
@@ -733,36 +732,6 @@ public class Optimizer {
       }
       if (skip) {
         continue;
-      }
-
-      // If the process is recursive, we need to check if we can turn it into a loop
-      if (callProc.isRecursive()) {
-        // It must have a single end point - otherwise, tail calls are not guaranteed
-        if (callProc.getEndPoints() != 1) {
-          continue;
-        }
-
-        // All recursive calls must be end points, and thus, be tail calls
-        boolean valid = true;
-        for (IRInstruction innerInstr : callProc.streamInstructions().toList()) {
-          if (innerInstr instanceof IRCallProcess) {
-            IRCallProcess innerCall = (IRCallProcess) innerInstr;
-            if (innerCall.getProcessId().equals(callId) && !innerCall.isEndPoint()) {
-              valid = false;
-              break;
-            }
-
-            // We must also be able to turn the call into a loop
-            throw new UnsupportedOperationException("TODO: implement IRCallLoop");
-            // if (!IRCallLoop.canGetFromCallProcess(innerCall)) {
-            //   valid = false;
-            //   break;
-            // }
-          }
-        }
-        if (!valid) {
-          continue;
-        }
       }
 
       // Remove the call instruction
@@ -854,18 +823,7 @@ public class Optimizer {
       }
 
       // Identify the block we'll be adding the inlined process' entry instructions
-      // If the process is recursive (and thus, a loop), we need to create a new block
-      IRBlock entryBlock;
-      if (callProc.isRecursive()) {
-        entryBlock = proc.createBlock(call.getProcessId().toString());
-        throw new UnsupportedOperationException("TODO: implement IRCallLoop");
-        // block.add(
-        //     IRCallLoop.fromCallProcess(
-        //             entryBlock.getLabel(), call, recordMap::get, exponentialMap::get)
-        //         .get());
-      } else {
-        entryBlock = block;
-      }
+      IRBlock entryBlock = block;
 
       // Create a mapping from locations in the inlined process to locations in the current process
       Map<IRCodeLocation, IRCodeLocation> locationMap = new HashMap<>();
@@ -885,34 +843,6 @@ public class Optimizer {
             newInstr.replaceCodeLocations(locationMap::get);
             newInstr.replaceDropIds(dropMap::get);
             newInstr.replaceTypes(slotReplacer, reqReplacer);
-
-            // If it is a recursive call, turn into a IRCallLoop instruction
-            if (callProc.isRecursive() && newInstr instanceof IRCallProcess) {
-              IRCallProcess newCall = (IRCallProcess) newInstr;
-              if (newCall.getProcessId().equals(callId)) {
-                throw new UnsupportedOperationException("TODO: implement IRCallLoop");
-                // newInstr =
-                //     IRCallLoop.fromCallProcess(
-                //             entryBlock.getLabel(), newCall, recordMap::get, exponentialMap::get)
-                //         .get();
-              }
-            }
-
-            // We might need to remove the end point from the instruction
-            // if (!call.isEndPoint()) {
-            //   if (newInstr instanceof IRCallProcess) {
-            //     ((IRCallProcess) newInstr).removeEndPoint();
-            //   } else if (newInstr instanceof IRForward) {
-            //     ((IRForward) newInstr).removeEndPoint();
-            //   } else if (newInstr instanceof IRFlipForward) {
-            //     ((IRFlipForward) newInstr).removeEndPoint();
-            //   } else if (newInstr instanceof IRReturn) {
-            //     ((IRReturn) newInstr).removeEndPoint();
-            //   } else if (newInstr instanceof IRNextTask) {
-            //     ((IRNextTask) newInstr).removeEndPoint();
-            //   }
-            // }
-
             return newInstr;
           };
 

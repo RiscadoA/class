@@ -303,57 +303,60 @@ public class Compiler {
     // Output the initial IR if requested
     openFileForOutput(outputInitialIRFile, stream -> stream.print(ir));
 
-    // Perform inlining and monomorphization before analysis
+    // Perform monomorphization before analysis
     Optimizer optimizer = new Optimizer();
     optimizer.removeUnusedProcesses(ir, new IRProcessId(entryProcess.get()));
     if (monomorphization.get()) {
       optimizer.monomorphizeProcesses(ir);
     }
-    optimizer.inlineProcesses(ir, inliningThreshold.get(), false);
+    
+    // Repeat the whole analysis and inlining process twice to catch more opportunities
+    for (int i = 0; i < 2; ++i) {
+      optimizer.inlineProcesses(ir, inliningThreshold.get());
 
-    if (analyzeIR.get()) {
-      // Analyze the IR
-      Map<IRProcessId, Map<IRBlock, AnlFlow>> flows = Analyzer.analyze(ir);
+      if (analyzeIR.get()) {
+        // Analyze the IR
+        Map<IRProcessId, Map<IRBlock, AnlFlow>> flows = Analyzer.analyze(ir);
 
-      openFileForOutput(
-          outputAnalysisFile,
-          stream -> {
-            for (IRProcessId id : flows.keySet()) {
-              stream.println(
-                  "===========================[ " + id + " ]===========================");
-              stream.println(flows.get(id).get(ir.get(id).getEntry()));
-            }
-          });
+        openFileForOutput(
+            outputAnalysisFile,
+            stream -> {
+              for (IRProcessId id : flows.keySet()) {
+                stream.println(
+                    "===========================[ " + id + " ]===========================");
+                stream.println(flows.get(id).get(ir.get(id).getEntry()));
+              }
+            });
 
-      optimizer.feedAnalysis(flows);
+        optimizer.feedAnalysis(flows);
+      }
+
+      // Optimize the IR using the analysis results
+      if (analyzeIR.get()) {
+        if (optimizeKnownJumps.get()) {
+          optimizer.optimizeKnownJumps(ir);
+        }
+
+        if (optimizeKnownEndPoints.get()) {
+          optimizer.optimizeKnownEndPoints(ir);
+        }
+
+        if (optimizeKnownLocations.get()) {
+          optimizer.optimizeKnownLocations(ir);
+        }
+
+        if (optimizeAlwaysDrop.get()) {
+          optimizer.optimizeAlwaysDrop(ir);
+        }
+
+        optimizer.removeUnreachableBlocks(ir);
+      }
+
+      optimizer.inlineProcesses(ir, inliningThreshold.get());
+
+      optimizer.removeUnusedProcesses(ir, new IRProcessId(entryProcess.get()));
+      optimizer.removeUnusedSessionsAndData(ir);
     }
-
-    // Optimize the IR using the analysis results
-    if (analyzeIR.get()) {
-      if (optimizeKnownJumps.get()) {
-        optimizer.optimizeKnownJumps(ir);
-      }
-
-      if (optimizeKnownEndPoints.get()) {
-        optimizer.optimizeKnownEndPoints(ir);
-      }
-
-      if (optimizeKnownLocations.get()) {
-        optimizer.optimizeKnownLocations(ir);
-      }
-
-      if (optimizeAlwaysDrop.get()) {
-        optimizer.optimizeAlwaysDrop(ir);
-      }
-
-      optimizer.removeUnreachableBlocks(ir);
-    }
-
-    optimizer.inlineProcesses(ir, inliningThreshold.get(), false);
-    // optimizer.inlineProcesses(ir, inliningThreshold.get(), true);
-
-    optimizer.removeUnusedProcesses(ir, new IRProcessId(entryProcess.get()));
-    optimizer.removeUnusedSessionsAndData(ir);
 
     // Output the final IR if requested
     openFileForOutput(outputFinalIRFile, stream -> stream.print(ir));
