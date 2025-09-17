@@ -163,6 +163,14 @@ public class Compiler {
             true);
 
     settings.addMode(
+        "no-inlining",
+        "Disables inlining of processes into their callers",
+        () -> {
+          inliningThreshold.set(0);
+        }
+    );
+
+    settings.addMode(
         "Os",
         "optimize-sequential",
         "Modifies setting defaults to maximize performance on sequential code (concurrency is disabled)",
