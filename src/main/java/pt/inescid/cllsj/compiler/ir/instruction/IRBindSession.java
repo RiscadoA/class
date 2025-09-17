@@ -1,11 +1,8 @@
 package pt.inescid.cllsj.compiler.ir.instruction;
 
-import java.util.Optional;
 import java.util.function.Function;
 import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
 import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
-import pt.inescid.cllsj.compiler.ir.slot.IRSlotOffset;
-import pt.inescid.cllsj.compiler.ir.slot.IRSlotTree;
 
 public class IRBindSession extends IRInstruction {
   private IRSessionId targetSessionId;
@@ -13,9 +10,7 @@ public class IRBindSession extends IRInstruction {
   private IRDataLocation localData;
 
   public IRBindSession(
-      IRSessionId targetSessionId,
-      IRDataLocation sourceLocation,
-      IRDataLocation localData) {
+      IRSessionId targetSessionId, IRDataLocation sourceLocation, IRDataLocation localData) {
     this.targetSessionId = targetSessionId;
     this.sourceLocation = sourceLocation;
     this.localData = localData;

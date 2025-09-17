@@ -584,7 +584,7 @@ public class Optimizer {
           }
         }
 
-        // Check if this local data comes from an argument                                                         
+        // Check if this local data comes from an argument
         Optional<IRCallProcess.DataArgument> arg =
             call.getDataArguments().stream()
                 .filter(a -> a.getTargetDataId().equals(id))
@@ -679,22 +679,25 @@ public class Optimizer {
             IRInstruction newInstr = callInstr.clone();
             newInstr.replaceLocalData(internalLocalDataMap::get, false);
             newInstr.replaceDataLocations(
-                loc1 -> loc1.replaceDataLocations(
-                      loc -> {
-                        if (loc.isRemote() && sessionOffsetMap.containsKey(loc.getSessionId())) {
-                          return IRDataLocation.remote(
-                              loc.getSessionId(),
-                              sessionOffsetMap.get(loc.getSessionId()).advance(loc.getOffset()));
-                        } else if (loc.isLocal()
-                            && argLocalDataMap.containsKey(loc.getLocalDataId())) {
-                          return argLocalDataMap.get(loc.getLocalDataId()).advance(loc.getOffset());
-                        } else if (loc.isLocal()) {
-                          return IRDataLocation.local(
-                              internalLocalDataMap.get(loc.getLocalDataId()), loc.getOffset());
-                        } else {
-                          return loc;
-                        }
-                      }));
+                loc1 ->
+                    loc1.replaceDataLocations(
+                        loc -> {
+                          if (loc.isRemote() && sessionOffsetMap.containsKey(loc.getSessionId())) {
+                            return IRDataLocation.remote(
+                                loc.getSessionId(),
+                                sessionOffsetMap.get(loc.getSessionId()).advance(loc.getOffset()));
+                          } else if (loc.isLocal()
+                              && argLocalDataMap.containsKey(loc.getLocalDataId())) {
+                            return argLocalDataMap
+                                .get(loc.getLocalDataId())
+                                .advance(loc.getOffset());
+                          } else if (loc.isLocal()) {
+                            return IRDataLocation.local(
+                                internalLocalDataMap.get(loc.getLocalDataId()), loc.getOffset());
+                          } else {
+                            return loc;
+                          }
+                        }));
             newInstr.replaceSessions(sessionMap::get);
             newInstr.replaceCodeLocations(locationMap::get);
             newInstr.replaceDropIds(dropMap::get);

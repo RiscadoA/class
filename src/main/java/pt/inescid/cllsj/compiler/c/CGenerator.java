@@ -1087,7 +1087,8 @@ public class CGenerator extends IRInstructionVisitor {
                 sessionContData(target), offset(sessionContData(target), arg.getDataOffset()));
 
             // Update the remote session's continuation
-            Optional<IRLocalDataId> calledLocalDataId = calledProcess.getAssociatedLocalData(arg.getTargetSessionId());
+            Optional<IRLocalDataId> calledLocalDataId =
+                calledProcess.getAssociatedLocalData(arg.getTargetSessionId());
             String remoteSessionAddress = remoteSessionAddress(source);
             putIf(
                 remoteSessionAddress + " != " + NULL,
@@ -1249,7 +1250,8 @@ public class CGenerator extends IRInstructionVisitor {
                 sessionContData(target), offset(sessionContData(target), arg.getDataOffset()));
 
             // Update the remote session's continuation to match the new environment
-            Optional<IRLocalDataId> calledLocalDataId = calledProcess.getAssociatedLocalData(arg.getTargetSessionId());
+            Optional<IRLocalDataId> calledLocalDataId =
+                calledProcess.getAssociatedLocalData(arg.getTargetSessionId());
             String remoteSessionAddress = remoteSessionAddress(source);
             putIf(
                 remoteSessionAddress + " != " + NULL,

@@ -729,9 +729,7 @@ public class IRGenerator extends ASTNodeVisitor {
           // Bind the new session to the value received from the main session
           block.add(
               new IRBindSession(
-                  argChannel.getSessionId(),
-                  channel.getLocalData(),
-                  argChannel.getLocalData()));
+                  argChannel.getSessionId(), channel.getLocalData(), argChannel.getLocalData()));
 
           // If the received session is negative, we must jump to it
           addContinueIfNegative(argChannel.getSessionId(), lhsType);
@@ -1245,9 +1243,7 @@ public class IRGenerator extends ASTNodeVisitor {
     IREnvironment.Channel argChannel = env.getChannel(chc);
 
     // Otherwise, we bind the new session to the one stored in the cell
-    block.add(
-        new IRBindSession(
-            argChannel.getSessionId(), cellDataLoc, argChannel.getLocalData()));
+    block.add(new IRBindSession(argChannel.getSessionId(), cellDataLoc, argChannel.getLocalData()));
 
     // The type checker doesn't place use nodes after takes of basic types
     // and cells, so we do it ourselves

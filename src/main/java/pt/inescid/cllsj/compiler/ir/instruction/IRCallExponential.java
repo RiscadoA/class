@@ -54,7 +54,8 @@ public class IRCallExponential extends IRAccess {
   }
 
   @Override
-  public void replaceLocalData(Function<IRLocalDataId, IRLocalDataId> replacer, boolean includeLocations) {
+  public void replaceLocalData(
+      Function<IRLocalDataId, IRLocalDataId> replacer, boolean includeLocations) {
     super.replaceLocalData(replacer, includeLocations);
     localDataId = replacer.apply(localDataId);
   }
