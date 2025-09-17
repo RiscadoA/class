@@ -3,18 +3,15 @@ package pt.inescid.cllsj.compiler.ir.instruction;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
 import java.util.function.Function;
 import java.util.stream.Stream;
 import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
-import pt.inescid.cllsj.compiler.ir.id.IRCodeLocation;
-import pt.inescid.cllsj.compiler.ir.id.IRDropId;
-import pt.inescid.cllsj.compiler.ir.id.IRLocalDataId;
-import pt.inescid.cllsj.compiler.ir.id.IRProcessId;
-import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
-import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
+import pt.inescid.cllsj.compiler.ir.id.*;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotCombinations;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotOffset;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotTree;
@@ -24,7 +21,8 @@ public class IRProcess {
   private int endPoints;
   private int typeCount = 0;
   private int sessionCount = 0;
-  private Map<IRSessionId, IRLocalDataId> argSessionLocalDataId = new HashMap<>();
+  private Set<IRSessionId> argSessions = new HashSet<>();
+  private Map<IRSessionId, IRLocalDataId> associatedLocalData = new HashMap<>();
   private List<DropOnEnd> dropOnEnd = new ArrayList<>();
   private List<IRSlotCombinations> localData = new ArrayList<>();
   private List<IRBlock> blocks = new ArrayList<>();
@@ -103,16 +101,25 @@ public class IRProcess {
     return new IRSessionId(sessionCount++);
   }
 
-  public IRSessionId addArgSession(IRLocalDataId localDataId) {
-    IRSessionId sessionId = new IRSessionId(sessionCount++);
-    argSessionLocalDataId.put(sessionId, localDataId);
+  public void makeSessionArgument(IRSessionId sessionId) {
+    argSessions.add(sessionId);
+  }
+
+  public boolean isSessionArgument(IRSessionId sessionId) {
+    return argSessions.contains(sessionId);
+  }
+
+  public IRSessionId associateLocalData(IRSessionId sessionId, IRLocalDataId localDataId) {
+    if (associatedLocalData.containsKey(sessionId)) {
+      throw new IllegalArgumentException("Session " + sessionId + " already has associated data");
+    }
+    associatedLocalData.put(sessionId, localDataId);
     return sessionId;
   }
 
   public void removeSession(IRSessionId sessionId) {
-    if (argSessionLocalDataId.containsKey(sessionId)) {
-      throw new IllegalArgumentException("Cannot remove argument session " + sessionId);
-    }
+    associatedLocalData.remove(sessionId);
+    argSessions.remove(sessionId);
     sessionCount -= 1;
   }
 
@@ -124,16 +131,16 @@ public class IRProcess {
     return typeCount;
   }
 
-  public boolean isArgSession(IRSessionId sessionId) {
-    return argSessionLocalDataId.containsKey(sessionId);
+  public boolean hasLocalData(IRSessionId sessionId) {
+    return associatedLocalData.containsKey(sessionId);
   }
 
-  public Optional<IRLocalDataId> getArgSessionLocalDataId(IRSessionId sessionId) {
-    return Optional.ofNullable(argSessionLocalDataId.get(sessionId));
+  public Optional<IRLocalDataId> getAssociatedLocalData(IRSessionId sessionId) {
+    return Optional.ofNullable(associatedLocalData.get(sessionId));
   }
 
-  public Optional<IRSessionId> getArgLocalDataSessionId(IRLocalDataId localDataId) {
-    for (Map.Entry<IRSessionId, IRLocalDataId> entry : argSessionLocalDataId.entrySet()) {
+  public Optional<IRSessionId> getAssociatedSessionId(IRLocalDataId localDataId) {
+    for (Map.Entry<IRSessionId, IRLocalDataId> entry : associatedLocalData.entrySet()) {
       if (entry.getValue().equals(localDataId)) {
         return Optional.of(entry.getKey());
       }
@@ -142,15 +149,17 @@ public class IRProcess {
   }
 
   public void replaceSessionsOnHeader(Function<IRSessionId, IRSessionId> replacer) {
-    Map<IRSessionId, IRLocalDataId> newArgSessionLocalDataId = new HashMap<>();
-    for (Map.Entry<IRSessionId, IRLocalDataId> entry : argSessionLocalDataId.entrySet()) {
-      newArgSessionLocalDataId.put(replacer.apply(entry.getKey()), entry.getValue());
+    argSessions =
+        argSessions.stream().map(replacer).collect(HashSet::new, HashSet::add, HashSet::addAll);
+    Map<IRSessionId, IRLocalDataId> newAssociatedLocalData = new HashMap<>();
+    for (Map.Entry<IRSessionId, IRLocalDataId> entry : associatedLocalData.entrySet()) {
+      newAssociatedLocalData.put(replacer.apply(entry.getKey()), entry.getValue());
     }
-    argSessionLocalDataId = newArgSessionLocalDataId;
+    associatedLocalData = newAssociatedLocalData;
   }
 
-  public boolean isArgData(IRLocalDataId localDataId) {
-    return argSessionLocalDataId.containsValue(localDataId);
+  public boolean isAssociatedLocalData(IRLocalDataId localDataId) {
+    return associatedLocalData.containsValue(localDataId);
   }
 
   public IRSlotCombinations getLocalData(IRLocalDataId id) {
@@ -168,17 +177,15 @@ public class IRProcess {
 
   public void removeLocalData(IRLocalDataId id) {
     localData.remove(id.getIndex());
-    if (argSessionLocalDataId.containsValue(id)) {
-      throw new IllegalArgumentException("Cannot remove argument data " + id);
-    }
+    associatedLocalData.values().remove(id);
   }
 
   public void replaceLocalDataOnHeader(Function<IRLocalDataId, IRLocalDataId> replacer) {
-    Map<IRSessionId, IRLocalDataId> newArgSessionLocalDataId = new HashMap<>();
-    for (Map.Entry<IRSessionId, IRLocalDataId> entry : argSessionLocalDataId.entrySet()) {
-      newArgSessionLocalDataId.put(entry.getKey(), replacer.apply(entry.getValue()));
+    Map<IRSessionId, IRLocalDataId> newAssociatedLocalData = new HashMap<>();
+    for (Map.Entry<IRSessionId, IRLocalDataId> entry : associatedLocalData.entrySet()) {
+      newAssociatedLocalData.put(entry.getKey(), replacer.apply(entry.getValue()));
     }
-    argSessionLocalDataId = newArgSessionLocalDataId;
+    associatedLocalData = newAssociatedLocalData;
 
     for (DropOnEnd drop : dropOnEnd) {
       drop.localDataId = replacer.apply(drop.localDataId);
@@ -255,7 +262,8 @@ public class IRProcess {
     newProcess.setEndPoints(endPoints);
     newProcess.typeCount = typeCount;
     newProcess.sessionCount = sessionCount;
-    newProcess.argSessionLocalDataId = new HashMap<>(argSessionLocalDataId);
+    newProcess.argSessions = new HashSet<>(argSessions);
+    newProcess.associatedLocalData = new HashMap<>(associatedLocalData);
     newProcess.dropOnEnd =
         new ArrayList<>(
             dropOnEnd.stream()
@@ -295,6 +303,9 @@ public class IRProcess {
     }
     b.append("\n");
     b.append("    sessions:");
+    if (sessionCount == 0) {
+      b.append(" none");
+    }
     for (int i = 0; i < sessionCount; i++) {
       IRSessionId sessionId = new IRSessionId(i);
       b.append(" ").append(sessionId);
@@ -305,9 +316,9 @@ public class IRProcess {
           .append(new IRLocalDataId(i))
           .append(": ")
           .append(localData.get(i).toString());
-      for (Map.Entry<IRSessionId, IRLocalDataId> entry : argSessionLocalDataId.entrySet()) {
+      for (Map.Entry<IRSessionId, IRLocalDataId> entry : associatedLocalData.entrySet()) {
         if (entry.getValue().getIndex() == i) {
-          b.append(" (arg ").append(entry.getKey().toString()).append(")");
+          b.append(" (").append(entry.getKey().toString()).append(")");
           break;
         }
       }

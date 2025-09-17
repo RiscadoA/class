@@ -140,11 +140,6 @@ public class IRWriteExponential extends IRWrite {
   }
 
   @Override
-  public void replaceLocalData(Function<IRLocalDataId, IRLocalDataId> replacer) {
-    super.replaceLocalData(replacer);
-  }
-
-  @Override
   public void replaceSlots(Function<IRSlotTree, IRSlotTree> replacer) {
     super.replaceSlots(replacer);
     for (DataArgument arg : dataArguments) {

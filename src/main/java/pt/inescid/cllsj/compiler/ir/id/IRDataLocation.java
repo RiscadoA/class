@@ -97,6 +97,14 @@ public class IRDataLocation {
     }
   }
 
+  public IRDataLocation replaceDataLocations(Function<IRDataLocation, IRDataLocation> replacer) {
+    IRDataLocation result = this;
+    if (isCell()) {
+      result = IRDataLocation.cell(getCell().replaceDataLocations(replacer), offset);
+    }
+    return replacer.apply(result);
+  }
+
   public IRDataLocation replaceSlots(Function<IRSlotTree, IRSlotTree> replacer) {
     return new IRDataLocation(index, remote, cell, offset.replaceSlots(replacer));
   }

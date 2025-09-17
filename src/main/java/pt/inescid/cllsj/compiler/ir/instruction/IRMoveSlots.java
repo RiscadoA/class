@@ -35,7 +35,7 @@ public class IRMoveSlots extends IRWrite {
 
   @Override
   public String toString() {
-    return "moveValue(" + location + ", " + sourceLocation + ", " + slots + ")";
+    return "moveSlots(" + location + ", " + sourceLocation + ", " + slots + ")";
   }
 
   @Override

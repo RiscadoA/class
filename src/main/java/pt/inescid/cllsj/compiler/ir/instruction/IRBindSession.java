@@ -9,32 +9,15 @@ import pt.inescid.cllsj.compiler.ir.slot.IRSlotTree;
 
 public class IRBindSession extends IRInstruction {
   private IRSessionId targetSessionId;
-  private Optional<IRDataLocation> sourceLocation;
-  private Optional<IRSessionId> sourceSessionId;
-  private IRSlotOffset remoteDataOffset;
+  private IRDataLocation sourceLocation;
   private IRDataLocation localData;
 
   public IRBindSession(
       IRSessionId targetSessionId,
       IRDataLocation sourceLocation,
-      IRSlotOffset remoteDataOffset,
       IRDataLocation localData) {
     this.targetSessionId = targetSessionId;
-    this.sourceLocation = Optional.of(sourceLocation);
-    this.sourceSessionId = Optional.empty();
-    this.remoteDataOffset = remoteDataOffset;
-    this.localData = localData;
-  }
-
-  public IRBindSession(
-      IRSessionId targetSessionId,
-      IRSessionId sourceSessionId,
-      IRSlotOffset remoteDataOffset,
-      IRDataLocation localData) {
-    this.targetSessionId = targetSessionId;
-    this.sourceLocation = Optional.empty();
-    this.sourceSessionId = Optional.of(sourceSessionId);
-    this.remoteDataOffset = remoteDataOffset;
+    this.sourceLocation = sourceLocation;
     this.localData = localData;
   }
 
@@ -42,26 +25,8 @@ public class IRBindSession extends IRInstruction {
     return targetSessionId;
   }
 
-  public boolean isFromLocation() {
-    return sourceLocation.isPresent();
-  }
-
   public IRDataLocation getSourceLocation() {
-    if (!sourceLocation.isPresent()) {
-      throw new IllegalStateException("Is not from a location");
-    }
-    return sourceLocation.get();
-  }
-
-  public IRSessionId getSourceSessionId() {
-    if (!sourceSessionId.isPresent()) {
-      throw new IllegalStateException("Is not from a session ID");
-    }
-    return sourceSessionId.get();
-  }
-
-  public IRSlotOffset getRemoteDataOffset() {
-    return remoteDataOffset;
+    return sourceLocation;
   }
 
   public IRDataLocation getLocalData() {
@@ -70,11 +35,7 @@ public class IRBindSession extends IRInstruction {
 
   @Override
   public IRInstruction clone() {
-    if (isFromLocation()) {
-      return new IRBindSession(targetSessionId, getSourceLocation(), remoteDataOffset, localData);
-    } else {
-      return new IRBindSession(targetSessionId, getSourceSessionId(), remoteDataOffset, localData);
-    }
+    return new IRBindSession(targetSessionId, getSourceLocation(), localData);
   }
 
   @Override
@@ -88,16 +49,7 @@ public class IRBindSession extends IRInstruction {
     sb.append("bindSession(");
     sb.append(targetSessionId);
     sb.append(", ");
-    if (isFromLocation()) {
-      sb.append(getSourceLocation());
-    } else {
-      sb.append(getSourceSessionId());
-    }
-    if (!remoteDataOffset.isZero()) {
-      sb.append("+");
-      sb.append(remoteDataOffset);
-    }
-
+    sb.append(getSourceLocation());
     sb.append(", ");
     sb.append(localData);
     sb.append(")");
@@ -107,20 +59,13 @@ public class IRBindSession extends IRInstruction {
   @Override
   public void replaceSessions(Function<IRSessionId, IRSessionId> replacer) {
     super.replaceSessions(replacer);
-    sourceSessionId = sourceSessionId.map(replacer);
     targetSessionId = replacer.apply(targetSessionId);
   }
 
   @Override
   public void replaceDataLocations(Function<IRDataLocation, IRDataLocation> replacer) {
     super.replaceDataLocations(replacer);
-    sourceLocation = sourceLocation.map(replacer);
+    sourceLocation = replacer.apply(sourceLocation);
     localData = replacer.apply(localData);
-  }
-
-  @Override
-  public void replaceSlots(Function<IRSlotTree, IRSlotTree> replacer) {
-    super.replaceSlots(replacer);
-    remoteDataOffset = remoteDataOffset.replaceSlots(replacer);
   }
 }

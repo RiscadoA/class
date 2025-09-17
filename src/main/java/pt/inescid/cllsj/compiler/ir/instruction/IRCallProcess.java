@@ -146,11 +146,17 @@ public class IRCallProcess extends IRInstruction {
 
     @Override
     public String toString() {
+      StringBuilder sb = new StringBuilder();
+      sb.append(targetSessionId).append(" <- ");
       if (sourceSessionLocation.isPresent()) {
-        return targetSessionId + " <- " + sourceSessionLocation.get() + "." + dataOffset;
+        sb.append(sourceSessionLocation.get());
       } else {
-        return targetSessionId + " <- " + sourceSessionId.get() + "." + dataOffset;
+        sb.append(sourceSessionId.get());
       }
+      if (!dataOffset.isZero()) {
+        sb.append(".").append(dataOffset);
+      }
+      return sb.toString();
     }
   }
 

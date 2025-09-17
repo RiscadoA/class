@@ -33,7 +33,7 @@ public class IRDropSlots extends IRInstruction {
 
   @Override
   public String toString() {
-    return "dropValue(" + location + ", " + slots + ")";
+    return "dropSlots(" + location + ", " + slots + ")";
   }
 
   @Override

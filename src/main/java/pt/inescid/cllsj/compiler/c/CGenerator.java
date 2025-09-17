@@ -818,21 +818,9 @@ public class CGenerator extends IRInstructionVisitor {
   @Override
   public void visit(IRBindSession instr) {
     // Copy the session into this environment
-    String source;
-    if (instr.isFromLocation()) {
-      source = data(instr.getSourceLocation()).deref("struct session*");
-    } else {
-      source = sessionAddress(instr.getSourceSessionId()).cast("struct session");
-    }
+    String source = data(instr.getSourceLocation()).deref("struct session*");
     CAddress targetAddr = sessionAddress(instr.getTargetSessionId());
     putCopyMemory(targetAddr, CAddress.of(source), compiler.arch.sessionSize());
-
-    // Apply an offset on the data pointer, if necessary
-    if (!instr.getRemoteDataOffset().isZero()) {
-      String target = targetAddr.deref("struct session");
-      putAssign(
-          sessionContData(target), offset(sessionContData(target), instr.getRemoteDataOffset()));
-    }
 
     // Modify the remote session to point to the target session
     String remoteSessionAddr = remoteSessionAddress(instr.getTargetSessionId());
@@ -840,9 +828,7 @@ public class CGenerator extends IRInstructionVisitor {
         remoteSessionAddr + " != " + NULL,
         () -> {
           String remoteSession = accessSession(remoteSessionAddr);
-          if (instr.isFromLocation()) {
-            putAssign(sessionContEnv(remoteSession), ENV);
-          }
+          putAssign(sessionContEnv(remoteSession), ENV);
           putAssign(sessionContSession(remoteSession), targetAddr);
           putAssign(sessionContData(remoteSession), data(instr.getLocalData()));
         });
@@ -1101,8 +1087,7 @@ public class CGenerator extends IRInstructionVisitor {
                 sessionContData(target), offset(sessionContData(target), arg.getDataOffset()));
 
             // Update the remote session's continuation
-            Optional<IRLocalDataId> calledLocalDataId =
-                calledProcess.getArgSessionLocalDataId(arg.getTargetSessionId());
+            Optional<IRLocalDataId> calledLocalDataId = calledProcess.getAssociatedLocalData(arg.getTargetSessionId());
             String remoteSessionAddress = remoteSessionAddress(source);
             putIf(
                 remoteSessionAddress + " != " + NULL,
@@ -1264,8 +1249,7 @@ public class CGenerator extends IRInstructionVisitor {
                 sessionContData(target), offset(sessionContData(target), arg.getDataOffset()));
 
             // Update the remote session's continuation to match the new environment
-            Optional<IRLocalDataId> calledLocalDataId =
-                calledProcess.getArgSessionLocalDataId(arg.getTargetSessionId());
+            Optional<IRLocalDataId> calledLocalDataId = calledProcess.getAssociatedLocalData(arg.getTargetSessionId());
             String remoteSessionAddress = remoteSessionAddress(source);
             putIf(
                 remoteSessionAddress + " != " + NULL,

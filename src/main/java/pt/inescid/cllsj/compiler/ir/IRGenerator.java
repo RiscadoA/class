@@ -134,7 +134,7 @@ public class IRGenerator extends ASTNodeVisitor {
 
       IRSlotsFromASTType info = slotsFromType(type);
       if (IRContinuationChecker.cannotHaveContinuation(compiler, env, type)) {
-        // Type has no continuation: no need to store session
+        // Type has no continuation: no need to store a session
         env = env.addValue(name, info.localCombinations(), Optional.empty());
       } else {
         env = env.addArgSession(name, info.localCombinations());
@@ -731,7 +731,6 @@ public class IRGenerator extends ASTNodeVisitor {
               new IRBindSession(
                   argChannel.getSessionId(),
                   channel.getLocalData(),
-                  IRSlotOffset.ZERO,
                   argChannel.getLocalData()));
 
           // If the received session is negative, we must jump to it
@@ -1248,7 +1247,7 @@ public class IRGenerator extends ASTNodeVisitor {
     // Otherwise, we bind the new session to the one stored in the cell
     block.add(
         new IRBindSession(
-            argChannel.getSessionId(), cellDataLoc, IRSlotOffset.ZERO, argChannel.getLocalData()));
+            argChannel.getSessionId(), cellDataLoc, argChannel.getLocalData()));
 
     // The type checker doesn't place use nodes after takes of basic types
     // and cells, so we do it ourselves

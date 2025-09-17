@@ -35,7 +35,7 @@ public class IRCloneSlots extends IRWrite {
 
   @Override
   public String toString() {
-    return "cloneValue(" + location + ", " + sourceLocation + ", " + slots + ")";
+    return "cloneSlots(" + location + ", " + sourceLocation + ", " + slots + ")";
   }
 
   @Override

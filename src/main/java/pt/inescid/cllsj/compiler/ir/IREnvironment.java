@@ -88,11 +88,14 @@ public class IREnvironment {
   }
 
   public IREnvironment addArgSession(String name, IRSlotCombinations combinations) {
+    IRSessionId sessionId = process.addSession();
     IRLocalDataId localDataId = process.addLocalData(combinations);
+    process.associateLocalData(sessionId, localDataId);
+    process.makeSessionArgument(sessionId);
     return new Channel(
         this,
         name,
-        Optional.of(process.addArgSession(localDataId)),
+        Optional.of(sessionId),
         IRSlotOffset.ZERO,
         Optional.of(localDataId),
         Optional.empty(),
@@ -100,11 +103,13 @@ public class IREnvironment {
   }
 
   public IREnvironment addSession(String name, IRSlotCombinations combinations) {
+    IRSessionId sessionId = process.addSession();
     IRLocalDataId localDataId = process.addLocalData(combinations);
+    process.associateLocalData(sessionId, localDataId);
     return new Channel(
         this,
         name,
-        Optional.of(process.addSession()),
+        Optional.of(sessionId),
         IRSlotOffset.ZERO,
         Optional.of(localDataId),
         Optional.empty(),

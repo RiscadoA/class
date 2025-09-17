@@ -337,199 +337,6 @@ public class Optimizer {
     }
   }
 
-  // public void optimizeKnownSlots(IRProgram ir) {
-  //   for (IRProcess p : ir.stream().toList()) {
-  //     if (!processFlows.containsKey(p.getId())) {
-  //       throw new IllegalStateException(
-  //           "Analysis must be enabled to perform known slots optimization");
-  //     }
-  //     optimizeKnownSlots(p, processFlows.get(p.getId()));
-  //   }
-  // }
-
-  // private void optimizeKnownSlots(IRProcess ir, Map<IRBlock, AnlFlow> flows) {
-  //   // Slots which have already been removed of types.
-  //   Map<Integer, Set<Integer>> removedSlots = new HashMap<>();
-
-  //   // Will store, for a given push instruction, the instructions which pop their data
-  //   Map<AnlFlowLocation, AnlFlowLocation> candidatePops = new HashMap<>();
-
-  //   // We search for any pop instruction which popped a slot with a known pusher
-  //   for (IRBlock block : ir.getBlocksIncludingEntry()) {
-  //     if (!flows.containsKey(block)) {
-  //       continue; // No flow information for this block
-  //     }
-  //     AnlFlow flow = flows.get(block);
-
-  //     for (int i = 0; i < block.getInstructions().size(); ++i) {
-  //       IRInstruction instruction = block.getInstructions().get(i);
-  //       if (!(instruction instanceof IRPop)) {
-  //         continue; // Not what we're looking for
-  //       }
-  //       IRPop pop = (IRPop) instruction;
-  //       if (pop instanceof IRPopSession && ((IRPopSession)
-  // pop).getValueRequisites().canBeValue()) {
-  //         continue; // This code currently doesn't handle value session pushes and pops.
-  //       }
-  //       if (pop instanceof IRPopUnfold) {
-  //         continue; // We're not really popping data with these instructions
-  //       }
-
-  //       AnlFlowRecord recordState = flow.getStates().get(i).getBoundRecord(pop.getRecord());
-  //       if (recordState.peek().isEmpty() || recordState.peek().get().getPusher().isEmpty()) {
-  //         continue; // Unknown slot, we can't do anything
-  //       }
-  //       AnlFlowLocation pushLoc = recordState.peek().get().getPusher().get();
-
-  //       candidatePops.put(pushLoc, flow.getLocation(i));
-  //     }
-  //   }
-
-  //   for (AnlFlowLocation pushLoc : candidatePops.keySet()) {
-  //     AnlFlowLocation popLoc = candidatePops.get(pushLoc);
-  //     IRPush push = (IRPush) pushLoc.getInstruction();
-  //     IRPop pop = (IRPop) popLoc.getInstruction();
-
-  //     AnlFlowRecord record = pushLoc.getNextState().getBoundRecord(push.getRecord());
-  //     if (record.getNextSlotIndex().isEmpty()) {
-  //       continue; // We need to know which part of the type we're removing
-  //     }
-  //     int slotIndex = record.getNextSlotIndex().get() - 1;
-  //     if (removedSlots.containsKey(push.getRecord())) {
-  //       // We might need to decrement the slot index if previous slots have already been removed
-  //       Set<Integer> slots = removedSlots.get(push.getRecord());
-  //       slotIndex -= slots.stream().filter(i -> i < record.getNextSlotIndex().get()).count();
-  //     }
-
-  //     // We must go through each location and ensure that there's a single execution
-  //     // path from the push to the pop.
-  //     if (!pushLoc.hasSinglePathUntil(popLoc)) {
-  //       continue; // We could optimize this across many branches but it is currently
-  // unimplemented
-  //     }
-
-  //     // Depending on the type of pop instruction, we'll try merging their argument data,
-  //     // so that the push/pop pair becomes unnecessary
-  //     boolean removePush = true;
-  //     if (pop instanceof IRPopExponential) {
-  //       int popped = ((IRPopExponential) pop).getArgExponential();
-
-  //       if (push instanceof IRPushExponential) {
-  //         int pushed = ((IRPushExponential) push).getExponential();
-
-  //         // We need to remove any IRDetachExponential instructions found for the pushed
-  // exponential
-  //         pushLoc.forEachAfter(
-  //             loc -> {
-  //               if (loc.getInstruction() instanceof IRDetachExponential) {
-  //                 IRDetachExponential detach = (IRDetachExponential) loc.getInstruction();
-  //                 if (detach.getExponential() == pushed) {
-  //                   loc.removeInstruction();
-  //                   return false;
-  //                 }
-  //               }
-  //               return true;
-  //             });
-
-  //         for (IRBlock block : ir.getBlocksIncludingEntry()) {
-  //           for (IRInstruction instr : block.getInstructions()) {
-  //             instr.renameExponentials(r -> r == popped ? pushed : r);
-  //           }
-  //         }
-  //       } else if (push instanceof IRPushExpression) {
-  //         removePush = false;
-  //         IRPushExpression pushExpr = (IRPushExpression) push;
-  //         pushLoc.replaceInstruction(
-  //             new IRNewExponentialExpression(popped, pushExpr.getExpression()));
-  //       } else if (push instanceof IRScan) {
-  //         removePush = false;
-  //         IRScan scan = (IRScan) push;
-  //         pushLoc.replaceInstruction(new IRNewExponentialScan(popped, scan.getType()));
-  //       } else {
-  //         continue; // Unsupported exponential push
-  //       }
-  //     } else if (pop instanceof IRPopSession) {
-  //       int pushed = ((IRPushSession) push).getArgRecord();
-  //       int popped = ((IRPopSession) pop).getArgRecord();
-  //       for (IRBlock block : ir.getBlocksIncludingEntry()) {
-  //         for (IRInstruction instr : block.getInstructions()) {
-  //           instr.renameRecords(r -> r == popped ? pushed : r);
-  //         }
-  //       }
-  //     } else if (pop instanceof IRPopClose) {
-  //       // We don't really need to do anything other than removing the instructions
-  //     } else if (pop instanceof IRPopTag) {
-  //       // For the tags, the jump has already been optimized away by the known jump optimization
-  //       if (!((IRPopTag) pop).getCases().isEmpty()) {
-  //         continue; // Known jump optimization didn't run?
-  //       }
-  //     } else {
-  //       continue; // Unimplemented pop type
-  //     }
-
-  //     // Now, we simply remove both instructions and modify the type accordingly
-  //     IRType oldType = ir.getRecordType(push.getRecord());
-  //     IRType newType = TypeModifier.removeNth(pushLoc.getPreviousState(), oldType, slotIndex);
-
-  //     if (newType instanceof IRCloseT) {
-  //       // We might be able to remove the session entirely
-  //       AtomicReference<Optional<AnlFlowLocation>> newLoc = new
-  // AtomicReference<>(Optional.empty());
-  //       AtomicReference<Optional<AnlFlowLocation>> freeLoc =
-  //           new AtomicReference<>(Optional.empty());
-
-  //       pushLoc.forEachBefore(
-  //           loc -> {
-  //             if (loc.getInstruction() instanceof IRNewSession) {
-  //               if (((IRNewSession) loc.getInstruction()).getRecord() == push.getRecord()) {
-  //                 newLoc.set(Optional.of(loc));
-  //                 return false;
-  //               }
-  //             } else if (loc.getInstruction().usesRecord(push.getRecord())) {
-  //               return false;
-  //             }
-  //             return true;
-  //           });
-
-  //       popLoc.forEachAfter(
-  //           loc -> {
-  //             if (loc.getInstruction() instanceof IRFreeSession) {
-  //               if (((IRFreeSession) loc.getInstruction()).getRecord() == push.getRecord()) {
-  //                 freeLoc.set(Optional.of(loc));
-  //                 return false;
-  //               }
-  //             } else if (loc.getInstruction().usesRecord(push.getRecord())) {
-  //               return false;
-  //             }
-  //             return true;
-  //           });
-
-  //       // If the record is still used between the push and the pop, we can't delete it
-  //       pushLoc.forEachAfter(
-  //           loc -> {
-  //             if (loc != popLoc && loc.getInstruction().usesRecord(push.getRecord())) {
-  //               freeLoc.set(Optional.empty());
-  //               newLoc.set(Optional.empty());
-  //             }
-  //             return loc != popLoc;
-  //           });
-
-  //       if (newLoc.get().isPresent() && freeLoc.get().isPresent()) {
-  //         newLoc.get().get().removeInstruction();
-  //         freeLoc.get().get().removeInstruction();
-  //       }
-  //     }
-
-  //     if (removePush) {
-  //       pushLoc.removeInstruction();
-  //     }
-  //     popLoc.removeInstruction();
-
-  //     ir.setRecordType(push.getRecord(), newType);
-  //     removedSlots.computeIfAbsent(push.getRecord(), k -> new HashSet<>()).add(slotIndex);
-  //   }
-  // }
-
   public void removeUnusedSessionsAndData(IRProgram ir) {
     for (IRProcess p : ir.stream().toList()) {
       removeUnusedSessions(p);
@@ -542,7 +349,7 @@ public class Optimizer {
     Set<IRSessionId> unusedSessions = new HashSet<>();
     for (int i = 0; i < ir.getSessionCount(); ++i) {
       IRSessionId id = new IRSessionId(i);
-      if (!ir.isArgSession(id)) {
+      if (!ir.isSessionArgument(id)) {
         unusedSessions.add(id);
       }
     }
@@ -612,7 +419,7 @@ public class Optimizer {
     Set<IRLocalDataId> unusedData = new HashSet<>();
     for (int i = 0; i < ir.getLocalDataCount(); ++i) {
       IRLocalDataId id = new IRLocalDataId(i);
-      if (!ir.isArgData(id)) {
+      if (!ir.isAssociatedLocalData(id)) {
         unusedData.add(id);
       }
     }
@@ -646,7 +453,7 @@ public class Optimizer {
     ir.replaceLocalDataOnHeader(dataRebindings::get);
     for (IRBlock block : ir.streamBlocks().toList()) {
       for (IRInstruction instr : block.stream().toList()) {
-        instr.replaceLocalData(dataRebindings::get);
+        instr.replaceLocalData(dataRebindings::get, true);
       }
     }
   }
@@ -759,44 +566,66 @@ public class Optimizer {
 
       // Start by adding the called processes' local data to the current process
       // We must add move instructions to copy the data from the caller to callee
-      Map<IRLocalDataId, IRLocalDataId> localDataMap = new HashMap<>();
+      Map<IRLocalDataId, IRLocalDataId> internalLocalDataMap = new HashMap<>();
+      Map<IRLocalDataId, IRDataLocation> argLocalDataMap = new HashMap<>();
       for (IRLocalDataId id : callProc.localData()) {
+        // If the local data is associated with a session which is passed as an argument,
+        // we can just reuse the local data from the caller
+        if (callProc.isAssociatedLocalData(id)) {
+          IRSessionId targetSessionId = callProc.getAssociatedSessionId(id).get();
+          Optional<IRSessionId> sourceSessionId =
+              call.getSessionArguments().stream()
+                  .filter(a -> a.getTargetSessionId().equals(targetSessionId))
+                  .map(IRCallProcess.SessionArgument::getSourceSessionId)
+                  .findFirst();
+          if (sourceSessionId.isPresent() && proc.hasLocalData(sourceSessionId.get())) {
+            internalLocalDataMap.put(id, proc.getAssociatedLocalData(sourceSessionId.get()).get());
+            continue;
+          }
+        }
+
+        // Check if this local data comes from an argument                                                         
+        Optional<IRCallProcess.DataArgument> arg =
+            call.getDataArguments().stream()
+                .filter(a -> a.getTargetDataId().equals(id))
+                .findFirst();
         IRSlotCombinations combinations =
             callProc.getLocalData(id).replaceTypes(slotReplacer, reqReplacer);
-        localDataMap.put(id, proc.addLocalData(combinations));
-      }
-      for (IRCallProcess.DataArgument arg : call.getDataArguments()) {
-        // We need to add move instructions to copy the data from the caller to callee
-        IRLocalDataId targetId = localDataMap.get(arg.getTargetDataId());
-        if (arg.isClone()) {
-          block.add(
-              new IRCloneSlots(
-                  IRDataLocation.local(targetId, IRSlotOffset.ZERO),
-                  arg.getSourceLocation(),
-                  arg.getSlots()));
+
+        if (arg.isPresent() && arg.get().getSourceLocation().isLocal() && !arg.get().isClone()) {
+          // If the argument is directly mapped to a local data,
+          // instead of creating a new local data and moving the data,
+          // we can just reuse the existing local data
+          argLocalDataMap.put(id, arg.get().getSourceLocation());
         } else {
-          block.add(
-              new IRMoveSlots(
-                  IRDataLocation.local(targetId, IRSlotOffset.ZERO),
-                  arg.getSourceLocation(),
-                  arg.getSlots()));
+          internalLocalDataMap.put(id, proc.addLocalData(combinations));
+
+          // We need to add move instructions to copy the data from the caller to callee
+          if (arg.isPresent()) {
+            IRLocalDataId targetId = internalLocalDataMap.get(arg.get().getTargetDataId());
+            if (arg.get().isClone()) {
+              block.add(
+                  new IRCloneSlots(
+                      IRDataLocation.local(targetId, IRSlotOffset.ZERO),
+                      arg.get().getSourceLocation(),
+                      arg.get().getSlots()));
+            } else {
+              block.add(
+                  new IRMoveSlots(
+                      IRDataLocation.local(targetId, IRSlotOffset.ZERO),
+                      arg.get().getSourceLocation(),
+                      arg.get().getSlots()));
+            }
+          }
         }
       }
 
       // Add the called processes' sessions to the current process
-      // We must add bind instructions to link the sessions from caller to callee
       Map<IRSessionId, IRSessionId> sessionMap = new HashMap<>();
+      Map<IRSessionId, IRSlotOffset> sessionOffsetMap = new HashMap<>();
       for (IRCallProcess.SessionArgument arg : call.getSessionArguments()) {
-        IRSessionId newId = proc.addSession();
-        sessionMap.put(arg.getTargetSessionId(), newId);
-        IRLocalDataId dataId = callProc.getArgSessionLocalDataId(arg.getTargetSessionId()).get();
-        dataId = localDataMap.get(dataId);
-        block.add(
-            new IRBindSession(
-                newId,
-                arg.getSourceSessionId(),
-                arg.getDataOffset(),
-                IRDataLocation.local(dataId, IRSlotOffset.ZERO)));
+        sessionMap.put(arg.getTargetSessionId(), arg.getSourceSessionId());
+        sessionOffsetMap.put(arg.getTargetSessionId(), arg.getDataOffset());
       }
       for (IRSessionId id : callProc.sessions()) {
         if (sessionMap.containsKey(id)) {
@@ -810,24 +639,34 @@ public class Optimizer {
       for (int old = 0; old < callProc.getDropOnEnd().size(); ++old) {
         IRDropId oldId = new IRDropId(old);
         IRProcess.DropOnEnd drop = callProc.getDropOnEnd(oldId);
-        IRDropId newId =
-            proc.addDropOnEnd(
-                localDataMap.get(drop.getLocalDataId()),
-                drop.getOffset().replaceSlots(t -> t.replaceTypes(slotReplacer, reqReplacer)),
-                drop.getSlots().replaceTypes(slotReplacer, reqReplacer),
-                false);
+        IRDropId newId;
+
+        IRLocalDataId dataId;
+        IRSlotOffset offset =
+            drop.getOffset().replaceSlots(t -> t.replaceTypes(slotReplacer, reqReplacer));
+        IRSlotTree slots = drop.getSlots().replaceTypes(slotReplacer, reqReplacer);
+
+        if (argLocalDataMap.containsKey(drop.getLocalDataId())) {
+          dataId = argLocalDataMap.get(drop.getLocalDataId()).getLocalDataId();
+          offset = argLocalDataMap.get(drop.getLocalDataId()).getOffset().advance(offset);
+        } else {
+          dataId = internalLocalDataMap.get(drop.getLocalDataId());
+        }
+
+        newId = proc.addDropOnEnd(dataId, offset, slots, false);
         dropMap.put(oldId, newId);
         if (drop.isAlways()) {
           block.add(new IRDeferDrop(newId));
         }
       }
 
-      // Identify the block we'll be adding the inlined process' entry instructions
-      IRBlock entryBlock = block;
-
       // Create a mapping from locations in the inlined process to locations in the current process
       Map<IRCodeLocation, IRCodeLocation> locationMap = new HashMap<>();
+      locationMap.put(IRCodeLocation.entry(), block.getLocation());
       for (IRBlock callBlock : callProc.streamBlocks().toList()) {
+        if (callBlock.getLocation().equals(IRCodeLocation.entry())) {
+          continue;
+        }
         locationMap.put(
             callBlock.getLocation(),
             proc.createBlock(call.getProcessId() + "_" + callBlock.getLocation().toString())
@@ -838,18 +677,30 @@ public class Optimizer {
       Function<IRInstruction, IRInstruction> convertInstruction =
           callInstr -> {
             IRInstruction newInstr = callInstr.clone();
+            newInstr.replaceLocalData(internalLocalDataMap::get, false);
+            newInstr.replaceDataLocations(
+                loc1 -> loc1.replaceDataLocations(
+                      loc -> {
+                        if (loc.isRemote() && sessionOffsetMap.containsKey(loc.getSessionId())) {
+                          return IRDataLocation.remote(
+                              loc.getSessionId(),
+                              sessionOffsetMap.get(loc.getSessionId()).advance(loc.getOffset()));
+                        } else if (loc.isLocal()
+                            && argLocalDataMap.containsKey(loc.getLocalDataId())) {
+                          return argLocalDataMap.get(loc.getLocalDataId()).advance(loc.getOffset());
+                        } else if (loc.isLocal()) {
+                          return IRDataLocation.local(
+                              internalLocalDataMap.get(loc.getLocalDataId()), loc.getOffset());
+                        } else {
+                          return loc;
+                        }
+                      }));
             newInstr.replaceSessions(sessionMap::get);
-            newInstr.replaceLocalData(localDataMap::get);
             newInstr.replaceCodeLocations(locationMap::get);
             newInstr.replaceDropIds(dropMap::get);
             newInstr.replaceTypes(slotReplacer, reqReplacer);
             return newInstr;
           };
-
-      // Add instructions from the entry block into the entryBlock
-      for (IRInstruction callInstr : callProc.getEntry().stream().toList()) {
-        entryBlock.add(convertInstruction.apply(callInstr));
-      }
 
       // Add all blocks of the process to the current process
       for (IRBlock callBlock : callProc.streamBlocks().toList()) {

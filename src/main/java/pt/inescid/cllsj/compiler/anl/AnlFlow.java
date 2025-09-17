@@ -145,11 +145,20 @@ public class AnlFlow {
   }
 
   public boolean guaranteedToRun() {
+    return guaranteedToRun(new HashSet<>());
+  }
+
+  private boolean guaranteedToRun(Set<AnlFlow> seen) {
+    if (seen.contains(this)) {
+      return true;
+    }
+    seen.add(this);
+
     for (AnlFlow source : sources) {
       if (!source.getDetached().contains(this) && source.getBranches().size() > 1) {
         return false;
       }
-      if (!source.guaranteedToRun()) {
+      if (!source.guaranteedToRun(seen)) {
         return false;
       }
     }

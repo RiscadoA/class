@@ -166,13 +166,8 @@ public class Analyzer extends IRInstructionVisitor {
   @Override
   public void visit(IRBindSession instr) {
     AnlSessionState targetSession = state.session(instr.getTargetSessionId());
-    Optional<IRSessionId> sourceSessionId;
-    if (instr.isFromLocation()) {
-      sourceSessionId =
-          state.read(instr.getSourceLocation(), true).assumeSession().map(s -> s.id());
-    } else {
-      sourceSessionId = Optional.of(instr.getSourceSessionId());
-    }
+    Optional<IRSessionId> sourceSessionId =
+        state.read(instr.getSourceLocation(), true).assumeSession().map(s -> s.id());
 
     if (sourceSessionId.isEmpty()) {
       // We're binding an unknown session
@@ -185,7 +180,7 @@ public class Analyzer extends IRInstructionVisitor {
       // We're binding a known session
       AnlSessionState sourceSession = state.session(sourceSessionId.get());
       targetSession.cont = sourceSession.cont;
-      targetSession.data = sourceSession.data.map(d -> d.advance(instr.getRemoteDataOffset()));
+      targetSession.data = sourceSession.data;
       targetSession.remote = sourceSession.remote;
       sourceSession.data = Optional.of(instr.getLocalData());
       sourceSession.remote = Optional.of(instr.getTargetSessionId());

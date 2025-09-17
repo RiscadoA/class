@@ -21,8 +21,10 @@ public abstract class IRInstruction {
     replaceDataLocations(loc -> loc.replaceSessions(replacer));
   }
 
-  public void replaceLocalData(Function<IRLocalDataId, IRLocalDataId> replacer) {
-    replaceDataLocations(loc -> loc.replaceLocalData(replacer));
+  public void replaceLocalData(Function<IRLocalDataId, IRLocalDataId> replacer, boolean includeLocations) {
+    if (includeLocations) {
+      replaceDataLocations(loc -> loc.replaceLocalData(replacer));
+    }
   }
 
   public void replaceSlots(Function<IRSlotTree, IRSlotTree> replacer) {
@@ -75,7 +77,8 @@ public abstract class IRInstruction {
             uses.set(true);
           }
           return data;
-        });
+        },
+        true);
     return uses.get();
   }
 
