@@ -223,17 +223,17 @@ public class CGenerator extends IRInstructionVisitor {
         () -> {
           putStatement("struct type_node* node");
           putStatement("int size");
-          putStatement("unsigned char alignment;");
-          putStatement("unsigned char flags;");
-          putStatement("unsigned char node_count;");
+          putStatement("unsigned char alignment");
+          putStatement("unsigned char flags");
+          putStatement("unsigned char node_count");
         });
 
     putStruct(
         "type_node",
         () -> {
-          putStatement("int offset;");
-          putStatement("short type;");
-          putStatement("short next;");
+          putStatement("int offset");
+          putStatement("short type");
+          putStatement("short next");
         });
 
     putStruct(
