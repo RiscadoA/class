@@ -832,12 +832,15 @@ public class CGenerator extends IRInstructionVisitor {
     }
 
     // Modify the remote session to point to the target session
-    String remoteSession = accessRemoteSession(instr.getTargetSessionId());
-    if (instr.isFromLocation()) {
-      putAssign(sessionContEnv(remoteSession), ENV);
-    }
-    putAssign(sessionContSession(remoteSession), targetAddr);
-    putAssign(sessionContData(remoteSession), data(instr.getLocalData()));
+    String remoteSessionAddr = remoteSessionAddress(instr.getTargetSessionId());
+    putIf(remoteSessionAddr + " != " + NULL, () -> {
+      String remoteSession = accessSession(remoteSessionAddr);
+      if (instr.isFromLocation()) {
+        putAssign(sessionContEnv(remoteSession), ENV);
+      }
+      putAssign(sessionContSession(remoteSession), targetAddr);
+      putAssign(sessionContData(remoteSession), data(instr.getLocalData()));
+    });
   }
 
   @Override
