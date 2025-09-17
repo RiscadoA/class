@@ -275,7 +275,10 @@ public abstract class IRSlotTree {
     public IRSlotTree replaceTypes(
         Function<IRTypeId, IRSlotTree> slotReplacer,
         Function<IRTypeId, IRValueRequisites> reqReplacer) {
-      return isValue(requisites.expandTypes(reqReplacer), value.replaceTypes(slotReplacer, reqReplacer), notValue.replaceTypes(slotReplacer, reqReplacer));
+      return isValue(
+          requisites.expandTypes(reqReplacer),
+          value.replaceTypes(slotReplacer, reqReplacer),
+          notValue.replaceTypes(slotReplacer, reqReplacer));
     }
 
     @Override

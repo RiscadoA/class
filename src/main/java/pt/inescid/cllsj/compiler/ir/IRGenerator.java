@@ -263,7 +263,7 @@ public class IRGenerator extends ASTNodeVisitor {
 
     IRSlotsFromASTType info = slotsFromType(new ASTWhyT(node.getType()));
     block.add(
-        new IRCloneValue(
+        new IRCloneSlots(
             channel.getRemoteData(), exponential.getLocalData(), info.activeLocalTree));
     block.add(new IRFinishSession(channel.getSessionId(), true));
   }
@@ -720,7 +720,7 @@ public class IRGenerator extends ASTNodeVisitor {
         () -> {
           // If the left type is a value, we do the send value optimization
           block.add(
-              new IRMoveValue(
+              new IRMoveSlots(
                   argChannel.getLocalData(), channel.getLocalData(), info.activeLocalTree));
 
           block.add(new IRJump(rhsBlock.getLocation()));
@@ -771,7 +771,7 @@ public class IRGenerator extends ASTNodeVisitor {
 
     // Move data stored on the negative session's local data to the positive session's remote data
     if (!info.activeLocalTree.isLeaf()) {
-      block.add(new IRMoveValue(pos.getRemoteData(), neg.getLocalData(), info.activeLocalTree));
+      block.add(new IRMoveSlots(pos.getRemoteData(), neg.getLocalData(), info.activeLocalTree));
     }
 
     Runnable withContinuation =
@@ -909,7 +909,7 @@ public class IRGenerator extends ASTNodeVisitor {
         () -> {
           // Just clone the exponential's data to the new channel
           block.add(
-              new IRCloneValue(
+              new IRCloneSlots(
                   argChannel.getLocalData(), channel.getLocalData(), info.activeLocalTree));
 
           block.add(new IRJump(rhsBlock.getLocation()));

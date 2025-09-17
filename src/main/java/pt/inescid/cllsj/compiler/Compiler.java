@@ -141,9 +141,7 @@ public class Compiler {
             8);
     monomorphization =
         settings.addFlag(
-            "monomorphization",
-            "Enables monomorphization of polymorphic processes",
-            true);
+            "monomorphization", "Enables monomorphization of polymorphic processes", true);
 
     analyzeIR = settings.addFlag("analyze-ir", "Enables analysis of the IR after generation", true);
     optimizeSingleEndpoint =
@@ -309,7 +307,7 @@ public class Compiler {
     if (monomorphization.get()) {
       optimizer.monomorphizeProcesses(ir);
     }
-    
+
     // Repeat the whole analysis and inlining process twice to catch more opportunities
     for (int i = 0; i < 2; ++i) {
       optimizer.inlineProcesses(ir, inliningThreshold.get());

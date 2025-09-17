@@ -276,24 +276,26 @@ public class Optimizer {
 
   private void optimizeKnownLocations(IRProcess ir, Map<IRBlock, AnlFlow> flows) {
     ir.streamBlocks()
-      .forEach(block -> {
-        AnlFlow flow = flows.get(block);
-        if (flow == null) {
-          return; // Unreachable block
-        }
+        .forEach(
+            block -> {
+              AnlFlow flow = flows.get(block);
+              if (flow == null) {
+                return; // Unreachable block
+              }
 
-        for (int i = 0; i < block.size(); ++i) {
-          AnlFlowState state = flow.getStates().get(i);
-          block.get(i).replaceDataLocations(loc -> optimizeKnownLocation(loc, state));
-        }
-      });
+              for (int i = 0; i < block.size(); ++i) {
+                AnlFlowState state = flow.getStates().get(i);
+                block.get(i).replaceDataLocations(loc -> optimizeKnownLocation(loc, state));
+              }
+            });
   }
 
   private IRDataLocation optimizeKnownLocation(IRDataLocation location, AnlFlowState state) {
     if (location.isLocal()) {
       return location;
     } else if (location.isCell()) {
-      return IRDataLocation.cell(optimizeKnownLocation(location.getCell(), state), location.getOffset());
+      return IRDataLocation.cell(
+          optimizeKnownLocation(location.getCell(), state), location.getOffset());
     } else if (location.isRemote()) {
       Optional<IRDataLocation> known = state.session(location.getSessionId()).data;
       if (known.isPresent()) {
@@ -551,23 +553,24 @@ public class Optimizer {
       for (int i = 0; i < block.size(); ++i) {
         IRInstruction instr = block.get(i);
         final int j = i;
-        unusedSessions.removeIf(s -> {
-          if (!instr.usesSession(s)) {
-            return false;
-          }
+        unusedSessions.removeIf(
+            s -> {
+              if (!instr.usesSession(s)) {
+                return false;
+              }
 
-          if (instr instanceof IRInitializeSession) {
-            IRInitializeSession init = (IRInitializeSession) instr;
-            if (init.getSessionId().equals(s)) {
-              toRemove
-                .computeIfAbsent(block, k -> new TreeMap<>(Comparator.reverseOrder()))
-                .put(j, s);
-              return false; // We can just remove the initialization
-            }
-          }
+              if (instr instanceof IRInitializeSession) {
+                IRInitializeSession init = (IRInitializeSession) instr;
+                if (init.getSessionId().equals(s)) {
+                  toRemove
+                      .computeIfAbsent(block, k -> new TreeMap<>(Comparator.reverseOrder()))
+                      .put(j, s);
+                  return false; // We can just remove the initialization
+                }
+              }
 
-          return true;
-        });
+              return true;
+            });
       }
     }
 
@@ -691,10 +694,7 @@ public class Optimizer {
   }
 
   private void inlineProcesses(
-      IRProgram ir,
-      int blockThreshold,
-      IRProcessId procId,
-      Set<IRProcessId> visited) {
+      IRProgram ir, int blockThreshold, IRProcessId procId, Set<IRProcessId> visited) {
     if (!visited.add(procId)) {
       return;
     }
@@ -770,13 +770,13 @@ public class Optimizer {
         IRLocalDataId targetId = localDataMap.get(arg.getTargetDataId());
         if (arg.isClone()) {
           block.add(
-              new IRCloneValue(
+              new IRCloneSlots(
                   IRDataLocation.local(targetId, IRSlotOffset.ZERO),
                   arg.getSourceLocation(),
                   arg.getSlots()));
         } else {
           block.add(
-              new IRMoveValue(
+              new IRMoveSlots(
                   IRDataLocation.local(targetId, IRSlotOffset.ZERO),
                   arg.getSourceLocation(),
                   arg.getSlots()));
@@ -899,7 +899,8 @@ public class Optimizer {
   private static class MonomorphizationArgs {
     Map<IRTypeId, IRSlotTree> typeTrees = new HashMap<>();
     Map<IRTypeId, Boolean> typeIsValue = new HashMap<>();
-  };
+  }
+  ;
 
   public void monomorphizeProcesses(IRProgram ir) {
     // While there are process calls / exponential writes with concrete type arguments
@@ -915,7 +916,9 @@ public class Optimizer {
             MonomorphizationArgs args = new MonomorphizationArgs();
             boolean candidate = !call.getTypeArguments().isEmpty();
             for (IRCallProcess.TypeArgument arg : call.getTypeArguments()) {
-              if (arg.isFromLocation() || arg.getSourceTree().isPolymorphic() || arg.getSourceIsValue().isUncertain()) {
+              if (arg.isFromLocation()
+                  || arg.getSourceTree().isPolymorphic()
+                  || arg.getSourceIsValue().isUncertain()) {
                 candidate = false;
                 break;
               }
@@ -981,9 +984,11 @@ public class Optimizer {
           IRProcess newProc = originalProc.clone(newId);
           newProc.removeTypes();
           newProc.replaceTypes(
-            id -> args.typeTrees.get(id),
-            id -> args.typeIsValue.get(id) ? IRValueRequisites.value() : IRValueRequisites.notValue()
-          );
+              id -> args.typeTrees.get(id),
+              id ->
+                  args.typeIsValue.get(id)
+                      ? IRValueRequisites.value()
+                      : IRValueRequisites.notValue());
           ir.add(newProc);
         }
       }

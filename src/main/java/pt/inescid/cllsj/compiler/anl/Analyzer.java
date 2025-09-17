@@ -218,19 +218,19 @@ public class Analyzer extends IRInstructionVisitor {
   }
 
   @Override
-  public void visit(IRMoveValue instr) {
+  public void visit(IRMoveSlots instr) {
     state.write(
         this, instr.getLocation(), state.read(instr.getSourceLocation(), instr.getSlots(), true));
   }
 
   @Override
-  public void visit(IRCloneValue instr) {
+  public void visit(IRCloneSlots instr) {
     state.write(
         this, instr.getLocation(), state.read(instr.getSourceLocation(), instr.getSlots(), false));
   }
 
   @Override
-  public void visit(IRDropValue instr) {
+  public void visit(IRDropSlots instr) {
     // Irrelevant for analysis
   }
 

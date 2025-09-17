@@ -19,11 +19,11 @@ public abstract class IRInstructionVisitor {
 
   public abstract void visit(IRWriteType instr);
 
-  public abstract void visit(IRMoveValue instr);
+  public abstract void visit(IRMoveSlots instr);
 
-  public abstract void visit(IRCloneValue instr);
+  public abstract void visit(IRCloneSlots instr);
 
-  public abstract void visit(IRDropValue instr);
+  public abstract void visit(IRDropSlots instr);
 
   public abstract void visit(IRPrint instr);
 

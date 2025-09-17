@@ -928,7 +928,7 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   @Override
-  public void visit(IRMoveValue instr) {
+  public void visit(IRMoveSlots instr) {
     putMoveSlots(
         instr.getSlots(),
         id -> typeNodeCount(type(id)),
@@ -941,7 +941,7 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   @Override
-  public void visit(IRCloneValue instr) {
+  public void visit(IRCloneSlots instr) {
     putMoveSlots(
         instr.getSlots(),
         id -> typeNodeCount(type(id)),
@@ -954,7 +954,7 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   @Override
-  public void visit(IRDropValue instr) {
+  public void visit(IRDropSlots instr) {
     putDropSlots(
         instr.getSlots(),
         id -> typeNodeCount(type(id)),

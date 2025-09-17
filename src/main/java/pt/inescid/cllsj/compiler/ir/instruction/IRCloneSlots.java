@@ -4,11 +4,11 @@ import java.util.function.Function;
 import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotTree;
 
-public class IRCloneValue extends IRWrite {
+public class IRCloneSlots extends IRWrite {
   private IRDataLocation sourceLocation;
   private IRSlotTree slots;
 
-  public IRCloneValue(
+  public IRCloneSlots(
       IRDataLocation targetLocation, IRDataLocation sourceLocation, IRSlotTree slots) {
     super(targetLocation);
     this.sourceLocation = sourceLocation;
@@ -30,7 +30,7 @@ public class IRCloneValue extends IRWrite {
 
   @Override
   public IRInstruction clone() {
-    return new IRCloneValue(location, sourceLocation, slots);
+    return new IRCloneSlots(location, sourceLocation, slots);
   }
 
   @Override

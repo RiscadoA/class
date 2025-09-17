@@ -4,11 +4,11 @@ import java.util.function.Function;
 import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotTree;
 
-public class IRDropValue extends IRInstruction {
+public class IRDropSlots extends IRInstruction {
   private IRDataLocation location;
   private IRSlotTree slots;
 
-  public IRDropValue(IRDataLocation location, IRSlotTree slots) {
+  public IRDropSlots(IRDataLocation location, IRSlotTree slots) {
     this.location = location;
     this.slots = slots;
   }
@@ -28,7 +28,7 @@ public class IRDropValue extends IRInstruction {
 
   @Override
   public IRInstruction clone() {
-    return new IRDropValue(location, slots);
+    return new IRDropSlots(location, slots);
   }
 
   @Override
