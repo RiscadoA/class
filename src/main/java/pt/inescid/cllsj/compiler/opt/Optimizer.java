@@ -10,6 +10,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.function.Function;
 import pt.inescid.cllsj.compiler.anl.AnlFlow;
 import pt.inescid.cllsj.compiler.anl.AnlFlowContinuation;
@@ -515,9 +516,38 @@ public class Optimizer {
       }
     }
 
+    Map<IRBlock, TreeMap<Integer, IRSessionId>> toRemove = new HashMap<>();
+
     for (IRBlock block : ir.streamBlocks().toList()) {
-      for (IRInstruction instr : block.stream().toList()) {
-        unusedSessions.removeIf(s -> instr.usesSession(s));
+      for (int i = 0; i < block.size(); ++i) {
+        IRInstruction instr = block.get(i);
+        final int j = i;
+        unusedSessions.removeIf(s -> {
+          if (!instr.usesSession(s)) {
+            return false;
+          }
+
+          if (instr instanceof IRInitializeSession) {
+            IRInitializeSession init = (IRInitializeSession) instr;
+            if (init.getSessionId().equals(s)) {
+              toRemove
+                .computeIfAbsent(block, k -> new TreeMap<>(Comparator.reverseOrder()))
+                .put(j, s);
+              return false; // We can just remove the initialization
+            }
+          }
+
+          return true;
+        });
+      }
+    }
+
+    // Remove any initialization instructions for the removed sessions
+    for (IRBlock b : toRemove.keySet()) {
+      for (int j : toRemove.get(b).keySet()) {
+        if (unusedSessions.contains(toRemove.get(b).get(j))) {
+          b.remove(j);
+        }
       }
     }
 
