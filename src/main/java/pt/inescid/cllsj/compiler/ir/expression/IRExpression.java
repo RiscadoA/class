@@ -11,5 +11,5 @@ public abstract class IRExpression {
 
   public abstract IRExpression clone();
 
-  public void replaceDataLocations(Function<IRDataLocation, IRDataLocation> replacer) {}
+  public abstract void replaceDataLocations(Function<IRDataLocation, IRDataLocation> replacer);
 }

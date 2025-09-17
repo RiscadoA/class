@@ -1,5 +1,8 @@
 package pt.inescid.cllsj.compiler.ir.expression;
 
+import java.util.function.Function;
+
+import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlot;
 
 public abstract class IRUnaryOp extends IRExpression {
@@ -16,5 +19,10 @@ public abstract class IRUnaryOp extends IRExpression {
 
   public IRExpression getInner() {
     return inner;
+  }
+
+  @Override
+  public void replaceDataLocations(Function<IRDataLocation, IRDataLocation> replacer) {
+    inner.replaceDataLocations(replacer);
   }
 }
