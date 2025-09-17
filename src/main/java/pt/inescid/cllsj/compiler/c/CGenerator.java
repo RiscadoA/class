@@ -2182,15 +2182,15 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   void putAddTypeNodeCount(String var, IRSlotTree slots) {
-    putTypeNodeConstruction(var, slots, (index, type, offset, next) -> {});
+    putTypeNodeConstruction(var, slots, Optional.empty(), CSize.zero());
   }
 
   void putTypeNodeConstruction(String indexVar, IRSlotTree slots, TypeNodeConsumer consumer) {
-    putTypeNodeConstruction(indexVar, slots, consumer, CSize.zero());
+    putTypeNodeConstruction(indexVar, slots, Optional.of(consumer), CSize.zero());
   }
 
   private void putTypeNodeConstruction(
-      String nextIndexVar, IRSlotTree slots, TypeNodeConsumer consumer, CSize offset) {
+      String nextIndexVar, IRSlotTree slots, Optional<TypeNodeConsumer> consumer, CSize offset) {
     if (slots.isUnary()) {
       IRSlot slot = slots.singleHead().get();
       IRSlotTree future = ((IRSlotTree.Unary) slots).child();
@@ -2213,7 +2213,8 @@ public class CGenerator extends IRInstructionVisitor {
 
         String newIndex = nextIndexVar + " + " + count;
 
-        putFor(
+        if (consumer.isPresent()) {
+          putFor(
             "int v_i = 0",
             "v_i < " + count,
             "++v_i",
@@ -2232,11 +2233,15 @@ public class CGenerator extends IRInstructionVisitor {
                       + typeNodeNext(node)
                       + ")";
 
-              consumer.accept(nextIndexVar + " + v_i", nodeType, nodeOffset, nodeNext);
+              consumer.get().accept(nextIndexVar + " + v_i", nodeType, nodeOffset, nodeNext);
             });
+        }
+        
         putAssign(nextIndexVar, newIndex);
       } else if (type != -1) {
-        consumer.accept(nextIndexVar, Integer.toString(type), offset, nextIndexVar + " + 1");
+        if (consumer.isPresent()) {
+          consumer.get().accept(nextIndexVar, Integer.toString(type), offset, nextIndexVar + " + 1");
+        }
         putIncrement(nextIndexVar);
       }
 
@@ -2244,7 +2249,9 @@ public class CGenerator extends IRInstructionVisitor {
     } else if (slots.isTag()) {
       IRSlotTree.Tag tag = (IRSlotTree.Tag) slots;
 
-      consumer.accept(nextIndexVar, Integer.toString(TYPE_NODE_TAG), offset, "-1");
+      if (consumer.isPresent()) {
+        consumer.get().accept(nextIndexVar, Integer.toString(TYPE_NODE_TAG), offset, "-1");
+      }
 
       putBlock(
           "",
@@ -2254,8 +2261,10 @@ public class CGenerator extends IRInstructionVisitor {
                 nextIndexVar, nextIndexVar + " + " + Integer.toString(1 + tag.cases().size()));
 
             for (int i = 1; i <= tag.cases().size(); ++i) {
-              consumer.accept(
-                  "t_i + " + i, Integer.toString(TYPE_NODE_INDIRECT), CSize.zero(), nextIndexVar);
+              if (consumer.isPresent()) {
+                consumer.get().accept(
+                    "t_i + " + i, Integer.toString(TYPE_NODE_INDIRECT), CSize.zero(), nextIndexVar);
+              }
 
               IRSlotTree child = tag.cases().get(i - 1);
               CSize newOffset =
@@ -2277,7 +2286,9 @@ public class CGenerator extends IRInstructionVisitor {
             putTypeNodeConstruction(nextIndexVar, isValue.notValue(), consumer, offset);
           });
     } else if (slots.isLeaf()) {
-      consumer.accept(nextIndexVar, Integer.toString(TYPE_NODE_INDIRECT), CSize.zero(), "-1");
+      if (consumer.isPresent()) {
+        consumer.get().accept(nextIndexVar, Integer.toString(TYPE_NODE_INDIRECT), CSize.zero(), "-1");
+      }
       putIncrement(nextIndexVar);
     } else {
       throw new IllegalArgumentException("Unknown slot tree " + slots);
