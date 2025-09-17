@@ -70,6 +70,7 @@ public class Compiler {
   public Settings.Flag optimizeSendValue;
   public Settings.Flag optimizeKnownJumps;
   public Settings.Flag optimizeKnownEndPoints;
+  public Settings.Flag optimizeKnownLocations;
 
   public Compiler() {
     // Compiler operation settings
@@ -167,6 +168,11 @@ public class Compiler {
             "optimize-known-endpoints",
             "Optimizes away end points when they are known to not be the last instruction in a process",
             true);
+    optimizeKnownLocations =
+        settings.addFlag(
+            "optimize-known-locations",
+            "Optimizes away remote locations to local ones when they are known to be the same",
+            true);
 
     settings.addMode(
         "no-inlining",
@@ -196,6 +202,7 @@ public class Compiler {
           optimizeSendValue.set(false);
           optimizeKnownJumps.set(false);
           optimizeKnownEndPoints.set(false);
+          optimizeKnownLocations.set(false);
         });
 
     settings.addMode(
@@ -315,13 +322,19 @@ public class Compiler {
     }
 
     // Optimize the IR using the analysis results
-    if (analyzeIR.get() && optimizeKnownJumps.get()) {
-      optimizer.optimizeKnownJumps(ir);
-    }
-    if (analyzeIR.get() && optimizeKnownEndPoints.get()) {
-      optimizer.optimizeKnownEndPoints(ir);
-    }
     if (analyzeIR.get()) {
+      if (optimizeKnownJumps.get()) {
+        optimizer.optimizeKnownJumps(ir);
+      }
+
+      if (optimizeKnownEndPoints.get()) {
+        optimizer.optimizeKnownEndPoints(ir);
+      }
+
+      if (optimizeKnownLocations.get()) {
+        optimizer.optimizeKnownLocations(ir);
+      }
+
       optimizer.removeUnreachableBlocks(ir);
     }
 

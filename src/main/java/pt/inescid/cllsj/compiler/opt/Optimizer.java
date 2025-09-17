@@ -13,6 +13,7 @@ import java.util.Set;
 import java.util.function.Function;
 import pt.inescid.cllsj.compiler.anl.AnlFlow;
 import pt.inescid.cllsj.compiler.anl.AnlFlowContinuation;
+import pt.inescid.cllsj.compiler.anl.AnlFlowState;
 import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
 import pt.inescid.cllsj.compiler.ir.id.*;
 import pt.inescid.cllsj.compiler.ir.instruction.*;
@@ -257,6 +258,50 @@ public class Optimizer {
 
       // We continue going up the chain of blocks
       modifyEndPoints(ir, introducer, endPoints, visited);
+    }
+  }
+
+  // Replaces accesses to known locations with direct accesses.
+  // E.g. write(s3...) to write(d2...) if s3 is known to point to d2.
+  public void optimizeKnownLocations(IRProgram ir) {
+    for (IRProcess p : ir.stream().toList()) {
+      if (!processFlows.containsKey(p.getId())) {
+        throw new IllegalStateException(
+            "Analysis must be enabled to perform known locations optimization");
+      }
+      optimizeKnownLocations(p, processFlows.get(p.getId()));
+    }
+  }
+
+  private void optimizeKnownLocations(IRProcess ir, Map<IRBlock, AnlFlow> flows) {
+    ir.streamBlocks()
+      .forEach(block -> {
+        AnlFlow flow = flows.get(block);
+        if (flow == null) {
+          return; // Unreachable block
+        }
+
+        for (int i = 0; i < block.size(); ++i) {
+          AnlFlowState state = flow.getStates().get(i);
+          block.get(i).replaceDataLocations(loc -> optimizeKnownLocation(loc, state));
+        }
+      });
+  }
+
+  private IRDataLocation optimizeKnownLocation(IRDataLocation location, AnlFlowState state) {
+    if (location.isLocal()) {
+      return location;
+    } else if (location.isCell()) {
+      return IRDataLocation.cell(optimizeKnownLocation(location.getCell(), state), location.getOffset());
+    } else if (location.isRemote()) {
+      Optional<IRDataLocation> known = state.session(location.getSessionId()).data;
+      if (known.isPresent()) {
+        return known.get().advance(location.getOffset());
+      } else {
+        return location;
+      }
+    } else {
+      throw new UnsupportedOperationException("Unknown data location type");
     }
   }
 
@@ -576,256 +621,6 @@ public class Optimizer {
       }
     }
   }
-
-  // // Searches for blocks of code like:
-  // //
-  // //    pushX(1, x)
-  // //    ...
-  // //    pushSession(0, 1, value)
-  // //
-  // // and turns them into
-  // //
-  // //    pushSession(0, 1, value)
-  // //    pushX(0, x)
-  // //
-  // // This change requires modifying the type of the record being pushed, e.g.,
-  // // if 1 was of type session(Y); X, then the new type will be session(Y); close.
-  // public void removeUnnecessaryValuePushes(IRProgram ir) {
-  //   ir.forEachProcess(
-  //       (name, proc) -> {
-  //         removeUnnecessaryValuePushes(proc, processFlows.get(name));
-  //       });
-  // }
-
-  // private void removeUnnecessaryValuePushes(IRProcess ir, Map<IRBlock, AnlFlow> flows) {
-  //   Map<Integer, List<AnlFlowLocation>> candidates = new HashMap<>();
-
-  //   // We search for any pushSession instruction which is certainly pushing a value
-  //   for (IRBlock block : ir.getBlocksIncludingEntry()) {
-  //     if (!flows.containsKey(block)) {
-  //       continue; // No flow information for this block
-  //     }
-  //     for (int i = 0; i < block.getInstructions().size(); ++i) {
-  //       IRInstruction instruction = block.getInstructions().get(i);
-  //       if (!(instruction instanceof IRPushSession)) {
-  //         continue; // Not what we're looking for
-  //       }
-  //       IRPushSession pushSession = (IRPushSession) instruction;
-  //       if (!pushSession.getValueRequisites().mustBeValue()) {
-  //         continue; // Not necessarily a value push
-  //       }
-
-  //       // We store the location of this instruction associated with the record being consumed.
-  //       List<AnlFlowLocation> locs =
-  //           candidates.computeIfAbsent(pushSession.getArgRecord(), k -> new ArrayList<>());
-  //       locs.add(flows.get(block).getLocation(i));
-
-  //       // Now we go back in the flow and look for the first push(argRecord, ...) instruction.
-  //       // If there is branching, we need to check all branches.
-  //     }
-  //   }
-
-  //   for (int candidate : candidates.keySet()) {
-  //     for (AnlFlowLocation pushSessionLoc : candidates.get(candidate)) {
-  //       IRPushSession pushSession = (IRPushSession) pushSessionLoc.getInstruction();
-  //       int argRecord = pushSession.getArgRecord();
-  //       AtomicBoolean recordModified = new AtomicBoolean(false);
-
-  //       Map<Integer, AnlFlowLocation> detachedExponentials = new HashMap<>();
-  //       Map<Integer, AnlFlowLocation> decRefExponentials = new HashMap<>();
-
-  //       pushSessionLoc.forEachBefore(
-  //           loc -> {
-  //             IRInstruction instr = loc.getInstruction();
-
-  //             if (instr instanceof IRDetachExponential) {
-  //               IRDetachExponential detachExponential = (IRDetachExponential) instr;
-  //               detachedExponentials.put(detachExponential.getExponential(), loc);
-  //             }
-
-  //             if (instr instanceof IRDecRefExponential) {
-  //               IRDecRefExponential decRefExponential = (IRDecRefExponential) instr;
-  //               decRefExponentials.putIfAbsent(decRefExponential.getExponential(), loc);
-  //             }
-
-  //             if (instr instanceof IRPush) {
-  //               IRPush push = (IRPush) instr;
-  //               if (push.getRecord() == argRecord) {
-  //                 if (recordModified.get() == false) {
-  //                   // If the main record wasn't modified from this push until the pushSession,
-  //                   // then we can avoid moving the push instruction and just change the record
-  //                   // target
-  //                   //
-  //                   // This requires us moving the push session instruction before this
-  // instruction
-  //                   pushSessionLoc.moveInstructionBefore(loc);
-  //                   push.setRecord(pushSession.getRecord());
-  //                 } else {
-  //                   // If it was modified, then we have no choice but to move the push
-  // instruction
-  //                   // ahead
-
-  //                   if (push instanceof IRScan) {
-  //                     // We can't move IRScan instructions, as they have side effects
-  //                     return false;
-  //                   }
-
-  //                   if (push instanceof IRPushExpression) {
-  //                     // These instructions have associated clean up instructions
-  //                     // We could also move those but that is not implemented yet, so leave them
-  //                     return false;
-  //                   }
-
-  //                   // If we pushed an exponential and later detached it, we must move the detach
-  // to
-  //                   // after the new push.
-  //                   // Additionally, if we decremented the reference count of exponential, we
-  // must
-  //                   // move it too.
-  //                   if (push instanceof IRPushExponential) {
-  //                     IRPushExponential pushExponential = (IRPushExponential) push;
-  //                     if (detachedExponentials.containsKey(pushExponential.getExponential())) {
-  //                       AnlFlowLocation detachLoc =
-  //                           detachedExponentials.get(pushExponential.getExponential());
-  //                       pushSessionLoc.insertInstructionAfter(detachLoc.getInstruction());
-  //                       detachLoc.removeInstruction();
-  //                     }
-  //                     if (decRefExponentials.containsKey(pushExponential.getExponential())) {
-  //                       AnlFlowLocation decRefLoc =
-  //                           decRefExponentials.get(pushExponential.getExponential());
-  //                       pushSessionLoc.insertInstructionAfter(decRefLoc.getInstruction());
-  //                       decRefLoc.removeInstruction();
-  //                     }
-  //                   }
-
-  //                   push.setRecord(pushSession.getRecord());
-  //                   loc.moveInstructionAfter(pushSessionLoc);
-  //                   ir.setRecordType(
-  //                       argRecord,
-  //                       TypeModifier.removeLast(
-  //                           loc.getPreviousState(), ir.getRecordType(argRecord)));
-  //                 }
-  //                 return true;
-  //               }
-  //             }
-
-  //             if (instr instanceof IRNewSession) {
-  //               IRNewSession newSession = (IRNewSession) instr;
-  //               if (newSession.getRecord() == argRecord) {
-  //                 loc.removeInstruction();
-  //                 pushSessionLoc.removeInstruction();
-  //                 return false;
-  //               }
-  //             }
-
-  //             if (instr.usesRecord(argRecord)) {
-  //               return false;
-  //             }
-
-  //             if (instr.usesRecord(pushSession.getRecord())) {
-  //               recordModified.set(true);
-  //             }
-
-  //             return true; // Continue iterating
-  //           });
-  //     }
-  //   }
-  // }
-
-  // // Searches for blocks of code like:
-  // //
-  // //    popSession(0, 1, value)
-  // //    ...
-  // //    popX(1, x)
-  // //
-  // // and turns them into
-  // //
-  // //    popX(0, x)
-  // //    popSession(0, 1, value)
-  // //
-  // // This change requires modifying the type of the record being popped, e.g.,
-  // // if 1 was of type session(Y); X, then the new type will be X.
-  // public void removeUnnecessaryValuePops(IRProgram ir) {
-  //   ir.forEachProcess(
-  //       (name, proc) -> {
-  //         removeUnnecessaryValuePops(proc, processFlows.get(name));
-  //       });
-  // }
-
-  // private void removeUnnecessaryValuePops(IRProcess ir, Map<IRBlock, AnlFlow> flows) {
-  //   Map<Integer, List<AnlFlowLocation>> candidates = new HashMap<>();
-
-  //   // We search for any popSession instruction which is certainly popping a value
-  //   for (IRBlock block : ir.getBlocksIncludingEntry()) {
-  //     if (!flows.containsKey(block)) {
-  //       continue; // No flow information for this block
-  //     }
-  //     for (int i = 0; i < block.getInstructions().size(); ++i) {
-  //       IRInstruction instruction = block.getInstructions().get(i);
-  //       if (!(instruction instanceof IRPopSession)) {
-  //         continue; // Not what we're looking for
-  //       }
-  //       IRPopSession popSession = (IRPopSession) instruction;
-  //       if (!popSession.getValueRequisites().mustBeValue()) {
-  //         continue; // Not necessarily a value pop
-  //       }
-
-  //       // We store the location of this instruction associated with the record being produced.
-  //       List<AnlFlowLocation> locs =
-  //           candidates.computeIfAbsent(popSession.getArgRecord(), k -> new ArrayList<>());
-  //       locs.add(flows.get(block).getLocation(i));
-
-  //       // Now we go ahead in the flow and look for the first pop(argRecord, ...) instruction.
-  //       // If there is branching, we need to check all branches.
-  //     }
-  //   }
-
-  //   for (int candidate : candidates.keySet()) {
-  //     for (AnlFlowLocation popSessionLoc : candidates.get(candidate)) {
-  //       IRPopSession popSession = (IRPopSession) popSessionLoc.getInstruction();
-  //       int argRecord = popSession.getArgRecord();
-
-  //       popSessionLoc.forEachAfter(
-  //           loc -> {
-  //             IRInstruction instr = loc.getInstruction();
-
-  //             if (instr instanceof IRPopTag) {
-  //               // We can't move this!
-  //               // Although we maybe could move the pop session to all of the branches?
-  //               return false;
-  //             }
-
-  //             if (instr instanceof IRPop) {
-  //               IRPop pop = (IRPop) instr;
-  //               if (pop.getRecord() == argRecord) {
-  //                 pop.setRecord(popSession.getRecord());
-  //                 loc.moveInstructionBefore(popSessionLoc);
-  //                 ir.setRecordType(
-  //                     argRecord,
-  //                     TypeModifier.removeFirst(
-  //                         loc.getPreviousState(), ir.getRecordType(argRecord)));
-  //                 return true;
-  //               }
-  //             }
-
-  //             if (instr instanceof IRFreeSession) {
-  //               IRFreeSession freeSession = (IRFreeSession) instr;
-  //               if (freeSession.getRecord() == argRecord) {
-  //                 loc.removeInstruction();
-  //                 popSessionLoc.removeInstruction();
-  //                 return false;
-  //               }
-  //             }
-
-  //             if (instr.usesRecord(argRecord)) {
-  //               return false;
-  //             }
-
-  //             return true; // Continue iterating
-  //           });
-  //     }
-  //   }
-  // }
 
   public void inlineProcesses(IRProgram ir, int blockThreshold, boolean allowLoops) {
     if (blockThreshold <= 0) {

@@ -51,6 +51,9 @@ public class IRSlotOffset {
   }
 
   public IRSlotOffset advance(IRSlotOffset offset) {
+    if (offset.isZero()) {
+      return this;
+    }
     return new IRSlotOffset(past.suffix(offset.past), offset.future);
   }
 
