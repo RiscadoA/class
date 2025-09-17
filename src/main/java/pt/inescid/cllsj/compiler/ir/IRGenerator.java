@@ -818,7 +818,9 @@ public class IRGenerator extends ASTNodeVisitor {
           for (int i = 0; i < process.getTypeCount(); ++i) {
             IRTypeId id = new IRTypeId(i);
             IREnvironment.Type envType = env.getType(id);
-            typeArguments.add(new IRWriteExponential.TypeArgument(id, id));
+            typeArguments.add(
+                new IRWriteExponential.TypeArgument(
+                    IRSlotTree.of(new IRVarS(id)), IRValueRequisites.valueIf(id), id));
             expEnv = expEnv.addType(envType.getName(), envType.isPositive());
           }
 

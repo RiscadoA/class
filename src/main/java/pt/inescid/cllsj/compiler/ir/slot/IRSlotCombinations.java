@@ -77,7 +77,11 @@ public class IRSlotCombinations {
 
   public IRSlotCombinations merge(IRSlotCombinations other) {
     List<IRSlotTree> newTrees = new ArrayList<>(trees);
-    newTrees.addAll(other.trees);
+    for (IRSlotTree tree : other.trees) {
+      if (!newTrees.contains(tree)) {
+        newTrees.add(tree);
+      }
+    }
     return new IRSlotCombinations(newTrees);
   }
 

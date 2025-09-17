@@ -93,8 +93,11 @@ public class IRBindSession extends IRInstruction {
     } else {
       sb.append(getSourceSessionId());
     }
-    sb.append(".");
-    sb.append(remoteDataOffset);
+    if (!remoteDataOffset.isZero()) {
+      sb.append("+");
+      sb.append(remoteDataOffset);
+    }
+    
     sb.append(", ");
     sb.append(localData);
     sb.append(")");

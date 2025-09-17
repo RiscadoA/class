@@ -2,6 +2,7 @@ package pt.inescid.cllsj.compiler.ir.instruction;
 
 import java.util.List;
 import java.util.function.Function;
+import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
 import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
 import pt.inescid.cllsj.compiler.ir.id.IRLocalDataId;
 import pt.inescid.cllsj.compiler.ir.id.IRProcessId;
@@ -10,16 +11,23 @@ import pt.inescid.cllsj.compiler.ir.slot.IRSlotTree;
 
 public class IRWriteExponential extends IRWrite {
   public static class TypeArgument {
-    private IRTypeId sourceType;
+    private IRSlotTree sourceTree;
+    private IRValueRequisites sourceIsValue;
     private IRTypeId targetType;
 
-    public TypeArgument(IRTypeId sourceType, IRTypeId targetType) {
-      this.sourceType = sourceType;
+    public TypeArgument(
+        IRSlotTree sourceTree, IRValueRequisites sourceIsValue, IRTypeId targetType) {
+      this.sourceTree = sourceTree;
+      this.sourceIsValue = sourceIsValue;
       this.targetType = targetType;
     }
 
-    public IRTypeId getSourceType() {
-      return sourceType;
+    public IRSlotTree getSourceTree() {
+      return sourceTree;
+    }
+
+    public IRValueRequisites getSourceIsValue() {
+      return sourceIsValue;
     }
 
     public IRTypeId getTargetType() {
@@ -27,12 +35,12 @@ public class IRWriteExponential extends IRWrite {
     }
 
     public TypeArgument clone() {
-      return new TypeArgument(sourceType, targetType);
+      return new TypeArgument(sourceTree, sourceIsValue, targetType);
     }
 
     @Override
     public String toString() {
-      return targetType + " <- " + sourceType;
+      return targetType + " <- " + sourceTree + " (value=" + sourceIsValue + ")";
     }
   }
 
@@ -133,6 +141,19 @@ public class IRWriteExponential extends IRWrite {
     super.replaceSlots(replacer);
     for (DataArgument arg : dataArguments) {
       arg.slots = replacer.apply(arg.slots);
+    }
+    for (TypeArgument arg : typeArguments) {
+      arg.sourceTree = replacer.apply(arg.sourceTree);
+    }
+  }
+
+  @Override
+  public void replaceType(
+      Function<IRTypeId, IRSlotTree> slotReplacer,
+      Function<IRTypeId, IRValueRequisites> reqReplacer) {
+    super.replaceType(slotReplacer, reqReplacer);
+    for (TypeArgument arg : typeArguments) {
+      arg.sourceIsValue = reqReplacer.apply(arg.targetType);
     }
   }
 

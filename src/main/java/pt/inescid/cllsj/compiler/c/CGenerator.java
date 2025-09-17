@@ -1032,12 +1032,6 @@ public class CGenerator extends IRInstructionVisitor {
 
     Runnable ifTailCall =
         () -> {
-          // TODO: reinitialize env in place
-          // - set end points
-          // - handle session args
-          // - handle data args
-          // - handle drop bits (must drop old ones first)
-
           // Drop data that would have been dropped on deallocation
           Set<IRCallProcess.DataArgument> wouldHaveBeenDropped = new HashSet<>();
           putDoDeferredEnvironmentDrops(
@@ -1310,7 +1304,6 @@ public class CGenerator extends IRInstructionVisitor {
       for (IRCallProcess.TypeArgument arg : instr.getTypeArguments()) {
         if (arg.isFromLocation()
             || !arg.getSourceTree().equals(IRSlotTree.of(new IRVarS(arg.getTargetType())))) {
-          System.err.println("Invalid type args");
           validArgs = false;
           break;
         }
@@ -1370,22 +1363,29 @@ public class CGenerator extends IRInstructionVisitor {
         };
 
     Function<IRTypeId, CLayout> typeLayoutProvider =
-        id -> typeLayout(findArgFromTarget.apply(id).getSourceType());
+        id ->
+            maxLayout(this::typeLayout, this::isValue, findArgFromTarget.apply(id).getSourceTree());
 
     Function<IRValueRequisites, CCondition> typeIsValue =
-        r -> isValue(r.replaceTypes(t -> findArgFromTarget.apply(t).getSourceType()));
+        r -> isValue(r.expandTypes(t -> findArgFromTarget.apply(t).getSourceIsValue()));
 
     CProcessLayout expProcessLayout = layout(expProcess);
 
-    CSize typeNodeSize = CSize.zero();
-    for (IRWriteExponential.TypeArgument arg : typeArguments) {
-      String nodeCount = typeNodeCount(type(arg.getSourceType()));
-      typeNodeSize = typeNodeSize.add(CSize.expression(nodeCount));
+    // Figure out how much space we need for the type nodes
+    if (!typeArguments.isEmpty()) {
+      putAssign(TMP_INT, 0);
     }
-    typeNodeSize = typeNodeSize.multiply(compiler.arch.typeNodeSize());
+    for (IRWriteExponential.TypeArgument arg : typeArguments) {
+      // Type nodes are only needed for value types
+      if (arg.getSourceIsValue().canBeValue()) {
+        putAddTypeNodeCount(TMP_INT, arg.getSourceTree());
+      }
+    }
+    CSize typeNodesSize = CSize.zero();
     CSize fullEnvSize = expProcessLayout.size(typeLayoutProvider, typeIsValue);
-    if (!typeNodeSize.equals(CSize.zero())) {
-      fullEnvSize = fullEnvSize.align(compiler.arch.typeNodeAlignment()).add(typeNodeSize);
+    if (!typeArguments.isEmpty()) {
+      typeNodesSize = compiler.arch.typeNodeSize().multiply(CSize.expression(TMP_INT));
+      fullEnvSize = fullEnvSize.align(compiler.arch.typeNodeAlignment()).add(typeNodesSize);
     }
 
     // Data arguments passed to exponentials need to support clone and drop operations
@@ -1401,7 +1401,7 @@ public class CGenerator extends IRInstructionVisitor {
 
     // Allocate a new exponential and write it to the target location
     putAllocExponential(
-        exponential, typeLayoutProvider, typeIsValue, expProcessLayout, typeNodeSize);
+        exponential, typeLayoutProvider, typeIsValue, expProcessLayout, typeNodesSize);
 
     // Initialize the exponential
     pendingExponentialManagers.put(processId, dataArguments);
@@ -1437,29 +1437,51 @@ public class CGenerator extends IRInstructionVisitor {
         sessionCont(entrySession),
         labelAddress(codeLocationLabel(expProcess, IRCodeLocation.entry())));
 
-    // Write the type arguments to the exponential's environment
-    CSize typeNodeOffset =
-        expProcessLayout
-            .size(typeLayoutProvider, typeIsValue)
-            .align(compiler.arch.typeNodeAlignment());
+    // Initialize the type arguments in the new environment
+    if (!typeArguments.isEmpty()) {
+      putAssign(
+          TMP_PTR2,
+          expProcessLayout
+              .size(typeLayoutProvider, typeIsValue)
+              .align(compiler.arch.typeNodeAlignment())
+              .advancePointer(newEnv));
+    }
     for (IRWriteExponential.TypeArgument arg : typeArguments) {
+      // Start by initializing the type nodes and count, if needed
+      boolean canBeValue = arg.getSourceIsValue().canBeValue();
+      final Optional<String> typeNode =
+          canBeValue ? Optional.of(cast(TMP_PTR2, "struct type_node*")) : Optional.empty();
+      final Optional<String> typeNodeCount = canBeValue ? Optional.of(TMP_INT) : Optional.empty();
+      if (canBeValue) {
+        // Compute them from the source type tree
+        putAssign(TMP_INT, 0);
+        putTypeNodeConstruction(
+            TMP_INT,
+            arg.getSourceTree(),
+            (index, type, offset, next) -> {
+              String ref = typeNode.get() + "[" + index + "]";
+              putAssign(ref, typeNodeInitializer(offset, type, next));
+            });
+      }
+
       // Get a reference to the target type in the new environment and initialize it
       String targetType = type(expProcessLayout, newEnv, arg.getTargetType());
-      putAssign(targetType, type(arg.getSourceType()));
-      putAssign(typeNode(targetType), CAddress.of(newEnv, typeNodeOffset).cast("struct type_node"));
+      putAssign(
+          targetType,
+          typeInitializer(
+              typeNode.orElse(NULL),
+              typeNodeCount.orElse("0"),
+              arg.getSourceTree(),
+              arg.getSourceIsValue()));
 
-      // Copy over the type nodes from the source type newEnv
-      CSize typeNodesSize =
-          compiler
-              .arch
-              .typeNodeSize()
-              .multiply(CSize.expression(typeNodeCount(type(arg.getSourceType()))));
-      putCopyMemory(
-          CAddress.of(newEnv).offset(typeNodeOffset),
-          CAddress.of(typeNode(type(arg.getSourceType()))),
-          typeNodesSize);
-
-      typeNodeOffset = typeNodeOffset.add(typeNodesSize);
+      if (typeNode.isPresent()) {
+        // Move the TMP_PTR2 pointer forward for the next type argument
+        putAssign(
+            TMP_PTR2,
+            castToAddress(TMP_PTR2)
+                .offset(
+                    compiler.arch.typeNodeSize().multiply(CSize.expression(typeNodeCount.get()))));
+      }
     }
 
     for (IRWriteExponential.DataArgument arg : dataArguments) {
