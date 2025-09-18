@@ -151,7 +151,7 @@ proc eat(s: ~ALockOrder, lh: ALockOrder; nam:colstring )
 };;
 
 proc rec go2(
-		   v1:~ALockOrder,
+		   v1:~LockOrder,
 		   fi: ~AFork,
 		   lh: send LockOrder; AFork ; 
 		   nam:colstring)
@@ -173,6 +173,8 @@ proc rec go2(
 		unfold fi;
 		fwd fi lh
 	| #Next:
+	        clltype h1;
+		unfold h1;
 		share h1 {
 			go2(h1,fi,lh; nam) 
 			||
