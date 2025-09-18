@@ -7,7 +7,7 @@ type rec LList(A){
     }
 };;
 
-proc copy(a:~LList(A), b:LList(A), c:LList(A)) {
+proc copy<A>(a:~LList(A), b:LList(A), c:LList(A)) {
 	unfold a;
 	share a {
 		unfold b; fwd a b
