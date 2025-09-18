@@ -1,0 +1,191 @@
+// shared thread-safe mutable queue 
+
+type rec LList(A){
+    state Node(A)
+} and Node(A) {
+    choice of {
+        |#Nil: close
+        |#Next: pair affine A; LList(A)
+    }
+};;
+
+proc copy<A>(a:~LList(A), b:LList(A), c:LList(A)) {
+	unfold a;
+	share a {
+		unfold b; fwd a b
+	||
+		unfold c; fwd a c
+	}
+};;
+
+type ANode(A) {
+    affine Node(A)
+};;
+
+proc nil<A>(l: ANode(A)) {
+    affine l;
+    #Nil l;
+    close l
+};;
+
+proc cons<A>(a:~affine A, t:~LList(A), l: ANode(A)){
+    unfold t;
+    affine l;
+    #Next l;
+    l <- a;
+    unfold l;
+    fwd l t
+};;
+
+type Ptr { state state Node(lint) };;
+
+proc free(p:~statel Node(lint)) {
+    put p(c. nil<lint>(c));
+    drop p
+};;
+
+type Aint { affine lint };;
+
+type Opt(A) {
+    affine choice of {
+        | #None : close
+        | #Some : A
+    }
+};;
+
+proc None(o:Opt(Aint)) {
+    affine o;#None o;close o
+};;
+
+proc Some(val:~Aint,o:Opt(Aint)) {
+    affine o;#Some o;fwd val o
+};;
+
+proc deq( hd:~Ptr, rv:pair Opt(Aint);Ptr) {
+    take hd(hp);
+    take hp(lh);
+    case lh of {
+        |#Nil : // empty queue
+            wait lh;
+            put hp(c. nil<lint>(c));
+            put hd(hp);
+            rv <- { r. None(r) };
+            fwd hd rv
+        |#Next : 
+            recv lh(val);
+            rv <- { r. Some(val,r) };
+            put hd(lh);
+            free(hp); fwd hd rv
+    }
+};;
+
+proc enq(tl:~Ptr, v:~affine lint, tlo:Ptr) {
+    letc nn:LList(lint) {
+        cell nn (c. nil<lint>(c))
+    };
+    take tl(sn);
+    share nn {
+        take sn(lp);
+	letc nn0: LList(lint) {
+	     unfold nn0; fwd nn0 nn }; // consider change to unfolded tail type in cons
+        put sn(c. cons<lint>(v,nn0,c));
+        drop sn;
+        discard lp // known to be nil
+    ||
+        put tl(nn);
+        forward tl tlo
+    }
+};;
+
+type corec EnqI {
+	offer of {
+	| #Enq: recv ~affine lint; EnqI
+	| #End: wait
+	}
+};;
+
+type corec DeqI {
+	offer of {
+	| #Deq: pair Opt(Aint); DeqI
+	| #End: wait
+	}
+};;
+
+proc rec enqop(enqi:EnqI,tl:~Ptr) {
+	case enqi of {
+        |#Enq:  recv enqi(item); 
+                letc tnext:Ptr {
+                    enq(tl,item,tnext)
+                };
+                enqop(enqi,tnext)
+        |#End:  wait enqi; 
+                drop tl
+    }
+};;
+
+proc rec deqop(deci:DeqI,tl:~Ptr) {
+	case deci of {
+        |#Deq:  letc tnext:pair Opt(Aint); Ptr {
+                    deq(tl,tnext)
+                };
+                recv tnext (val);
+                deci <- val;
+                deqop(deci,tnext)
+        |#End:  wait deci; 
+                drop tl
+    }
+};;
+
+proc lqueue(ienq:EnqI,ideq:DeqI) {
+    letc sn: LList(lint) {
+        cell sn (c.nil<lint>(c))
+    };
+    share sn {
+        letc hd:Ptr {
+            cell hd (sn)
+        };
+        deqop(ideq,hd)
+        ||
+        letc tl:Ptr {
+            cell tl (sn)
+        };
+        enqop(ienq,tl)
+    }
+};;
+
+proc unsafe_rec enq_user(cl:~EnqI;N:~lint) {
+    if N==0 then {
+        #End cl; close cl
+    } else {
+        #Enq cl;
+        cl <- N;
+        println("enq "+N);
+        enq_user(cl;N-1)
+    }
+};;
+
+proc unsafe_rec deq_user(cl:~DeqI;N:~lint) {
+    if N==0 then {
+        #End cl; 
+        close cl
+    } else {
+        #Deq cl; 
+        recv cl(ans);
+        case ans of {
+            | #None: println("NONE"); wait ans;
+                deq_user(cl;N-1)
+            | #Some: println("deq "+ans);
+                deq_user(cl;N-1)
+        }
+    }
+};;
+
+proc mainq(;n:~lint) {
+    letc cl1:~EnqI { enq_user(cl1;n)};
+    letc cl2:~DeqI { sleep 5;deq_user(cl2;n+2)};
+    lqueue(cl1,cl2)
+};;
+
+proc main() {
+    mainq(;10)
+};;
