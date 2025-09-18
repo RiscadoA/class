@@ -21,6 +21,10 @@ public abstract class CAlignment {
     return new CAlignmentTernary(condition, then, otherwise);
   }
 
+  public static CAlignment alignmentOf(String type) {
+    return expression("__alignof__(" + type + ")");
+  }
+
   public CAlignment max(CAlignment other) {
     return new CAlignmentMax(this, other);
   }

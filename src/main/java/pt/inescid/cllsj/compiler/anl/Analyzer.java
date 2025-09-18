@@ -354,12 +354,12 @@ public class Analyzer extends IRInstructionVisitor {
   }
 
   @Override
-  public void visit(IRIncrementCell instr) {
+  public void visit(IRAcquireCell instr) {
     // Irrelevant for analysis
   }
 
   @Override
-  public void visit(IRDecrementCell instr) {
+  public void visit(IRReleaseCell instr) {
     // Irrelevant for analysis
   }
 

@@ -2,8 +2,8 @@ package pt.inescid.cllsj.compiler.ir.instruction;
 
 import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
 
-public class IRIncrementCell extends IRAccess {
-  public IRIncrementCell(IRDataLocation location) {
+public class IRAcquireCell extends IRAccess {
+  public IRAcquireCell(IRDataLocation location) {
     super(location);
   }
 
@@ -14,11 +14,11 @@ public class IRIncrementCell extends IRAccess {
 
   @Override
   public IRInstruction clone() {
-    return new IRIncrementCell(location);
+    return new IRAcquireCell(location);
   }
 
   @Override
   public String toString() {
-    return "incrementCell(" + location + ")";
+    return "acquireCell(" + location + ")";
   }
 }

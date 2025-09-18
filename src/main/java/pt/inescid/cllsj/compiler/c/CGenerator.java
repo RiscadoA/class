@@ -533,17 +533,30 @@ public class CGenerator extends IRInstructionVisitor {
         () -> {
           // Start by validating the architecture
           for (CArchitecture.Test test : compiler.arch.getTests()) {
-            String actual = CSize.sizeOf(test.cType).toString();
+            String actualSize = CSize.sizeOf(test.cType).toString();
+            String actualAlignment = CAlignment.alignmentOf(test.cType).toString();
             putIf(
-                actual + " != " + test.expected,
+                actualSize + " != " + test.expectedSize,
                 () -> {
                   putDebugLn(
                       "Program was compiled for an architecture where "
-                          + actual
+                          + actualSize
                           + " is "
-                          + test.expected
+                          + test.expectedSize
                           + ", but instead got %ld",
-                      actual);
+                      actualSize);
+                  putReturn("1");
+                });
+            putIf(
+                actualAlignment + " != " + test.expectedAlignment,
+                () -> {
+                  putDebugLn(
+                      "Program was compiled for an architecture where "
+                          + actualAlignment
+                          + " is "
+                          + test.expectedAlignment
+                          + ", but instead got %ld",
+                      actualAlignment);
                   putReturn("1");
                 });
           }
@@ -1618,12 +1631,12 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   @Override
-  public void visit(IRIncrementCell instr) {
+  public void visit(IRAcquireCell instr) {
     putIncrementCell(data(instr.getLocation()).deref("struct cell*"));
   }
 
   @Override
-  public void visit(IRDecrementCell instr) {
+  public void visit(IRReleaseCell instr) {
     putDecrementCell(data(instr.getLocation()), instr.getCell());
   }
 

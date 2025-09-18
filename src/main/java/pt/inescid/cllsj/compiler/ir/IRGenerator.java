@@ -1221,7 +1221,7 @@ public class IRGenerator extends ASTNodeVisitor {
   void addRelease(String ch, ASTUsageT type, boolean popTask) {
     IRSlotsFromASTType info = slotsFromType(type);
     block.add(
-        new IRDecrementCell(
+        new IRReleaseCell(
             env.getChannel(ch).getLocalData(), (IRCellS) info.activeLocalTree.singleHead().get()));
     if (popTask) {
       block.add(new IRPopTask(true));
@@ -1229,7 +1229,7 @@ public class IRGenerator extends ASTNodeVisitor {
   }
 
   void addShare(String ch, boolean concurrent, Runnable lhsCont, Runnable rhsCont) {
-    block.add(new IRIncrementCell(env.getChannel(ch).getLocalData()));
+    block.add(new IRAcquireCell(env.getChannel(ch).getLocalData()));
 
     IRBlock rhsBlock = process.createBlock("share_rhs");
     block.add(new IRPushTask(rhsBlock.getLocation(), concurrent && compiler.concurrency.get()));
