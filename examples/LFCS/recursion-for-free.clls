@@ -1,0 +1,498 @@
+/*
+	Illustrates how to encode in piCLL recursive types
+	and auxiliary constructions, see:
+	Recursive types for free!, Philip Wadler, 1990
+	https://homepages.inXf.ed.ac.uk/wadler/papers/free-rectypes
+	free-rectypes.txt
+
+	See also:
+	On Polymorphic Sessions and Functions:
+	A Tale of Two (Fully Abstract) Encodings.
+	Bernardo Toninho, Nobuko Yoshida, 2017.
+*/
+
+type G(X) {  	
+	choice of {
+	|  #Zero: close
+	|  #Succ: !X
+	}
+};;
+
+type M { // mu X.G(X) = M = All X. (G(X) -> X)-> X
+	recvty X;
+	recv ~ ! recv ~ ! G(X); ! X;
+	! X
+};;
+
+// we have G(M) <-> M.
+
+type N { // G(mu X.G(X)) = G M = N
+	G(M)
+};;
+
+type TFold { // All X. (G(X) -> X) -> M -> X
+	recvty X;
+	recv ~ ! recv ~ ! G(X); ! X;
+	! recv ~ ! M; 
+	! X
+};;
+
+proc fold(z:TFold)
+{
+	recvty z (X);
+	recv z (k: ~ ! recv ~ ! G(X); ! X);
+	?k;
+	!z(z1:recv ~ ! M; ! X);
+		recv z1 (t: ~ ! M);
+		?t;
+		call t(t1:~M);
+		sendty t1 (X);
+		send t1 (kp: ! recv ~ ! G(X); ! X. 
+				!kp(kp1:recv ~ ! G(X); ! X);
+				call k(k1: send ! G(X); ~ ! X);
+				fwd k1 kp1);
+		fwd t1 z1
+};;
+
+proc GLiftB<M1,X1>(f:?send !M1;~ ! X1, gi:~ ! G(M1), g0: ! G(X1))
+{
+ ?gi;
+ ?f;
+ call gi(gi0:~G(M1)); // ~G(M1) =  z:1 (&) succ:?X
+case gi0 of {
+	| #Zero : wait gi0;
+			!g0(rv:G(X1)); #Zero rv; close rv
+     | #Succ: ?gi0; 
+			!g0(rv:G(X1)); 
+		     cut {
+			!gm1(z:M1); call gi0 (rvv:~M1); fwd rvv z
+		     |gm1: ?~M1 |
+			call f(f0:send !M1;~ ! X1);
+			send f0(m:!M1. fwd m gm1);
+			#Succ rv;
+			fwd rv f0
+		     }
+ }				
+};;
+
+
+proc inXB(s:~ !N, z0: !M) // G(M) -> M
+{
+	?s;
+	!z0(z:M);
+	recvty z (X);
+	recv z (k:? send ! G(X);~ ! X);
+	?k;
+	cut { 
+		fold(f)
+		| f:~TFold |
+		sendty f (X);
+		send f (k1: ! recv ~ ! G(X); ! X. 
+				   ! k1(z:recv ~ ! G(X); ! X);
+					call k (w: send ! G(X);~ ! X);
+					fwd z w);
+		// f: ?send !M;~ ! X
+		cut {
+		!s0(ss:N); call s(xs:~N); fwd ss xs
+		| s0:~ ! N |
+		GLiftB<M,X>(f,s0,go)
+		}
+		|go: ~ !G(X)|
+		call k (u:send !G(X);~ ! X);
+		send u (d:! G(X). fwd go d); 
+		fwd u z
+	}	
+};;
+
+proc inXBi(i:!recv ~!N; !M) // cf. G(M) -> M part of isomorohism
+{
+	!i(i0:recv ~!N; !M);
+	recv i0 (s:~!N);
+	inXB(s,i0)
+};;
+
+
+proc outB(s:~ ! M, z:! N) // // cf. M -> G(M) part of isomorohism
+{
+	cut { 
+		fold(f)
+		|f:~TFold|
+		sendty f (G(M));
+		send f (k1: ! recv ~ ! G(G(M)); ! G(M). 
+				 ! k1 ( k : recv ~ ! G(G(M)); ! G(M));
+				 recv k (s0: ~ ! G(G(M)));
+				 cut {
+				   inXBi(i)
+				   | i: ?send !G(M); ~!M  |
+				   GLiftB<G(M),M>(i,s0,k)
+				   // should be !G(M) for k
+				 }
+			   );
+		?f;
+		call f(f0: send ! M; ~ ! G(M));
+		send f0 (k2:!M. fwd s k2);
+		fwd f0 z
+	}	
+};;
+
+proc szero(z:!M)
+{
+    cut {
+	 !zv(zvv:N); #Zero zvv; close zvv
+	 |zv: ~!N | 
+	 inXB(zv,re) // !G(M) -> !M
+	 |re:~!M | 
+	 fwd re z 
+    }
+};;
+
+proc ssucc(n:~!M,m:!M)
+{
+    cut {
+	 ?n; !sv(svv:N);
+		#Succ svv; 
+		!svv(sm:M);call n (sv1:~M); fwd sv1 sm
+	 |sv: ~!N | 
+	 inXB(sv,re)
+	 |re:~!M | 
+	 fwd re m 
+    }
+};;
+
+
+
+
+proc siter(n:~!M,step:?send !G(M);~!M, r:!M)
+{
+	cut {
+	fold(f)
+	|f:~TFold|
+	sendty f (M);  
+	send f (f0: !recv ~!G(M);!M. fwd f0 step);  
+	?f;
+	call f(f1: send ! M;~!M );
+	send f1 (v0: !M. fwd n v0);
+	fwd r f1 
+	}
+};;
+
+proc pNAT(n:~!M)
+{
+	cut {
+		!step(s:recv ~!G(M);!M);
+		recv s (v:~!G(M));
+		call v (v0:~G(M));
+		case v0 of {
+		|	#Zero: print ("0 "); wait v0; szero(s)
+		|	#Succ: print ("S "); fwd! s v0 
+
+		}
+		|step:?send !G(M);~!M|
+		siter(n,step, r)
+		|r:~!M|
+		?r; println();
+		()
+	}
+};;
+
+proc pADD(n:~!M, m:~!M, r:!M)
+{
+	cut {
+		?m;
+		!step(s); recv s(v); call v (v0);
+		case v0 of {
+	  	| #Zero: wait v0; fwd! s m
+		| #Succ: ssucc(v0,s)
+		}
+		|step:?send !G(M);~!M|
+		siter(n,step,r)
+	}
+};;
+
+proc pADD2(n:~!M, r:!M; m:~M)
+{
+	cut {
+		!step(s); recv s(v); call v (v0);
+		case v0 of {
+	  	| #Zero: wait v0; fwd! s m
+		| #Succ: ssucc(v0,s)
+		}
+		|step:?send !G(M);~!M|
+		siter(n,step,r)
+	}
+};;
+
+proc pMUL(n:~!M, m:~!M, r:!M)
+{
+	cut {
+		?m;
+		!step(s); recv s(v); call v (v0);
+		case v0 of {
+	  	| #Zero: wait v0; szero(s)
+		| #Succ: pADD2(v0,s;m)
+		}
+		|step:?send !G(M);~!M|
+		siter(n,step,r)
+	}
+};;
+
+proc pMUL2(n:~!M, r:!M; m:~M)
+{
+	cut {
+		!step(s); recv s(v); call v (v0);
+		case v0 of {
+	  	| #Zero: wait v0; szero(s)
+		| #Succ: pADD2(v0,s;m)
+		}
+		|step:?send !G(M);~!M|
+		siter(n,step,r)
+	}
+};;
+
+proc sone(n:!M)
+{
+	cut{
+	szero(z)
+	|z:~!M|
+	ssucc(z,n)
+	}
+};;
+
+
+proc pEXP(m:~!M, n:~!M, r:!M)
+{
+	cut {
+		?m;
+		!step(s); recv s(v); call v (v0);
+		case v0 of {
+	  	| #Zero: wait v0; sone(s)
+		| #Succ: pMUL2(v0,s;m)
+		}
+		|step:?send !G(M);~!M|
+		siter(n,step,r)
+	}
+};;
+
+proc testpNAT()
+{
+  cut {
+	szero(z)
+	|z:~!M|
+	ssucc(z,n1)
+	|n1:~!M|
+	ssucc(n1,n2)
+	|n2:~!M|
+	ssucc(n2,n3)
+	|n3:~!M|
+	pNAT(n3)
+  }
+};;
+
+proc testpNAT0()
+{
+  cut {
+	szero(z)
+	|z:~!M|
+	pNAT(z)
+  }
+};;
+
+proc two(r:!M)
+{
+cut {
+	szero(z)
+	|z:~!M|
+	ssucc(z,n1)
+	|n1:~!M|
+	ssucc(n1,r)
+    }	
+};;
+
+proc three(r:!M)
+{
+cut {
+	two(z)
+	|z:~!M|
+	ssucc(z,r)
+    }	
+};;
+
+
+proc four(r:!M)
+{
+cut {
+	two(z)
+	|z:~!M|
+	ssucc(z,n1)
+	|n1:~!M|
+	ssucc(n1,r)
+    }	
+};;
+
+
+proc testADD()
+{
+  cut {
+	two(n1)
+	|n1:~!M|
+	four(n2)
+	|n2:~!M|
+	pADD(n1,n2,n3)
+	|n3:~!M|
+	pNAT(n3)
+  }
+};;
+
+type Pair(X,Y) {
+	send X;
+	send Y;
+	close
+};;
+
+proc snd<A,B>(inX:~!Pair(!A,!B), rsnd:!B)
+{
+		call inX(x0:~Pair(!A,!B));
+		recv x0 (f:~!A); recv x0 (s:~!B); wait x0; ?f; fwd rsnd s
+};;
+
+proc fst<A,B>(inX:~!Pair(!A,!B), rfst:!A)
+{		
+		call inX(x0:~Pair(!A,!B));
+		recv x0 (f:~!A); recv x0 (s:~!B); wait x0; ?s; fwd rfst f
+};;
+
+proc srec<A>(n:~!M,step:?send !G(Pair(!A,!M));~!A, r:!Pair(!A,!M))
+{
+	?step;
+	cut {
+	fold(f)
+	|f:~TFold|
+	sendty f (Pair(!A,!M));  
+	send f (f0: !recv ~!G(Pair(!A,!M));!Pair(!A,!M).
+	!f0(f00:recv ~!G(Pair(!A,!M));!Pair(!A,!M));
+	recv f00 (a:~!G(Pair(!A,!M)));
+	?a;
+	call step (stx: send !G(Pair(!A,!M));~!A);
+	send stx (sa:!G(Pair(!A,!M)). 
+			!sa(a0:G(Pair(!A,!M)));
+				 call a(a1:~G(Pair(!A,!M)));fwd a0 a1);
+	cut {
+		!gii(a3:G(Pair(!A,!M))); call a(a2:~G(Pair(!A,!M))); fwd a3 a2
+	|gii: ?~G(Pair(!A,!M)) |
+	cut {
+		!sf(u: recv ~!Pair(!A,!M);!M);
+			 recv u (i:~!Pair(!A,!M)); snd<A,M>(i,u)
+	|sf:  ? send !Pair(!A,!M);~!M |
+	GLiftB<Pair(!A,!M),M>(sf,gii,go)  // G snd: G(X*M) -> G(M) 
+	|go:~!G(M)|  // inXB(s:~ !N, z0: !M) // G(M) -> M
+	inXB(go,rm)
+	|rm: ~!M|
+	?rm; ?stx;!f00(zp: Pair(!A,!M));
+		send zp (af0:!A. !af0(fa00:A);call stx(af00:~A); fwd af00 fa00);
+		send zp (mf0:!M. !mf0(fm:M);call rm(mf:~M); fwd mf fm);
+		close zp
+	}});
+	?f;
+	call f( fr: send !M; ~!Pair(!A,!M));
+	send fr (n0: !M. fwd n0 n); 
+	fwd fr r
+	}
+};;
+
+proc prNAT(n:~!M, m:!lint)
+{
+	cut {
+		!step(s);
+		  recv s (v);
+		  call v (v0);
+		  case v0 of {
+		  	|	#Zero: wait v0; let! s 0
+			|	#Succ: 
+				call v0(pp);
+				recv pp (vx); recv pp (vm:~!M);
+				wait pp; ?vm; ?vx;
+			      	let! s vx+1
+		}
+		|step:?send !G(Pair(!lint,!M));~!lint|
+		srec<lint>(n,step,r)
+		|r:~!Pair(!lint,!M)|
+		fst<lint,M>(r,m)
+	}
+};;
+
+proc testrNAT()
+{
+  cut {
+	szero(z)
+	|z:~!M|
+	ssucc(z,n1)
+	|n1:~!M|
+	ssucc(n1,n2)
+	|n2:~!M|
+	ssucc(n2,n3)
+	|n3:~!M|
+	ssucc(n3,n4)
+	|n4:~!M|
+	prNAT(n4,n)
+	|n:~!lint|
+	println ("DECODE="+n);()
+  }
+};;
+
+proc testMUL()
+{
+  cut {
+	four(n1)
+	|n1:~!M|
+	four(n2)
+	|n2:~!M|
+	pMUL(n1,n2,n3)
+	|n3:~!M|
+	pNAT(n3)
+  }
+};;
+
+proc testEXP1()
+{
+  cut {
+	three(n1)
+	|n1:~!M|
+	four(n2)
+	|n2:~!M|
+	pEXP(n1,n2,n3)
+	|n3:~!M|
+	pNAT(n3)
+  }
+};;
+
+proc testEXP2()
+{
+  cut {
+	four(n1)
+	|n1:~!M|
+	four(n2)
+	|n2:~!M|
+	pEXP(n1,n2,n3)
+	|n3:~!M|
+	pNAT(n3)
+  }
+};;
+
+proc main()
+{
+  cut {
+	four(n1)
+	|n1:~!M|
+	four(n2)
+	|n2:~!M|
+	pEXP(n1,n2,n3)
+	|n3:~!M|
+	pNAT(n3)
+  }
+};;
+
+/*
+
+include "examples/pure/recursion-for-free.clls";;
+
+*/
