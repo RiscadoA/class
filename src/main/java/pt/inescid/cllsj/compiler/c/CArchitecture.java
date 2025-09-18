@@ -43,7 +43,7 @@ public class CArchitecture {
   }
 
   public CAlignment typeAlignment() {
-    return intAlignment;
+    return pointerAlignment;
   }
 
   public CSize typeNodeSize() {
@@ -56,11 +56,13 @@ public class CArchitecture {
 
   public static class Test {
     public String cType;
-    public CSize expected;
+    public CSize expectedSize;
+    public CAlignment expectedAlignment;
 
-    public Test(String cType, CSize expected) {
+    public Test(String cType, CSize expectedSize, CAlignment expectedAlignment) {
       this.cType = cType;
-      this.expected = expected;
+      this.expectedSize = expectedSize;
+      this.expectedAlignment = expectedAlignment;
     }
   }
 
@@ -68,12 +70,12 @@ public class CArchitecture {
   // running in
   public List<Test> getTests() {
     return List.of(
-        new Test("int", intSize),
-        new Test("unsigned char", unsignedCharSize),
-        new Test("void*", pointerSize),
-        new Test("struct session", sessionSize()),
-        new Test("struct type", typeSize()),
-        new Test("struct type_node", typeNodeSize()),
-        new Test("struct exponential", exponentialSize(CSize.zero())));
+        new Test("int", intSize, intAlignment),
+        new Test("unsigned char", unsignedCharSize, unsignedCharAlignment),
+        new Test("void*", pointerSize, pointerAlignment),
+        new Test("struct session", sessionSize(), sessionAlignment()),
+        new Test("struct type", typeSize(), typeAlignment()),
+        new Test("struct type_node", typeNodeSize(), typeNodeAlignment()),
+        new Test("struct exponential", exponentialSize(CSize.zero()), pointerAlignment));
   }
 }
