@@ -191,7 +191,7 @@ public class AnlFlow {
           String.join(
               ", ",
               flows.entrySet().stream()
-                .map(e -> e.getKey() + (e.getValue() > 1 ? " (x" + e.getValue() + ")" : ""))
+                  .map(e -> e.getKey() + (e.getValue() > 1 ? " (x" + e.getValue() + ")" : ""))
                   .toList()));
     }
   }

@@ -1,37 +1,37 @@
 type corec IntStream {
 	offer of   {
-		|#next: send !lint; IntStream
+		|#next: send int; IntStream
 		|#stop: close
 	}
 };;
 
 type NextIntStream {
-	send !lint; IntStream
+	send int; IntStream
 };;
  
-proc rec integersfrom(n: IntStream; k:~lint)
+proc rec integersfrom(n: IntStream, k:~int)
 {
     case n of   {
-      	| #next: send n(k); integersfrom(n;k+1)
+      	| #next: send n(k); integersfrom(n,k+1)
 	   	| #stop: close n
  	   }	   	   
  };;
 
-proc unsafe_rec filter(fouts:IntStream, fins:~IntStream; n:~lint) {
+proc unsafe_rec filter(fouts:IntStream, fins:~IntStream, n:~int) {
 	case fouts of {
 		|#next:
-			filter_next(fouts, fins; n)
+			filter_next(fouts, fins, n)
 		|#stop:
 			#stop fins; wait fins; close fouts
 	}
-} and filter_next(fouts:NextIntStream, fins:~IntStream; n:~lint) {
+} and filter_next(fouts:NextIntStream, fins:~IntStream, n:~int) {
 	#next fins;
 	recv fins(v);
 	if ((v / n)*n == v) {
-		filter_next(fouts, fins; n)
+		filter_next(fouts, fins, n)
 	} else {
 		send fouts(v);
-		filter(fouts, fins; n)
+		filter(fouts, fins, n)
 	}
 };;
 
@@ -46,7 +46,7 @@ proc rec sieve(souts:IntStream, sins:~IntStream)
 			cut {
 				sieve(souts, outp)
 				|outp:IntStream|
-				filter(outp,sins;p)
+				filter(outp,sins,p)
 			}
 		|#stop:
 			#stop sins; wait sins; close souts
@@ -56,45 +56,42 @@ proc rec sieve(souts:IntStream, sins:~IntStream)
 proc primesN(primes:IntStream)
  {
  cut  {
-      integersfrom(n;2)
+      integersfrom(n,2)
       |n:~IntStream|
       sieve(primes,n)
 }
  };;
 
-proc unsafe_rec printfirstN(il:~IntStream;k:~lint)
+proc unsafe_rec printfirstN(il:~IntStream,k:~int)
 {
    	if(k==0) {
 	  	#stop il; wait il; println("DONE."); ()
 	} else {
 		#next il; recv il(n);
-		?n;
 		println(n);
-		printfirstN(il;k-1)
+		printfirstN(il,k-1)
    	}
 };;
 
-// ATTENTION: n too large causes fully concurrent executor
-// to run out of threads
 
-proc main_ss(;np:colint)
+proc main_ss(np:colint)
 {
  cut  {
       primesN(primes)
       |primes:~IntStream|
-      printfirstN(primes;np)
+      printfirstN(primes,np)
       }
  };;
 
 proc primesNC(primes:IntStream)
  {
  ccut  {
-      integersfrom(n;2)
+      integersfrom(n,2)
       |n:~IntStream|
       sieve(primes,n)
 }
  };;
 
 proc main() {
-	main_ss(;100000)
+	main_ss(100)
 };;

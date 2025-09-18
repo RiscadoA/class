@@ -1426,18 +1426,29 @@ public class IRGenerator extends ASTNodeVisitor {
         IRBlock valueBlock = process.createBlock("value_dummy");
         IRBlock notValueBlock = process.createBlock("not_value_dummy");
         IRBranch.Case valueCase = new IRBranch.Case(valueBlock.getLocation(), ifValueEndPoints);
-        IRBranch.Case notValueCase = new IRBranch.Case(notValueBlock.getLocation(), ifNotValueEndPoints);
-        block.add(new IRBranchIsValue(valueRequisitesCache.get(reqs) ? IRValueRequisites.value() : IRValueRequisites.notValue(), valueCase, notValueCase));
+        IRBranch.Case notValueCase =
+            new IRBranch.Case(notValueBlock.getLocation(), ifNotValueEndPoints);
+        block.add(
+            new IRBranchIsValue(
+                valueRequisitesCache.get(reqs)
+                    ? IRValueRequisites.value()
+                    : IRValueRequisites.notValue(),
+                valueCase,
+                notValueCase));
 
         if (valueRequisitesCache.get(reqs)) {
           recurse(valueBlock, ifValue);
-          recurse(notValueBlock, () -> {
-            block.add(new IRPanic("Unreachable block"));
-          });
+          recurse(
+              notValueBlock,
+              () -> {
+                block.add(new IRPanic("Unreachable block"));
+              });
         } else {
-          recurse(valueBlock, () -> {
-            block.add(new IRPanic("Unreachable block"));
-          });
+          recurse(
+              valueBlock,
+              () -> {
+                block.add(new IRPanic("Unreachable block"));
+              });
           recurse(notValueBlock, ifNotValue);
         }
       } else {
