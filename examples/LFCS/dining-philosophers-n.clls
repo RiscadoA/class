@@ -366,6 +366,8 @@ proc mainN(; n:~lint, nphil:~lint)
 	 }     	 	 
 };;
 
-// mainN(;5,5);;
+proc main() {
+	mainN(;5,5)
+};;
 
 
