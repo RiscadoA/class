@@ -119,6 +119,7 @@ proc lqueue(ienq:EnqI,ideq:DeqI) {
 };;
 
 proc unsafe_rec enq_user(cl:~EnqI;N:~lint) {
+    sleep 1;
     if N==0 then {
         #End cl; close cl
     } else {
@@ -130,6 +131,7 @@ proc unsafe_rec enq_user(cl:~EnqI;N:~lint) {
 };;
 
 proc unsafe_rec deq_user(cl:~DeqI;N:~lint) {
+    sleep 1;
     if N==0 then {
         #End cl; 
         close cl
@@ -147,10 +149,10 @@ proc unsafe_rec deq_user(cl:~DeqI;N:~lint) {
 
 proc mainq(;n:~lint) {
     letc cl1:~EnqI { enq_user(cl1;n)};
-    letc cl2:~DeqI { sleep 5;deq_user(cl2;n+2)};
+    letc cl2:~DeqI { deq_user(cl2;n+2)};
     lqueue(cl1,cl2)
 };;
 
 proc main() {
-    mainq(;10)
+    mainq(;4)
 };;

@@ -83,7 +83,7 @@ proc mainb(;nt:~lint) {
 
 proc main()
 {
-    mainb(;10)
+    mainb(;250)
 };;
 
 

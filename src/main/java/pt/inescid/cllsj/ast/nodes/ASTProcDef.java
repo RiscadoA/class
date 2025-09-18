@@ -223,6 +223,7 @@ public class ASTProcDef extends ASTNode {
     for (String param : args) {
       // System.out.println("ARGS");
       ASTType argtype = it.next().subst(rho);
+      argtype.kindcheck(ep);
       // System.out.println("argtype "+argtype.toStr(ep));
       newargtypes.add(argtype);
       // SAM
@@ -237,6 +238,7 @@ public class ASTProcDef extends ASTNode {
     Iterator<ASTType> itg = gargtypes.iterator();
     for (String param : gargs) {
       ASTType argtype = itg.next().subst(rho);
+      argtype.kindcheck(ep);
       newgargtypes.add(argtype);
       eg = eg.assoc(param, argtype.unfoldType(ep));
     }
