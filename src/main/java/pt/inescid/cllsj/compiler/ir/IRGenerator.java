@@ -505,39 +505,25 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTDiscard node) {
-    IREnvironment.Channel channel = env.getChannel(node.getCh());
-
-    IRValueRequisites reqs = valueRequisites(node.getCoAffineT().getin(), false);
-    if (!compiler.optimizeAffineValue.get()) {
-      reqs = IRValueRequisites.notValue();
-    }
-    addBranchIsValue(
-        reqs,
-        1,
-        () -> {
-          // Drop the slots associated with the coaffine
-          IRSlotsFromASTType info = slotsFromType(node.getCoAffineT().getin());
-          block.add(new IRDropSlots(channel.getLocalData(), info.activeLocalTree));
-          block.add(new IRPopTask(true));
-        },
-        () -> {
-          // Write a tag indicating the coaffine is being discarded and pass control to it
-          block.add(new IRWriteTag(channel.getRemoteData(), 0));
-          addContinue(channel.getSessionId());
-          block.add(new IRPopTask(true));
-        });
+    addDiscard(node.getCh(), node.getCoAffineT(), 1);
+    block.add(new IRPopTask(true));
   }
 
   @Override
   public void visit(ASTCell node) {
+    ASTType rhsType = node.getTypeRhs();
+    boolean rhsNeedsAffine = rhsType instanceof ASTBasicType || rhsType instanceof ASTCellT;
+    if (rhsNeedsAffine) {
+      rhsType = new ASTAffineT(rhsType);
+    }
+
     addCell(
         node.getCh(),
         node.getChc(),
-        node.getTypeRhs(),
+        rhsType,
         countEndPoints(node.getRhs()),
         () -> {
-          if (node.getTypeRhs() instanceof ASTCoBasicType
-              || node.getTypeRhs() instanceof ASTCellT) {
+          if (rhsNeedsAffine) {
             // We need to make sure the right hand-side an affine
             addAffine(
                 node.getChc(),
@@ -556,14 +542,19 @@ public class IRGenerator extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTPut node) {
+    ASTType lhsType = node.getLhsType();
+    boolean lhsNeedsAffine = lhsType instanceof ASTBasicType || lhsType instanceof ASTCellT;
+    if (lhsNeedsAffine) {
+      lhsType = new ASTAffineT(lhsType);
+    }
+
     addPut(
         node.getChs(),
         node.getCho(),
-        node.getLhsType(),
+        lhsType,
         countEndPoints(node.getLhs()),
         () -> {
-          if (node.getLhsType() instanceof ASTCoBasicType
-              || node.getLhsType() instanceof ASTCellT) {
+          if (lhsNeedsAffine) {
             // We need to make sure the right hand-side an affine
             addAffine(
                 node.getCho(),
@@ -1139,8 +1130,6 @@ public class IRGenerator extends ASTNodeVisitor {
       Map<String, ASTType> coaffineSet,
       int contEndPoints,
       Runnable cont) {
-    IREnvironment.Channel channel = env.getChannel(ch);
-
     IRValueRequisites reqs = valueRequisites(contType, true);
     if (!compiler.optimizeAffineValue.get()) {
       reqs = IRValueRequisites.notValue();
@@ -1155,6 +1144,8 @@ public class IRGenerator extends ASTNodeVisitor {
         () -> {
           // Affine types are positive, but if the inner type is not a value, since a choice
           // must be made, we must pass control to the other side
+          env = env.resetChannel(ch);
+          IREnvironment.Channel channel = env.getChannel(ch);
           addContinue(channel.getSessionId());
 
           // We branch on whether the affine is used or not
@@ -1164,6 +1155,7 @@ public class IRGenerator extends ASTNodeVisitor {
           IRBranch.Case unused = new IRBranch.Case(unusedBlock.getLocation(), 1);
 
           block.add(new IRBranchTag(channel.getLocalData(), List.of(unused, used)));
+          advanceOrReset(ch, new IRTagS(), contType, false);
           recurse(usedBlock, cont);
           recurse(
               unusedBlock,
@@ -1181,10 +1173,7 @@ public class IRGenerator extends ASTNodeVisitor {
                 }
 
                 for (String name : coaffineSet.keySet()) {
-                  // We must write a drop tag and jump to the closure
-                  IREnvironment.Channel capturedChannel = env.getChannel(name);
-                  block.add(new IRWriteTag(capturedChannel.getRemoteData(), 0));
-                  addContinue(capturedChannel.getSessionId());
+                  addDiscard(name, (ASTCoAffineT) coaffineSet.get(name), 1);
                 }
 
                 block.add(new IRFinishSession(channel.getSessionId(), true));
@@ -1215,7 +1204,41 @@ public class IRGenerator extends ASTNodeVisitor {
           block.add(new IRJump(rhsBlock.getLocation()));
         });
 
+    if (!isPositive(contType)) {
+      env = env.resetChannelIfNotValue(ch, reqs);
+    } else {
+      // Positive, for sure it is not a value
+      advanceOrReset(ch, IRSlotTree.of(new IRTagS()), contType, true);
+    }
     recurse(rhsBlock, cont);
+  }
+
+  void addDiscard(String ch, ASTCoAffineT type, int contEndPoints) {
+    IREnvironment.Channel channel = env.getChannel(ch);
+
+    IRBlock rhsBlock = process.createBlock("discard_rhs");
+
+    IRValueRequisites reqs = valueRequisites(type.getin(), false);
+    if (!compiler.optimizeAffineValue.get()) {
+      reqs = IRValueRequisites.notValue();
+    }
+    addBranchIsValue(
+        reqs,
+        contEndPoints,
+        () -> {
+          // Drop the slots associated with the coaffine
+          IRSlotsFromASTType info = slotsFromType(type.getin());
+          block.add(new IRDropSlots(channel.getLocalData(), info.activeLocalTree));
+          block.add(new IRJump(rhsBlock.getLocation()));
+        },
+        () -> {
+          // Write a tag indicating the coaffine is being discarded and pass control to it
+          block.add(new IRWriteTag(channel.getRemoteData(), 0));
+          addContinue(channel.getSessionId());
+          block.add(new IRJump(rhsBlock.getLocation()));
+        });
+
+    block = rhsBlock;
   }
 
   void addRelease(String ch, ASTUsageT type, boolean popTask) {
@@ -1406,7 +1429,7 @@ public class IRGenerator extends ASTNodeVisitor {
         () -> {
           // The type checker doesn't place use nodes after takes of basic types
           // and cells, so we do it ourselves
-          if (typeLhs instanceof ASTBasicType || typeLhs instanceof ASTUsageT) {
+          if (typeLhs instanceof ASTCoBasicType || typeLhs instanceof ASTUsageT) {
             addUse(chc, typeLhs, contEndPoints, cont);
           } else {
             cont.run();
@@ -1512,7 +1535,10 @@ public class IRGenerator extends ASTNodeVisitor {
   }
 
   void advanceOrReset(String ch, IRSlotOffset offset, ASTType cont, boolean advancePolarity) {
-    if (cont instanceof ASTRecT
+    if (cont instanceof ASTCoAffineT && !advancePolarity) {
+      env = env.advanceChannel(ch, offset);
+      env = env.resetChannelIfNotValue(ch, valueRequisites(cont, false));
+    } else if (cont instanceof ASTRecT
         || cont instanceof ASTCoRecT
         || isPositive(cont) != advancePolarity) {
       env = env.resetChannel(ch);

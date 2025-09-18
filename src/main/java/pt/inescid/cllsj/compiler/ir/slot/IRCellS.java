@@ -37,6 +37,10 @@ public class IRCellS extends IRSlot {
 
   @Override
   public String toString() {
-    return "cell(" + slots + " (value=" + isValue + "))";
+    if (isValue.canBeValue()) {
+      return "cell(" + slots + " (value=" + isValue + "))";
+    } else {
+      return "cell(affine)";
+    }
   }
 }

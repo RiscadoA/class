@@ -77,6 +77,10 @@ public class IRSlotCombinations {
     return new IRSlotCombinations(newTrees);
   }
 
+  public IRSlotCombinations merge(IRSlotTree tree) {
+    return this.merge(IRSlotCombinations.of(tree));
+  }
+
   public boolean isEmpty() {
     return trees.isEmpty() || (trees.size() == 1 && trees.get(0).isLeaf());
   }

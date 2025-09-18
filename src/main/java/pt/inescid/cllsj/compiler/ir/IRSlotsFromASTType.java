@@ -299,13 +299,15 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
     }
 
     IRSlotsFromASTType inner = recurse(type.getin());
-    activeLocalTree =
-        IRSlotTree.isValue(
-            reqs,
-            IRSlotTree.LEAF,
-            new IRSlotTree.Tag(List.of(IRSlotTree.LEAF, inner.activeLocalTree)));
     activeRemoteTree = IRSlotTree.isValue(reqs, inner.activeRemoteTree, IRSlotTree.LEAF);
-    remainderLocalCombinations = inner.localCombinations();
+    remainderLocalCombinations =
+        inner
+            .localCombinations()
+            .merge(
+                IRSlotTree.isValue(
+                    reqs,
+                    IRSlotTree.LEAF,
+                    new IRSlotTree.Tag(List.of(IRSlotTree.LEAF, inner.activeLocalTree))));
     remainderRemoteCombinations = inner.remoteCombinations();
   }
 
@@ -318,13 +320,15 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
 
     IRSlotsFromASTType inner = recurse(type.getin());
     activeLocalTree = IRSlotTree.isValue(reqs, inner.activeLocalTree, IRSlotTree.LEAF);
-    activeRemoteTree =
-        IRSlotTree.isValue(
-            reqs,
-            IRSlotTree.LEAF,
-            new IRSlotTree.Tag(List.of(IRSlotTree.LEAF, inner.activeRemoteTree)));
     remainderLocalCombinations = inner.localCombinations();
-    remainderRemoteCombinations = inner.remoteCombinations();
+    remainderRemoteCombinations =
+        inner
+            .remoteCombinations()
+            .merge(
+                IRSlotTree.isValue(
+                    reqs,
+                    IRSlotTree.LEAF,
+                    new IRSlotTree.Tag(List.of(IRSlotTree.LEAF, inner.activeRemoteTree))));
   }
 
   @Override
