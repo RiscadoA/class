@@ -556,7 +556,7 @@ public class CGenerator extends IRInstructionVisitor {
                           + " is "
                           + test.expectedAlignment
                           + ", but instead got %ld",
-                      actualSize);
+                      actualAlignment);
                   putReturn("1");
                 });
           }
