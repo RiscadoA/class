@@ -7,10 +7,10 @@ import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
 import pt.inescid.cllsj.compiler.ir.slot.IRCellS;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotTree;
 
-public class IRDecrementCell extends IRAccess {
+public class IRReleaseCell extends IRAccess {
   private IRCellS cell;
 
-  public IRDecrementCell(IRDataLocation location, IRCellS cell) {
+  public IRReleaseCell(IRDataLocation location, IRCellS cell) {
     super(location);
     this.cell = cell;
   }
@@ -26,12 +26,12 @@ public class IRDecrementCell extends IRAccess {
 
   @Override
   public IRInstruction clone() {
-    return new IRDecrementCell(location, cell);
+    return new IRReleaseCell(location, cell);
   }
 
   @Override
   public String toString() {
-    return "decrementCell(" + location + ", " + cell + ")";
+    return "releaseCell(" + location + ", " + cell + ")";
   }
 
   @Override

@@ -1631,12 +1631,12 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   @Override
-  public void visit(IRIncrementCell instr) {
+  public void visit(IRAcquireCell instr) {
     putIncrementCell(data(instr.getLocation()).deref("struct cell*"));
   }
 
   @Override
-  public void visit(IRDecrementCell instr) {
+  public void visit(IRReleaseCell instr) {
     putDecrementCell(data(instr.getLocation()), instr.getCell());
   }
 
