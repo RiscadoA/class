@@ -9,6 +9,7 @@ import pt.inescid.cllsj.SAMCont;
 import pt.inescid.cllsj.Server;
 import pt.inescid.cllsj.Session;
 import pt.inescid.cllsj.SessionField;
+import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.types.ASTCointT;
 import pt.inescid.cllsj.ast.types.ASTType;
 
@@ -20,6 +21,18 @@ public class ASTCLLType extends ASTNode {
   public ASTCLLType(String _id, ASTNode _rhs) {
     id = _id;
     rhs = _rhs;
+  }
+
+  public String getId() {
+    return id;
+  }
+
+  public void setId(String id) {
+    this.id = id;
+  }
+
+  public ASTNode getRhs() {
+    return rhs;
   }
 
   public void ASTInsertPipe(Function<ASTNode, ASTNode> f, ASTNode from) throws Exception {
@@ -112,5 +125,10 @@ public class ASTCLLType extends ASTNode {
     p_cont.code = rhs;
     p_cont.frame = frame;
     p_cont.epnm = ep;
+  }
+
+  @Override
+  public void accept(ASTNodeVisitor visitor) {
+    visitor.visit(this);
   }
 }

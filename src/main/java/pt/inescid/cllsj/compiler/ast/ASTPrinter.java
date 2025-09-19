@@ -518,4 +518,10 @@ public class ASTPrinter extends ASTNodeVisitor {
   public void visit(ASTExpr node) {
     node.accept(new ASTExprPrinter());
   }
+
+  @Override
+  public void visit(ASTCLLType node) {
+    indentPrintln("clltype " + node.getId() + ";");
+    node.getRhs().accept(this);
+  }
 }

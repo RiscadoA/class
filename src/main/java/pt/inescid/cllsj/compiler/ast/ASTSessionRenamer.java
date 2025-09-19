@@ -421,4 +421,10 @@ public class ASTSessionRenamer extends ASTNodeVisitor {
   public void visit(ASTUnreachable node) {
     node.setCh(rename(node.getCh()));
   }
+
+  @Override
+  public void visit(ASTCLLType node) {
+    node.setId(rename(node.getId()));
+    node.getRhs().accept(this);
+  }
 }

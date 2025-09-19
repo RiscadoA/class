@@ -78,4 +78,6 @@ public abstract class ASTNodeVisitor {
   public abstract void visit(ASTSleep node);
 
   public abstract void visit(ASTUnreachable node);
+
+  public abstract void visit(ASTCLLType node);
 }

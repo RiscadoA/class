@@ -638,6 +638,11 @@ public class IRGenerator extends ASTNodeVisitor {
     throw new UnsupportedOperationException("Expressions should not appear here");
   }
 
+  @Override
+  public void visit(ASTCLLType node) {
+    node.getRhs().accept(this);
+  }
+
   // ======================================= Helper methods =======================================
 
   void addSend(

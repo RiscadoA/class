@@ -229,4 +229,9 @@ public class IREndPointCounter extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTExpr node) {}
+
+  @Override
+  public void visit(ASTCLLType node) {
+    node.getRhs().accept(this);
+  }
 }
