@@ -79,9 +79,7 @@ proc enq(tl:~Ptr, v:~affine lint, tlo:Ptr) {
     take tl(sn);
     share nn {
         take sn(lp);
-	letc nn0: LList(lint) { fwd nn0 nn }; 
-	unfold nn0;
-        put sn(c. cons<lint>(v,nn0,c));
+        put sn(c. cons<lint>(v,nn,c));
         drop sn;
         discard lp 
     ||
