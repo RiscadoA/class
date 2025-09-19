@@ -2706,6 +2706,7 @@ public class CGenerator extends IRInstructionVisitor {
         () -> {
           putStatement("pthread_t result_thread");
           putStatement("pthread_create(&result_thread, NULL, " + func + ", " + arg + ")");
+          putStatement("pthread_detach(result_thread)");
         });
   }
 
