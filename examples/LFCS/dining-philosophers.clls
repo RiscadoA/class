@@ -217,21 +217,23 @@ proc eat2X(s: ~ALockOrder, lh:ALockOrder; nam:colstring)
 };;
 
 
-proc doNPick(s:~ALockOrder,ns: ALockOrder; a:~lint,nam:~lstring)
+proc unsafe_rec doNPick(s:~ALockOrder,ns: ALockOrder; a:~lint, nam:~lstring)
 {  
-	cut {
-		!body(sb); recv sb (e); eat(e,sb;nam)
-		|body: ?send ALockOrder; ~ ALockOrder |
-		iter<ALockOrder>(ns,s;body,a)
+	if (a==0) {
+		fwd s ns
+	} else { 
+		letc sb:ALockOrder { eat(s,sb;nam) };
+		doNPick(sb,ns;a-1,nam)
 	}
 };;
 
-proc doNPickS(s:~ALockOrder,ns: ALockOrder; a:~lint,nam:~lstring)
-{
-	cut {
-		!body(sb);recv sb (e); eat2X(e,sb;nam)
-		|body: ?send ALockOrder;~ ALockOrder |
-		iter<ALockOrder>(ns,s;body,a)
+proc unsafe_rec doNPickS(s:~ALockOrder,ns: ALockOrder; a:~lint, nam:~lstring)
+{  
+	if (a==0) {
+		fwd s ns
+	} else { 
+		letc sb:ALockOrder { eat2X(s,sb;nam) };
+		doNPickS(sb,ns;a-1,nam)
 	}
 };;
 
