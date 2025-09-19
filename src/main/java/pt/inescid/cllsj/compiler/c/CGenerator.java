@@ -71,6 +71,7 @@ public class CGenerator extends IRInstructionVisitor {
     putLine("#include <time.h>");
     if (compiler.concurrency.get()) {
       putLine("#include <pthread.h>");
+      putLine("#include <semaphore.h>");
       putLine("#include <stdatomic.h>");
     }
     putBlankLine();
@@ -264,7 +265,7 @@ public class CGenerator extends IRInstructionVisitor {
         "cell",
         () -> {
           if (compiler.concurrency.get()) {
-            putStatement("pthread_mutex_t mutex");
+            putStatement("sem_t semaphore");
             putStatement("atomic_int ref_count");
           } else {
             putStatement("int ref_count");
@@ -1626,7 +1627,7 @@ public class CGenerator extends IRInstructionVisitor {
     putAllocCell(cell, maxLayout(this::typeLayout, this::isValue, instr.getSlots()).size);
     putAssign(cellRefCount(cell), 1);
     if (compiler.concurrency.get()) {
-      putMutexInit(cellMutex(cell));
+      putSemaphoreInit(cellSemaphore(cell), 1);
     }
   }
 
@@ -1643,14 +1644,14 @@ public class CGenerator extends IRInstructionVisitor {
   @Override
   public void visit(IRLockCell instr) {
     if (compiler.concurrency.get()) {
-      putMutexLock(cellMutex(data(instr.getLocation()).deref("struct cell*")));
+      putSemaphoreWait(cellSemaphore(data(instr.getLocation()).deref("struct cell*")));
     }
   }
 
   @Override
   public void visit(IRUnlockCell instr) {
     if (compiler.concurrency.get()) {
-      putMutexUnlock(cellMutex(data(instr.getLocation()).deref("struct cell*")));
+      putSemaphorePost(cellSemaphore(data(instr.getLocation()).deref("struct cell*")));
     }
   }
 
@@ -1936,8 +1937,8 @@ public class CGenerator extends IRInstructionVisitor {
     return var + "->ref_count";
   }
 
-  private String cellMutex(String var) {
-    return var + "->mutex";
+  private String cellSemaphore(String var) {
+    return var + "->semaphore";
   }
 
   private CAddress offset(String address, IRSlotOffset offset) {
@@ -2463,7 +2464,7 @@ public class CGenerator extends IRInstructionVisitor {
 
           // Now we can free the cell itself
           if (compiler.concurrency.get()) {
-            putMutexDestroy(cellMutex(ref));
+            putSemaphoreDestroy(cellSemaphore(ref));
           }
           putFreeCell(ref);
         });
@@ -2681,6 +2682,22 @@ public class CGenerator extends IRInstructionVisitor {
 
   void putCondVarSignal(String var) {
     putStatement("pthread_cond_signal(&(" + var + "))");
+  }
+
+  void putSemaphoreInit(String var, int value) {
+    putStatement("sem_init(&(" + var + "), 0, " + value + ")");
+  }
+
+  void putSemaphoreDestroy(String var) {
+    putStatement("sem_destroy(&(" + var + "))");
+  }
+
+  void putSemaphoreWait(String var) {
+    putStatement("sem_wait(&(" + var + "))");
+  }
+
+  void putSemaphorePost(String var) {
+    putStatement("sem_post(&(" + var + "))");
   }
 
   void putLaunchThread(String func, String arg) {

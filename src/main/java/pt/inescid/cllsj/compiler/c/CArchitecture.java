@@ -27,7 +27,7 @@ public class CArchitecture {
   }
 
   public CSize cellDataOffset(boolean withMutex) {
-    CSize size = withMutex ? CSize.sizeOf("pthread_mutex_t") : CSize.zero();
+    CSize size = withMutex ? CSize.sizeOf("sem_t") : CSize.zero();
     size = size.align(intAlignment);
     size = size.add(intSize); // ref count
     size = size.align(pointerAlignment); // assume data is pointer aligned
