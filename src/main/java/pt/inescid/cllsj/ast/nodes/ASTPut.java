@@ -135,7 +135,6 @@ public class ASTPut extends ASTNode {
 
   public void typecheck(Env<ASTType> ed, Env<ASTType> eg, Env<EnvEntry> ep) throws Exception {
     this.eg = eg;
-    // this.inferUses(chs,ed,ep);
 
     ASTType ty = ed.find(chs);
     ty = ty.unfoldType(ep);
@@ -147,7 +146,6 @@ public class ASTPut extends ASTNode {
 
       if (type != null) {
         type = type.unfoldType(ep);
-        // type = ASTType.unfoldRec(type);
         if (!type.equalst(tys_payl, ep, true, new Trail()))
           throw new TypeError(
               "Line "
@@ -167,16 +165,14 @@ public class ASTPut extends ASTNode {
       if (lhs instanceof ASTExpr) {
         ASTExpr pe = (ASTExpr) lhs;
         try {
-          // System.out.println("Compile PUT "+pe);
           ASTNode lhsc = compileExpr(cho, pe, tys_payl, ep);
           lhs = lhsc;
           lhsc.setanc(this);
         } catch (Exception ee) {
           if (pe instanceof ASTVId) {
             String x = ((ASTVId) pe).ch;
-            try { // check if the free put is a linear or unrestricted name
+            try {
               ASTType t2 = ed.find(x);
-              // System.out.println("VID PUT "+t2.toStr(ep));
               lhs = compileFwd(cho, x, tys_payl, t2, ep);
               lhs.setanc(this);
             } catch (Exception e) { // use less

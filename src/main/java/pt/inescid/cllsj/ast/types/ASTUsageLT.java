@@ -47,7 +47,7 @@ public class ASTUsageLT extends ASTType {
 
   public String toStr(Env<EnvEntry> e) throws Exception {
     String timage = lin ? "LUSAGEL" : "USAGEL";
-    return timage + t.toStr(e);
+    return timage + " " + t.toStr(e);
   }
 
   public ASTType subst(Env<ASTType> e) {

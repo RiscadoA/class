@@ -9,27 +9,19 @@ type rec LList(A){
     }
 };;
 
-proc copy<A>(a:~LList(A), b:LList(A), c:LList(A)) {
-	unfold a;
-	share a {
-		unfold b; fwd a b
-	||
-		unfold c; fwd a c
-	}
-};;
-
 type ANode(A) {
     affine Node(A)
 };;
 
-proc nil<A>(l: ANode(A)) {
-    affine l;
-    #Nil l;
-    close l
+type SList(A) {
+    state Node(A)
 };;
 
-proc cons<A>(a:~affine A, t:~LList(A), l: ANode(A)){
-    unfold t;
+proc nil<A>(l: ANode(A)) {
+    affine l; #Nil l; close l
+};;
+
+proc cons<A>(a:~affine A, t:~SList(A), l: ANode(A)){
     affine l;
     #Next l;
     l <- a;
@@ -54,7 +46,7 @@ type Opt(A) {
 };;
 
 proc None(o:Opt(Aint)) {
-    affine o;#None o;close o
+    affine o; #None o; close o
 };;
 
 proc Some(val:~Aint,o:Opt(Aint)) {
@@ -75,6 +67,7 @@ proc deq( hd:~Ptr, rv:pair Opt(Aint);Ptr) {
             recv lh(val);
             rv <- { r. Some(val,r) };
             unfold lh;
+ 	    clltype lh;
             put hd(lh);
             free(hp); fwd hd rv
     }
@@ -87,11 +80,11 @@ proc enq(tl:~Ptr, v:~affine lint, tlo:Ptr) {
     take tl(sn);
     share nn {
         take sn(lp);
-	letc nn0: LList(lint) {
-	     unfold nn0; fwd nn0 nn }; // consider change to unfolded tail type in cons
+	letc nn0: LList(lint) { fwd nn0 nn }; 
+	unfold nn0;
         put sn(c. cons<lint>(v,nn0,c));
         drop sn;
-        discard lp // known to be nil
+        discard lp 
     ||
         put tl(nn);
         forward tl tlo
@@ -185,10 +178,10 @@ proc unsafe_rec deq_user(cl:~DeqI;N:~lint) {
 
 proc mainq(;n:~lint) {
     letc cl1:~EnqI { enq_user(cl1;n)};
-    letc cl2:~DeqI { sleep 5;deq_user(cl2;n+2)};
+    letc cl2:~DeqI { sleep 10;deq_user(cl2;n+2)};
     lqueue(cl1,cl2)
 };;
 
 proc main() {
-    mainq(;10)
+    mainq(;100)
 };;
