@@ -275,8 +275,7 @@ public abstract class IRSlotTree {
     @Override
     protected void toStringHelper(StringBuilder sb) {
       sb.append("isValue<").append(requisites).append(">[");
-      sb.append("yes: ").append(value);
-      sb.append(" | no: ").append(notValue);
+      sb.append(value).append(" | ").append(notValue);
       sb.append("]");
     }
   }
