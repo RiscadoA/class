@@ -342,8 +342,11 @@ public class IRGenerator extends ASTNodeVisitor {
   @Override
   public void visit(ASTMix node) {
     IRBlock rhsBlock = process.createBlock("mix_rhs");
-    block.add(
-        new IRPushTask(rhsBlock.getLocation(), node.isConcurrent() && compiler.concurrency.get()));
+    if (node.isConcurrent() && compiler.concurrency.get()) {
+      block.add(new IRLaunchThread(rhsBlock.getLocation(), findLockedCells(node.fn(new HashSet<>()))));
+    } else {
+      block.add(new IRPushTask(rhsBlock.getLocation()));
+    }
     recurse(block, node.getLhs());
     recurse(rhsBlock, node.getRhs());
   }
@@ -596,19 +599,24 @@ public class IRGenerator extends ASTNodeVisitor {
         node.getCh(),
         node.isConcurrent(),
         () -> node.getLhs().accept(this),
+        node.getRhs().fn(new HashSet<>()),
         () -> node.getRhs().accept(this));
   }
 
   @Override
   public void visit(ASTShareL node) {
     addShare(
-        node.getCh(), true, () -> node.getLhs().accept(this), () -> node.getRhs().accept(this));
+        node.getCh(), true, () -> node.getLhs().accept(this), 
+        node.getRhs().fn(new HashSet<>()),
+        () -> node.getRhs().accept(this));
   }
 
   @Override
   public void visit(ASTShareR node) {
     addShare(
-        node.getCh(), true, () -> node.getRhs().accept(this), () -> node.getLhs().accept(this));
+        node.getCh(), true, () -> node.getRhs().accept(this), 
+        node.getLhs().fn(new HashSet<>()),
+        () -> node.getLhs().accept(this));
   }
 
   @Override
@@ -1256,11 +1264,15 @@ public class IRGenerator extends ASTNodeVisitor {
     }
   }
 
-  void addShare(String ch, boolean concurrent, Runnable lhsCont, Runnable rhsCont) {
+  void addShare(String ch, boolean concurrent, Runnable lhsCont, Set<String> rhsFreeNames, Runnable rhsCont) {
     block.add(new IRAcquireCell(env.getChannel(ch).getLocalData()));
 
     IRBlock rhsBlock = process.createBlock("share_rhs");
-    block.add(new IRPushTask(rhsBlock.getLocation(), concurrent && compiler.concurrency.get()));
+    if (concurrent && compiler.concurrency.get()) {
+      block.add(new IRLaunchThread(rhsBlock.getLocation(), findLockedCells(rhsFreeNames)));
+    } else {
+      block.add(new IRPushTask(rhsBlock.getLocation()));
+    }
     recurse(block, lhsCont);
     recurse(rhsBlock, rhsCont);
   }
@@ -1336,6 +1348,9 @@ public class IRGenerator extends ASTNodeVisitor {
       int contLhsEndPoints,
       Runnable contLhs,
       Runnable contRhs) {
+    if (compiler.concurrency.get()) {
+      env = env.setChannelLockedCell(ch, false);
+    }
     IREnvironment.Channel channel = env.getChannel(ch);
     IRDataLocation cellDataLoc = IRDataLocation.cell(channel.getLocalData(), IRSlotOffset.ZERO);
 
@@ -1395,6 +1410,9 @@ public class IRGenerator extends ASTNodeVisitor {
   }
 
   void addTake(String ch, String chc, ASTType typeLhs, int contEndPoints, Runnable cont) {
+    if (compiler.concurrency.get()) {
+      env = env.setChannelLockedCell(ch, true);
+    }
     IREnvironment.Channel channel = env.getChannel(ch);
     IRDataLocation cellDataLoc = IRDataLocation.cell(channel.getLocalData(), IRSlotOffset.ZERO);
 
@@ -1529,6 +1547,17 @@ public class IRGenerator extends ASTNodeVisitor {
     if (isPositive(type)) {
       addContinue(sessionId);
     }
+  }
+
+  private List<IRDataLocation> findLockedCells(Set<String> names) {
+    List<IRDataLocation> locked = new ArrayList<>();
+    for (String ch : names) {
+      IREnvironment.Channel channel = env.getChannel(ch);
+      if (channel.isLockedCell()) {
+        locked.add(channel.getLocalData());
+      }
+    }
+    return locked;
   }
 
   void advanceOrReset(String ch, IRSlot slot, ASTType cont, boolean advancePolarity) {

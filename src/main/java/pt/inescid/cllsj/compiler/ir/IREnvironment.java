@@ -96,7 +96,8 @@ public class IREnvironment {
         Optional.of(sessionId),
         IRSlotOffset.ZERO,
         Optional.of(localDataId),
-        Optional.empty());
+        Optional.empty(),
+        false);
   }
 
   public IREnvironment addSession(String name, IRSlotCombinations combinations) {
@@ -109,7 +110,8 @@ public class IREnvironment {
         Optional.of(sessionId),
         IRSlotOffset.ZERO,
         Optional.of(localDataId),
-        Optional.empty());
+        Optional.empty(),
+        false);
   }
 
   public IREnvironment addSession(String name) {
@@ -119,7 +121,8 @@ public class IREnvironment {
         Optional.of(process.addSession()),
         IRSlotOffset.ZERO,
         Optional.empty(),
-        Optional.empty());
+        Optional.empty(),
+        false);
   }
 
   public IREnvironment addValue(
@@ -130,7 +133,8 @@ public class IREnvironment {
         Optional.empty(),
         IRSlotOffset.ZERO,
         Optional.of(process.addLocalData(combinations)),
-        exponentialType);
+        exponentialType,
+        false);
   }
 
   public Channel getChannel(String name) {
@@ -156,7 +160,8 @@ public class IREnvironment {
         channel.sessionId,
         channel.getOffset().advance(offset),
         channel.localDataId,
-        channel.exponentialType);
+        channel.exponentialType,
+        channel.isLockedCell);
   }
 
   public IREnvironment resetChannel(String name) {
@@ -167,7 +172,8 @@ public class IREnvironment {
         channel.sessionId,
         IRSlotOffset.ZERO,
         channel.localDataId,
-        channel.exponentialType);
+        channel.exponentialType,
+        channel.isLockedCell);
   }
 
   public IREnvironment resetChannelIfNotValue(String name, IRValueRequisites reqs) {
@@ -180,7 +186,8 @@ public class IREnvironment {
             IRSlotTree.isValue(reqs, channel.offset.getPast(), IRSlotTree.LEAF),
             IRSlotTree.isValue(reqs, channel.offset.getFuture(), IRSlotTree.LEAF)),
         channel.localDataId,
-        channel.exponentialType);
+        channel.exponentialType,
+        channel.isLockedCell);
   }
 
   public IREnvironment makeChannelExponential(
@@ -195,7 +202,20 @@ public class IREnvironment {
         channel.sessionId,
         channel.getOffset(),
         channel.localDataId,
-        Optional.of(slots));
+        Optional.of(slots),
+        channel.isLockedCell);
+  }
+
+  public IREnvironment setChannelLockedCell(String name, boolean isLockedCell) {
+    Channel channel = getChannel(name);
+    return new Channel(
+        this,
+        channel.getName(),
+        channel.sessionId,
+        channel.getOffset(),
+        channel.localDataId,
+        channel.exponentialType,
+        isLockedCell);
   }
 
   public IREnvironment alias(String oldName, String newName) {
@@ -206,7 +226,8 @@ public class IREnvironment {
         channel.sessionId,
         channel.getOffset(),
         channel.localDataId,
-        channel.exponentialType);
+        channel.exponentialType,
+        channel.isLockedCell);
   }
 
   public boolean isPositive(ASTType type) {
@@ -261,6 +282,7 @@ public class IREnvironment {
     private IRSlotOffset offset;
     private Optional<IRLocalDataId> localDataId;
     private Optional<IRSlotTree> exponentialType;
+    private boolean isLockedCell;
 
     public Channel(
         IREnvironment parent,
@@ -268,13 +290,15 @@ public class IREnvironment {
         Optional<IRSessionId> sessionId,
         IRSlotOffset offset,
         Optional<IRLocalDataId> localDataId,
-        Optional<IRSlotTree> exponentialType) {
+        Optional<IRSlotTree> exponentialType,
+        boolean isLockedCell) {
       super(parent, parent.ep);
       this.name = name;
       this.sessionId = sessionId;
       this.offset = offset;
       this.localDataId = localDataId;
       this.exponentialType = exponentialType;
+      this.isLockedCell = isLockedCell;
     }
 
     public String getName() {
@@ -311,6 +335,10 @@ public class IREnvironment {
 
     public IRSlotTree getExponentialType() {
       return exponentialType.orElseThrow();
+    }
+
+    public boolean isLockedCell() {
+      return isLockedCell;
     }
   }
 }

@@ -71,7 +71,6 @@ public class CGenerator extends IRInstructionVisitor {
     putLine("#include <time.h>");
     if (compiler.concurrency.get()) {
       putLine("#include <pthread.h>");
-      putLine("#include <semaphore.h>");
       putLine("#include <stdatomic.h>");
     }
     putBlankLine();
@@ -265,7 +264,9 @@ public class CGenerator extends IRInstructionVisitor {
         "cell",
         () -> {
           if (compiler.concurrency.get()) {
-            putStatement("sem_t semaphore");
+            putStatement("pthread_mutex_t mutex");
+            putStatement("pthread_cond_t cond_var");
+            putStatement("unsigned char is_free");
             putStatement("atomic_int ref_count");
           } else {
             putStatement("int ref_count");
@@ -757,15 +758,7 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRPushTask instr) {
-    if (instr.isConcurrent() && compiler.concurrency.get()) {
-      putAllocTask(TMP_PTR1);
-      putAssign(taskCont(cast(TMP_PTR1, "struct task*")), codeLocationAddress(instr.getLocation()));
-      putAssign(taskContEnv(cast(TMP_PTR1, "struct task*")), ENV);
-      putIncrementAtomic("thread_inits");
-      putLaunchThread("thread", TMP_PTR1);
-    } else {
-      putPushTask(TMP_PTR1, codeLocationAddress(instr.getLocation()));
-    }
+    putPushTask(TMP_PTR1, codeLocationAddress(instr.getLocation()));
   }
 
   private void putPushTask(String tmpVar, String address) {
@@ -1627,7 +1620,9 @@ public class CGenerator extends IRInstructionVisitor {
     putAllocCell(cell, maxLayout(this::typeLayout, this::isValue, instr.getSlots()).size);
     putAssign(cellRefCount(cell), 1);
     if (compiler.concurrency.get()) {
-      putSemaphoreInit(cellSemaphore(cell), 1);
+      putMutexInit(cellMutex(cell));
+      putCondVarInit(cellCondVar(cell));
+      putAssign(cellIsFree(cell), 1);
     }
   }
 
@@ -1644,14 +1639,58 @@ public class CGenerator extends IRInstructionVisitor {
   @Override
   public void visit(IRLockCell instr) {
     if (compiler.concurrency.get()) {
-      putSemaphoreWait(cellSemaphore(data(instr.getLocation()).deref("struct cell*")));
+      String ref = data(instr.getLocation()).deref("struct cell*");
+      putMutexLock(cellMutex(ref));
+      putWhile("!" + cellIsFree(ref), () -> {
+        putCondVarWait(cellCondVar(ref), cellMutex(ref));
+      });
+      putAssign(cellIsFree(ref), 0);
     }
   }
 
   @Override
   public void visit(IRUnlockCell instr) {
     if (compiler.concurrency.get()) {
-      putSemaphorePost(cellSemaphore(data(instr.getLocation()).deref("struct cell*")));
+      String ref = data(instr.getLocation()).deref("struct cell*");
+      putAssign(cellIsFree(ref), 1);
+      putCondVarSignal(cellCondVar(ref));
+      putMutexUnlock(cellMutex(ref));
+    }
+  }
+
+  @Override
+  public void visit(IRLaunchThread instr) {
+    if (!compiler.concurrency.get()) {
+      putPushTask(TMP_PTR1, codeLocationAddress(instr.getLocation()));
+      return;
+    }
+
+    String lockCellsLabel = makeLabel("lock_cells");
+    String lockCellsContLabel = makeLabel("lock_cells_cont");
+
+    // The thread will immediately jump to the the label we just lockCellsLabel
+    putAllocTask(TMP_PTR1);
+    putAssign(taskCont(cast(TMP_PTR1, "struct task*")), labelAddress(lockCellsLabel));
+    putAssign(taskContEnv(cast(TMP_PTR1, "struct task*")), ENV);
+    putIncrementAtomic("thread_inits");
+    putLaunchThread("thread", TMP_PTR1);
+    putConstantGoto(lockCellsContLabel);
+
+    // The new thread starts here
+    // We need to lock all cells passed to the new thread
+    putLabel(lockCellsLabel);
+    for (IRDataLocation loc : instr.getPassedLockedCells()) {
+      putMutexLock(cellMutex(data(loc).deref("struct cell*")));
+    }
+    putConstantGoto(codeLocationLabel(instr.getLocation()));
+
+    // Continuation for the original thread
+    // We must unlock all cells passed to the new thread
+    // Since we don't set the is_free flag to 1, other threads won't be able to steal the cell
+    // from the new thread
+    putLabel(lockCellsContLabel);
+    for (IRDataLocation loc : instr.getPassedLockedCells()) {
+      putMutexUnlock(cellMutex(data(loc).deref("struct cell*")));
     }
   }
 
@@ -1937,8 +1976,16 @@ public class CGenerator extends IRInstructionVisitor {
     return var + "->ref_count";
   }
 
-  private String cellSemaphore(String var) {
-    return var + "->semaphore";
+  private String cellMutex(String var) {
+    return var + "->mutex";
+  }
+
+  private String cellCondVar(String var) {
+    return var + "->cond_var";
+  }
+
+  private String cellIsFree(String var) {
+    return var + "->is_free";
   }
 
   private CAddress offset(String address, IRSlotOffset offset) {
@@ -2464,7 +2511,8 @@ public class CGenerator extends IRInstructionVisitor {
 
           // Now we can free the cell itself
           if (compiler.concurrency.get()) {
-            putSemaphoreDestroy(cellSemaphore(ref));
+            putMutexDestroy(cellMutex(ref));
+            putCondVarDestroy(cellCondVar(ref));
           }
           putFreeCell(ref);
         });
@@ -2682,22 +2730,6 @@ public class CGenerator extends IRInstructionVisitor {
 
   void putCondVarSignal(String var) {
     putStatement("pthread_cond_signal(&(" + var + "))");
-  }
-
-  void putSemaphoreInit(String var, int value) {
-    putStatement("sem_init(&(" + var + "), 0, " + value + ")");
-  }
-
-  void putSemaphoreDestroy(String var) {
-    putStatement("sem_destroy(&(" + var + "))");
-  }
-
-  void putSemaphoreWait(String var) {
-    putStatement("sem_wait(&(" + var + "))");
-  }
-
-  void putSemaphorePost(String var) {
-    putStatement("sem_post(&(" + var + "))");
   }
 
   void putLaunchThread(String func, String arg) {

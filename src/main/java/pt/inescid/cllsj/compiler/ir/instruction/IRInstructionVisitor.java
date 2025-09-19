@@ -62,4 +62,6 @@ public abstract class IRInstructionVisitor {
   public abstract void visit(IRLockCell instr);
 
   public abstract void visit(IRUnlockCell instr);
+
+  public abstract void visit(IRLaunchThread instr);
 }

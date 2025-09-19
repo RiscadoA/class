@@ -5,19 +5,13 @@ import pt.inescid.cllsj.compiler.ir.id.IRCodeLocation;
 
 public class IRPushTask extends IRInstruction {
   private IRCodeLocation location;
-  private boolean concurrent;
 
-  public IRPushTask(IRCodeLocation location, boolean concurrent) {
+  public IRPushTask(IRCodeLocation location) {
     this.location = location;
-    this.concurrent = concurrent;
   }
 
   public IRCodeLocation getLocation() {
     return location;
-  }
-
-  public boolean isConcurrent() {
-    return concurrent;
   }
 
   @Override
@@ -27,12 +21,12 @@ public class IRPushTask extends IRInstruction {
 
   @Override
   public String toString() {
-    return "pushTask(" + location + (concurrent ? ", concurrent" : "") + ")";
+    return "pushTask(" + location + ")";
   }
 
   @Override
   public IRInstruction clone() {
-    return new IRPushTask(location, concurrent);
+    return new IRPushTask(location);
   }
 
   @Override
