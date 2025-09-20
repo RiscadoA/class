@@ -828,16 +828,12 @@ public class CGenerator extends IRInstructionVisitor {
 
     // Get the address of the local session which will be bound to the remote session
     CAddress localAddr = sessionAddress(instr.getTargetSessionId());
-    String localSession = accessSession(instr.getTargetSessionId());
 
     // Copy the session into this environment
     putCopyMemory(localAddr, remoteAddr, compiler.arch.sessionSize());
 
-    // Make the sessions point to each other
-    putAssign(sessionContSession(localSession), remoteAddr);
-    putAssign(sessionContSession(remoteSession), localAddr);
-
     // Modify the remote session to point to this environment
+    putAssign(sessionContSession(remoteSession), localAddr);
     putAssign(sessionContEnv(remoteSession), ENV);
     putAssign(sessionContData(remoteSession), data(instr.getLocalData()));
   }
@@ -869,19 +865,13 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRWriteSession instr) {
-    String local = accessSession(instr.getSessionId());
-    String remote = accessRemoteSession(instr.getSessionId());
-
     // Write the session address of the remote session
     String ref = data(instr.getLocation()).deref("char*");
     putAssign(ref, remoteSessionAddress(instr.getSessionId()));
 
-    // Store the continuation of the local session in the remote session
     // This is necessary for the future bindSession instruction to be able
-    // to obtain the correct continuation
-    putAssign(sessionCont(remote), sessionCont(local));
-    putAssign(sessionContEnv(remote), sessionContEnv(local));
-    putAssign(sessionContData(remote), sessionContData(local));
+    // to obtain the correct session state
+    putCopyMemory(CAddress.of(remoteSessionAddress(instr.getSessionId())), sessionAddress(instr.getSessionId()), compiler.arch.sessionSize());
   }
 
   @Override
