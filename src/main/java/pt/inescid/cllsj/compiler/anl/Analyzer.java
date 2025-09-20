@@ -377,7 +377,7 @@ public class Analyzer extends IRInstructionVisitor {
   public void visit(IRUnlockCell instr) {
     // Irrelevant for analysis
   }
-  
+
   @Override
   public void visit(IRLaunchThread instr) {
     state.pushPendingContinuation(this, instr.getLocation(), flowLoc);

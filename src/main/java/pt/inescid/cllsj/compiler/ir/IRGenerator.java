@@ -343,7 +343,8 @@ public class IRGenerator extends ASTNodeVisitor {
   public void visit(ASTMix node) {
     IRBlock rhsBlock = process.createBlock("mix_rhs");
     if (node.isConcurrent() && compiler.concurrency.get()) {
-      block.add(new IRLaunchThread(rhsBlock.getLocation(), findLockedCells(node.fn(new HashSet<>()))));
+      block.add(
+          new IRLaunchThread(rhsBlock.getLocation(), findLockedCells(node.fn(new HashSet<>()))));
     } else {
       block.add(new IRPushTask(rhsBlock.getLocation()));
     }
@@ -606,7 +607,9 @@ public class IRGenerator extends ASTNodeVisitor {
   @Override
   public void visit(ASTShareL node) {
     addShare(
-        node.getCh(), true, () -> node.getLhs().accept(this), 
+        node.getCh(),
+        true,
+        () -> node.getLhs().accept(this),
         node.getRhs().fn(new HashSet<>()),
         () -> node.getRhs().accept(this));
   }
@@ -614,7 +617,9 @@ public class IRGenerator extends ASTNodeVisitor {
   @Override
   public void visit(ASTShareR node) {
     addShare(
-        node.getCh(), true, () -> node.getRhs().accept(this), 
+        node.getCh(),
+        true,
+        () -> node.getRhs().accept(this),
         node.getLhs().fn(new HashSet<>()),
         () -> node.getLhs().accept(this));
   }
@@ -1264,7 +1269,8 @@ public class IRGenerator extends ASTNodeVisitor {
     }
   }
 
-  void addShare(String ch, boolean concurrent, Runnable lhsCont, Set<String> rhsFreeNames, Runnable rhsCont) {
+  void addShare(
+      String ch, boolean concurrent, Runnable lhsCont, Set<String> rhsFreeNames, Runnable rhsCont) {
     block.add(new IRAcquireCell(env.getChannel(ch).getLocalData()));
 
     IRBlock rhsBlock = process.createBlock("share_rhs");

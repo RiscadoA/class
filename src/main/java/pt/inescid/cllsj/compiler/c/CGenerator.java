@@ -1641,9 +1641,11 @@ public class CGenerator extends IRInstructionVisitor {
     if (compiler.concurrency.get()) {
       String ref = data(instr.getLocation()).deref("struct cell*");
       putMutexLock(cellMutex(ref));
-      putWhile("!" + cellIsFree(ref), () -> {
-        putCondVarWait(cellCondVar(ref), cellMutex(ref));
-      });
+      putWhile(
+          "!" + cellIsFree(ref),
+          () -> {
+            putCondVarWait(cellCondVar(ref), cellMutex(ref));
+          });
       putAssign(cellIsFree(ref), 0);
     }
   }
