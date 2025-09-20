@@ -12,9 +12,9 @@ public abstract class AnlSlot {
       return 0;
     } else if (tree.isUnary()) {
       return 1 + count(((IRSlotTree.Unary) tree).child());
-    } else if (tree.isIsValue()) {
-      IRSlotTree.IsValue valueTree = (IRSlotTree.IsValue) tree;
-      return Math.max(count(valueTree.value()), count(valueTree.notValue()));
+    } else if (tree.isType()) {
+      IRSlotTree.Type type = (IRSlotTree.Type) tree;
+      return Math.max(count(type.met()), count(type.unmet()));
     } else if (tree.isTag()) {
       int count = 0;
       for (IRSlotTree child : ((IRSlotTree.Tag) tree).cases()) {

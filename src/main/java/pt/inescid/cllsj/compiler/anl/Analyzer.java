@@ -328,7 +328,7 @@ public class Analyzer extends IRInstructionVisitor {
   }
 
   @Override
-  public void visit(IRBranchIsValue instr) {
+  public void visit(IRBranchTypeFlag instr) {
     visit(instr.getThen().getLocation(), VisitType.BRANCH);
     visit(instr.getOtherwise().getLocation(), VisitType.BRANCH);
   }
@@ -377,7 +377,7 @@ public class Analyzer extends IRInstructionVisitor {
   public void visit(IRUnlockCell instr) {
     // Irrelevant for analysis
   }
-  
+
   @Override
   public void visit(IRLaunchThread instr) {
     state.pushPendingContinuation(this, instr.getLocation(), flowLoc);

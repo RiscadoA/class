@@ -7,12 +7,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.function.BiFunction;
 import java.util.function.Function;
-import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
+import pt.inescid.cllsj.compiler.ir.IRTypeFlagRequisites;
 import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
 import pt.inescid.cllsj.compiler.ir.id.IRLocalDataId;
 import pt.inescid.cllsj.compiler.ir.id.IRProcessId;
 import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
+import pt.inescid.cllsj.compiler.ir.id.IRTypeFlag;
 import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotOffset;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotTree;
@@ -21,7 +23,7 @@ public class IRCallProcess extends IRInstruction {
   public static class TypeArgument {
     private Optional<IRDataLocation> sourceLocation;
     private Optional<IRSlotTree> sourceTree;
-    private Optional<IRValueRequisites> sourceIsValue;
+    private Optional<IRTypeFlagRequisites> sourceIsValue;
     private IRTypeId targetType;
 
     public TypeArgument(IRDataLocation sourceLocation, IRTypeId targetType) {
@@ -32,7 +34,7 @@ public class IRCallProcess extends IRInstruction {
     }
 
     public TypeArgument(
-        IRSlotTree sourceTree, IRValueRequisites sourceIsValue, IRTypeId targetType) {
+        IRSlotTree sourceTree, IRTypeFlagRequisites sourceIsValue, IRTypeId targetType) {
       this.sourceLocation = Optional.empty();
       this.sourceTree = Optional.of(sourceTree);
       this.sourceIsValue = Optional.of(sourceIsValue);
@@ -51,8 +53,16 @@ public class IRCallProcess extends IRInstruction {
       return sourceTree.orElseThrow();
     }
 
-    public IRValueRequisites getSourceIsValue() {
+    public IRTypeFlagRequisites getSourceIsValue() {
       return sourceIsValue.orElseThrow();
+    }
+
+    public IRTypeFlagRequisites getSourceFlagRequisites(IRTypeFlag flag) {
+      if (flag.equals(IRTypeFlag.IS_VALUE)) {
+        return sourceIsValue.orElseThrow();
+      } else {
+        return IRTypeFlagRequisites.impossible();
+      }
     }
 
     public IRTypeId getTargetType() {
@@ -293,7 +303,7 @@ public class IRCallProcess extends IRInstruction {
   @Override
   public void replaceTypes(
       Function<IRTypeId, IRSlotTree> slotReplacer,
-      Function<IRTypeId, IRValueRequisites> reqReplacer) {
+      BiFunction<IRTypeId, IRTypeFlag, IRTypeFlagRequisites> reqReplacer) {
     super.replaceTypes(slotReplacer, reqReplacer);
     for (TypeArgument arg : typeArguments) {
       arg.sourceIsValue = arg.sourceIsValue.map(r -> r.expandTypes(reqReplacer));

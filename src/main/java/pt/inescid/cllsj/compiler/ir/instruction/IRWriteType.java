@@ -1,15 +1,15 @@
 package pt.inescid.cllsj.compiler.ir.instruction;
 
-import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
+import pt.inescid.cllsj.compiler.ir.IRTypeFlagRequisites;
 import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotTree;
 
 public class IRWriteType extends IRWrite {
   private IRSlotTree slots;
-  private IRValueRequisites valueRequisites;
+  private IRTypeFlagRequisites valueRequisites;
 
   public IRWriteType(
-      IRDataLocation location, IRSlotTree typeSlots, IRValueRequisites valueRequisites) {
+      IRDataLocation location, IRSlotTree typeSlots, IRTypeFlagRequisites valueRequisites) {
     super(location);
     this.slots = typeSlots;
     this.valueRequisites = valueRequisites;
@@ -19,7 +19,7 @@ public class IRWriteType extends IRWrite {
     return slots;
   }
 
-  public IRValueRequisites getValueRequisites() {
+  public IRTypeFlagRequisites getValueRequisites() {
     return valueRequisites;
   }
 

@@ -43,7 +43,7 @@ public abstract class IRInstructionVisitor {
 
   public abstract void visit(IRBranchExpression instr);
 
-  public abstract void visit(IRBranchIsValue instr);
+  public abstract void visit(IRBranchTypeFlag instr);
 
   public abstract void visit(IRDeferDrop instr);
 

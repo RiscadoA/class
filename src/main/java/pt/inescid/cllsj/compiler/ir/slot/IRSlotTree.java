@@ -5,8 +5,10 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BiFunction;
 import java.util.function.Function;
-import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
+import pt.inescid.cllsj.compiler.ir.IRTypeFlagRequisites;
+import pt.inescid.cllsj.compiler.ir.id.IRTypeFlag;
 import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
 
 public abstract class IRSlotTree {
@@ -28,14 +30,13 @@ public abstract class IRSlotTree {
     return new Tag(cases);
   }
 
-  public static IRSlotTree isValue(
-      IRValueRequisites requisites, IRSlotTree value, IRSlotTree notValue) {
-    if (requisites.mustBeValue()) {
-      return value;
-    } else if (requisites.canBeValue()) {
-      return new IsValue(requisites, value, notValue);
+  public static IRSlotTree type(IRTypeFlagRequisites requisites, IRSlotTree set, IRSlotTree unset) {
+    if (requisites.isGuaranteed()) {
+      return set;
+    } else if (requisites.isPossible()) {
+      return new Type(requisites, set, unset);
     } else {
-      return notValue;
+      return unset;
     }
   }
 
@@ -43,7 +44,7 @@ public abstract class IRSlotTree {
 
   public abstract IRSlotTree replaceTypes(
       Function<IRTypeId, IRSlotTree> slotReplacer,
-      Function<IRTypeId, IRValueRequisites> reqReplacer);
+      BiFunction<IRTypeId, IRTypeFlag, IRTypeFlagRequisites> reqReplacer);
 
   public boolean isPolymorphic() {
     AtomicBoolean polymorphic = new AtomicBoolean(false);
@@ -52,9 +53,9 @@ public abstract class IRSlotTree {
           polymorphic.set(true);
           return LEAF;
         },
-        typeId -> {
+        (typeId, flag) -> {
           polymorphic.set(true);
-          return IRValueRequisites.notValue();
+          return IRTypeFlagRequisites.impossible();
         });
     return polymorphic.get();
   }
@@ -78,8 +79,8 @@ public abstract class IRSlotTree {
     return this instanceof Tag;
   }
 
-  public boolean isIsValue() {
-    return this instanceof IsValue;
+  public boolean isType() {
+    return this instanceof Type;
   }
 
   public abstract Optional<IRSlot> singleHead();
@@ -119,7 +120,7 @@ public abstract class IRSlotTree {
     @Override
     public IRSlotTree replaceTypes(
         Function<IRTypeId, IRSlotTree> slotReplacer,
-        Function<IRTypeId, IRValueRequisites> reqReplacer) {
+        BiFunction<IRTypeId, IRTypeFlag, IRTypeFlagRequisites> reqReplacer) {
       return this;
     }
 
@@ -157,7 +158,7 @@ public abstract class IRSlotTree {
     @Override
     public IRSlotTree replaceTypes(
         Function<IRTypeId, IRSlotTree> slotReplacer,
-        Function<IRTypeId, IRValueRequisites> reqReplacer) {
+        BiFunction<IRTypeId, IRTypeFlag, IRTypeFlagRequisites> reqReplacer) {
       return slot.replaceTypes(slotReplacer, reqReplacer)
           .suffix(child.replaceTypes(slotReplacer, reqReplacer));
     }
@@ -204,7 +205,7 @@ public abstract class IRSlotTree {
     @Override
     public IRSlotTree replaceTypes(
         Function<IRTypeId, IRSlotTree> slotReplacer,
-        Function<IRTypeId, IRValueRequisites> reqReplacer) {
+        BiFunction<IRTypeId, IRTypeFlag, IRTypeFlagRequisites> reqReplacer) {
       return new Tag(cases.stream().map(c -> c.replaceTypes(slotReplacer, reqReplacer)).toList());
     }
 
@@ -221,34 +222,34 @@ public abstract class IRSlotTree {
     }
   }
 
-  public static class IsValue extends IRSlotTree {
-    private IRValueRequisites requisites;
-    private IRSlotTree value;
-    private IRSlotTree notValue;
+  public static class Type extends IRSlotTree {
+    private IRTypeFlagRequisites requisites;
+    private IRSlotTree met;
+    private IRSlotTree unmet;
 
-    public IsValue(IRValueRequisites requisites, IRSlotTree value, IRSlotTree notValue) {
+    public Type(IRTypeFlagRequisites requisites, IRSlotTree met, IRSlotTree unmet) {
       this.requisites = requisites;
-      this.value = value;
-      this.notValue = notValue;
+      this.met = met;
+      this.unmet = unmet;
     }
 
-    public IRValueRequisites requisites() {
+    public IRTypeFlagRequisites requisites() {
       return requisites;
     }
 
-    public IRSlotTree value() {
-      return value;
+    public IRSlotTree met() {
+      return met;
     }
 
-    public IRSlotTree notValue() {
-      return notValue;
+    public IRSlotTree unmet() {
+      return unmet;
     }
 
     @Override
     public Set<IRSlot> head() {
       Set<IRSlot> heads = new HashSet<>();
-      heads.addAll(value.head());
-      heads.addAll(notValue.head());
+      heads.addAll(met.head());
+      heads.addAll(unmet.head());
       return heads;
     }
 
@@ -259,23 +260,25 @@ public abstract class IRSlotTree {
 
     @Override
     public IRSlotTree suffix(IRSlotTree other) {
-      return new IsValue(requisites, value.suffix(other), notValue.suffix(other));
+      return new Type(requisites, met.suffix(other), unmet.suffix(other));
     }
 
     @Override
     public IRSlotTree replaceTypes(
         Function<IRTypeId, IRSlotTree> slotReplacer,
-        Function<IRTypeId, IRValueRequisites> reqReplacer) {
-      return isValue(
+        BiFunction<IRTypeId, IRTypeFlag, IRTypeFlagRequisites> reqReplacer) {
+      return type(
           requisites.expandTypes(reqReplacer),
-          value.replaceTypes(slotReplacer, reqReplacer),
-          notValue.replaceTypes(slotReplacer, reqReplacer));
+          met.replaceTypes(slotReplacer, reqReplacer),
+          unmet.replaceTypes(slotReplacer, reqReplacer));
     }
 
     @Override
     protected void toStringHelper(StringBuilder sb) {
-      sb.append("isValue<").append(requisites).append(">[");
-      sb.append(value).append(" | ").append(notValue);
+      sb.append("type<").append(requisites).append(">[");
+      sb.append(met);
+      sb.append(" | ");
+      sb.append(unmet);
       sb.append("]");
     }
   }

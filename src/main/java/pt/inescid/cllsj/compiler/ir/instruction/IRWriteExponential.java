@@ -1,22 +1,24 @@
 package pt.inescid.cllsj.compiler.ir.instruction;
 
 import java.util.List;
+import java.util.function.BiFunction;
 import java.util.function.Function;
-import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
+import pt.inescid.cllsj.compiler.ir.IRTypeFlagRequisites;
 import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
 import pt.inescid.cllsj.compiler.ir.id.IRLocalDataId;
 import pt.inescid.cllsj.compiler.ir.id.IRProcessId;
+import pt.inescid.cllsj.compiler.ir.id.IRTypeFlag;
 import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotTree;
 
 public class IRWriteExponential extends IRWrite {
   public static class TypeArgument {
     private IRSlotTree sourceTree;
-    private IRValueRequisites sourceIsValue;
+    private IRTypeFlagRequisites sourceIsValue;
     private IRTypeId targetType;
 
     public TypeArgument(
-        IRSlotTree sourceTree, IRValueRequisites sourceIsValue, IRTypeId targetType) {
+        IRSlotTree sourceTree, IRTypeFlagRequisites sourceIsValue, IRTypeId targetType) {
       this.sourceTree = sourceTree;
       this.sourceIsValue = sourceIsValue;
       this.targetType = targetType;
@@ -26,8 +28,16 @@ public class IRWriteExponential extends IRWrite {
       return sourceTree;
     }
 
-    public IRValueRequisites getSourceIsValue() {
+    public IRTypeFlagRequisites getSourceIsValue() {
       return sourceIsValue;
+    }
+
+    public IRTypeFlagRequisites getSourceFlagRequisites(IRTypeFlag flag) {
+      if (flag.equals(IRTypeFlag.IS_VALUE)) {
+        return sourceIsValue;
+      } else {
+        return IRTypeFlagRequisites.impossible();
+      }
     }
 
     public IRTypeId getTargetType() {
@@ -153,10 +163,10 @@ public class IRWriteExponential extends IRWrite {
   @Override
   public void replaceTypes(
       Function<IRTypeId, IRSlotTree> slotReplacer,
-      Function<IRTypeId, IRValueRequisites> reqReplacer) {
+      BiFunction<IRTypeId, IRTypeFlag, IRTypeFlagRequisites> reqReplacer) {
     super.replaceTypes(slotReplacer, reqReplacer);
     for (TypeArgument arg : typeArguments) {
-      arg.sourceIsValue = reqReplacer.apply(arg.targetType);
+      arg.sourceIsValue = arg.sourceIsValue.expandTypes(reqReplacer);
     }
   }
 

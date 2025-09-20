@@ -176,15 +176,15 @@ public class IREnvironment {
         channel.isLockedCell);
   }
 
-  public IREnvironment resetChannelIfNotValue(String name, IRValueRequisites reqs) {
+  public IREnvironment resetChannelIfNotValue(String name, IRTypeFlagRequisites reqs) {
     Channel channel = getChannel(name);
     return new Channel(
         this,
         channel.getName(),
         channel.sessionId,
         IRSlotOffset.of(
-            IRSlotTree.isValue(reqs, channel.offset.getPast(), IRSlotTree.LEAF),
-            IRSlotTree.isValue(reqs, channel.offset.getFuture(), IRSlotTree.LEAF)),
+            IRSlotTree.type(reqs, channel.offset.getPast(), IRSlotTree.LEAF),
+            IRSlotTree.type(reqs, channel.offset.getFuture(), IRSlotTree.LEAF)),
         channel.localDataId,
         channel.exponentialType,
         channel.isLockedCell);
