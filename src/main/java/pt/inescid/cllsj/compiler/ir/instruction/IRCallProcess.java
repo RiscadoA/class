@@ -164,7 +164,7 @@ public class IRCallProcess extends IRInstruction {
         sb.append(sourceSessionId.get());
       }
       if (!dataOffset.isZero()) {
-        sb.append(".").append(dataOffset);
+        sb.append("+").append(dataOffset);
       }
       return sb.toString();
     }
