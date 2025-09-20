@@ -1,0 +1,184 @@
+// shared thread-safe mutable stack 
+
+type rec LList(A){
+    state Node(A)
+} and Node(A) {
+    choice of {
+        |#Nil: close
+        |#Next: pair affine A; LList(A)
+    }
+};;
+
+type ANode(A) {
+    affine Node(A)
+};;
+
+type SList(A) {
+    state Node(A)
+};;
+
+proc nil<A>(l: ANode(A)) {
+    affine l; #Nil l; close l
+};;
+
+
+proc cons<A>(a:~affine A, t:~SList(A), l: ANode(A)){
+    affine l;
+    #Next l;
+    l <- a;
+    unfold l;
+    fwd l t
+};;
+
+type Ptr { state state Node(lint) };;
+
+proc free(p:~statel Node(lint)) {
+    put p(c. nil<lint>(c));
+    drop p
+};;
+
+
+type Aint { affine lint };;
+
+type Opt(A) {
+    affine choice of {
+        | #None : close
+        | #Some : A
+    }
+};;
+
+proc None(o:Opt(Aint)) {
+    affine o; #None o; close o
+};;
+
+proc Some(val:~Aint,o:Opt(Aint)) {
+    affine o;#Some o;fwd val o
+};;
+
+proc pop( hd:~Ptr, rv:pair Opt(Aint);Ptr) {
+    sleep 100;
+    take hd(hp);
+    take hp(lh);
+    case lh of {
+        |#Nil : // empty queue
+            wait lh;
+            put hp(c. nil<lint>(c));
+            put hd(hp);
+            rv <- { r. None(r) };
+            fwd hd rv
+        |#Next : 
+            recv lh(val);
+            rv <- { r. Some(val,r) };
+            unfold lh;
+            put hd(lh);
+            free(hp); 
+            fwd hd rv
+    }
+};;
+
+proc push(hd:~Ptr, v:~affine lint, hdo:Ptr) {
+    take hd(hp);
+    letc cn:ANode(lint)
+        { cons<lint>(v,hp,cn) };
+    letc nc: LList(lint) {
+        cell nc (cn)
+    };
+    put hd(nc);
+    forward hd hdo
+};;
+
+type corec PushI {
+	offer of {
+	| #Push: recv ~affine lint; PushI
+	| #End: wait
+	}
+};;
+
+type corec PopI {
+	offer of {
+	| #Pop: pair Opt(Aint); PopI
+	| #End: wait
+	}
+};;
+
+proc rec pushop(pushi:PushI,hd:~Ptr) {
+	case pushi of {
+        |#Push: recv pushi(item); 
+                letc tnext:Ptr {
+                    push(hd,item,tnext)
+                };
+                pushop(pushi,tnext)
+        |#End:  wait pushi; 
+                drop hd
+    }
+};;
+
+proc rec popop(popi:PopI,hd:~Ptr) {
+	case popi of {
+        |#Pop: 
+		letc tnext:pair Opt(Aint); Ptr {
+		    
+                    pop(hd,tnext)
+                };
+                recv tnext (val);
+                popi <- val;
+                popop(popi,tnext)
+        |#End:  wait popi; 
+                drop hd
+    }
+};;
+
+
+proc lstack(ipush:PushI,ipop:PopI) {
+    letc sn: LList(lint) {
+        cell sn (c.nil<lint>(c))
+    };
+    letc hd:Ptr {
+            cell hd (sn)
+    };
+    share hd {
+        popop(ipop,hd)
+        ||
+        pushop(ipush,hd)
+    }
+};;
+
+
+proc unsafe_rec push_user(cl:~PushI;N:~lint) {
+    if N==0 then {
+        #End cl; close cl
+    } else {
+        #Push cl;
+        cl <- N;
+        println("push "+N);
+        push_user(cl;N-1)
+    }
+};;
+
+
+proc unsafe_rec pop_user(cl:~PopI;N:~lint) {
+    if N==0 then {
+        #End cl; 
+        close cl 
+    } else {
+        #Pop cl; 
+        recv cl(ans);
+        case ans of {
+            | #None: println("NONE"); wait ans;
+                pop_user(cl;N-1)
+            | #Some: println("pop "+ans);
+                pop_user(cl;N-1)
+        }
+    }
+};;
+
+proc mainm(;n:~lint) {
+    letc cl1:~PushI { push_user(cl1;n)};
+    letc cl2:~PopI { pop_user(cl2;n)};
+    lstack(cl1,cl2)
+};;
+
+proc main() {
+    println("go"); 
+	mainm(;3)
+};;
