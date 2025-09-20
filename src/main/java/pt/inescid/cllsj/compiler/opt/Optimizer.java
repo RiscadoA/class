@@ -11,11 +11,12 @@ import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
 import java.util.TreeMap;
+import java.util.function.BiFunction;
 import java.util.function.Function;
 import pt.inescid.cllsj.compiler.anl.AnlFlow;
 import pt.inescid.cllsj.compiler.anl.AnlFlowContinuation;
 import pt.inescid.cllsj.compiler.anl.AnlFlowState;
-import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
+import pt.inescid.cllsj.compiler.ir.IRTypeFlagRequisites;
 import pt.inescid.cllsj.compiler.ir.id.*;
 import pt.inescid.cllsj.compiler.ir.instruction.*;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotCombinations;
@@ -554,11 +555,11 @@ public class Optimizer {
             }
             throw new IllegalStateException("Unbound type variable: " + id);
           };
-      Function<IRTypeId, IRValueRequisites> reqReplacer =
-          id -> {
+      BiFunction<IRTypeId, IRTypeFlag, IRTypeFlagRequisites> reqReplacer =
+          (id, flag) -> {
             for (IRCallProcess.TypeArgument arg : call.getTypeArguments()) {
               if (arg.getTargetType().equals(id)) {
-                return arg.getSourceIsValue();
+                return arg.getSourceFlagRequisites(flag);
               }
             }
             throw new IllegalStateException("Unbound type variable: " + id);
@@ -777,7 +778,7 @@ public class Optimizer {
                 break;
               }
               args.typeTrees.put(arg.getTargetType(), arg.getSourceTree());
-              args.typeIsValue.put(arg.getTargetType(), arg.getSourceIsValue().mustBeValue());
+              args.typeIsValue.put(arg.getTargetType(), arg.getSourceIsValue().isGuaranteed());
             }
             if (!candidate) {
               // No type arguments or not all concrete, not a valid candidate
@@ -804,7 +805,7 @@ public class Optimizer {
                 break;
               }
               args.typeTrees.put(arg.getTargetType(), arg.getSourceTree());
-              args.typeIsValue.put(arg.getTargetType(), arg.getSourceIsValue().mustBeValue());
+              args.typeIsValue.put(arg.getTargetType(), arg.getSourceIsValue().isGuaranteed());
             }
             if (!candidate) {
               // No type arguments or not all concrete, not a valid candidate
@@ -839,10 +840,15 @@ public class Optimizer {
           newProc.removeTypes();
           newProc.replaceTypes(
               id -> args.typeTrees.get(id),
-              id ->
-                  args.typeIsValue.get(id)
-                      ? IRValueRequisites.value()
-                      : IRValueRequisites.notValue());
+              (id, flag) -> {
+                if (flag.equals(IRTypeFlag.IS_VALUE)) {
+                  return args.typeIsValue.get(id)
+                      ? IRTypeFlagRequisites.guaranteed()
+                      : IRTypeFlagRequisites.impossible();
+                } else {
+                  throw new IllegalStateException("Unknown type flag: " + flag);
+                }
+              });
           ir.add(newProc);
         }
       }

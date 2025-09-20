@@ -1,8 +1,10 @@
 package pt.inescid.cllsj.compiler.ir.instruction;
 
+import java.util.function.BiFunction;
 import java.util.function.Function;
-import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
+import pt.inescid.cllsj.compiler.ir.IRTypeFlagRequisites;
 import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
+import pt.inescid.cllsj.compiler.ir.id.IRTypeFlag;
 import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
 import pt.inescid.cllsj.compiler.ir.slot.IRCellS;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotTree;
@@ -37,7 +39,7 @@ public class IRReleaseCell extends IRAccess {
   @Override
   public void replaceTypes(
       Function<IRTypeId, IRSlotTree> slotReplacer,
-      Function<IRTypeId, IRValueRequisites> reqReplacer) {
+      BiFunction<IRTypeId, IRTypeFlag, IRTypeFlagRequisites> reqReplacer) {
     cell = (IRCellS) cell.replaceTypes(slotReplacer, reqReplacer).singleHead().get();
   }
 }

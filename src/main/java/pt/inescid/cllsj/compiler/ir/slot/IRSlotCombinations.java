@@ -2,8 +2,10 @@ package pt.inescid.cllsj.compiler.ir.slot;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.BiFunction;
 import java.util.function.Function;
-import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
+import pt.inescid.cllsj.compiler.ir.IRTypeFlagRequisites;
+import pt.inescid.cllsj.compiler.ir.id.IRTypeFlag;
 import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
 
 public class IRSlotCombinations {
@@ -41,7 +43,7 @@ public class IRSlotCombinations {
 
   public IRSlotCombinations replaceTypes(
       Function<IRTypeId, IRSlotTree> slotReplacer,
-      Function<IRTypeId, IRValueRequisites> reqReplacer) {
+      BiFunction<IRTypeId, IRTypeFlag, IRTypeFlagRequisites> reqReplacer) {
     return new IRSlotCombinations(
         trees.stream().map(tree -> tree.replaceTypes(slotReplacer, reqReplacer)).toList());
   }

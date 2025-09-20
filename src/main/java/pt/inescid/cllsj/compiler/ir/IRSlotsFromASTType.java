@@ -99,10 +99,10 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTBangT type) {
-    IRValueRequisites reqs = IRValueRequisites.check(compiler, env, type.getin(), true);
+    IRTypeFlagRequisites reqs = IRIsValueChecker.check(compiler, env, type.getin(), true);
     IRSlotsFromASTType inner = recurse(type.getin());
     activeRemoteTree =
-        IRSlotTree.isValue(reqs, inner.activeRemoteTree, IRSlotTree.of(new IRExponentialS()));
+        IRSlotTree.type(reqs, inner.activeRemoteTree, IRSlotTree.of(new IRExponentialS()));
   }
 
   @Override
@@ -199,14 +199,13 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTRecvT type) {
-    IRValueRequisites reqs = IRValueRequisites.check(compiler, env, type.getlhs(), false);
+    IRTypeFlagRequisites reqs = IRIsValueChecker.check(compiler, env, type.getlhs(), false);
     if (!compiler.optimizeSendValue.get()) {
-      reqs = IRValueRequisites.notValue();
+      reqs = IRTypeFlagRequisites.impossible();
     }
 
     IRSlotsFromASTType lhs = recurse(type.getlhs());
-    activeLocalTree =
-        IRSlotTree.isValue(reqs, lhs.activeLocalTree, IRSlotTree.of(new IRSessionS()));
+    activeLocalTree = IRSlotTree.type(reqs, lhs.activeLocalTree, IRSlotTree.of(new IRSessionS()));
 
     // Merge with the right-hand-side
     IRSlotsFromASTType rhsResult = recurse(type.getrhs());
@@ -217,14 +216,13 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTSendT type) {
-    IRValueRequisites reqs = IRValueRequisites.check(compiler, env, type.getlhs(), true);
+    IRTypeFlagRequisites reqs = IRIsValueChecker.check(compiler, env, type.getlhs(), true);
     if (!compiler.optimizeSendValue.get()) {
-      reqs = IRValueRequisites.notValue();
+      reqs = IRTypeFlagRequisites.impossible();
     }
 
     IRSlotsFromASTType lhs = recurse(type.getlhs());
-    activeRemoteTree =
-        IRSlotTree.isValue(reqs, lhs.activeRemoteTree, IRSlotTree.of(new IRSessionS()));
+    activeRemoteTree = IRSlotTree.type(reqs, lhs.activeRemoteTree, IRSlotTree.of(new IRSessionS()));
 
     // Merge with the right-hand-side
     IRSlotsFromASTType rhsResult = recurse(type.getrhs());
@@ -235,10 +233,10 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTWhyT type) {
-    IRValueRequisites reqs = IRValueRequisites.check(compiler, env, type.getin(), false);
+    IRTypeFlagRequisites reqs = IRIsValueChecker.check(compiler, env, type.getin(), false);
     IRSlotsFromASTType inner = recurse(type.getin());
     activeLocalTree =
-        IRSlotTree.isValue(reqs, inner.activeLocalTree, IRSlotTree.of(new IRExponentialS()));
+        IRSlotTree.type(reqs, inner.activeLocalTree, IRSlotTree.of(new IRExponentialS()));
   }
 
   @Override
@@ -293,18 +291,18 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTAffineT type) {
-    IRValueRequisites reqs = IRValueRequisites.check(compiler, env, type.getin(), true);
+    IRTypeFlagRequisites reqs = IRIsValueChecker.check(compiler, env, type.getin(), true);
     if (!compiler.optimizeAffineValue.get()) {
-      reqs = IRValueRequisites.notValue();
+      reqs = IRTypeFlagRequisites.impossible();
     }
 
     IRSlotsFromASTType inner = recurse(type.getin());
-    activeRemoteTree = IRSlotTree.isValue(reqs, inner.activeRemoteTree, IRSlotTree.LEAF);
+    activeRemoteTree = IRSlotTree.type(reqs, inner.activeRemoteTree, IRSlotTree.LEAF);
     remainderLocalCombinations =
         inner
             .localCombinations()
             .merge(
-                IRSlotTree.isValue(
+                IRSlotTree.type(
                     reqs,
                     IRSlotTree.LEAF,
                     new IRSlotTree.Tag(List.of(IRSlotTree.LEAF, inner.activeLocalTree))));
@@ -313,19 +311,19 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTCoAffineT type) {
-    IRValueRequisites reqs = IRValueRequisites.check(compiler, env, type.getin(), false);
+    IRTypeFlagRequisites reqs = IRIsValueChecker.check(compiler, env, type.getin(), false);
     if (!compiler.optimizeAffineValue.get()) {
-      reqs = IRValueRequisites.notValue();
+      reqs = IRTypeFlagRequisites.impossible();
     }
 
     IRSlotsFromASTType inner = recurse(type.getin());
-    activeLocalTree = IRSlotTree.isValue(reqs, inner.activeLocalTree, IRSlotTree.LEAF);
+    activeLocalTree = IRSlotTree.type(reqs, inner.activeLocalTree, IRSlotTree.LEAF);
     remainderLocalCombinations = inner.localCombinations();
     remainderRemoteCombinations =
         inner
             .remoteCombinations()
             .merge(
-                IRSlotTree.isValue(
+                IRSlotTree.type(
                     reqs,
                     IRSlotTree.LEAF,
                     new IRSlotTree.Tag(List.of(IRSlotTree.LEAF, inner.activeRemoteTree))));
@@ -334,44 +332,44 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
   @Override
   public void visit(ASTCellT type) {
     if (compiler.optimizeAffineValue.get()) {
-      IRValueRequisites reqs = IRValueRequisites.check(compiler, env, type.getin(), true);
+      IRTypeFlagRequisites reqs = IRIsValueChecker.check(compiler, env, type.getin(), true);
       IRSlotsFromASTType inner = recurse(type.getin());
       remoteSlot(new IRCellS(inner.activeRemoteTree, reqs));
     } else {
-      remoteSlot(new IRCellS(IRSlotTree.of(new IRSessionS()), IRValueRequisites.notValue()));
+      remoteSlot(new IRCellS(IRSlotTree.of(new IRSessionS()), IRTypeFlagRequisites.impossible()));
     }
   }
 
   @Override
   public void visit(ASTUsageT type) {
     if (compiler.optimizeAffineValue.get()) {
-      IRValueRequisites reqs = IRValueRequisites.check(compiler, env, type.getin(), false);
+      IRTypeFlagRequisites reqs = IRIsValueChecker.check(compiler, env, type.getin(), false);
       IRSlotsFromASTType inner = recurse(type.getin());
       localSlot(new IRCellS(inner.activeLocalTree, reqs));
     } else {
-      localSlot(new IRCellS(IRSlotTree.of(new IRSessionS()), IRValueRequisites.notValue()));
+      localSlot(new IRCellS(IRSlotTree.of(new IRSessionS()), IRTypeFlagRequisites.impossible()));
     }
   }
 
   @Override
   public void visit(ASTCellLT type) {
     if (compiler.optimizeAffineValue.get()) {
-      IRValueRequisites reqs = IRValueRequisites.check(compiler, env, type.getin(), true);
+      IRTypeFlagRequisites reqs = IRIsValueChecker.check(compiler, env, type.getin(), true);
       IRSlotsFromASTType inner = recurse(type.getin());
       remoteSlot(new IRCellS(inner.activeRemoteTree, reqs));
     } else {
-      remoteSlot(new IRCellS(IRSlotTree.of(new IRSessionS()), IRValueRequisites.notValue()));
+      remoteSlot(new IRCellS(IRSlotTree.of(new IRSessionS()), IRTypeFlagRequisites.impossible()));
     }
   }
 
   @Override
   public void visit(ASTUsageLT type) {
     if (compiler.optimizeAffineValue.get()) {
-      IRValueRequisites reqs = IRValueRequisites.check(compiler, env, type.getin(), false);
+      IRTypeFlagRequisites reqs = IRIsValueChecker.check(compiler, env, type.getin(), false);
       IRSlotsFromASTType inner = recurse(type.getin());
       localSlot(new IRCellS(inner.activeLocalTree, reqs));
     } else {
-      localSlot(new IRCellS(IRSlotTree.of(new IRSessionS()), IRValueRequisites.notValue()));
+      localSlot(new IRCellS(IRSlotTree.of(new IRSessionS()), IRTypeFlagRequisites.impossible()));
     }
   }
 }

@@ -1,14 +1,16 @@
 package pt.inescid.cllsj.compiler.ir.slot;
 
+import java.util.function.BiFunction;
 import java.util.function.Function;
-import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
+import pt.inescid.cllsj.compiler.ir.IRTypeFlagRequisites;
+import pt.inescid.cllsj.compiler.ir.id.IRTypeFlag;
 import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
 
 public class IRCellS extends IRSlot {
   private IRSlotTree slots;
-  private IRValueRequisites isValue;
+  private IRTypeFlagRequisites isValue;
 
-  public IRCellS(IRSlotTree slots, IRValueRequisites isValue) {
+  public IRCellS(IRSlotTree slots, IRTypeFlagRequisites isValue) {
     this.slots = slots;
     this.isValue = isValue;
   }
@@ -17,14 +19,14 @@ public class IRCellS extends IRSlot {
     return slots;
   }
 
-  public IRValueRequisites getIsValue() {
+  public IRTypeFlagRequisites getIsValue() {
     return isValue;
   }
 
   @Override
   public IRSlotTree replaceTypes(
       Function<IRTypeId, IRSlotTree> typeReplacer,
-      Function<IRTypeId, IRValueRequisites> reqsReplacer) {
+      BiFunction<IRTypeId, IRTypeFlag, IRTypeFlagRequisites> reqsReplacer) {
     return IRSlotTree.of(
         new IRCellS(
             slots.replaceTypes(typeReplacer, reqsReplacer), isValue.expandTypes(reqsReplacer)));
@@ -37,10 +39,10 @@ public class IRCellS extends IRSlot {
 
   @Override
   public String toString() {
-    if (isValue.canBeValue()) {
-      return "cell(" + slots + " (value=" + isValue + "))";
+    if (isValue.isPossible()) {
+      return "cell[" + slots + " (value=" + isValue + ")]";
     } else {
-      return "cell(affine)";
+      return "cell[affine]";
     }
   }
 }

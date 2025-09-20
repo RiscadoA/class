@@ -1,23 +1,25 @@
 package pt.inescid.cllsj.compiler.ir.instruction;
 
 import java.util.List;
+import java.util.function.BiFunction;
 import java.util.function.Function;
-import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
+import pt.inescid.cllsj.compiler.ir.IRTypeFlagRequisites;
+import pt.inescid.cllsj.compiler.ir.id.IRTypeFlag;
 import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotTree;
 
-public class IRBranchIsValue extends IRBranch {
-  IRValueRequisites requisites;
+public class IRBranchTypeFlag extends IRBranch {
+  IRTypeFlagRequisites requisites;
   Case then;
   Case otherwise;
 
-  public IRBranchIsValue(IRValueRequisites requisites, Case then, Case otherwise) {
+  public IRBranchTypeFlag(IRTypeFlagRequisites requisites, Case then, Case otherwise) {
     this.requisites = requisites;
     this.then = then;
     this.otherwise = otherwise;
   }
 
-  public IRValueRequisites getRequisites() {
+  public IRTypeFlagRequisites getRequisites() {
     return requisites;
   }
 
@@ -41,18 +43,18 @@ public class IRBranchIsValue extends IRBranch {
 
   @Override
   public IRInstruction clone() {
-    return new IRBranchIsValue(requisites, then.clone(), otherwise.clone());
+    return new IRBranchTypeFlag(requisites, then.clone(), otherwise.clone());
   }
 
   @Override
   public String toString() {
-    return "branchIsValue(" + requisites + ", " + then + ", " + otherwise + ")";
+    return "branchTypeFlag(" + requisites + ", " + then + ", " + otherwise + ")";
   }
 
   @Override
   public void replaceTypes(
       Function<IRTypeId, IRSlotTree> slotReplacer,
-      Function<IRTypeId, IRValueRequisites> reqReplacer) {
+      BiFunction<IRTypeId, IRTypeFlag, IRTypeFlagRequisites> reqReplacer) {
     super.replaceTypes(slotReplacer, reqReplacer);
     requisites = requisites.expandTypes(reqReplacer);
   }

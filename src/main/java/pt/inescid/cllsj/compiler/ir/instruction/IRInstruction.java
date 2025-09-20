@@ -1,14 +1,16 @@
 package pt.inescid.cllsj.compiler.ir.instruction;
 
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.function.BiFunction;
 import java.util.function.Function;
-import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
+import pt.inescid.cllsj.compiler.ir.IRTypeFlagRequisites;
 import pt.inescid.cllsj.compiler.ir.id.IRCodeLocation;
 import pt.inescid.cllsj.compiler.ir.id.IRDataLocation;
 import pt.inescid.cllsj.compiler.ir.id.IRDropId;
 import pt.inescid.cllsj.compiler.ir.id.IRLocalDataId;
 import pt.inescid.cllsj.compiler.ir.id.IRProcessId;
 import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
+import pt.inescid.cllsj.compiler.ir.id.IRTypeFlag;
 import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
 import pt.inescid.cllsj.compiler.ir.slot.IRSlotTree;
 
@@ -34,7 +36,7 @@ public abstract class IRInstruction {
 
   public void replaceTypes(
       Function<IRTypeId, IRSlotTree> slotReplacer,
-      Function<IRTypeId, IRValueRequisites> reqReplacer) {
+      BiFunction<IRTypeId, IRTypeFlag, IRTypeFlagRequisites> reqReplacer) {
     replaceSlots(t -> t.replaceTypes(slotReplacer, reqReplacer));
   }
 

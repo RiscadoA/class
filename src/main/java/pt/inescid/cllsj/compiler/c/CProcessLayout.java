@@ -5,7 +5,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.function.Function;
 import pt.inescid.cllsj.compiler.Compiler;
-import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
+import pt.inescid.cllsj.compiler.ir.IRTypeFlagRequisites;
 import pt.inescid.cllsj.compiler.ir.id.IRDropId;
 import pt.inescid.cllsj.compiler.ir.id.IRLocalDataId;
 import pt.inescid.cllsj.compiler.ir.id.IRSessionId;
@@ -117,7 +117,7 @@ public class CProcessLayout {
 
   public CSize dataOffset(
       Function<IRTypeId, CLayout> typeLayout,
-      Function<IRValueRequisites, CCondition> isValue,
+      Function<IRTypeFlagRequisites, CCondition> isValue,
       IRLocalDataId id) {
     CSize dataEnd = sessionsEnd;
     for (int i = 0; i < id.getIndex(); ++i) {
@@ -135,7 +135,7 @@ public class CProcessLayout {
 
   public CSize size(
       Function<IRTypeId, CLayout> typeLayoutProvider,
-      Function<IRValueRequisites, CCondition> isValue) {
+      Function<IRTypeFlagRequisites, CCondition> isValue) {
     CSize dataEnd = sessionsEnd;
     for (int i = 0; i < process.getLocalDataCount(); ++i) {
       CLayout layout =

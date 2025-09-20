@@ -2,7 +2,7 @@ package pt.inescid.cllsj.compiler.c;
 
 import java.util.function.BiFunction;
 import java.util.function.Function;
-import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
+import pt.inescid.cllsj.compiler.ir.IRTypeFlagRequisites;
 import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
 import pt.inescid.cllsj.compiler.ir.slot.*;
 
@@ -22,16 +22,16 @@ public class CLayout {
       IRSlotTree tree,
       CArchitecture arch,
       Function<IRTypeId, CLayout> typeLayoutProvider,
-      Function<IRValueRequisites, CCondition> typeIsValue,
+      Function<IRTypeFlagRequisites, CCondition> requisitesMet,
       BiFunction<CSize, Integer, CCondition> isTag) {
-    return computeCurrent(tree, arch, typeLayoutProvider, typeIsValue, isTag, CSize.zero());
+    return computeCurrent(tree, arch, typeLayoutProvider, requisitesMet, isTag, CSize.zero());
   }
 
   private static CLayout computeCurrent(
       IRSlotTree tree,
       CArchitecture arch,
       Function<IRTypeId, CLayout> typeLayoutProvider,
-      Function<IRValueRequisites, CCondition> typeIsValue,
+      Function<IRTypeFlagRequisites, CCondition> requisitesMet,
       BiFunction<CSize, Integer, CCondition> isTag,
       CSize offset) {
     if (tree.isLeaf()) {
@@ -42,13 +42,13 @@ public class CLayout {
       IRSlot slot = unary.singleHead().get();
       CLayout slotLayout = compute(slot, arch, typeLayoutProvider);
       CAlignment childAlignment =
-          computeMaximum(unary.child(), arch, typeLayoutProvider, typeIsValue).alignment;
+          computeMaximum(unary.child(), arch, typeLayoutProvider, requisitesMet).alignment;
       CLayout childLayout =
           computeCurrent(
               unary.child(),
               arch,
               typeLayoutProvider,
-              typeIsValue,
+              requisitesMet,
               isTag,
               offset.add(slotLayout.size).align(childAlignment));
       return slotLayout.concat(childLayout);
@@ -61,21 +61,21 @@ public class CLayout {
         IRSlotTree caseTree = tag.cases().get(i);
         CCondition condition = isTag.apply(offset, i);
         CAlignment caseAlignment =
-            computeMaximum(caseTree, arch, typeLayoutProvider, typeIsValue).alignment;
+            computeMaximum(caseTree, arch, typeLayoutProvider, requisitesMet).alignment;
         CSize caseOffset = offset.add(slotLayout.size).align(caseAlignment);
         CLayout caseLayout =
-            computeCurrent(caseTree, arch, typeLayoutProvider, typeIsValue, isTag, caseOffset);
+            computeCurrent(caseTree, arch, typeLayoutProvider, requisitesMet, isTag, caseOffset);
         result = condition.ternary(caseLayout, result);
       }
       return slotLayout.concat(result);
-    } else if (tree.isIsValue()) {
-      // Branch depending on if the value requisites are met or not
-      IRSlotTree.IsValue isValue = (IRSlotTree.IsValue) tree;
-      CCondition condition = typeIsValue.apply(isValue.requisites());
+    } else if (tree.isType()) {
+      // Branch depending on if the flag requisites are met or not
+      IRSlotTree.Type type = (IRSlotTree.Type) tree;
+      CCondition condition = requisitesMet.apply(type.requisites());
       CLayout valueLayout =
-          computeCurrent(isValue.value(), arch, typeLayoutProvider, typeIsValue, isTag, offset);
+          computeCurrent(type.met(), arch, typeLayoutProvider, requisitesMet, isTag, offset);
       CLayout notValueLayout =
-          computeCurrent(isValue.notValue(), arch, typeLayoutProvider, typeIsValue, isTag, offset);
+          computeCurrent(type.unmet(), arch, typeLayoutProvider, requisitesMet, isTag, offset);
       return condition.ternary(valueLayout, notValueLayout);
     } else {
       throw new IllegalArgumentException("Unsupported slot tree: " + tree);
@@ -87,14 +87,14 @@ public class CLayout {
       IRSlotTree tree,
       CArchitecture arch,
       Function<IRTypeId, CLayout> typeLayoutProvider,
-      Function<IRValueRequisites, CCondition> typeIsValue) {
+      Function<IRTypeFlagRequisites, CCondition> requisitesMet) {
     if (tree.isLeaf()) {
       return CLayout.ZERO;
     } else if (tree.isUnary()) {
       // A unary node contains a single slot and a child tree
       IRSlotTree.Unary unary = (IRSlotTree.Unary) tree;
       IRSlot slot = unary.singleHead().get();
-      CLayout childLayout = computeMaximum(unary.child(), arch, typeLayoutProvider, typeIsValue);
+      CLayout childLayout = computeMaximum(unary.child(), arch, typeLayoutProvider, requisitesMet);
       CLayout slotLayout = compute(slot, arch, typeLayoutProvider);
       return slotLayout.concat(childLayout);
     } else if (tree.isTag()) {
@@ -103,19 +103,19 @@ public class CLayout {
       CLayout result = CLayout.ZERO;
       for (int i = 0; i < tag.cases().size(); ++i) {
         IRSlotTree caseTree = tag.cases().get(i);
-        CLayout caseLayout = computeMaximum(caseTree, arch, typeLayoutProvider, typeIsValue);
+        CLayout caseLayout = computeMaximum(caseTree, arch, typeLayoutProvider, requisitesMet);
         result =
             new CLayout(
                 result.size.max(caseLayout.size), result.alignment.max(caseLayout.alignment));
       }
       return compute(new IRTagS(), arch, typeLayoutProvider).concat(result);
-    } else if (tree.isIsValue()) {
-      // Branch depending on if the value requisites are met or not
-      IRSlotTree.IsValue isValue = (IRSlotTree.IsValue) tree;
-      CCondition condition = typeIsValue.apply(isValue.requisites());
-      CLayout valueLayout = computeMaximum(isValue.value(), arch, typeLayoutProvider, typeIsValue);
+    } else if (tree.isType()) {
+      // Branch depending on if the requisites are met or not
+      IRSlotTree.Type type = (IRSlotTree.Type) tree;
+      CCondition condition = requisitesMet.apply(type.requisites());
+      CLayout valueLayout = computeMaximum(type.met(), arch, typeLayoutProvider, requisitesMet);
       CLayout notValueLayout =
-          computeMaximum(isValue.notValue(), arch, typeLayoutProvider, typeIsValue);
+          computeMaximum(type.unmet(), arch, typeLayoutProvider, requisitesMet);
       return condition.ternary(valueLayout, notValueLayout);
     } else {
       throw new IllegalArgumentException("Unsupported slot tree: " + tree);
@@ -127,10 +127,10 @@ public class CLayout {
       IRSlotCombinations combinations,
       CArchitecture arch,
       Function<IRTypeId, CLayout> typeLayoutProvider,
-      Function<IRValueRequisites, CCondition> typeIsValue) {
+      Function<IRTypeFlagRequisites, CCondition> requisitesMet) {
     CLayout layout = new CLayout(CSize.zero(), CAlignment.one());
     for (IRSlotTree tree : combinations.list()) {
-      CLayout treeLayout = computeMaximum(tree, arch, typeLayoutProvider, typeIsValue);
+      CLayout treeLayout = computeMaximum(tree, arch, typeLayoutProvider, requisitesMet);
       layout.size = layout.size.max(treeLayout.size);
       layout.alignment = layout.alignment.max(treeLayout.alignment);
     }

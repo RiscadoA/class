@@ -1,7 +1,9 @@
 package pt.inescid.cllsj.compiler.ir.slot;
 
+import java.util.function.BiFunction;
 import java.util.function.Function;
-import pt.inescid.cllsj.compiler.ir.IRValueRequisites;
+import pt.inescid.cllsj.compiler.ir.IRTypeFlagRequisites;
+import pt.inescid.cllsj.compiler.ir.id.IRTypeFlag;
 import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
 
 public class IRVarS extends IRSlot {
@@ -28,7 +30,7 @@ public class IRVarS extends IRSlot {
   @Override
   public IRSlotTree replaceTypes(
       Function<IRTypeId, IRSlotTree> typeReplacer,
-      Function<IRTypeId, IRValueRequisites> reqsReplacer) {
+      BiFunction<IRTypeId, IRTypeFlag, IRTypeFlagRequisites> reqsReplacer) {
     return typeReplacer.apply(typeId);
   }
 }
