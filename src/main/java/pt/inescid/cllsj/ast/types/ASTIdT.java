@@ -32,6 +32,14 @@ public class ASTIdT extends ASTType {
     haspars = true;
   }
 
+  public List<ASTType> getargs() {
+    if (!haspars) {
+      return List.of();
+    } else {
+      return args;
+    }
+  }
+
   public String getid() {
     return s;
   }

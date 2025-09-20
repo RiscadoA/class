@@ -1,0 +1,45 @@
+type rec List {
+  choice of {
+    |#next: state List
+    |#stop: close
+  }
+};;
+
+proc rec foo(l: ~List) {
+  unfold l;
+  case l of {
+    |#next:
+      println("take");
+      take l(l2);
+      put l(l3. affine l3; #stop l3; close l3);
+      release l;
+      foo(l2)
+    |#stop:
+      wait l; ()
+  }
+};;
+
+proc main() {
+  cut {
+    unfold l1;
+    #next l1;
+    cell l1(l2.
+      affine l2;
+      unfold l2;
+      #next l2;
+      cell l2(l3.
+        affine l3;
+        unfold l3;
+        #next l3;
+        cell l3(l4.
+          affine l4;
+          unfold l4;
+          #stop l4;
+          close l4
+        )
+      )
+    )
+    |l1: ~List|
+    foo(l1)
+  }
+};;

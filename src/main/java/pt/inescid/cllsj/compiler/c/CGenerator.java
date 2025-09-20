@@ -822,21 +822,24 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRBindSession instr) {
-    // Copy the session into this environment
-    String source = data(instr.getSourceLocation()).deref("struct session*");
-    CAddress targetAddr = sessionAddress(instr.getTargetSessionId());
-    putCopyMemory(targetAddr, CAddress.of(source), compiler.arch.sessionSize());
+    // Get the address of the remote session to bind to
+    CAddress remoteAddr = CAddress.of(data(instr.getSourceLocation()).deref("char*"));
+    String remoteSession = accessSession(remoteAddr.toString());
 
-    // Modify the remote session to point to the target session
-    String remoteSessionAddr = remoteSessionAddress(instr.getTargetSessionId());
-    putIf(
-        remoteSessionAddr + " != " + NULL,
-        () -> {
-          String remoteSession = accessSession(remoteSessionAddr);
-          putAssign(sessionContEnv(remoteSession), ENV);
-          putAssign(sessionContSession(remoteSession), targetAddr);
-          putAssign(sessionContData(remoteSession), data(instr.getLocalData()));
-        });
+    // Get the address of the local session which will be bound to the remote session
+    CAddress localAddr = sessionAddress(instr.getTargetSessionId());
+    String localSession = accessSession(instr.getTargetSessionId());
+
+    // Copy the session into this environment
+    putCopyMemory(localAddr, remoteAddr, compiler.arch.sessionSize());
+
+    // Make the sessions point to each other
+    putAssign(sessionContSession(localSession), remoteAddr);
+    putAssign(sessionContSession(remoteSession), localAddr);
+
+    // Modify the remote session to point to this environment
+    putAssign(sessionContEnv(remoteSession), ENV);
+    putAssign(sessionContData(remoteSession), data(instr.getLocalData()));
   }
 
   @Override
@@ -866,8 +869,19 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRWriteSession instr) {
-    String ref = data(instr.getLocation()).deref("struct session*");
-    putAssign(ref, sessionAddress(instr.getSessionId()).cast("struct session"));
+    String local = accessSession(instr.getSessionId());
+    String remote = accessRemoteSession(instr.getSessionId());
+
+    // Write the session address of the remote session
+    String ref = data(instr.getLocation()).deref("char*");
+    putAssign(ref, remoteSessionAddress(instr.getSessionId()));
+
+    // Store the continuation of the local session in the remote session
+    // This is necessary for the future bindSession instruction to be able
+    // to obtain the correct continuation
+    putAssign(sessionCont(remote), sessionCont(local));
+    putAssign(sessionContEnv(remote), sessionContEnv(local));
+    putAssign(sessionContData(remote), sessionContData(local));
   }
 
   @Override
@@ -2508,15 +2522,14 @@ public class CGenerator extends IRInstructionVisitor {
                 // To drop the cell's contents, we drop its affine session
                 String sessionPtr = cellData(cellAddr, IRSlotOffset.ZERO).deref("struct session*");
                 String session = accessSession(sessionPtr);
-                String remoteSession = accessRemoteSession(session);
 
                 String tagRef = CAddress.of(sessionContData(session)).deref("unsigned char");
                 putAssign(tagRef, 0); // 0 means discard
                 String label = makeLabel("drop_affine");
                 putAssign(TMP_PTR1, sessionCont(session));
                 putAssign(TMP_PTR2, sessionContEnv(session));
-                putAssign(sessionCont(remoteSession), labelAddress(label));
-                putAssign(sessionContEnv(remoteSession), ENV);
+                putAssign(sessionCont(session), labelAddress(label));
+                putAssign(sessionContEnv(session), ENV);
                 putAssign(ENV, cast(TMP_PTR2, "char*"));
                 putComputedGoto(TMP_PTR1);
                 putLabel(label);

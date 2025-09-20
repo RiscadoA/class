@@ -196,6 +196,19 @@ public class ASTPrinter extends ASTNodeVisitor {
     @Override
     public void visit(ASTIdT type) {
       out.print(type.getid());
+      if (!type.getargs().isEmpty()) {
+        out.print("(");
+        boolean first = true;
+        for (ASTType arg : type.getargs()) {
+          if (first) {
+            first = false;
+          } else {
+            out.print(", ");
+          }
+          arg.accept(this);
+        }
+        out.print(")");
+      }
     }
 
     @Override
@@ -321,7 +334,7 @@ public class ASTPrinter extends ASTNodeVisitor {
 
     @Override
     public void visit(ASTCellT type) {
-      out.print("cell ");
+      out.print("state ");
       type.getin().accept(this);
     }
 
@@ -333,13 +346,13 @@ public class ASTPrinter extends ASTNodeVisitor {
 
     @Override
     public void visit(ASTCellLT type) {
-      out.print("cellL ");
+      out.print("statel ");
       type.getin().accept(this);
     }
 
     @Override
     public void visit(ASTUsageLT type) {
-      out.print("usageL ");
+      out.print("usagel ");
       type.getin().accept(this);
     }
   }
@@ -383,7 +396,7 @@ public class ASTPrinter extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTCoClose node) {
-    indentPrintln("wait " + node.getCh());
+    indentPrintln("wait " + node.getCh() + ";");
     node.getRhs().accept(this);
   }
 
@@ -666,7 +679,7 @@ public class ASTPrinter extends ASTNodeVisitor {
     node.getLhsType().accept(new ASTTypePrinter());
     out.println(".");
     indentLevel++;
-    node.getRhs().accept(this);
+    node.getLhs().accept(this);
     indentLevel--;
     indentPrintln(");");
     node.getRhs().accept(this);
