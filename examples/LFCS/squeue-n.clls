@@ -55,21 +55,16 @@ proc Some(val:~Aint,o:Opt(Aint)) {
 
 proc deq( hd:~Ptr, rv:pair Opt(Aint);Ptr) {
 
-    sleep 100;
-    println("#Deq-go");    
     take hd(hp);
     take hp(lh);
-    println("#Deq-get");    
     case lh of {
         |#Nil : // empty queue
-    	    println("#Deq-nil");    
             wait lh;
             put hp(c. nil<lint>(c));
             put hd(hp);
             rv <- { r. None(r) };
             fwd hd rv
         |#Next : 
-    	    println("#Deq-next");    
             recv lh(val);
             rv <- { r. Some(val,r) };
             unfold lh;
@@ -109,6 +104,7 @@ type corec DeqI {
 };;
 
 proc rec enqop(enqi:EnqI,tl:~Ptr) {
+    sleep 1;
 	case enqi of {
         |#Enq:  recv enqi(item); 
                 letc tnext:Ptr {
@@ -121,8 +117,9 @@ proc rec enqop(enqi:EnqI,tl:~Ptr) {
 };;
 
 proc rec deqop(deci:DeqI,tl:~Ptr) {
+    sleep 2;
 	case deci of {
-        |#Deq:  println("#Deq-op");
+        |#Deq:  
 		letc tnext:pair Opt(Aint); Ptr {
 		    
                     deq(tl,tnext)
@@ -168,7 +165,6 @@ proc unsafe_rec deq_user(cl:~DeqI;N:~lint) {
         #End cl; 
         close cl 
     } else {
-    	println("#Deq");
         #Deq cl; 
         recv cl(ans);
         case ans of {
@@ -211,5 +207,5 @@ proc main3() {
 };;
 
 proc main() {
-	main3()
+	mainq(;10000)
 };;

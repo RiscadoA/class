@@ -179,6 +179,5 @@ proc mainm(;n:~lint) {
 };;
 
 proc main() {
-    println("go"); 
-	mainm(;3)
+    println("go"); ()
 };;

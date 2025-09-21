@@ -871,7 +871,10 @@ public class CGenerator extends IRInstructionVisitor {
 
     // This is necessary for the future bindSession instruction to be able
     // to obtain the correct session state
-    putCopyMemory(CAddress.of(remoteSessionAddress(instr.getSessionId())), sessionAddress(instr.getSessionId()), compiler.arch.sessionSize());
+    putCopyMemory(
+        CAddress.of(remoteSessionAddress(instr.getSessionId())),
+        sessionAddress(instr.getSessionId()),
+        compiler.arch.sessionSize());
   }
 
   @Override
