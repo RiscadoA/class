@@ -31,6 +31,14 @@ type ALockOrder { // unfolded
 	state Lock
 };;
 
+type ALock {
+	affine Lock
+};;
+
+type ELock {
+	statel Lock
+};;
+
 proc rec newFork(f:Fork; nam:colstring)
 {
 	affine f;
@@ -45,13 +53,6 @@ proc rec newFork(f:Fork; nam:colstring)
     }
 };;
 
-type ALock {
-	affine Lock
-};;
-
-type ELock {
-	statel Lock
-};;
 
 proc null(v:ALock, f:~AFork) {
 	affine v;
@@ -81,13 +82,16 @@ proc addOrder(s:~LockOrder, f:~AFork, sr:LockOrder) {
 	fwd s sr
 };;
 
+/*
 proc addOrderTR(s:~LockOrder, f:~Fork, sr:send close;LockOrder) {
 	take s (h: ~ALock );
+	unfold f;
 	put s (n:ALock. next(n,f, h));
 	send sr (x.close x);
     unfold sr;
 	fwd s sr
 };;
+*/
 
 proc unsafe_rec getNth(n:~!lint, s: ~ALockOrder, lh: ALockOrder)
 {
@@ -105,10 +109,12 @@ proc unsafe_rec getNth(n:~!lint, s: ~ALockOrder, lh: ALockOrder)
 					getNth(n-1,h,lh)
 			     	||
 			    	put s (hh:ALock.affine hh;
-					send hh (f0:AFork. fwd f f0);
-					affine hh;
-					#Next hh; unfold hh; fwd hh h);
-			    		release s
+						send hh (f0:AFork. fwd f f0);
+						affine hh;
+						#Next hh;
+						unfold hh;
+						fwd hh h);
+			    	drop s
                }
          }
     }
@@ -125,7 +131,7 @@ proc eat(s: ~ALockOrder, lh: ALockOrder; nam:colstring )
 	   	put s (v:ALock.null(v,f));
 	   	fwd s lh
 	| #Next: 
-		take h1 (h2: ~ALock );
+		take h1 (h2:~ALock );
 		recv h2 (f2:~AFork);
 		print (nam+" "); #Pick f;
 		print (nam+" "); #Pick f2; 
@@ -133,11 +139,11 @@ proc eat(s: ~ALockOrder, lh: ALockOrder; nam:colstring )
 		print (nam+" "); #Drop f; 
 		print (nam+" "); #Drop f2;
 		unfold f2;
-		unfold f;
 		put h1 (n2: ALock. 
 				affine n2;
 				send n2 (f0:AFork. fwd f2 f0);
 				fwd h2 n2);
+		unfold f;
 		put s (n1: ALock. 
 				affine n1;
 				send n1 (f0:AFork. fwd f f0);
@@ -266,13 +272,17 @@ proc philosophers3(;n:~lint)
 		sleep 100;
 		philo("P1",h0;n) 
 		||
+		drop s2
+		/*
 		letc h1: LockOrder { getNth(1,s2,h1) };
 		sleep 100;
 		philo("P2",h1;n)
 		||
 		sleep 100;
 		philoSM("P0",s2;n) 
+		*/
 	} 
+	
 };;
 
 proc main() {
