@@ -212,12 +212,12 @@ public class IRIsValueChecker extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTSendTT type) {
-    types = Optional.empty();
+    expectPolarity(true);
   }
 
   @Override
   public void visit(ASTRecvTT type) {
-    types = Optional.empty();
+    expectPolarity(false);
   }
 
   @Override
