@@ -83,6 +83,7 @@ proc push(hd:~Ptr, v:~affine lint, hdo:Ptr) {
     letc nc: LList(lint) {
         cell nc (cn)
     };
+    unfold nc;
     put hd(nc);
     forward hd hdo
 };;
@@ -134,7 +135,8 @@ proc lstack(ipush:PushI,ipop:PopI) {
         cell sn (c.nil<lint>(c))
     };
     letc hd:Ptr {
-            cell hd (sn)
+        unfold sn;
+        cell hd (sn)
     };
     share hd {
         popop(ipop,hd)
@@ -179,5 +181,5 @@ proc mainm(;n:~lint) {
 };;
 
 proc main() {
-    println("go"); ()
+    mainm(; 10)
 };;
