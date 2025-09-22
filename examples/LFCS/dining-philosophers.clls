@@ -131,6 +131,7 @@ proc eat(s: ~ALockOrder, lh: ALockOrder; nam:colstring )
 	   	put s (v:ALock.null(v,f));
 	   	fwd s lh
 	| #Next: 
+	
 		take h1 (h2:~ALock );
 		recv h2 (f2:~AFork);
 		print (nam+" "); #Pick f;
