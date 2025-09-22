@@ -16,19 +16,13 @@ import pt.inescid.cllsj.compiler.ir.slot.IRVarS;
 
 public class CSlotDropper extends IRSlotVisitor {
   private CGenerator gen;
-  private Function<IRTypeId, String> typeNodeCount;
   private Function<IRTypeId, String> typeNode;
   private CAddress address;
 
   public static void drop(
-      CGenerator gen,
-      Function<IRTypeId, String> typeNodeCount,
-      Function<IRTypeId, String> typeNode,
-      CAddress address,
-      IRSlot slot) {
+      CGenerator gen, Function<IRTypeId, String> typeNode, CAddress address, IRSlot slot) {
     CSlotDropper dropper = new CSlotDropper();
     dropper.gen = gen;
-    dropper.typeNodeCount = typeNodeCount;
     dropper.typeNode = typeNode;
     dropper.address = address;
     slot.accept(dropper);
@@ -50,7 +44,18 @@ public class CSlotDropper extends IRSlotVisitor {
 
   @Override
   public void visit(IRSessionS slot) {
-    throw new IllegalArgumentException("Sessions cannot be dropped");
+    // Assume session follows the affine protocol
+    String session = gen.accessSession(address.deref("struct session*"));
+    String tagRef = CAddress.of(gen.sessionContData(session)).deref("unsigned char");
+    String returnLabel = gen.makeLabel("drop_session_return");
+    gen.putAssign(tagRef, 0); // 0 means discard
+    gen.putAssign(CGenerator.TMP_PTR1, gen.sessionCont(session));
+    gen.putAssign(CGenerator.TMP_PTR2, gen.sessionContEnv(session));
+    gen.putAssign(gen.sessionCont(session), gen.labelAddress(returnLabel));
+    gen.putAssign(gen.sessionContEnv(session), CGenerator.ENV);
+    gen.putAssign(CGenerator.ENV, "(char*)" + CGenerator.TMP_PTR2);
+    gen.putComputedGoto(CGenerator.TMP_PTR1);
+    gen.putLabel(returnLabel);
   }
 
   @Override
@@ -70,12 +75,9 @@ public class CSlotDropper extends IRSlotVisitor {
 
   @Override
   public void visit(IRVarS slot) {
-    gen.putTypeNodeTraversal(
-        slot.getTypeId(),
-        typeNodeCount,
-        typeNode,
-        address,
-        address -> drop(gen, typeNodeCount, typeNode, address, new IRExponentialS()),
-        address -> drop(gen, typeNodeCount, typeNode, address, new IRStringS()));
+    String dropReturn = gen.makeLabel("drop_return");
+    gen.putPushTypeFrame(address, typeNode.apply(slot.getTypeId()), gen.labelAddress(dropReturn));
+    gen.putConstantGoto("drop_type_frame");
+    gen.putLabel(dropReturn);
   }
 }

@@ -166,7 +166,9 @@ public class Optimizer {
     } else if (last instanceof IRFinishSession) {
       IRFinishSession i = (IRFinishSession) last;
       AnlFlowContinuation contBefore =
-          prev.getStates().getLast().session(i.getSessionId()).cont.get();
+          prev.getStates().getLast().session(i.getSessionId()).cont.orElseThrow(
+            () -> new IllegalStateException("Could not find writer for " + i + " on process " + ir.getId())
+          );
       contBefore.replaceWritten(Optional.empty());
 
       // We're removing a single end point of the process
@@ -559,7 +561,7 @@ public class Optimizer {
           (id, flag) -> {
             for (IRCallProcess.TypeArgument arg : call.getTypeArguments()) {
               if (arg.getTargetType().equals(id)) {
-                return arg.getSourceFlagRequisites(flag);
+                return Optional.of(arg.getSourceFlags().get(flag)).orElseThrow();
               }
             }
             throw new IllegalStateException("Unbound type variable: " + id);
@@ -753,9 +755,8 @@ public class Optimizer {
 
   private static class MonomorphizationArgs {
     Map<IRTypeId, IRSlotTree> typeTrees = new HashMap<>();
-    Map<IRTypeId, Boolean> typeIsValue = new HashMap<>();
+    Map<IRTypeId, Map<IRTypeFlag, Boolean>> typeFlags = new HashMap<>();
   }
-  ;
 
   public void monomorphizeProcesses(IRProgram ir) {
     // While there are process calls / exponential writes with concrete type arguments
@@ -771,14 +772,20 @@ public class Optimizer {
             MonomorphizationArgs args = new MonomorphizationArgs();
             boolean candidate = !call.getTypeArguments().isEmpty();
             for (IRCallProcess.TypeArgument arg : call.getTypeArguments()) {
-              if (arg.isFromLocation()
-                  || arg.getSourceTree().isPolymorphic()
-                  || arg.getSourceIsValue().isUncertain()) {
+              if (arg.isFromLocation() || arg.getSourceTree().isPolymorphic()) {
                 candidate = false;
                 break;
               }
               args.typeTrees.put(arg.getTargetType(), arg.getSourceTree());
-              args.typeIsValue.put(arg.getTargetType(), arg.getSourceIsValue().isGuaranteed());
+              for (IRTypeFlag flag : arg.getSourceFlags().keySet()) {
+                if (arg.getSourceFlags().get(flag).isUncertain()) {
+                  candidate = false;
+                  break;
+                }
+                args.typeFlags
+                    .computeIfAbsent(arg.getTargetType(), k -> new HashMap<>())
+                    .put(flag, arg.getSourceFlags().get(flag).isGuaranteed());
+              }
             }
             if (!candidate) {
               // No type arguments or not all concrete, not a valid candidate
@@ -800,12 +807,20 @@ public class Optimizer {
             MonomorphizationArgs args = new MonomorphizationArgs();
             boolean candidate = !write.getTypeArguments().isEmpty();
             for (IRWriteExponential.TypeArgument arg : write.getTypeArguments()) {
-              if (arg.getSourceTree().isPolymorphic() || arg.getSourceIsValue().isUncertain()) {
+              if (arg.getSourceTree().isPolymorphic()) {
                 candidate = false;
                 break;
               }
               args.typeTrees.put(arg.getTargetType(), arg.getSourceTree());
-              args.typeIsValue.put(arg.getTargetType(), arg.getSourceIsValue().isGuaranteed());
+              for (IRTypeFlag flag : arg.getSourceFlags().keySet()) {
+                if (arg.getSourceFlags().get(flag).isUncertain()) {
+                  candidate = false;
+                  break;
+                }
+                args.typeFlags
+                    .computeIfAbsent(arg.getTargetType(), k -> new HashMap<>())
+                    .put(flag, arg.getSourceFlags().get(flag).isGuaranteed());
+              }
             }
             if (!candidate) {
               // No type arguments or not all concrete, not a valid candidate
@@ -839,15 +854,16 @@ public class Optimizer {
           IRProcess newProc = originalProc.clone(newId);
           newProc.removeTypes();
           newProc.replaceTypes(
-              id -> args.typeTrees.get(id),
+              id ->
+                  Optional.ofNullable(args.typeTrees.get(id))
+                      .orElseThrow(
+                          () -> {
+                            throw new IllegalStateException("Unbound type variable: " + id);
+                          }),
               (id, flag) -> {
-                if (flag.equals(IRTypeFlag.IS_VALUE)) {
-                  return args.typeIsValue.get(id)
-                      ? IRTypeFlagRequisites.guaranteed()
-                      : IRTypeFlagRequisites.impossible();
-                } else {
-                  throw new IllegalStateException("Unknown type flag: " + flag);
-                }
+                return Optional.ofNullable(args.typeFlags.get(id)).orElseThrow().get(flag)
+                    ? IRTypeFlagRequisites.guaranteed()
+                    : IRTypeFlagRequisites.impossible();
               });
           ir.add(newProc);
         }
@@ -865,8 +881,11 @@ public class Optimizer {
     for (IRTypeId key : keys) {
       sb.append("_");
       sb.append(key);
-      sb.append("_");
-      sb.append(args.typeIsValue.get(key) ? "v" : "n");
+      for (IRTypeFlag flag : args.typeFlags.get(key).keySet()) {
+        sb.append("_");
+        sb.append(flag.toString().charAt(0));
+        sb.append(args.typeFlags.get(key).get(flag) ? "t" : "f");
+      }
       if (!args.typeTrees.get(key).isLeaf()) {
         sb.append("_");
         sb.append(args.typeTrees.get(key).toString().replaceAll("[ ,;\\[\\]\\(\\){}\\|]", ""));

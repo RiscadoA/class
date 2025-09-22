@@ -16,19 +16,13 @@ import pt.inescid.cllsj.compiler.ir.slot.IRVarS;
 
 public class CSlotCloner extends IRSlotVisitor {
   private CGenerator gen;
-  private Function<IRTypeId, String> typeNodeCount;
   private Function<IRTypeId, String> typeNode;
   private CAddress address;
 
   public static void clone(
-      CGenerator gen,
-      Function<IRTypeId, String> typeNodeCount,
-      Function<IRTypeId, String> typeNode,
-      CAddress address,
-      IRSlot slot) {
+      CGenerator gen, Function<IRTypeId, String> typeNode, CAddress address, IRSlot slot) {
     CSlotCloner cloner = new CSlotCloner();
     cloner.gen = gen;
-    cloner.typeNodeCount = typeNodeCount;
     cloner.typeNode = typeNode;
     cloner.address = address;
     slot.accept(cloner);
@@ -70,12 +64,9 @@ public class CSlotCloner extends IRSlotVisitor {
 
   @Override
   public void visit(IRVarS slot) {
-    gen.putTypeNodeTraversal(
-        slot.getTypeId(),
-        typeNodeCount,
-        typeNode,
-        address,
-        address -> clone(gen, typeNodeCount, typeNode, address, new IRExponentialS()),
-        address -> clone(gen, typeNodeCount, typeNode, address, new IRStringS()));
+    String cloneReturn = gen.makeLabel("clone_return");
+    gen.putPushTypeFrame(address, typeNode.apply(slot.getTypeId()), gen.labelAddress(cloneReturn));
+    gen.putConstantGoto("clone_type_frame");
+    gen.putLabel(cloneReturn);
   }
 }

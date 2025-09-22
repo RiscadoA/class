@@ -45,6 +45,10 @@ public class IRTypeFlagRequisites {
     return isPossible() && !isGuaranteed();
   }
 
+  public boolean canBeUnmet() {
+    return types.isEmpty() || !types.get().isEmpty();
+  }
+
   public Map<IRTypeId, Set<IRTypeFlag>> flagsByType() {
     return types.orElseThrow();
   }

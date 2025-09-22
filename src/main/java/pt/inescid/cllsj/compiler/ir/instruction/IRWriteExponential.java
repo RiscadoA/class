@@ -1,6 +1,8 @@
 package pt.inescid.cllsj.compiler.ir.instruction;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.BiFunction;
 import java.util.function.Function;
 import pt.inescid.cllsj.compiler.ir.IRTypeFlagRequisites;
@@ -15,12 +17,20 @@ public class IRWriteExponential extends IRWrite {
   public static class TypeArgument {
     private IRSlotTree sourceTree;
     private IRTypeFlagRequisites sourceIsValue;
+    private IRTypeFlagRequisites sourceIsCloneable;
+    private IRTypeFlagRequisites sourceIsDroppable;
     private IRTypeId targetType;
 
     public TypeArgument(
-        IRSlotTree sourceTree, IRTypeFlagRequisites sourceIsValue, IRTypeId targetType) {
+        IRSlotTree sourceTree,
+        IRTypeFlagRequisites sourceIsValue,
+        IRTypeFlagRequisites sourceIsCloneable,
+        IRTypeFlagRequisites sourceIsDroppable,
+        IRTypeId targetType) {
       this.sourceTree = sourceTree;
       this.sourceIsValue = sourceIsValue;
+      this.sourceIsCloneable = sourceIsCloneable;
+      this.sourceIsDroppable = sourceIsDroppable;
       this.targetType = targetType;
     }
 
@@ -28,16 +38,12 @@ public class IRWriteExponential extends IRWrite {
       return sourceTree;
     }
 
-    public IRTypeFlagRequisites getSourceIsValue() {
-      return sourceIsValue;
-    }
-
-    public IRTypeFlagRequisites getSourceFlagRequisites(IRTypeFlag flag) {
-      if (flag.equals(IRTypeFlag.IS_VALUE)) {
-        return sourceIsValue;
-      } else {
-        return IRTypeFlagRequisites.impossible();
-      }
+    public Map<IRTypeFlag, IRTypeFlagRequisites> getSourceFlags() {
+      Map<IRTypeFlag, IRTypeFlagRequisites> flags = new HashMap<>();
+      flags.put(IRTypeFlag.IS_VALUE, sourceIsValue);
+      flags.put(IRTypeFlag.IS_CLONEABLE, sourceIsCloneable);
+      flags.put(IRTypeFlag.IS_DROPPABLE, sourceIsDroppable);
+      return flags;
     }
 
     public IRTypeId getTargetType() {
@@ -45,12 +51,22 @@ public class IRWriteExponential extends IRWrite {
     }
 
     public TypeArgument clone() {
-      return new TypeArgument(sourceTree, sourceIsValue, targetType);
+      return new TypeArgument(
+          sourceTree, sourceIsValue, sourceIsCloneable, sourceIsDroppable, targetType);
     }
 
     @Override
     public String toString() {
-      return targetType + " <- " + sourceTree + " (value=" + sourceIsValue + ")";
+      return targetType
+          + " <- "
+          + sourceTree
+          + " (value="
+          + sourceIsValue
+          + ", cloneable="
+          + sourceIsCloneable
+          + ", droppable="
+          + sourceIsDroppable
+          + ")";
     }
   }
 
@@ -167,6 +183,8 @@ public class IRWriteExponential extends IRWrite {
     super.replaceTypes(slotReplacer, reqReplacer);
     for (TypeArgument arg : typeArguments) {
       arg.sourceIsValue = arg.sourceIsValue.expandTypes(reqReplacer);
+      arg.sourceIsCloneable = arg.sourceIsCloneable.expandTypes(reqReplacer);
+      arg.sourceIsDroppable = arg.sourceIsDroppable.expandTypes(reqReplacer);
     }
   }
 
