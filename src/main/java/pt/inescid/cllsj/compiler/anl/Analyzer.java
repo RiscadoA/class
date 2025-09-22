@@ -202,7 +202,17 @@ public class Analyzer extends IRInstructionVisitor {
 
   @Override
   public void visit(IRWriteSession instr) {
-    state.write(this, instr.getLocation(), new AnlSlot.Session(instr.getSessionId()));
+    AnlSessionState local = state.session(instr.getSessionId());
+
+    if (local.remote.isEmpty()) {
+      state.write(this, instr.getLocation(), new AnlSlot.Unknown());
+    } else {
+      AnlSessionState remote = state.session(local.remote.get());
+      remote.cont = local.cont;
+      remote.data = local.data;
+      remote.remote = local.remote;
+      state.write(this, instr.getLocation(), new AnlSlot.Session(local.remote.get()));
+    }
   }
 
   @Override

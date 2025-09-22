@@ -24,20 +24,30 @@ public class IRCallProcess extends IRInstruction {
     private Optional<IRDataLocation> sourceLocation;
     private Optional<IRSlotTree> sourceTree;
     private Optional<IRTypeFlagRequisites> sourceIsValue;
+    private Optional<IRTypeFlagRequisites> sourceIsCloneable;
+    private Optional<IRTypeFlagRequisites> sourceIsDroppable;
     private IRTypeId targetType;
 
     public TypeArgument(IRDataLocation sourceLocation, IRTypeId targetType) {
       this.sourceLocation = Optional.of(sourceLocation);
       this.sourceTree = Optional.empty();
       this.sourceIsValue = Optional.empty();
+      this.sourceIsCloneable = Optional.empty();
+      this.sourceIsDroppable = Optional.empty();
       this.targetType = targetType;
     }
 
     public TypeArgument(
-        IRSlotTree sourceTree, IRTypeFlagRequisites sourceIsValue, IRTypeId targetType) {
+        IRSlotTree sourceTree,
+        IRTypeFlagRequisites sourceIsValue,
+        IRTypeFlagRequisites sourceIsCloneable,
+        IRTypeFlagRequisites sourceIsDroppable,
+        IRTypeId targetType) {
       this.sourceLocation = Optional.empty();
       this.sourceTree = Optional.of(sourceTree);
       this.sourceIsValue = Optional.of(sourceIsValue);
+      this.sourceIsCloneable = Optional.of(sourceIsCloneable);
+      this.sourceIsDroppable = Optional.of(sourceIsDroppable);
       this.targetType = targetType;
     }
 
@@ -53,16 +63,12 @@ public class IRCallProcess extends IRInstruction {
       return sourceTree.orElseThrow();
     }
 
-    public IRTypeFlagRequisites getSourceIsValue() {
-      return sourceIsValue.orElseThrow();
-    }
-
-    public IRTypeFlagRequisites getSourceFlagRequisites(IRTypeFlag flag) {
-      if (flag.equals(IRTypeFlag.IS_VALUE)) {
-        return sourceIsValue.orElseThrow();
-      } else {
-        return IRTypeFlagRequisites.impossible();
-      }
+    public Map<IRTypeFlag, IRTypeFlagRequisites> getSourceFlags() {
+      Map<IRTypeFlag, IRTypeFlagRequisites> flags = new HashMap<>();
+      flags.put(IRTypeFlag.IS_VALUE, sourceIsValue.orElseThrow());
+      flags.put(IRTypeFlag.IS_CLONEABLE, sourceIsCloneable.orElseThrow());
+      flags.put(IRTypeFlag.IS_DROPPABLE, sourceIsDroppable.orElseThrow());
+      return flags;
     }
 
     public IRTypeId getTargetType() {
@@ -73,7 +79,12 @@ public class IRCallProcess extends IRInstruction {
       if (sourceLocation.isPresent()) {
         return new TypeArgument(sourceLocation.get(), targetType);
       } else {
-        return new TypeArgument(sourceTree.get(), sourceIsValue.get(), targetType);
+        return new TypeArgument(
+            sourceTree.get(),
+            sourceIsValue.get(),
+            sourceIsCloneable.get(),
+            sourceIsDroppable.get(),
+            targetType);
       }
     }
 
@@ -82,7 +93,16 @@ public class IRCallProcess extends IRInstruction {
       if (sourceLocation.isPresent()) {
         return targetType + " <- " + sourceLocation.get();
       } else {
-        return targetType + " <- " + sourceTree.get() + " (value=" + sourceIsValue.get() + ")";
+        return targetType
+            + " <- "
+            + sourceTree.get()
+            + " (value="
+            + sourceIsValue.get()
+            + ", cloneable="
+            + sourceIsCloneable.get()
+            + ", droppable="
+            + sourceIsDroppable.get()
+            + ")";
       }
     }
   }
@@ -307,6 +327,8 @@ public class IRCallProcess extends IRInstruction {
     super.replaceTypes(slotReplacer, reqReplacer);
     for (TypeArgument arg : typeArguments) {
       arg.sourceIsValue = arg.sourceIsValue.map(r -> r.expandTypes(reqReplacer));
+      arg.sourceIsCloneable = arg.sourceIsCloneable.map(r -> r.expandTypes(reqReplacer));
+      arg.sourceIsDroppable = arg.sourceIsDroppable.map(r -> r.expandTypes(reqReplacer));
     }
   }
 

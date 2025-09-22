@@ -176,7 +176,7 @@ public class IREnvironment {
         channel.isLockedCell);
   }
 
-  public IREnvironment resetChannelIfNotValue(String name, IRTypeFlagRequisites reqs) {
+  public IREnvironment resetChannelIfRequisitesUnmet(String name, IRTypeFlagRequisites reqs) {
     Channel channel = getChannel(name);
     return new Channel(
         this,

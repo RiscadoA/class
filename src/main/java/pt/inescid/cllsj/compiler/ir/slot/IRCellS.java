@@ -8,28 +8,20 @@ import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
 
 public class IRCellS extends IRSlot {
   private IRSlotTree slots;
-  private IRTypeFlagRequisites isValue;
 
-  public IRCellS(IRSlotTree slots, IRTypeFlagRequisites isValue) {
+  public IRCellS(IRSlotTree slots) {
     this.slots = slots;
-    this.isValue = isValue;
   }
 
   public IRSlotTree getSlots() {
     return slots;
   }
 
-  public IRTypeFlagRequisites getIsValue() {
-    return isValue;
-  }
-
   @Override
   public IRSlotTree replaceTypes(
       Function<IRTypeId, IRSlotTree> typeReplacer,
       BiFunction<IRTypeId, IRTypeFlag, IRTypeFlagRequisites> reqsReplacer) {
-    return IRSlotTree.of(
-        new IRCellS(
-            slots.replaceTypes(typeReplacer, reqsReplacer), isValue.expandTypes(reqsReplacer)));
+    return IRSlotTree.of(new IRCellS(slots.replaceTypes(typeReplacer, reqsReplacer)));
   }
 
   @Override
@@ -39,10 +31,10 @@ public class IRCellS extends IRSlot {
 
   @Override
   public String toString() {
-    if (isValue.isPossible()) {
-      return "cell[" + slots + " (value=" + isValue + ")]";
-    } else {
-      return "cell[affine]";
-    }
+    StringBuilder sb = new StringBuilder();
+    sb.append("cell[");
+    slots.toStringHelper(sb);
+    sb.append("]");
+    return sb.toString();
   }
 }

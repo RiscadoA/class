@@ -20,23 +20,28 @@ import pt.inescid.cllsj.compiler.ir.slot.*;
 
 public class CGenerator extends IRInstructionVisitor {
   // Auxiliary registers used in the execution of a single instruction
-  private static final String TMP_PTR1 = "tmp_ptr1";
-  private static final String TMP_PTR2 = "tmp_ptr2";
-  private static final String TMP_INT = "tmp_int";
-  private static final String TMP_SESSION = "tmp_session";
+  static final String TMP_PTR1 = "tmp_ptr1";
+  static final String TMP_PTR2 = "tmp_ptr2";
+  static final String TMP_PTR3 = "tmp_ptr3";
+  static final String TMP_PTR4 = "tmp_ptr4";
+  static final String TMP_INT = "tmp_int";
+  static final String TMP_SESSION = "tmp_session";
 
   // Main register which hold the execution state across many instructions
-  private static final String TASK = "task";
-  private static final String ENV = "env";
+  static final String TASK = "task";
+  static final String ENV = "env";
+  static final String TYPE_FRAME = "type_frame";
 
   // Useful constants
   private static final String NULL = "NULL";
 
   // Type node types
   public static final int TYPE_NODE_TAG = 0;
-  public static final int TYPE_NODE_STRING = 1;
-  public static final int TYPE_NODE_EXPONENTIAL = 2;
-  public static final int TYPE_NODE_INDIRECT = 3;
+  public static final int TYPE_NODE_CELL = 1;
+  public static final int TYPE_NODE_STRING = 2;
+  public static final int TYPE_NODE_EXPONENTIAL = 3;
+  public static final int TYPE_NODE_SESSION = 4;
+  public static final int TYPE_NODE_INDIRECT = 5;
 
   private Compiler compiler;
   private IRProgram program;
@@ -234,6 +239,16 @@ public class CGenerator extends IRInstructionVisitor {
         });
 
     putStruct(
+        "type_frame",
+        () -> {
+          putStatement("struct type_frame* prev");
+          putStatement("char* target");
+          putStatement("struct type_node* nodes");
+          putStatement("void* return_address");
+          putStatement("int step");
+        });
+
+    putStruct(
         "session",
         () -> {
           putStatement("void* cont");
@@ -253,7 +268,7 @@ public class CGenerator extends IRInstructionVisitor {
           putStatement("int entry_session_offset");
           putStatement("int entry_data_offset");
           putStatement("int env_size");
-          putStatement("void(*manager)(char* exp_env, char* src_env, int mode)");
+          putStatement("void* manager");
           putStatement("char env[]");
         });
 
@@ -459,8 +474,11 @@ public class CGenerator extends IRInstructionVisitor {
           putStatement("register char* " + ENV);
           putStatement("register void* " + TMP_PTR1);
           putStatement("register void* " + TMP_PTR2);
+          putStatement("register void* " + TMP_PTR3);
+          putStatement("register void* " + TMP_PTR4);
           putStatement("register int " + TMP_INT);
           putStatement("struct session " + TMP_SESSION);
+          putStatement("struct type_frame* " + TYPE_FRAME + " = " + NULL);
           putBlankLine();
 
           // Initialize the task list.
@@ -497,6 +515,42 @@ public class CGenerator extends IRInstructionVisitor {
                     putBlankLine();
                   });
 
+          // Generate all exponential managers
+          pendingExponentialManagers.entrySet().stream()
+              .forEach(e -> generateExponentialManager(e.getKey(), e.getValue()));
+
+          // Generate code for cloning polymorphic data using info in the type frame stack
+          putLabel("clone_type_frame");
+          putTypeNodeTraversal(
+              address -> CSlotCloner.clone(this, t -> null, address, new IRExponentialS()),
+              address -> CSlotCloner.clone(this, t -> null, address, new IRStringS()),
+              address -> putPanic("Sessions are not cloneable"),
+              (address, nodes) -> putPanic("Cells are not cloneable"));
+          putPopTypeFrame();
+          putBlankLine();
+
+          // Generate code for dropping polymorphic data using info in the type frame stack
+          putLabel("drop_type_frame");
+          putTypeNodeTraversal(
+              address -> CSlotDropper.drop(this, t -> null, address, new IRExponentialS()),
+              address -> CSlotDropper.drop(this, t -> null, address, new IRStringS()),
+              address -> CSlotDropper.drop(this, t -> null, address, new IRSessionS()),
+              (address, nodes) -> {
+                putDecrementCell(
+                    address,
+                    () -> {
+                      // Recursively drop the contents of the cell
+                      putPushTypeFrame(
+                          cellData(address, IRSlotOffset.ZERO),
+                          nodes,
+                          labelAddress("drop_type_frame_cell_return"));
+                      putConstantGoto("drop_type_frame");
+                      putLabel("drop_type_frame_cell_return");
+                    });
+              });
+          putPopTypeFrame();
+          putBlankLine();
+
           // Generate the end label, where the thread jumps to when it finishes execution
           // If concurrency is enabled, we must notify the main thread that we are stopping
           putLabel("end");
@@ -508,14 +562,6 @@ public class CGenerator extends IRInstructionVisitor {
           }
         });
     putBlankLine();
-
-    // Generate all exponential managers
-    pendingExponentialManagers.entrySet().stream()
-        .forEach(
-            e -> {
-              generateExponentialManager(e.getKey(), e.getValue());
-              putBlankLine();
-            });
 
     // Function which is called by new threads (and the main function)
     putBlock(
@@ -695,81 +741,84 @@ public class CGenerator extends IRInstructionVisitor {
 
     // Set up the layout and the function used to get layouts from types
     CProcessLayout layout = layout(program.get(processId));
-    Function<IRTypeId, CLayout> typeLayoutProvider = id -> typeLayout(layout, "exp_env", id);
-    Function<IRTypeFlagRequisites, CCondition> requisitesMet =
-        r -> requisitesMet(layout, "exp_env", r);
+    Function<IRTypeId, CLayout> typeLayoutProvider = id -> typeLayout(layout, ENV, id);
+    Function<IRTypeFlagRequisites, CCondition> requisitesMet = r -> requisitesMet(layout, ENV, r);
 
-    putBlock(
-        "void " + managerName(processId) + "(char* exp_env, char* src_env, int mode)",
+    putLabel(managerName(processId));
+    putIfElse(
+        TMP_INT + " == 0",
         () -> {
-          putIfElse(
-              "mode == 0",
-              () -> {
-                putComment("Clone mode");
+          putComment("Clone mode");
 
-                // Fix the type node pointers in the exponential environment
-                for (int t = 0; t < program.get(processId).getTypeCount(); ++t) {
-                  String target = typeNode(type(layout, "exp_env", new IRTypeId(t)));
-                  String source = typeNode(type(layout, "src_env", new IRTypeId(t)));
-                  putAssign(
-                      target, "(struct type_node*)(exp_env + ((char*)" + source + " - src_env))");
-                }
+          // Fix the type node pointers in the exponential environment
+          for (int t = 0; t < program.get(processId).getTypeCount(); ++t) {
+            String target = typeNode(type(layout, ENV, new IRTypeId(t)));
+            String source = typeNode(type(layout, "(char*)" + TMP_PTR1, new IRTypeId(t)));
+            putAssign(
+                target,
+                "(struct type_node*)("
+                    + ENV
+                    + " + ((char*)"
+                    + source
+                    + " - (char*)"
+                    + TMP_PTR1
+                    + "))");
+          }
 
-                for (IRWriteExponential.DataArgument arg : dataArguments) {
-                  IRLocalDataId dataId = arg.getTargetDataId();
-                  putSlotTraversal(
-                      arg.getSlots(),
-                      id -> typeLayout(layout, "exp_env", id),
-                      reqs -> requisitesMet(layout, "exp_env", reqs),
-                      (target, slot) -> {
-                        putCloneSlot(
-                            id -> typeNodeCount(type(layout, "exp_env", id)),
-                            id -> typeNode(type(layout, "exp_env", id)),
-                            target,
-                            slot);
-                      },
-                      localData(typeLayoutProvider, requisitesMet, layout, "exp_env", dataId));
-                }
-              },
-              () -> {
-                putComment("Drop mode");
-                for (IRWriteExponential.DataArgument arg : dataArguments) {
-                  IRLocalDataId dataId = arg.getTargetDataId();
-                  putSlotTraversal(
-                      arg.getSlots(),
-                      id -> typeLayout(layout, "exp_env", id),
-                      reqs -> requisitesMet(layout, "exp_env", reqs),
-                      (target, slot) -> {
-                        putDropSlot(
-                            id -> typeNodeCount(type(layout, "exp_env", id)),
-                            id -> typeNode(type(layout, "exp_env", id)),
-                            target,
-                            slot);
-                      },
-                      localData(typeLayoutProvider, requisitesMet, layout, "exp_env", dataId));
-                }
-              });
+          for (IRWriteExponential.DataArgument arg : dataArguments) {
+            IRLocalDataId dataId = arg.getTargetDataId();
+            putSlotTraversal(
+                arg.getSlots(),
+                id -> typeLayout(layout, ENV, id),
+                reqs -> requisitesMet(layout, ENV, reqs),
+                (target, slot) -> {
+                  putCloneSlot(id -> typeNode(type(layout, ENV, id)), target, slot);
+                },
+                localData(typeLayoutProvider, requisitesMet, layout, ENV, dataId));
+          }
+        },
+        () -> {
+          putComment("Drop mode");
+          for (IRWriteExponential.DataArgument arg : dataArguments) {
+            IRLocalDataId dataId = arg.getTargetDataId();
+            putSlotTraversal(
+                arg.getSlots(),
+                id -> typeLayout(layout, ENV, id),
+                reqs -> requisitesMet(layout, ENV, reqs),
+                (target, slot) -> {
+                  putDropSlot(id -> typeNode(type(layout, ENV, id)), target, slot);
+                },
+                localData(typeLayoutProvider, requisitesMet, layout, ENV, dataId));
+          }
         });
+    putAssign(TMP_PTR3, sessionCont(accessSession(layout, ENV, new IRSessionId(0))));
+    putAssign(ENV, sessionContEnv(accessSession(layout, ENV, new IRSessionId(0))));
+    putComputedGoto(TMP_PTR3);
+    putBlankLine();
   }
 
   // ============================ Instruction generation visit methods ============================
 
   @Override
   public void visit(IRPushTask instr) {
-    putPushTask(TMP_PTR1, codeLocationAddress(instr.getLocation()));
+    putPushTask(TMP_PTR1, codeLocationAddress(instr.getLocation()), ENV);
   }
 
-  private void putPushTask(String tmpVar, String address) {
+  void putPushTask(String tmpVar, String address, String env) {
     putAssign(tmpVar, TASK);
     putAllocTask(TASK);
     putAssign(taskNext(TASK), cast(tmpVar, "struct task*"));
     putAssign(taskCont(TASK), address);
-    putAssign(taskContEnv(TASK), ENV);
+    putAssign(taskContEnv(TASK), env);
   }
 
   @Override
   public void visit(IRPopTask instr) {
-    putDecrementEndPoints(instr.isEndPoint());
+    putPopTask(instr.isEndPoint(), TMP_PTR1, TMP_PTR2);
+  }
+
+  void putPopTask(boolean isEndPoint, String tmpPtr1, String tmpPtr2) {
+    putDecrementEndPoints(isEndPoint);
     putAssign(TMP_PTR1, TASK);
     putAssign(TMP_PTR2, taskCont(TASK));
     putAssign(ENV, taskContEnv(TASK));
@@ -887,7 +936,8 @@ public class CGenerator extends IRInstructionVisitor {
   public void visit(IRWriteType instr) {
     putAssign(TMP_INT, 0);
     putIfElse(
-        requisitesMet(instr.getValueRequisites()),
+        requisitesMet(instr.getFlags().get(IRTypeFlag.IS_CLONEABLE))
+            .or(requisitesMet(instr.getFlags().get(IRTypeFlag.IS_DROPPABLE))),
         () -> {
           // Count how many type nodes we'll need for the type
           putAddTypeNodeCount(TMP_INT, instr.getSlots());
@@ -919,17 +969,13 @@ public class CGenerator extends IRInstructionVisitor {
     putAssign(
         ref,
         typeInitializer(
-            cast(TMP_PTR1, "struct type_node*"),
-            TMP_INT,
-            instr.getSlots(),
-            instr.getValueRequisites()));
+            cast(TMP_PTR1, "struct type_node*"), TMP_INT, instr.getSlots(), instr.getFlags()));
   }
 
   @Override
   public void visit(IRMoveSlots instr) {
     putMoveSlots(
         instr.getSlots(),
-        id -> typeNodeCount(type(id)),
         id -> typeNode(type(id)),
         this::typeLayout,
         this::requisitesMet,
@@ -942,7 +988,6 @@ public class CGenerator extends IRInstructionVisitor {
   public void visit(IRCloneSlots instr) {
     putMoveSlots(
         instr.getSlots(),
-        id -> typeNodeCount(type(id)),
         id -> typeNode(type(id)),
         this::typeLayout,
         this::requisitesMet,
@@ -955,7 +1000,6 @@ public class CGenerator extends IRInstructionVisitor {
   public void visit(IRDropSlots instr) {
     putDropSlots(
         instr.getSlots(),
-        id -> typeNodeCount(type(id)),
         id -> typeNode(type(id)),
         this::typeLayout,
         this::requisitesMet,
@@ -1044,7 +1088,7 @@ public class CGenerator extends IRInstructionVisitor {
                     result.and(
                         CCondition.maybe(typeFlags(ref) + " & (1 << " + flag.getBit() + ")"));
               } else {
-                result = result.and(requisitesMet(arg.getSourceFlagRequisites(flag)));
+                result = result.and(requisitesMet(arg.getSourceFlags().get(flag)));
               }
             }
           }
@@ -1133,7 +1177,6 @@ public class CGenerator extends IRInstructionVisitor {
             putMoveSlots(
                 arg.getSlots(),
                 arg.isClone() && !wouldHaveBeenDropped.contains(arg),
-                id -> typeNodeCount(type(id)),
                 id -> typeNode(type(id)),
                 this::typeLayout,
                 this::requisitesMet,
@@ -1151,11 +1194,12 @@ public class CGenerator extends IRInstructionVisitor {
             putAssign(TMP_INT, 0);
           }
           for (IRCallProcess.TypeArgument arg : instr.getTypeArguments()) {
-            // Type nodes are only needed for value types
+            // Type nodes are only needed for cloneable or droppable types
             if (arg.isFromLocation()) {
               String sourceType = data(arg.getSourceLocation()).deref("struct type");
               putAssign(TMP_INT, TMP_INT + " + " + typeNodeCount(sourceType));
-            } else if (arg.getSourceIsValue().isPossible()) {
+            } else if (arg.getSourceFlags().get(IRTypeFlag.IS_CLONEABLE).isPossible()
+                || arg.getSourceFlags().get(IRTypeFlag.IS_DROPPABLE).isPossible()) {
               putAddTypeNodeCount(TMP_INT, arg.getSourceTree());
             }
           }
@@ -1188,10 +1232,13 @@ public class CGenerator extends IRInstructionVisitor {
           }
           for (IRCallProcess.TypeArgument arg : instr.getTypeArguments()) {
             // Start by initializing the type nodes and count, if needed
-            boolean canBeValue = arg.isFromLocation() || arg.getSourceIsValue().isPossible();
-            String typeNode = canBeValue ? cast(TMP_PTR2, "struct type_node*") : NULL;
-            String typeNodeCount = canBeValue ? TMP_INT : "0";
-            if (canBeValue) {
+            boolean mayNeedNodes =
+                arg.isFromLocation()
+                    || arg.getSourceFlags().get(IRTypeFlag.IS_CLONEABLE).isPossible()
+                    || arg.getSourceFlags().get(IRTypeFlag.IS_DROPPABLE).isPossible();
+            String typeNode = mayNeedNodes ? cast(TMP_PTR2, "struct type_node*") : NULL;
+            String typeNodeCount = mayNeedNodes ? TMP_INT : "0";
+            if (mayNeedNodes) {
               if (arg.isFromLocation()) {
                 // Copy them over from the source type, and then free the source type nodes
                 String source = data(arg.getSourceLocation()).deref("struct type");
@@ -1234,10 +1281,10 @@ public class CGenerator extends IRInstructionVisitor {
               putAssign(
                   targetType,
                   typeInitializer(
-                      typeNode, typeNodeCount, arg.getSourceTree(), arg.getSourceIsValue()));
+                      typeNode, typeNodeCount, arg.getSourceTree(), arg.getSourceFlags()));
             }
 
-            if (canBeValue) {
+            if (mayNeedNodes) {
               // Move the TMP_PTR2 pointer forward for the next type argument
               putAssign(
                   TMP_PTR2,
@@ -1298,7 +1345,6 @@ public class CGenerator extends IRInstructionVisitor {
             putMoveSlots(
                 arg.getSlots(),
                 arg.isClone(),
-                id -> typeNodeCount(type(calledLayout, newEnv, id)),
                 id -> typeNode(type(calledLayout, newEnv, id)),
                 id -> typeLayout(calledLayout, newEnv, id),
                 req -> requisitesMet(calledLayout, newEnv, req),
@@ -1390,7 +1436,7 @@ public class CGenerator extends IRInstructionVisitor {
     Function<IRTypeFlagRequisites, CCondition> requisitesMet =
         r ->
             requisitesMet(
-                r.expandTypes((t, f) -> findArgFromTarget.apply(t).getSourceFlagRequisites(f)));
+                r.expandTypes((t, f) -> findArgFromTarget.apply(t).getSourceFlags().get(f)));
 
     CProcessLayout expProcessLayout = layout(expProcess);
 
@@ -1398,7 +1444,8 @@ public class CGenerator extends IRInstructionVisitor {
     putAssign(TMP_INT, 0);
     for (IRWriteExponential.TypeArgument arg : typeArguments) {
       // Type nodes are only needed for value types
-      if (arg.getSourceIsValue().isPossible()) {
+      if (arg.getSourceFlags().get(IRTypeFlag.IS_CLONEABLE).isPossible()
+          || arg.getSourceFlags().get(IRTypeFlag.IS_DROPPABLE).isPossible()) {
         putAddTypeNodeCount(TMP_INT, arg.getSourceTree());
       }
     }
@@ -1434,11 +1481,7 @@ public class CGenerator extends IRInstructionVisitor {
         exponentialEntryDataOffset(exponential),
         expProcessLayout.dataOffset(typeLayoutProvider, requisitesMet, new IRLocalDataId(0)));
     putAssign(exponentialEnvSize(exponential), fullEnvSize);
-    putStatement(
-        "void "
-            + managerName(processId)
-            + "(char* exp_env, char* src_env, int mode)"); // Forward declare function
-    putAssign(exponentialManager(exponential), managerName(processId));
+    putAssign(exponentialManager(exponential), labelAddress(managerName(processId)));
     putAssign(TMP_PTR1, exponentialEnv(exponential));
     String newEnv = cast(TMP_PTR1, "char*");
 
@@ -1469,10 +1512,12 @@ public class CGenerator extends IRInstructionVisitor {
     }
     for (IRWriteExponential.TypeArgument arg : typeArguments) {
       // Start by initializing the type nodes and count, if needed
-      boolean canBeValue = arg.getSourceIsValue().isPossible();
+      boolean mayNeedNodes =
+          arg.getSourceFlags().get(IRTypeFlag.IS_CLONEABLE).isPossible()
+              || arg.getSourceFlags().get(IRTypeFlag.IS_DROPPABLE).isPossible();
       String typeNode = NULL;
-      String typeNodeCount = canBeValue ? TMP_INT : "0";
-      if (canBeValue) {
+      String typeNodeCount = mayNeedNodes ? TMP_INT : "0";
+      if (mayNeedNodes) {
         // Compute them from the source type tree
         String nodePtr = cast(TMP_PTR2, "struct type_node*");
         putAssign(TMP_INT, 0);
@@ -1490,9 +1535,9 @@ public class CGenerator extends IRInstructionVisitor {
       String targetType = type(expProcessLayout, newEnv, arg.getTargetType());
       putAssign(
           targetType,
-          typeInitializer(typeNode, typeNodeCount, arg.getSourceTree(), arg.getSourceIsValue()));
+          typeInitializer(typeNode, typeNodeCount, arg.getSourceTree(), arg.getSourceFlags()));
 
-      if (canBeValue) {
+      if (mayNeedNodes) {
         // Move the TMP_PTR2 pointer forward for the next type argument
         putAssign(
             TMP_PTR2,
@@ -1508,7 +1553,6 @@ public class CGenerator extends IRInstructionVisitor {
       putMoveSlots(
           arg.getSlots(),
           arg.isClone(),
-          id -> typeNodeCount(type(id)),
           id -> typeNode(type(id)),
           this::typeLayout,
           this::requisitesMet,
@@ -1520,26 +1564,21 @@ public class CGenerator extends IRInstructionVisitor {
   @Override
   public void visit(IRCallExponential instr) {
     String exponential = data(instr.getLocation()).deref("struct exponential*");
-    Optional<CAddress> localSessionAddress = Optional.of(sessionAddress(instr.getSessionId()));
-    Optional<CAddress> localDataAddress = Optional.of(localData(instr.getLocalDataId()));
-    putCallExponential(TMP_PTR1, exponential, localSessionAddress, localDataAddress);
+    CAddress localSessionAddress = sessionAddress(instr.getSessionId());
+    CAddress localDataAddress = localData(instr.getLocalDataId());
+    putCallExponential(exponential, localSessionAddress, localDataAddress);
   }
 
   private void putCallExponential(
-      String envVar,
-      String exponential,
-      Optional<CAddress> localSessionAddress,
-      Optional<CAddress> localDataAddress) {
+      String exponential, CAddress localSessionAddress, CAddress localDataAddress) {
+    String localSession = localSessionAddress.deref("struct session");
+    String newEnvVar = sessionContEnv(localSession);
+    CAddress newEnv = CAddress.of(newEnvVar);
     CAddress oldEnv = CAddress.of(exponentialEnv(exponential));
 
     // Allocate the new environment and initialize it by copying the one stored in the exponential
-    putAllocEnvironment(envVar, CSize.expression(exponentialEnvSize(exponential)));
-    CAddress newEnv = castToAddress(envVar);
+    putAllocEnvironment(newEnvVar, CSize.expression(exponentialEnvSize(exponential)));
     putCopyMemory(newEnv, oldEnv, CSize.expression(exponentialEnvSize(exponential)));
-
-    // Call the exponential manager to clone the slots
-    putStatement(
-        exponentialManager(exponential) + "(" + newEnv + ", " + oldEnv + ", 0)"); // 0 = Clone
 
     // Setup the new session and tie it to the exponential's entry session
     CAddress remoteSessionAddress =
@@ -1548,26 +1587,24 @@ public class CGenerator extends IRInstructionVisitor {
     CAddress remoteData = newEnv.offset(CSize.expression(exponentialEntryDataOffset(exponential)));
 
     // Initialize local session
-    if (localSessionAddress.isPresent()) {
-      StringBuilder sb = new StringBuilder("(struct session)");
-      sb.append("{.cont=").append(sessionCont(remoteSession));
-      sb.append(",.cont_env=").append(newEnv);
-      sb.append(",.cont_data=").append(remoteData);
-      sb.append(",.cont_session=").append(remoteSessionAddress);
-      sb.append("}");
-      putAssign(localSessionAddress.get().deref("struct session"), sb.toString());
-    }
+    putAssign(sessionCont(localSession), sessionCont(remoteSession));
+    putAssign(sessionContData(localSession), remoteData);
+    putAssign(sessionContSession(localSession), remoteSessionAddress);
 
     // Initialize remote session (the one stored in the exponential)
     putAssign(sessionContEnv(remoteSession), ENV);
-    if (localDataAddress.isPresent()) {
-      putAssign(sessionContData(remoteSession), localDataAddress.get());
-    }
-    if (localSessionAddress.isPresent()) {
-      putAssign(sessionContSession(remoteSession), localSessionAddress.get());
-    } else {
-      putAssign(sessionContSession(remoteSession), remoteSession);
-    }
+    putAssign(sessionContData(remoteSession), localDataAddress);
+    putAssign(sessionContSession(remoteSession), localSessionAddress);
+
+    // Call the exponential manager to clone the slots
+    String callDone = makeLabel("exp_call_return");
+    putAssign(sessionCont(remoteSession), labelAddress(callDone));
+    putAssign(TMP_PTR1, oldEnv);
+    putAssign(TMP_PTR2, exponentialManager(exponential));
+    putAssign(TMP_INT, 0); // 0 = Clone
+    putAssign(ENV, newEnv);
+    putComputedGoto(TMP_PTR2);
+    putLabel(callDone);
   }
 
   @Override
@@ -1675,7 +1712,7 @@ public class CGenerator extends IRInstructionVisitor {
   @Override
   public void visit(IRLaunchThread instr) {
     if (!compiler.concurrency.get()) {
-      putPushTask(TMP_PTR1, codeLocationAddress(instr.getLocation()));
+      putPushTask(TMP_PTR1, codeLocationAddress(instr.getLocation()), ENV);
       return;
     }
 
@@ -1715,8 +1752,12 @@ public class CGenerator extends IRInstructionVisitor {
 
   @Override
   public void visit(IRPanic instr) {
-    putDebugLn("Panic: " + instr.getMessage());
-    putStatement("exit(1);");
+    putPanic(instr.getMessage());
+  }
+
+  void putPanic(String message) {
+    putDebugLn("Panic: " + message);
+    putStatement("exit(1)");
   }
 
   @Override
@@ -1767,14 +1808,22 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   private String typeInitializer(
-      String node, String node_count, IRSlotTree slots, IRTypeFlagRequisites isValue) {
+      String node,
+      String node_count,
+      IRSlotTree slots,
+      Map<IRTypeFlag, IRTypeFlagRequisites> flags) {
     CLayout layout = maxLayout(this::typeLayout, this::requisitesMet, slots);
     StringBuilder sb = new StringBuilder("(struct type)");
     sb.append("{.node=").append(node);
     sb.append(",.size=").append(layout.size);
     sb.append(",.alignment=").append(layout.alignment);
-    sb.append(",.flags=");
-    sb.append(requisitesMet(isValue).ternary("(1 << " + IRTypeFlag.IS_VALUE.getBit() + ")", "0"));
+    sb.append(",.flags=0");
+    for (IRTypeFlag flag : flags.keySet()) {
+      if (flags.get(flag).isPossible()) {
+        sb.append(" | ");
+        sb.append(requisitesMet(flags.get(flag)).ternary("(1 << " + flag.getBit() + ")", "0"));
+      }
+    }
     sb.append(",.node_count=").append(node_count);
     sb.append("}");
     return sb.toString();
@@ -1801,7 +1850,7 @@ public class CGenerator extends IRInstructionVisitor {
     return sessionAddress(layout, env, id).deref("struct session");
   }
 
-  private String accessSession(String address) {
+  String accessSession(String address) {
     return access(address, "struct session");
   }
 
@@ -1954,15 +2003,15 @@ public class CGenerator extends IRInstructionVisitor {
     return var + "->cont_env";
   }
 
-  private String sessionCont(String var) {
+  String sessionCont(String var) {
     return var + ".cont";
   }
 
-  private String sessionContEnv(String var) {
+  String sessionContEnv(String var) {
     return var + ".cont_env";
   }
 
-  private String sessionContData(String var) {
+  String sessionContData(String var) {
     return var + ".cont_data";
   }
 
@@ -2008,6 +2057,26 @@ public class CGenerator extends IRInstructionVisitor {
 
   private String cellIsFree(String var) {
     return var + "->is_free";
+  }
+
+  private String typeFramePrev(String var) {
+    return var + "->prev";
+  }
+
+  private String typeFrameTarget(String var) {
+    return var + "->target";
+  }
+
+  private String typeFrameNodes(String var) {
+    return var + "->nodes";
+  }
+
+  private String typeFrameReturnAddress(String var) {
+    return var + "->return_address";
+  }
+
+  private String typeFrameStep(String var) {
+    return var + "->step";
   }
 
   private CAddress offset(String address, IRSlotOffset offset) {
@@ -2063,7 +2132,6 @@ public class CGenerator extends IRInstructionVisitor {
 
   void putMoveSlots(
       IRSlotTree slots,
-      Function<IRTypeId, String> typeNodeCount,
       Function<IRTypeId, String> typeNode,
       Function<IRTypeId, CLayout> typeLayout,
       Function<IRTypeFlagRequisites, CCondition> requisitesMet,
@@ -2073,7 +2141,6 @@ public class CGenerator extends IRInstructionVisitor {
     putMoveSlots(
         slots,
         clone,
-        typeNodeCount,
         typeNode,
         typeLayout,
         requisitesMet,
@@ -2084,7 +2151,6 @@ public class CGenerator extends IRInstructionVisitor {
   void putMoveSlots(
       IRSlotTree slots,
       boolean clone,
-      Function<IRTypeId, String> typeNodeCount,
       Function<IRTypeId, String> typeNode,
       Function<IRTypeId, CLayout> typeLayout,
       Function<IRTypeFlagRequisites, CCondition> requisitesMet,
@@ -2100,7 +2166,7 @@ public class CGenerator extends IRInstructionVisitor {
           CAddress target = targetBaseAddress.offset(offset);
           putMoveSlot(typeLayout, target, source, slot);
           if (clone) {
-            putCloneSlot(typeNodeCount, typeNode, target, slot);
+            putCloneSlot(typeNode, target, slot);
           }
         });
   }
@@ -2111,18 +2177,13 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   // Marks a slot as cloned, e.g., incrementing reference counts if necessary
-  void putCloneSlot(
-      Function<IRTypeId, String> typeNodeCount,
-      Function<IRTypeId, String> typeNode,
-      CAddress address,
-      IRSlot slot) {
-    CSlotCloner.clone(this, typeNodeCount, typeNode, address, slot);
+  void putCloneSlot(Function<IRTypeId, String> typeNode, CAddress address, IRSlot slot) {
+    CSlotCloner.clone(this, typeNode, address, slot);
   }
 
   // Drops each slot on the tree
   void putDropSlots(
       IRSlotTree slots,
-      Function<IRTypeId, String> typeNodeCount,
       Function<IRTypeId, String> typeNode,
       Function<IRTypeId, CLayout> typeLayout,
       Function<IRTypeFlagRequisites, CCondition> requisitesMet,
@@ -2131,17 +2192,13 @@ public class CGenerator extends IRInstructionVisitor {
         slots,
         typeLayout,
         requisitesMet,
-        (address, slot) -> putDropSlot(typeNodeCount, typeNode, address, slot),
+        (address, slot) -> putDropSlot(typeNode, address, slot),
         baseAddress);
   }
 
   // Drops a slot, e.g., decrementing reference counts if necessary
-  void putDropSlot(
-      Function<IRTypeId, String> typeNodeCount,
-      Function<IRTypeId, String> typeNode,
-      CAddress address,
-      IRSlot slot) {
-    CSlotDropper.drop(this, typeNodeCount, typeNode, address, slot);
+  void putDropSlot(Function<IRTypeId, String> typeNode, CAddress address, IRSlot slot) {
+    CSlotDropper.drop(this, typeNode, address, slot);
   }
 
   void putSlotTraversal(
@@ -2226,43 +2283,63 @@ public class CGenerator extends IRInstructionVisitor {
     }
   }
 
+  void putPushTypeFrame(CAddress target, String nodes, String returnAddress) {
+    putAlloc(TMP_PTR3, CSize.sizeOf("struct type_frame"));
+    String newTypeFrame = cast(TMP_PTR3, "struct type_frame*");
+    putAssign(typeFramePrev(newTypeFrame), TYPE_FRAME);
+    putAssign(typeFrameTarget(newTypeFrame), target);
+    putAssign(typeFrameNodes(newTypeFrame), nodes);
+    putAssign(typeFrameReturnAddress(newTypeFrame), returnAddress);
+    putAssign(typeFrameStep(newTypeFrame), 0);
+    putAssign(TYPE_FRAME, newTypeFrame);
+  }
+
+  void putPopTypeFrame() {
+    putAssign(TMP_PTR3, typeFramePrev(TYPE_FRAME));
+    putAssign(TMP_PTR4, typeFrameReturnAddress(TYPE_FRAME));
+    putFree(TYPE_FRAME);
+    putAssign(TYPE_FRAME, cast(TMP_PTR3, "struct type_frame*"));
+    putComputedGoto(TMP_PTR4);
+  }
+
   void putTypeNodeTraversal(
-      IRTypeId typeId,
-      Function<IRTypeId, String> typeNodeCount,
-      Function<IRTypeId, String> typeNode,
-      CAddress baseAddress,
       Consumer<CAddress> atExponential,
-      Consumer<CAddress> atString) {
-    putIf(
-        typeNodeCount.apply(typeId) + " > 0",
+      Consumer<CAddress> atString,
+      Consumer<CAddress> atSession,
+      BiConsumer<CAddress, String> atCell) {
+    String i = typeFrameStep(TYPE_FRAME);
+    putWhile(
+        i + " > 0",
         () -> {
-          String nodeArray = typeNode.apply(typeId);
-          putFor(
-              "int i = 0",
-              "i >= 0",
-              "",
+          String node = typeFrameNodes(TYPE_FRAME) + "[" + i + "]";
+          CAddress slotAddress =
+              CAddress.of(typeFrameTarget(TYPE_FRAME))
+                  .offset(CSize.expression(typeNodeOffset(node)));
+
+          Runnable cases[] = new Runnable[6];
+          cases[TYPE_NODE_TAG] = () -> putAssign(i, i + " + " + slotAddress.deref("unsigned char"));
+          cases[TYPE_NODE_CELL] =
               () -> {
-                String node = nodeArray + "[i]";
-                Runnable cases[] = new Runnable[4];
-
-                CAddress slotAddress = baseAddress.offset(CSize.expression(typeNodeOffset(node)));
-
-                cases[TYPE_NODE_TAG] =
-                    () -> putAssign("i", "i + " + slotAddress.deref("unsigned char"));
-                cases[TYPE_NODE_STRING] =
-                    () -> {
-                      atString.accept(slotAddress);
-                      putAssign("i", typeNodeNext(node));
-                    };
-                cases[TYPE_NODE_EXPONENTIAL] =
-                    () -> {
-                      atExponential.accept(slotAddress);
-                      putAssign("i", typeNodeNext(node));
-                    };
-                cases[TYPE_NODE_INDIRECT] = () -> putAssign("i", typeNodeNext(node));
-
-                putSwitch(typeNodeType(node), List.of(cases));
-              });
+                atCell.accept(slotAddress, typeFrameNodes(TYPE_FRAME) + " + " + typeNodeNext(node));
+                putAssign(i, i + " + 1");
+              };
+          cases[TYPE_NODE_STRING] =
+              () -> {
+                atString.accept(slotAddress);
+                putAssign(i, i + " + 1");
+              };
+          cases[TYPE_NODE_EXPONENTIAL] =
+              () -> {
+                atExponential.accept(slotAddress);
+                putAssign(i, i + " + 1");
+              };
+          cases[TYPE_NODE_SESSION] =
+              () -> {
+                atSession.accept(slotAddress);
+                putAssign(i, i + " + 1");
+              };
+          cases[TYPE_NODE_INDIRECT] = () -> putAssign(i, typeNodeNext(node));
+          putSwitch(typeNodeType(node), List.of(cases));
         });
   }
 
@@ -2284,7 +2361,11 @@ public class CGenerator extends IRInstructionVisitor {
       return CCondition.certainlyFalse();
     } else if (slots.isUnary()) {
       IRSlot slot = slots.singleHead().get();
-      if (slot instanceof IRVarS || slot instanceof IRExponentialS || slot instanceof IRStringS) {
+      if (slot instanceof IRVarS
+          || slot instanceof IRCellS
+          || slot instanceof IRExponentialS
+          || slot instanceof IRStringS
+          || slot instanceof IRSessionS) {
         return CCondition.certainlyTrue();
       } else {
         return hasTypeNodes(((IRSlotTree.Unary) slots).child());
@@ -2320,6 +2401,8 @@ public class CGenerator extends IRInstructionVisitor {
         type = TYPE_NODE_EXPONENTIAL;
       } else if (slot instanceof IRStringS) {
         type = TYPE_NODE_STRING;
+      } else if (slot instanceof IRSessionS) {
+        type = TYPE_NODE_SESSION;
       }
 
       if (slot instanceof IRVarS) {
@@ -2353,6 +2436,10 @@ public class CGenerator extends IRInstructionVisitor {
         }
 
         putAssign(nextIndexVar, nextIndexVar + " + " + count);
+      } else if (slot instanceof IRCellS) {
+
+        // TODO: create a cell node. its successor node is an indirect node to the cell's type nodes
+        // TODO: the successor of the indirect node is the cell node's successor
       } else if (type != -1) {
         if (consumer.isPresent()) {
           consumer
@@ -2464,9 +2551,20 @@ public class CGenerator extends IRInstructionVisitor {
             putDebugLn("[freeExponential]");
           }
 
-          // Call the exponential's manager
-          putStatement(
-              exponentialManager(var) + "(" + exponentialEnv(var) + ", NULL, 1)"); // 1 = Drop
+          CAddress expEnv = CAddress.of(exponentialEnv(var));
+          CAddress remoteSessionAddress =
+              expEnv.offset(CSize.expression(exponentialEntrySessionOffset(var)));
+          String remoteSession = remoteSessionAddress.deref("struct session");
+
+          // Call the exponential manager to drop the slots
+          String dropDone = makeLabel("exp_drop_return");
+          putAssign(sessionCont(remoteSession), labelAddress(dropDone));
+          putAssign(sessionContEnv(remoteSession), ENV);
+          putAssign(TMP_PTR3, exponentialManager(var));
+          putAssign(TMP_INT, 1); // 0 = Drop
+          putAssign(ENV, expEnv);
+          putComputedGoto(TMP_PTR3);
+          putLabel(dropDone);
           putFreeExponential(var);
         });
   }
@@ -2490,6 +2588,19 @@ public class CGenerator extends IRInstructionVisitor {
   }
 
   void putDecrementCell(CAddress cellAddr, IRCellS cell) {
+    putDecrementCell(
+        cellAddr,
+        () -> {
+          putDropSlots(
+              cell.getSlots(),
+              id -> typeNode(type(id)),
+              this::typeLayout,
+              this::requisitesMet,
+              cellData(cellAddr, IRSlotOffset.ZERO));
+        });
+  }
+
+  void putDecrementCell(CAddress cellAddr, Runnable dropContents) {
     String ref = cellAddr.deref("struct cell*");
 
     putIf(
@@ -2499,34 +2610,8 @@ public class CGenerator extends IRInstructionVisitor {
             putDebugLn("[freeCell]");
           }
 
-          putIfElse(
-              requisitesMet(cell.getIsValue()),
-              () -> {
-                // Since the cell contains a value, we drop its slots directly
-                putDropSlots(
-                    cell.getSlots(),
-                    id -> typeNodeCount(type(id)),
-                    id -> typeNode(type(id)),
-                    this::typeLayout,
-                    this::requisitesMet,
-                    cellData(cellAddr, IRSlotOffset.ZERO));
-              },
-              () -> {
-                // To drop the cell's contents, we drop its affine session
-                String sessionPtr = cellData(cellAddr, IRSlotOffset.ZERO).deref("struct session*");
-                String session = accessSession(sessionPtr);
-
-                String tagRef = CAddress.of(sessionContData(session)).deref("unsigned char");
-                putAssign(tagRef, 0); // 0 means discard
-                String label = makeLabel("drop_affine");
-                putAssign(TMP_PTR1, sessionCont(session));
-                putAssign(TMP_PTR2, sessionContEnv(session));
-                putAssign(sessionCont(session), labelAddress(label));
-                putAssign(sessionContEnv(session), ENV);
-                putAssign(ENV, cast(TMP_PTR2, "char*"));
-                putComputedGoto(TMP_PTR1);
-                putLabel(label);
-              });
+          // Drop the cell's contents
+          dropContents.run();
 
           // Now we can free the cell itself
           if (compiler.concurrency.get()) {
@@ -2589,7 +2674,6 @@ public class CGenerator extends IRInstructionVisitor {
           () ->
               putDropSlots(
                   drop.getSlots(),
-                  id -> typeNodeCount(type(processLayout, var, id)),
                   id -> typeNode(type(processLayout, var, id)),
                   id -> typeLayout(processLayout, var, id),
                   reqs -> requisitesMet(processLayout, var, reqs),
@@ -2644,7 +2728,7 @@ public class CGenerator extends IRInstructionVisitor {
     return castAndDeref(expr, type + "*");
   }
 
-  private String labelAddress(String label) {
+  String labelAddress(String label) {
     return "&&" + label;
   }
 
@@ -2684,7 +2768,7 @@ public class CGenerator extends IRInstructionVisitor {
     }
   }
 
-  private String makeLabel(String prefix) {
+  String makeLabel(String prefix) {
     return currentProcess.getId() + "_" + prefix + "_" + (nextLabelId++);
   }
 

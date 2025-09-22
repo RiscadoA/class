@@ -40,7 +40,7 @@ public abstract class IRSlotTree {
     }
   }
 
-  protected abstract void toStringHelper(StringBuilder sb);
+  public abstract void toStringHelper(StringBuilder sb);
 
   public abstract IRSlotTree replaceTypes(
       Function<IRTypeId, IRSlotTree> slotReplacer,
@@ -125,7 +125,7 @@ public abstract class IRSlotTree {
     }
 
     @Override
-    protected void toStringHelper(StringBuilder sb) {
+    public void toStringHelper(StringBuilder sb) {
       if (sb.isEmpty()) {
         sb.append("[]");
       }
@@ -164,7 +164,7 @@ public abstract class IRSlotTree {
     }
 
     @Override
-    protected void toStringHelper(StringBuilder sb) {
+    public void toStringHelper(StringBuilder sb) {
       boolean started = false;
       if (sb.isEmpty()) {
         sb.append("[");
@@ -210,7 +210,7 @@ public abstract class IRSlotTree {
     }
 
     @Override
-    protected void toStringHelper(StringBuilder sb) {
+    public void toStringHelper(StringBuilder sb) {
       sb.append("tag[");
       for (int i = 0; i < cases.size(); i++) {
         if (i > 0) {
@@ -274,7 +274,7 @@ public abstract class IRSlotTree {
     }
 
     @Override
-    protected void toStringHelper(StringBuilder sb) {
+    public void toStringHelper(StringBuilder sb) {
       sb.append("type<").append(requisites).append(">[");
       sb.append(met);
       sb.append(" | ");

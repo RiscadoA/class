@@ -99,7 +99,7 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTBangT type) {
-    IRTypeFlagRequisites reqs = IRIsValueChecker.check(compiler, env, type.getin(), true);
+    IRTypeFlagRequisites reqs = IRIsCloneableChecker.check(compiler, env, type.getin(), true);
     IRSlotsFromASTType inner = recurse(type.getin());
     activeRemoteTree =
         IRSlotTree.type(reqs, inner.activeRemoteTree, IRSlotTree.of(new IRExponentialS()));
@@ -233,7 +233,7 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTWhyT type) {
-    IRTypeFlagRequisites reqs = IRIsValueChecker.check(compiler, env, type.getin(), false);
+    IRTypeFlagRequisites reqs = IRIsCloneableChecker.check(compiler, env, type.getin(), false);
     IRSlotsFromASTType inner = recurse(type.getin());
     activeLocalTree =
         IRSlotTree.type(reqs, inner.activeLocalTree, IRSlotTree.of(new IRExponentialS()));
@@ -291,7 +291,7 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTAffineT type) {
-    IRTypeFlagRequisites reqs = IRIsValueChecker.check(compiler, env, type.getin(), true);
+    IRTypeFlagRequisites reqs = IRIsDroppableChecker.check(compiler, env, type.getin(), true);
     if (!compiler.optimizeAffineValue.get()) {
       reqs = IRTypeFlagRequisites.impossible();
     }
@@ -311,7 +311,7 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTCoAffineT type) {
-    IRTypeFlagRequisites reqs = IRIsValueChecker.check(compiler, env, type.getin(), false);
+    IRTypeFlagRequisites reqs = IRIsDroppableChecker.check(compiler, env, type.getin(), false);
     if (!compiler.optimizeAffineValue.get()) {
       reqs = IRTypeFlagRequisites.impossible();
     }
@@ -331,45 +331,47 @@ public class IRSlotsFromASTType extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTCellT type) {
-    if (compiler.optimizeAffineValue.get()) {
-      IRTypeFlagRequisites reqs = IRIsValueChecker.check(compiler, env, type.getin(), true);
-      IRSlotsFromASTType inner = recurse(type.getin());
-      remoteSlot(new IRCellS(inner.activeRemoteTree, reqs));
-    } else {
-      remoteSlot(new IRCellS(IRSlotTree.of(new IRSessionS()), IRTypeFlagRequisites.impossible()));
+    IRTypeFlagRequisites reqs = IRIsDroppableChecker.check(compiler, env, type.getin(), true);
+    if (!compiler.optimizeAffineValue.get()) {
+      reqs = IRTypeFlagRequisites.impossible();
     }
+    IRSlotsFromASTType inner = recurse(type.getin());
+    remoteSlot(
+        new IRCellS(
+            IRSlotTree.type(reqs, inner.activeRemoteTree, IRSlotTree.of(new IRSessionS()))));
   }
 
   @Override
   public void visit(ASTUsageT type) {
-    if (compiler.optimizeAffineValue.get()) {
-      IRTypeFlagRequisites reqs = IRIsValueChecker.check(compiler, env, type.getin(), false);
-      IRSlotsFromASTType inner = recurse(type.getin());
-      localSlot(new IRCellS(inner.activeLocalTree, reqs));
-    } else {
-      localSlot(new IRCellS(IRSlotTree.of(new IRSessionS()), IRTypeFlagRequisites.impossible()));
+    IRTypeFlagRequisites reqs = IRIsDroppableChecker.check(compiler, env, type.getin(), false);
+    if (!compiler.optimizeAffineValue.get()) {
+      reqs = IRTypeFlagRequisites.impossible();
     }
+    IRSlotsFromASTType inner = recurse(type.getin());
+    localSlot(
+        new IRCellS(IRSlotTree.type(reqs, inner.activeLocalTree, IRSlotTree.of(new IRSessionS()))));
   }
 
   @Override
   public void visit(ASTCellLT type) {
+    IRTypeFlagRequisites reqs = IRIsDroppableChecker.check(compiler, env, type.getin(), true);
     if (compiler.optimizeAffineValue.get()) {
-      IRTypeFlagRequisites reqs = IRIsValueChecker.check(compiler, env, type.getin(), true);
-      IRSlotsFromASTType inner = recurse(type.getin());
-      remoteSlot(new IRCellS(inner.activeRemoteTree, reqs));
-    } else {
-      remoteSlot(new IRCellS(IRSlotTree.of(new IRSessionS()), IRTypeFlagRequisites.impossible()));
+      reqs = IRTypeFlagRequisites.impossible();
     }
+    IRSlotsFromASTType inner = recurse(type.getin());
+    remoteSlot(
+        new IRCellS(
+            IRSlotTree.type(reqs, inner.activeRemoteTree, IRSlotTree.of(new IRSessionS()))));
   }
 
   @Override
   public void visit(ASTUsageLT type) {
-    if (compiler.optimizeAffineValue.get()) {
-      IRTypeFlagRequisites reqs = IRIsValueChecker.check(compiler, env, type.getin(), false);
-      IRSlotsFromASTType inner = recurse(type.getin());
-      localSlot(new IRCellS(inner.activeLocalTree, reqs));
-    } else {
-      localSlot(new IRCellS(IRSlotTree.of(new IRSessionS()), IRTypeFlagRequisites.impossible()));
+    IRTypeFlagRequisites reqs = IRIsDroppableChecker.check(compiler, env, type.getin(), false);
+    if (!compiler.optimizeAffineValue.get()) {
+      reqs = IRTypeFlagRequisites.impossible();
     }
+    IRSlotsFromASTType inner = recurse(type.getin());
+    localSlot(
+        new IRCellS(IRSlotTree.type(reqs, inner.activeLocalTree, IRSlotTree.of(new IRSessionS()))));
   }
 }

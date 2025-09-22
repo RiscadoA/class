@@ -135,7 +135,7 @@ public class IRGenerator extends ASTNodeVisitor {
       ASTType type = procDef.getArgTypes().get(i);
 
       IRSlotsFromASTType info = slotsFromType(type);
-      if (IRContinuationChecker.cannotHaveContinuation(compiler, env, type)) {
+      if (isValueRequisites(type, false).isGuaranteed()) {
         // Type has no continuation: no need to store a session
         env = env.addValue(name, info.localCombinations(), Optional.empty());
       } else {
@@ -283,7 +283,11 @@ public class IRGenerator extends ASTNodeVisitor {
       tArgPolarities[i] = isPositive(type);
       typeArguments.add(
           new IRCallProcess.TypeArgument(
-              info.activeTree(), isValueRequisites(type, tArgPolarities[i]), new IRTypeId(i)));
+              info.activeTree(),
+              isValueRequisites(type, tArgPolarities[i]),
+              isCloneableRequisites(type, tArgPolarities[i]),
+              isDroppableRequisites(type, tArgPolarities[i]),
+              new IRTypeId(i)));
       env = env.changeEp(env.getEp().assoc(node.getProcTParIds().get(i), new TypeEntry(type)));
     }
 
@@ -307,7 +311,7 @@ public class IRGenerator extends ASTNodeVisitor {
       IREnvironment.Channel channel = env.getChannel(node.getPars().get(i));
       IREnvironment.Channel targetChannel = processEnv.getChannel(processDef.getArgs().get(i));
 
-      if (mayHaveContinuation(type)) {
+      if (isValueRequisites(type, false).canBeUnmet()) {
         // If the type has a continuation, we must pass the session
         sessionArguments.add(
             new IRCallProcess.SessionArgument(
@@ -820,15 +824,8 @@ public class IRGenerator extends ASTNodeVisitor {
           block.add(new IRFinishSession(pos.getSessionId(), true));
         };
 
-    if (mayHaveContinuation(negChType)) {
-      IRTypeFlagRequisites reqs = isValueRequisites(negChType, false);
-      if (!compiler.optimizeSendValue.get()) {
-        reqs = IRTypeFlagRequisites.impossible();
-      }
-      addBranchTypeFlag(reqs, 1, withoutContinuation, withContinuation);
-    } else {
-      withoutContinuation.run();
-    }
+    IRTypeFlagRequisites reqs = isValueRequisites(negChType, false);
+    addBranchTypeFlag(reqs, 1, withoutContinuation, withContinuation);
   }
 
   void addBang(
@@ -841,7 +838,7 @@ public class IRGenerator extends ASTNodeVisitor {
     IREnvironment.Channel channel = env.getChannel(ch);
     IRSlotsFromASTType info = slotsFromType(type);
 
-    IRTypeFlagRequisites reqs = isValueRequisites(type, true);
+    IRTypeFlagRequisites reqs = isCloneableRequisites(type, true);
     addBranchTypeFlag(
         reqs,
         contEndPoints,
@@ -870,6 +867,8 @@ public class IRGenerator extends ASTNodeVisitor {
                 new IRWriteExponential.TypeArgument(
                     IRSlotTree.of(new IRVarS(id)),
                     IRTypeFlagRequisites.onlyIf(id, IRTypeFlag.IS_VALUE),
+                    IRTypeFlagRequisites.onlyIf(id, IRTypeFlag.IS_CLONEABLE),
+                    IRTypeFlagRequisites.onlyIf(id, IRTypeFlag.IS_DROPPABLE),
                     id));
             expEnv = expEnv.addType(envType.getName(), envType.isPositive());
           }
@@ -935,7 +934,7 @@ public class IRGenerator extends ASTNodeVisitor {
     env = env.addSession(chi, info.localCombinations());
     IREnvironment.Channel argChannel = env.getChannel(chi);
 
-    IRTypeFlagRequisites reqs = isValueRequisites(type, false);
+    IRTypeFlagRequisites reqs = isCloneableRequisites(type, false);
 
     IRBlock rhsBlock = process.createBlock("call_rhs");
 
@@ -990,7 +989,12 @@ public class IRGenerator extends ASTNodeVisitor {
     // Write the type, the right-hand-side session and the type's polarity to the main channel
     IRSlotsFromASTType varInfo = slotsFromType(type);
     block.add(
-        new IRWriteType(typeLoc, varInfo.activeTree(), isValueRequisites(type, isPositive(type))));
+        new IRWriteType(
+            typeLoc,
+            varInfo.activeTree(),
+            isValueRequisites(type, isPositive(type)),
+            isCloneableRequisites(type, isPositive(type)),
+            isDroppableRequisites(type, isPositive(type))));
     block.add(new IRWriteSession(sessionLoc, channel.getSessionId()));
     block.add(new IRWriteTag(polarityLoc, isPositive(type) ? 1 : 0));
     block.add(new IRFinishSession(originalSession, true));
@@ -1041,6 +1045,8 @@ public class IRGenerator extends ASTNodeVisitor {
                 new IRCallProcess.TypeArgument(
                     IRSlotTree.of(new IRVarS(id)),
                     IRTypeFlagRequisites.onlyIf(id, IRTypeFlag.IS_VALUE),
+                    IRTypeFlagRequisites.onlyIf(id, IRTypeFlag.IS_CLONEABLE),
+                    IRTypeFlagRequisites.onlyIf(id, IRTypeFlag.IS_DROPPABLE),
                     newId));
           }
 
@@ -1096,7 +1102,7 @@ public class IRGenerator extends ASTNodeVisitor {
               IREnvironment.Channel sourceChannel = env.getChannel(name);
               IREnvironment.Channel targetChannel = polyEnv.getChannel(name);
 
-              if (IRContinuationChecker.mayHaveContinuation(compiler, polyEnv, type)) {
+              if (isValueRequisites(type, false).canBeUnmet()) {
                 // If the type is not a value, or if it's a positive value, we must pass the session
                 sessionArguments.add(
                     new IRCallProcess.SessionArgument(
@@ -1153,7 +1159,7 @@ public class IRGenerator extends ASTNodeVisitor {
       Map<String, ASTType> coaffineSet,
       int contEndPoints,
       Runnable cont) {
-    IRTypeFlagRequisites reqs = isValueRequisites(contType, true);
+    IRTypeFlagRequisites reqs = isDroppableRequisites(contType, true);
     if (!compiler.optimizeAffineValue.get()) {
       reqs = IRTypeFlagRequisites.impossible();
     }
@@ -1209,7 +1215,7 @@ public class IRGenerator extends ASTNodeVisitor {
 
     IRBlock rhsBlock = process.createBlock("use_rhs");
 
-    IRTypeFlagRequisites reqs = isValueRequisites(contType, false);
+    IRTypeFlagRequisites reqs = isDroppableRequisites(contType, false);
     if (!compiler.optimizeAffineValue.get()) {
       reqs = IRTypeFlagRequisites.impossible();
     }
@@ -1228,7 +1234,7 @@ public class IRGenerator extends ASTNodeVisitor {
         });
 
     if (!isPositive(contType)) {
-      env = env.resetChannelIfNotValue(ch, reqs);
+      env = env.resetChannelIfRequisitesUnmet(ch, reqs);
     } else {
       // Positive, for sure it is not a value
       advanceOrReset(ch, IRSlotTree.of(new IRTagS()), contType, true);
@@ -1241,7 +1247,7 @@ public class IRGenerator extends ASTNodeVisitor {
 
     IRBlock rhsBlock = process.createBlock("discard_rhs");
 
-    IRTypeFlagRequisites reqs = isValueRequisites(type.getin(), false);
+    IRTypeFlagRequisites reqs = isDroppableRequisites(type.getin(), false);
     if (!compiler.optimizeAffineValue.get()) {
       reqs = IRTypeFlagRequisites.impossible();
     }
@@ -1291,7 +1297,7 @@ public class IRGenerator extends ASTNodeVisitor {
   void addCell(String ch, String chc, ASTType typeRhs, int contEndPoints, Runnable cont) {
     IREnvironment.Channel channel = env.getChannel(ch);
 
-    IRTypeFlagRequisites reqs = isValueRequisites(typeRhs, true);
+    IRTypeFlagRequisites reqs = isDroppableRequisites(typeRhs, true);
     if (!compiler.optimizeAffineValue.get()) {
       reqs = IRTypeFlagRequisites.impossible();
     }
@@ -1367,7 +1373,7 @@ public class IRGenerator extends ASTNodeVisitor {
 
     IRBlock rhsBlock = process.createBlock("put_rhs");
 
-    IRTypeFlagRequisites reqs = isValueRequisites(typeLhs, true);
+    IRTypeFlagRequisites reqs = isDroppableRequisites(typeLhs, true);
     if (!compiler.optimizeAffineValue.get()) {
       reqs = IRTypeFlagRequisites.impossible();
     }
@@ -1439,7 +1445,7 @@ public class IRGenerator extends ASTNodeVisitor {
 
     IRBlock rhsBlock = process.createBlock("take_rhs");
 
-    IRTypeFlagRequisites reqs = isValueRequisites(typeLhs, false);
+    IRTypeFlagRequisites reqs = isDroppableRequisites(typeLhs, false);
     if (!compiler.optimizeAffineValue.get()) {
       reqs = IRTypeFlagRequisites.impossible();
     }
@@ -1582,7 +1588,7 @@ public class IRGenerator extends ASTNodeVisitor {
   void advanceOrReset(String ch, IRSlotOffset offset, ASTType cont, boolean advancePolarity) {
     if (cont instanceof ASTCoAffineT && !advancePolarity) {
       env = env.advanceChannel(ch, offset);
-      env = env.resetChannelIfNotValue(ch, isValueRequisites(cont, false));
+      env = env.resetChannelIfRequisitesUnmet(ch, isDroppableRequisites(cont, false));
     } else if (cont instanceof ASTRecT
         || cont instanceof ASTCoRecT
         || isPositive(cont) != advancePolarity) {
@@ -1600,8 +1606,12 @@ public class IRGenerator extends ASTNodeVisitor {
     return IRIsValueChecker.check(compiler, env, type, requiredPolarity);
   }
 
-  private boolean mayHaveContinuation(ASTType type) {
-    return IRContinuationChecker.mayHaveContinuation(compiler, env, type);
+  private IRTypeFlagRequisites isCloneableRequisites(ASTType type, boolean requiredPolarity) {
+    return IRIsCloneableChecker.check(compiler, env, type, requiredPolarity);
+  }
+
+  private IRTypeFlagRequisites isDroppableRequisites(ASTType type, boolean requiredPolarity) {
+    return IRIsDroppableChecker.check(compiler, env, type, requiredPolarity);
   }
 
   IRProcessId genChildProcessId(String suffix) {

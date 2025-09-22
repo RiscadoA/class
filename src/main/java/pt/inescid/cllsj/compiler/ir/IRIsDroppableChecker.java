@@ -39,7 +39,7 @@ import pt.inescid.cllsj.compiler.Compiler;
 import pt.inescid.cllsj.compiler.ir.id.IRTypeFlag;
 import pt.inescid.cllsj.compiler.ir.id.IRTypeId;
 
-public class IRIsValueChecker extends ASTTypeVisitor {
+public class IRIsDroppableChecker extends ASTTypeVisitor {
   private Compiler compiler;
   private IREnvironment env;
   private boolean polarity;
@@ -48,7 +48,7 @@ public class IRIsValueChecker extends ASTTypeVisitor {
 
   public static IRTypeFlagRequisites check(
       Compiler compiler, IREnvironment env, ASTType type, boolean expectedPolarity) {
-    IRIsValueChecker checker = new IRIsValueChecker();
+    IRIsDroppableChecker checker = new IRIsDroppableChecker();
     checker.compiler = compiler;
     checker.env = env;
     checker.polarity = expectedPolarity;
@@ -65,19 +65,6 @@ public class IRIsValueChecker extends ASTTypeVisitor {
       types = Optional.empty();
     }
     this.polarity = polarity;
-  }
-
-  private void expectMet(IRTypeFlagRequisites requisites) {
-    if (types.isPresent() && requisites.isPossible()) {
-      for (IRTypeId id : requisites.flagsByType().keySet()) {
-        types
-            .get()
-            .computeIfAbsent(id, k -> new HashSet<>())
-            .addAll(requisites.flagsByType().get(id));
-      }
-    } else {
-      types = Optional.empty();
-    }
   }
 
   private void recurse(ASTType type) {
@@ -126,7 +113,9 @@ public class IRIsValueChecker extends ASTTypeVisitor {
     IREnvironment.Type typeEntry = env.getType(type.getid());
     expectPolarity(typeEntry.isPositive());
     types.ifPresent(
-        s -> s.computeIfAbsent(typeEntry.getId(), k -> new HashSet<>()).add(IRTypeFlag.IS_VALUE));
+        s ->
+            s.computeIfAbsent(typeEntry.getId(), k -> new HashSet<>())
+                .add(IRTypeFlag.IS_DROPPABLE));
   }
 
   @Override
@@ -155,14 +144,24 @@ public class IRIsValueChecker extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTRecvT type) {
-    expectPolarity(false);
-    recurse(type.getrhs());
+    if (!compiler.optimizeSendValue.get()) {
+      types = Optional.empty();
+    } else {
+      expectPolarity(false);
+      recurse(type.getlhs());
+      recurse(type.getrhs());
+    }
   }
 
   @Override
   public void visit(ASTSendT type) {
-    expectPolarity(true);
-    recurse(type.getrhs());
+    if (!compiler.optimizeSendValue.get()) {
+      types = Optional.empty();
+    } else {
+      expectPolarity(true);
+      recurse(type.getlhs());
+      recurse(type.getrhs());
+    }
   }
 
   @Override
@@ -224,7 +223,7 @@ public class IRIsValueChecker extends ASTTypeVisitor {
   public void visit(ASTAffineT type) {
     if (compiler.optimizeAffineValue.get()) {
       expectPolarity(true);
-      expectMet(IRIsDroppableChecker.check(compiler, env, type.getin(), true));
+      recurse(type.getin());
     } else {
       types = Optional.empty();
     }
@@ -234,7 +233,7 @@ public class IRIsValueChecker extends ASTTypeVisitor {
   public void visit(ASTCoAffineT type) {
     if (compiler.optimizeAffineValue.get()) {
       expectPolarity(false);
-      expectMet(IRIsDroppableChecker.check(compiler, env, type.getin(), false));
+      recurse(type.getin());
     } else {
       types = Optional.empty();
     }
@@ -252,11 +251,11 @@ public class IRIsValueChecker extends ASTTypeVisitor {
 
   @Override
   public void visit(ASTCellLT type) {
-    expectPolarity(true);
+    types = Optional.empty();
   }
 
   @Override
   public void visit(ASTUsageLT type) {
-    expectPolarity(false);
+    types = Optional.empty();
   }
 }
