@@ -298,8 +298,6 @@ public class Analyzer extends IRInstructionVisitor {
       negRemote.get().cont = oldPos.cont;
       negRemote.get().data = oldPos.data;
       negRemote.get().remote = oldPos.remote;
-    } else {
-      oldPos.markAsUnknown(this, state);
     }
 
     if (posRemote.isPresent()) {

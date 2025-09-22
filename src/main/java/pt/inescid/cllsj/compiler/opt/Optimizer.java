@@ -166,7 +166,9 @@ public class Optimizer {
     } else if (last instanceof IRFinishSession) {
       IRFinishSession i = (IRFinishSession) last;
       AnlFlowContinuation contBefore =
-          prev.getStates().getLast().session(i.getSessionId()).cont.get();
+          prev.getStates().getLast().session(i.getSessionId()).cont.orElseThrow(
+            () -> new IllegalStateException("Could not find writer for " + i + " on process " + ir.getId())
+          );
       contBefore.replaceWritten(Optional.empty());
 
       // We're removing a single end point of the process
