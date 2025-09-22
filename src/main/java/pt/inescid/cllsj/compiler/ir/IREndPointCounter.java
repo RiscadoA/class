@@ -177,9 +177,7 @@ public class IREndPointCounter extends ASTNodeVisitor {
 
   @Override
   public void visit(ASTCell node) {
-    if (IRIsDroppableChecker.check(compiler, env, node.getTypeRhs(), true).isPossible()) {
-      count += 1;
-    }
+    count += 1;
     node.getRhs().accept(this);
   }
 

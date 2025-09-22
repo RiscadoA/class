@@ -1351,7 +1351,7 @@ public class IRGenerator extends ASTNodeVisitor {
               new IRWriteSession(
                   IRDataLocation.cell(channel.getRemoteData(), IRSlotOffset.ZERO),
                   cellSession.getSessionId()));
-          block.add(new IRFinishSession(channel.getSessionId(), false));
+          block.add(new IRFinishSession(channel.getSessionId(), true));
 
           // Recurse on the cell's right-hand-side
           recurse(cellBlock, () -> cont.run());
