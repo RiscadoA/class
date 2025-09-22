@@ -160,9 +160,9 @@ public class Optimizer {
       // We're removing a single end point of the process, if we didn't end up creating a new finish
       // instruction
       if (i.isEndPoint() && !(contBefore.getWriter().getInstruction() instanceof IRFinishSession)) {
-        i.removeEndPoint();
         modifyEndPoints(ir, prev.getBlock(), -1);
       }
+      i.removeEndPoint();
     } else if (last instanceof IRFinishSession) {
       IRFinishSession i = (IRFinishSession) last;
       AnlFlowContinuation contBefore =
