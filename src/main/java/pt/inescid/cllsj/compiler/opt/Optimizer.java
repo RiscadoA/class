@@ -157,9 +157,8 @@ public class Optimizer {
       AnlFlowContinuation contBefore = prev.getStates().getLast().session(i.getPosId()).cont.get();
       contBefore.replaceWritten(Optional.empty());
 
-      // We're removing a single end point of the process, if we didn't end up creating a new finish
-      // instruction
-      if (i.isEndPoint() && !(contBefore.getWriter().getInstruction() instanceof IRFinishSession)) {
+      // We're removing a single end point of the process
+      if (i.isEndPoint()) {
         modifyEndPoints(ir, prev.getBlock(), -1);
       }
       i.removeEndPoint();
