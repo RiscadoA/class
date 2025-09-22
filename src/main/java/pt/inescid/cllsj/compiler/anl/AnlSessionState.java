@@ -35,7 +35,7 @@ public class AnlSessionState {
 
   public void markAsUnknown(Analyzer analyzer, AnlFlowState state) {
     if (cont.isPresent()) {
-      state.pushPendingContinuation(analyzer, cont.get(), false);
+      state.pushPendingContinuation(analyzer, cont.get(), true);
       cont = Optional.empty();
     }
     if (data.isPresent()) {
