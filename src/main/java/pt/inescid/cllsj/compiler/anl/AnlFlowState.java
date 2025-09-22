@@ -108,14 +108,18 @@ public class AnlFlowState {
     }
   }
 
-  public void pushPendingContinuation(Analyzer analyzer, AnlFlowContinuation cont) {
-    analyzer.getFlow().addDetached(analyzer.getFlow(cont.getLocation()));
+  public void pushPendingContinuation(Analyzer analyzer, AnlFlowContinuation cont, boolean concurrent) {
+    if (concurrent) {
+      analyzer.getFlow().addTarget(analyzer.getFlow(cont.getLocation()));
+    } else {
+      analyzer.getFlow().addDetached(analyzer.getFlow(cont.getLocation()));
+    }
     pendingContinuations.push(cont);
   }
 
   public void pushPendingContinuation(
-      Analyzer analyzer, IRCodeLocation cLocation, AnlFlowLocation fLocation) {
-    pushPendingContinuation(analyzer, new AnlFlowContinuation(cLocation, fLocation));
+      Analyzer analyzer, IRCodeLocation cLocation, AnlFlowLocation fLocation, boolean concurrent) {
+    pushPendingContinuation(analyzer, new AnlFlowContinuation(cLocation, fLocation), concurrent);
   }
 
   public Optional<AnlFlowContinuation> popPendingContinuation() {

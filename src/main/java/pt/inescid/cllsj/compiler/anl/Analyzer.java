@@ -135,7 +135,7 @@ public class Analyzer extends IRInstructionVisitor {
       remote.get().cont = Optional.of(newCont);
     } else {
       // Otherwise, push our continuation to the pending stack
-      state.pushPendingContinuation(this, newCont);
+      state.pushPendingContinuation(this, newCont, false);
     }
 
     if (oldCont.isPresent()) {
@@ -249,7 +249,7 @@ public class Analyzer extends IRInstructionVisitor {
 
   @Override
   public void visit(IRPushTask instr) {
-    state.pushPendingContinuation(this, instr.getLocation(), flowLoc);
+    state.pushPendingContinuation(this, instr.getLocation(), flowLoc, false);
   }
 
   @Override
@@ -388,6 +388,6 @@ public class Analyzer extends IRInstructionVisitor {
 
   @Override
   public void visit(IRLaunchThread instr) {
-    state.pushPendingContinuation(this, instr.getLocation(), flowLoc);
+    state.pushPendingContinuation(this, instr.getLocation(), flowLoc, true);
   }
 }
