@@ -108,7 +108,8 @@ public class AnlFlowState {
     }
   }
 
-  public void pushPendingContinuation(Analyzer analyzer, AnlFlowContinuation cont, boolean concurrent) {
+  public void pushPendingContinuation(
+      Analyzer analyzer, AnlFlowContinuation cont, boolean concurrent) {
     if (concurrent) {
       analyzer.getFlow().addTarget(analyzer.getFlow(cont.getLocation()));
     } else {

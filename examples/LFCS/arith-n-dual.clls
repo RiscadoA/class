@@ -1,0 +1,76 @@
+type tmenu {
+    option of {
+        |#Dup:  send lint; recv ~lint; close 
+        |#Add:  send lint; send lint; recv ~lint; close
+    }
+};;
+
+proc menu(m:~tmenu) {
+    case m of {
+        |#Dup:  m -> n;
+                m <- 2 * n;
+                wait m; ()
+        |#Add:  m -> n1;
+                m -> n2;
+                m <- n1 + n2;
+                wait m; ()
+    }
+};;
+
+proc alice(c:tmenu) {
+    #Dup c;
+    c <- 2; c -> m;
+    println("alice got " + m);
+    close c
+};;
+
+proc bob(c:tmenu){
+    #Add c;
+    c <- 4;
+    c <- 3;
+    c -> m;
+    println("bob got " + m);
+    close c
+};;
+
+proc main0(){
+    cut {
+        menu(s)
+        |s:tmenu|
+        alice(s)
+    }
+};;
+
+proc main1(){
+    letc s:~tmenu {
+        menu(s)
+    };
+    bob(s)
+};;
+
+proc rserver(sm:!~tmenu) {
+    !sm(m); menu(m)
+};;
+
+
+proc alicer(; rs:~~tmenu){
+    call rs(a);
+    alice(a)
+};;
+
+
+proc bobr(; rs:tmenu){
+    call rs(b);
+    bob(b)
+};;
+
+
+proc main(){
+    letc s:!~tmenu {
+        rserver(s)
+    };
+    cpar {
+        alicer(;s) || bobr(;s)
+    }
+};;
+

@@ -423,6 +423,8 @@ TOKEN :
   |
   < CHOICE: "choice" >
   |
+  < OPTION: "option" >
+  |
   < OFFER: "offer" >
   |  
   < OF: "of" >
@@ -729,7 +731,7 @@ ASTType SType() throws Exception:
     |
     <RECVT> s=<Id> <SEMIC> r=SType() { t = new ASTRecvTT(s.image,r); }
     |
-    <CHOICE> <OF> <LBRA>
+    (<OPTION> | <CHOICE>) <OF> <LBRA>
     { ASTCaseT tc = new ASTCaseT();
     } (TypeCase(tc))+ <RBRA> { t = tc; }
     |

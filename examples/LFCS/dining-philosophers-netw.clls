@@ -218,6 +218,7 @@ proc unsafe_rec doNPick(s:~ALockOrder,ns: ALockOrder; a:~lint, nam:~lstring)
 		println("done!"+nam);
 		fwd s ns
 	} else { 
+        println(nam+" round "+a);
 		letc sb:ALockOrder { eat(s,sb;nam) };
 		sleep 10; doNPick(sb,ns;a-1,nam)
 	}
@@ -226,9 +227,10 @@ proc unsafe_rec doNPick(s:~ALockOrder,ns: ALockOrder; a:~lint, nam:~lstring)
 proc unsafe_rec doNPickS(s:~ALockOrder,ns: ALockOrder; a:~lint, nam:~lstring)
 {  
 	if (a==0) {
-		println("done!S");
+		println("done!"+nam);
 		fwd s ns
 	} else { 
+        println(nam+" round "+a);
 		letc sb:ALockOrder { eat2(s,sb;nam) };
 		sleep 10; doNPickS(sb,ns;a-1,nam)
 	}
@@ -249,34 +251,6 @@ proc philoSM(nam:?colstring, s:~ ALockOrder;a:colint)
 	drop sn
 };;
 
-
-proc philosophers3(;n:~lint)
-{
-	letc f0:Fork { newFork(f0;"fork0")};
-	letc s0:LockOrder { newOrder(s0,f0)};
-	letc f1:Fork { newFork(f1;"fork1")};
-	letc s1:LockOrder { addOrder(s0,f1,s1)};
-	letc f2:Fork { newFork(f2;"fork2")};
-	letc s2:LockOrder { addOrder(s1,f2,s2)};
-	share s2 {
-		letc h0: LockOrder { getNth(0,s2,h0) };
-		sleep 100;
-		philo("P1",h0;n) 
-		||
-		letc h1: LockOrder { getNth(1,s2,h1) };
-		sleep 100;
-		philo("P2",h1;n)
-		||
-		sleep 100;
-		philoSM("P0",s2;n) 
-	} 
-	
-};;
-
-proc main0() {
-	philosophers3(;100)
-};;
-
 proc addOrderTR(s:~LockOrder, f:~Fork, sr:send close;LockOrder) {
 	take s (h: ~ALock );
 	unfold f;
@@ -288,74 +262,54 @@ proc addOrderTR(s:~LockOrder, f:~Fork, sr:send close;LockOrder) {
 
 proc unsafe_rec mkForks(ord:send close;LockOrder;n:~lint)
 {
-println("makeF "+n);
-if (n==0) {
-    cut {
-	 newFork(f;"fork "+n)
-	 | f: ~Fork |
-	 send ord (x.close x);
-	 newOrder(ord,f)
-	 }     	 
-} 
-{
-    cut {
-    	mkForks(ord_ind;n-1)
-   	 | ord_ind: ~send close; LockOrder |
-	recv ord_ind (ack);
-	println("recv ord_ind ");
-	wait ack;
-	cut {
-	    newFork(f;"fork "+n)
-	    	| f: ~Fork |
-	    addOrderTR(ord_ind,f,ordp)
-	        | ordp: ~send close; LockOrder |
-	    recv ordp (ack);
-	    wait ack;
-	    send ord (x.close x);
-	    unfold ord;
-	    unfold ordp;
-	    fwd ord ordp
-	}     	 
-	
+    println("makeF "+n);
+    if (n==0) {
+        letc f: Fork { newFork(f;"fork "+n) };
+	    ord <- { x.close x };
+        newOrder(ord,f)
+    } else {
+        letc ord_ind: send close; LockOrder {
+            mkForks(ord_ind;n-1)
+        };
+        ord_ind -> ack; wait ack;
+	    letc f: Fork { newFork(f;"fork "+n) };
+        letc ordp: send close; LockOrder { addOrderTR(ord_ind,f,ordp) };
+	    ordp -> ack; wait ack;
+	    ord <- { x.close x };
+	    // unfold ord;
+	    // unfold ordp;
+	    fwd ord ordp	
     }     	 
-  }     
 };;
 
 
 proc unsafe_rec mkPhils(ord:~ALockOrder;n:~lint,nphil:~lint)
 {
     println("makeP "+n);
-if (nphil==1) {
-	philoSM("P "+(nphil-1),ord;n) // symmetry breaker
-} 
-{
-    cut {
-	share ord {
-	  cut {
-	      getNth(nphil-2,ord,ord_to_me)
-	      | ord_to_me:~ LockOrder |
-	      philo("P "+(nphil-1),ord_to_me;n) }
-	 ||
-	 mkPhils(ord;n,nphil-1)
-	}     	 
-	}     	 
-}     
+    if (nphil==1) {
+	    philoSM("P "+(nphil-1),ord;n) // symmetry breaker
+    } 
+    {
+        share ord {
+            letc ord_to_me: LockOrder {
+                getNth(nphil-2,ord,ord_to_me)
+            };
+            philo("P "+(nphil-1),ord_to_me;n) 
+        ||
+            mkPhils(ord;n,nphil-1)
+        }     	 
+    }     
 };;
-
 
 proc mainN(; n:~lint, nphil:~lint)
 {
-    cut {
-	 mkForks(ord;nphil)
-   	 | ord: ~send close;LockOrder |
-	 recv ord (ack);
-	 sleep 100;
-	 wait ack;
-	 mkPhils(ord;n,nphil)
-	 }     	 	 
+    letc ord: send close;LockOrder { mkForks(ord;nphil) };
+	ord -> ack;
+	wait ack;
+	mkPhils(ord;n,nphil)	 	 
 };;
 
 proc main() {
-	mainN(;5,5)
+	mainN(;100,4)
 };;
 
