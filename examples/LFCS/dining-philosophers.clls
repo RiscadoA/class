@@ -7,7 +7,7 @@ type corec Fork {
     }
 };;
 
-type AFork {
+type AFork { // unfolded
     affine offer of {
         |#Pick:
 	offer of {
@@ -39,8 +39,8 @@ proc rec newFork(f:Fork; nam:colstring)
 		println ("Pick "+nam+"!");
     		case f of {
         		|#Drop: 
-			   	println ("Drop "+nam+"!");
-				newFork(f;nam)
+			   		println ("Drop "+nam+"!");
+					newFork(f;nam)
     			}
     }
 };;
