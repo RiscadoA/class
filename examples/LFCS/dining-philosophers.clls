@@ -131,7 +131,7 @@ proc eat(s: ~ALockOrder, lh: ALockOrder; nam:colstring )
 	   	put s (v:ALock.null(v,f));
 	   	fwd s lh
 	| #Next: 
-	
+
 		take h1 (h2:~ALock );
 		recv h2 (f2:~AFork);
 		print (nam+" "); #Pick f;
@@ -179,6 +179,7 @@ proc rec go2(
 		unfold fi;
 		fwd fi lh
 	| #Next:
+		unfold h1;
 		share h1 {
 			go2(h1,fi,lh; nam) 
 			||
@@ -188,14 +189,14 @@ proc rec go2(
 			  		affine n1;
 			  		#Next n1;
 					unfold n1;
-			  		fwd n1 h1);
+			  		fwd h1 n1);
 			drop v1
 		}
     }
 };;
 
 
-proc eat2X(s: ~ALockOrder, lh:ALockOrder; nam:colstring) 
+proc eat2(s: ~ALockOrder, lh:ALockOrder; nam:colstring) 
 {
 	take s (h1: ~ALock );
 	recv h1 (f:~AFork);
@@ -239,7 +240,7 @@ proc unsafe_rec doNPickS(s:~ALockOrder,ns: ALockOrder; a:~lint, nam:~lstring)
 		println("done!S");
 		fwd s ns
 	} else { 
-		letc sb:ALockOrder { eat2X(s,sb;nam) };
+		letc sb:ALockOrder { eat2(s,sb;nam) };
 		sleep 10; doNPickS(sb,ns;a-1,nam)
 	}
 };;
@@ -273,15 +274,12 @@ proc philosophers3(;n:~lint)
 		sleep 100;
 		philo("P1",h0;n) 
 		||
-		drop s2
-		/*
 		letc h1: LockOrder { getNth(1,s2,h1) };
 		sleep 100;
 		philo("P2",h1;n)
 		||
 		sleep 100;
 		philoSM("P0",s2;n) 
-		*/
 	} 
 	
 };;
