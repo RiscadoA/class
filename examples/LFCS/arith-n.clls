@@ -1,16 +1,16 @@
-type tmenu {
-    offer of {
-        |#Dup:  recv ~lint; send lint; wait 
-        |#Add:  recv ~lint; recv ~lint; send lint; wait
-    }
-};;
-
 proc sys() {
     cut {
         f -> x; let f (x+1)
         |f: send lint; ~lint|
         f <- 2 ; println (f); ()
     } 
+};;
+
+type tmenu {
+    offer of {
+        |#Dup:  recv ~lint; send lint; wait 
+        |#Add:  recv ~lint; recv ~lint; send lint; wait
+    }
 };;
 
 proc menu(m:tmenu) {
