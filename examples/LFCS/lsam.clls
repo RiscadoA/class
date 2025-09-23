@@ -1,0 +1,12 @@
+proc main() {
+    cut {
+        n->y;
+        println (y);
+        wait n;
+        ()
+        | n : send int; close |
+        n <- 42;
+        close n
+    }
+};;
+

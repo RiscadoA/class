@@ -287,14 +287,14 @@ proc unsafe_rec mkPhils(ord:~ALockOrder;n:~lint,nphil:~lint)
 {
     println("makeP "+n);
     if (nphil==1) {
-	    philoSM("P "+(nphil-1),ord;n) // symmetry breaker
+	    philoSM("P "+(nphil-1),ord;n) // last phil, symmetry breaker
     } 
     {
         share ord {
-            letc ord_to_me: LockOrder {
-                getNth(nphil-2,ord,ord_to_me)
+            letc nth_handle: LockOrder {
+                getNth(nphil-2,ord,nth_handle)
             };
-            philo("P "+(nphil-1),ord_to_me;n) 
+            philo("P "+(nphil-1),nth_handle;n) 
         ||
             mkPhils(ord;n,nphil-1)
         }     	 
@@ -304,8 +304,7 @@ proc unsafe_rec mkPhils(ord:~ALockOrder;n:~lint,nphil:~lint)
 proc mainN(; n:~lint, nphil:~lint)
 {
     letc ord: send close;LockOrder { mkForks(ord;nphil) };
-	ord -> ack;
-	wait ack;
+	ord -> ack; wait ack;
 	mkPhils(ord;n,nphil)	 	 
 };;
 
