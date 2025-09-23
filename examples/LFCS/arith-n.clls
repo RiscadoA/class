@@ -5,6 +5,14 @@ type tmenu {
     }
 };;
 
+proc sys() {
+    cut {
+        f -> x; let f (x+1)
+        |f: send lint; ~lint|
+        f <- 2 ; println (f); ()
+    } 
+};;
+
 proc menu(m:tmenu) {
     case m of {
         |#Dup:  m -> n;
