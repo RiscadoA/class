@@ -417,8 +417,9 @@ public class IRGenerator extends ASTNodeVisitor {
   public void visit(ASTUnfold node) {
     IREnvironment.Channel channel = env.getChannel(node.getCh());
 
-    addContinue(channel.getSessionId());
     if (node.isPos()) {
+      addContinue(channel.getSessionId());
+    } else {
       addContinueIfNegative(channel.getSessionId(), node.getRhsType());
     }
     env = env.resetChannel(node.getCh());
@@ -1556,12 +1557,6 @@ public class IRGenerator extends ASTNodeVisitor {
 
   void addContinueIfNegative(IRSessionId sessionId, ASTType type) {
     if (!isPositive(type)) {
-      addContinue(sessionId);
-    }
-  }
-
-  void addContinueIfPositive(IRSessionId sessionId, ASTType type) {
-    if (isPositive(type)) {
       addContinue(sessionId);
     }
   }
