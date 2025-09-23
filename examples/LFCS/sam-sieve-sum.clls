@@ -12,7 +12,7 @@ type NextIntStream {
 proc rec integersfrom(n: IntStream, k:~int)
 {
     case n of   {
-      	| #next: send n(k); integersfrom(n,k+1)
+      	| #next: n <- k; integersfrom(n,k+1)
 	   	| #stop: close n
  	   }	   	   
  };;
@@ -26,11 +26,11 @@ proc unsafe_rec filter(fouts:IntStream, fins:~IntStream, n:~int) {
 	}
 } and filter_next(fouts:NextIntStream, fins:~IntStream, n:~int) {
 	#next fins;
-	recv fins(v);
+	fins -> v;
 	if (v%n == 0) {
 		filter_next(fouts, fins, n)
 	} else {
-		send fouts(v);
+		fouts <- v;
 		filter(fouts, fins, n)
 	}
 };;
@@ -41,25 +41,23 @@ proc rec sieve(souts:IntStream, sins:~IntStream)
 	case souts of { 
 		|#next:
 			#next sins;
-			recv sins(p);
-			send souts(p);
-			cut {
-				sieve(souts, outp)
-				|outp:IntStream|
+			sins -> p;
+			souts <- p;
+			letc outp:IntStream {
 				filter(outp,sins,p)
-			}
+			};
+			sieve(souts, outp)
 		|#stop:
 			#stop sins; wait sins; close souts
 	}
  };;
 
 proc primesN(primes:IntStream)
- {
- cut  {
+{
+ 	letc  n:IntStream {
       integersfrom(n,2)
-      |n:~IntStream|
-      sieve(primes,n)
-}
+ 	};
+    sieve(primes,n)
  };;
 
 proc unsafe_rec printfirstN(il:~IntStream,k:~int)
@@ -67,7 +65,7 @@ proc unsafe_rec printfirstN(il:~IntStream,k:~int)
    	if(k==0) {
 	  	#stop il; wait il; println("DONE."); ()
 	} else {
-		#next il; recv il(n);
+		#next il; il -> n;
 		println(n);
 		printfirstN(il,k-1)
    	}
@@ -75,13 +73,12 @@ proc unsafe_rec printfirstN(il:~IntStream,k:~int)
 
 proc main_ss(np:coint)
 {
- cut  {
+ 	letc primes:IntStream {
       primesN(primes)
-      |primes:~IntStream|
-      printfirstN(primes,np)
-      }
+	};
+    printfirstN(primes,np)
  };;
 
 proc main() {
-	  	main_ss(10000)
+	  	main_ss(50000)
 };;

@@ -30,4 +30,4 @@ printAllp xs k   =
 
 
 main :: IO ()
-main = printAllp (primesp) 100000
+main = printAllp (primesp) 50000

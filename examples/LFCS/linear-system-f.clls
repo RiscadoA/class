@@ -11,8 +11,10 @@
 	Bernardo Toninho, Nobuko Yoshida, 2017.
 */
 
+/* sample functor */
+
 type G(X) {  	
-	choice of {
+	case of {
 	|  #Zero: close
 	|  #Succ: !X
 	}
@@ -158,9 +160,6 @@ proc ssucc(n:~!M,m:!M)
 	 fwd re m 
     }
 };;
-
-
-
 
 proc siter(n:~!M,step:?send !G(M);~!M, r:!M)
 {
@@ -480,6 +479,7 @@ proc testEXP2()
 
 proc main()
 {
+  println("4^4=(256):");
   cut {
 	four(n1)
 	|n1:~!M|
@@ -490,9 +490,3 @@ proc main()
 	pNAT(n3)
   }
 };;
-
-/*
-
-include "examples/pure/recursion-for-free.clls";;
-
-*/
