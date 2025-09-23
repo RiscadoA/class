@@ -1,5 +1,5 @@
 type tmenu {
-    option of {
+    case of {
         |#Dup:  send lint; recv ~lint; close 
         |#Add:  send lint; send lint; recv ~lint; close
     }

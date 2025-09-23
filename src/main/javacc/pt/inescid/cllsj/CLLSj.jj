@@ -731,7 +731,7 @@ ASTType SType() throws Exception:
     |
     <RECVT> s=<Id> <SEMIC> r=SType() { t = new ASTRecvTT(s.image,r); }
     |
-    (<OPTION> | <CHOICE>) <OF> <LBRA>
+    (<CASE> | <CHOICE>) <OF> <LBRA>
     { ASTCaseT tc = new ASTCaseT();
     } (TypeCase(tc))+ <RBRA> { t = tc; }
     |

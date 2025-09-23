@@ -1,18 +1,21 @@
+
+	x <- (2+n) ; Q
+
 type corec Fork {
     affine offer of {
         |#Pick:
-	offer of {
-        |#Drop: Fork
-    }
+		offer of {
+        	|#Drop: Fork
+    	}
     }
 };;
 
 type AFork { // unfolded
     affine offer of {
         |#Pick:
-	offer of {
-        |#Drop: Fork
-    }
+		offer of {
+        	|#Drop: Fork
+    	}
     }
 };;
 
@@ -21,9 +24,9 @@ type rec LockOrder {
 } and Lock {
     pair AFork;
     affine
-	 choice of {
-        |#Null: close
-        |#Next: LockOrder
+	 	choice of {
+        	|#Null: close
+        	|#Next: LockOrder
     }
 };;
 

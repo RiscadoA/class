@@ -74,15 +74,14 @@ proc deq( hd:~Ptr, rv:pair Opt(Aint);Ptr) {
 };;
 
 proc enq(tl:~Ptr, v:~affine lint, tlo:Ptr) {
+    take tl(tn);
+    take tn(lp);
     letc nn:LList(lint) {
-        cell nn (c. nil<lint>(c))
+        cell nn (lp)
     };
-    take tl(sn);
     share nn {
-        take sn(lp);
-        put sn(c. cons<lint>(v,nn,c));
-        drop sn;
-        discard lp 
+        put tn(c. cons<lint>(v,nn,c));
+        drop tn
     ||
         put tl(nn);
         forward tl tlo
@@ -151,7 +150,8 @@ proc lqueue(ienq:EnqI,ideq:DeqI) {
 
 proc unsafe_rec enq_user(cl:~EnqI;N:~lint) {
     if N==0 then {
-        #End cl; close cl
+        #End cl; 
+        close cl
     } else {
         #Enq cl;
         cl <- N;
@@ -165,7 +165,7 @@ proc unsafe_rec deq_user(cl:~DeqI;N:~lint) {
         #End cl; 
         close cl 
     } else {
-        #Deq cl; 
+        #Deq cl;
         recv cl(ans);
         case ans of {
             | #None: println("NONE"); wait ans;
@@ -182,30 +182,6 @@ proc mainq(;n:~lint) {
     lqueue(cl1,cl2)
 };;
 
-proc main0() {
-    letc cl1:~EnqI { enq_user(cl1;1)};
-    letc cl2:~DeqI { deq_user(cl2;1)};
-    lqueue(cl1,cl2)
-};;
-
-proc main1() {
-    letc cl1:~EnqI { enq_user(cl1;0)};
-    letc cl2:~DeqI { deq_user(cl2;3)};
-    lqueue(cl1,cl2)
-};;
-
-proc main2() {
-    letc cl1:~EnqI { enq_user(cl1;2)};
-    letc cl2:~DeqI { deq_user(cl2;0)};
-    lqueue(cl1,cl2)
-};;
-
-proc main3() {
-    letc cl1:~EnqI { enq_user(cl1;2)};
-    letc cl2:~DeqI { deq_user(cl2;1)};
-    lqueue(cl1,cl2)
-};;
-
 proc main() {
-	mainq(;10000)
+	mainq(;100)
 };;

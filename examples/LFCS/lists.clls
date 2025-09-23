@@ -3,7 +3,7 @@
 */
 
 type rec List(A){
-    choice of {
+    case of {
         |#Nil:  close
         |#Cons: send A; List(A)
     }
