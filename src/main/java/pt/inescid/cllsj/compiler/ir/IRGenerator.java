@@ -348,8 +348,7 @@ public class IRGenerator extends ASTNodeVisitor {
   public void visit(ASTMix node) {
     IRBlock rhsBlock = process.createBlock("mix_rhs");
     if (node.isConcurrent() && compiler.concurrency.get()) {
-      block.add(
-          new IRLaunchThread(rhsBlock.getLocation(), findLockedCells(node.fn(new HashSet<>()))));
+      block.add(new IRLaunchThread(rhsBlock.getLocation()));
     } else {
       block.add(new IRPushTask(rhsBlock.getLocation()));
     }
@@ -1287,7 +1286,7 @@ public class IRGenerator extends ASTNodeVisitor {
 
     IRBlock rhsBlock = process.createBlock("share_rhs");
     if (concurrent && compiler.concurrency.get()) {
-      block.add(new IRLaunchThread(rhsBlock.getLocation(), findLockedCells(rhsFreeNames)));
+      block.add(new IRLaunchThread(rhsBlock.getLocation()));
     } else {
       block.add(new IRPushTask(rhsBlock.getLocation()));
     }
@@ -1366,9 +1365,6 @@ public class IRGenerator extends ASTNodeVisitor {
       int contLhsEndPoints,
       Runnable contLhs,
       Runnable contRhs) {
-    if (compiler.concurrency.get()) {
-      env = env.setChannelLockedCell(ch, false);
-    }
     IREnvironment.Channel channel = env.getChannel(ch);
     IRDataLocation cellDataLoc = IRDataLocation.cell(channel.getLocalData(), IRSlotOffset.ZERO);
 
@@ -1428,9 +1424,6 @@ public class IRGenerator extends ASTNodeVisitor {
   }
 
   void addTake(String ch, String chc, ASTType typeLhs, int contEndPoints, Runnable cont) {
-    if (compiler.concurrency.get()) {
-      env = env.setChannelLockedCell(ch, true);
-    }
     IREnvironment.Channel channel = env.getChannel(ch);
     IRDataLocation cellDataLoc = IRDataLocation.cell(channel.getLocalData(), IRSlotOffset.ZERO);
 
@@ -1559,17 +1552,6 @@ public class IRGenerator extends ASTNodeVisitor {
     if (!isPositive(type)) {
       addContinue(sessionId);
     }
-  }
-
-  private List<IRDataLocation> findLockedCells(Set<String> names) {
-    List<IRDataLocation> locked = new ArrayList<>();
-    for (String ch : names) {
-      IREnvironment.Channel channel = env.getChannel(ch);
-      if (channel.isLockedCell()) {
-        locked.add(channel.getLocalData());
-      }
-    }
-    return locked;
   }
 
   void advanceOrReset(String ch, IRSlot slot, ASTType cont, boolean advancePolarity) {

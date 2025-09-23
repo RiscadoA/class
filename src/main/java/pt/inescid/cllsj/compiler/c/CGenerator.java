@@ -1696,6 +1696,7 @@ public class CGenerator extends IRInstructionVisitor {
             putCondVarWait(cellCondVar(ref), cellMutex(ref));
           });
       putAssign(cellIsFree(ref), 0);
+      putMutexUnlock(cellMutex(ref));
     }
   }
 
@@ -1703,6 +1704,7 @@ public class CGenerator extends IRInstructionVisitor {
   public void visit(IRUnlockCell instr) {
     if (compiler.concurrency.get()) {
       String ref = data(instr.getLocation()).deref("struct cell*");
+      putMutexLock(cellMutex(ref));
       putAssign(cellIsFree(ref), 1);
       putCondVarSignal(cellCondVar(ref));
       putMutexUnlock(cellMutex(ref));
@@ -1716,33 +1718,12 @@ public class CGenerator extends IRInstructionVisitor {
       return;
     }
 
-    String lockCellsLabel = makeLabel("lock_cells");
-    String lockCellsContLabel = makeLabel("lock_cells_cont");
-
-    // The thread will immediately jump to the the label we just lockCellsLabel
+    // The thread will immediately jump to the label of the instruction
     putAllocTask(TMP_PTR1);
-    putAssign(taskCont(cast(TMP_PTR1, "struct task*")), labelAddress(lockCellsLabel));
+    putAssign(taskCont(cast(TMP_PTR1, "struct task*")), codeLocationAddress(instr.getLocation()));
     putAssign(taskContEnv(cast(TMP_PTR1, "struct task*")), ENV);
     putIncrementAtomic("thread_inits");
     putLaunchThread("thread", TMP_PTR1);
-    putConstantGoto(lockCellsContLabel);
-
-    // The new thread starts here
-    // We need to lock all cells passed to the new thread
-    putLabel(lockCellsLabel);
-    for (IRDataLocation loc : instr.getPassedLockedCells()) {
-      putMutexLock(cellMutex(data(loc).deref("struct cell*")));
-    }
-    putConstantGoto(codeLocationLabel(instr.getLocation()));
-
-    // Continuation for the original thread
-    // We must unlock all cells passed to the new thread
-    // Since we don't set the is_free flag to 1, other threads won't be able to steal the cell
-    // from the new thread
-    putLabel(lockCellsContLabel);
-    for (IRDataLocation loc : instr.getPassedLockedCells()) {
-      putMutexUnlock(cellMutex(data(loc).deref("struct cell*")));
-    }
   }
 
   @Override
