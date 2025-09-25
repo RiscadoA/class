@@ -1,5 +1,12 @@
 #!/usr/bin/env bash
 
+# Receives at least three arguments: a name, a binary and one or more inputs
+# The inputs can be either filenames (ending in .in) or direct input text to be piped to the binary
+# The binary is run with each input, and its execution time and memory usage are recorded using GNU time
+# The results are appended to profile.csv in the current directory
+
+# The script can be run concurrently as it locks the CSV file when writing
+
 if [[ $# -lt 3 ]]; then
     echo "Usage: $0 name binary input1 [input2 ...]"
     exit 1
