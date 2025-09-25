@@ -30,4 +30,7 @@ printAllp xs k   =
 
 
 main :: IO ()
-main = printAllp (primesp) 150000 
+main = do
+  input <- getLine
+  let n = read input :: Int
+  printAllp primesp n

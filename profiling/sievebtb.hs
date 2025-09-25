@@ -48,4 +48,7 @@ printAllp xs k   =
                                printAllp xs (k-1)
 
 main :: IO ()
-main = printAllp (primes) 100000
+main = do
+  input <- getLine
+  let n = read input :: Int
+  printAllp primes n
