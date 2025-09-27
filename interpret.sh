@@ -10,5 +10,4 @@ fi
 source="$1"
 process="$2"
 
-input="include \"$source\";; $process();; quit;;"
-mvn -q exec:java -Dexec.args="-i '$input'"
+java -cp target/classes pt.inescid.cllsj.CLLSj -i "include \"$source\";; $process();; quit;;"
