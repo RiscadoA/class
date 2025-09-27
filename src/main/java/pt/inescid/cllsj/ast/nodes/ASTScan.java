@@ -26,6 +26,7 @@ import pt.inescid.cllsj.ast.types.ASTLboolT;
 import pt.inescid.cllsj.ast.types.ASTLintT;
 import pt.inescid.cllsj.ast.types.ASTLstringT;
 import pt.inescid.cllsj.ast.types.ASTType;
+import pt.inescid.cllsj.ast.types.ASTintT;
 
 public class ASTScan extends ASTNode {
   private static Scanner scanner = new Scanner(System.in);
@@ -131,7 +132,11 @@ public class ASTScan extends ASTNode {
   }
 
   private Value valueFromStdin(Env<EnvEntry> ep) throws Exception {
-    if (type instanceof ASTLintT) {
+    if (type instanceof ASTBangT) {
+      type = ((ASTBangT) type).getin();
+    }
+
+    if (type instanceof ASTintT || type instanceof ASTLintT) {
       return new VInt(scanner.nextInt());
     } else if (type instanceof ASTLboolT) {
       return new VBool(scanner.nextBoolean());

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# This scripts includes the given source file and immediately runs the given process.
+# This scripts includes the given source file and immediately interprets the given process.
 
 if [[ $# -lt 2 ]]; then
     echo "Usage: $0 source process" 

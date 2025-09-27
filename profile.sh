@@ -13,14 +13,9 @@ if [[ $# -lt 3 ]]; then
 fi
 
 what="$1"
-binary="$2"
+read -r -a binary <<< "$2"
 shift 2
 inputs=("$@")
-
-if [[ ! -x "$binary" ]]; then
-    echo "Error: $binary is not executable"
-    exit 1
-fi
 
 # Find GNU time (gtime on macOS, time elsewhere)
 TIME_CMD=$(command -v gtime || command -v time || true)
@@ -40,13 +35,13 @@ for input in "${inputs[@]}"; do
         inputname=$(basename "$input" .in)
         runout="bin/$what.$inputname.runout"
         profile="bin/$what.$inputname.profile"
-        echo "Running $binary with input file $input..."
-        "$TIME_CMD" -v "$binary" < "$input" > "$runout" 2> "$profile"
+        echo "Running ${binary[@]} with input file $input..."
+        "$TIME_CMD" -v ${binary[@]} < "$input" > "$runout" 2> "$profile"
     else
         runout="bin/$what.$input.runout"
         profile="bin/$what.$input.profile"
-        echo "Running $binary with input argument $input..."
-        echo "$input" | "$TIME_CMD" -v "$binary" > "$runout" 2> "$profile"
+        echo "Running ${binary[@]} with input argument $input..."
+        echo "$input" | "$TIME_CMD" -v ${binary[@]} > "$runout" 2> "$profile"
     fi
 
     user_time=$(grep "User time" "$profile" | awk '{print $4}')
