@@ -28,6 +28,8 @@ import pt.inescid.cllsj.ast.types.ASTLstringT;
 import pt.inescid.cllsj.ast.types.ASTType;
 
 public class ASTScan extends ASTNode {
+  private static Scanner scanner = new Scanner(System.in);
+
   String ch;
   ASTType type;
 
@@ -129,19 +131,14 @@ public class ASTScan extends ASTNode {
   }
 
   private Value valueFromStdin(Env<EnvEntry> ep) throws Exception {
-    Scanner scanner = new Scanner(System.in);
-    try {
-      if (type instanceof ASTLintT) {
-        return new VInt(scanner.nextInt());
-      } else if (type instanceof ASTLboolT) {
-        return new VBool(scanner.nextBoolean());
-      } else if (type instanceof ASTLstringT) {
-        return new VString(scanner.nextLine());
-      } else {
-        throw new TypeError("Line " + lineno + " :" + "SCAN: unsupported type " + type.toStr(ep));
-      }
-    } finally {
-      scanner.close();
+    if (type instanceof ASTLintT) {
+      return new VInt(scanner.nextInt());
+    } else if (type instanceof ASTLboolT) {
+      return new VBool(scanner.nextBoolean());
+    } else if (type instanceof ASTLstringT) {
+      return new VString(scanner.nextLine());
+    } else {
+      throw new TypeError("Line " + lineno + " :" + "SCAN: unsupported type " + type.toStr(ep));
     }
   }
 
