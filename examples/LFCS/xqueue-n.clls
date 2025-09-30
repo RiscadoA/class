@@ -90,13 +90,14 @@ proc enq(tl:~Ptr, v:~affine lint, tlo:Ptr) {
 
 proc printv(v:~Opt(Aint)) {
     case v of {
-        | #None: println("NONE"); wait v; ()
+        | #None: println("NO"); wait v; ()
         | #Some: println(v); ()
     }
 };;
 
-proc unsafe_rec deqloop(tl:~Ptr; N:~lint) {
+proc unsafe_rec deqloop(tl:~Ptr;N:~int) {
     if N==0 then {
+        println("DONE_D");
         drop tl
     } else {
         letc tnext:pair Opt(Aint);Ptr { deq(tl,tnext) };
@@ -106,8 +107,9 @@ proc unsafe_rec deqloop(tl:~Ptr; N:~lint) {
     }
 };;
 
-proc unsafe_rec encloop(hd:~Ptr; N:~lint) {
+proc unsafe_rec encloop(hd:~Ptr;N:~int) {
     if N==0 then {
+        println("DONE_E");
         drop hd
     } else {
         letc hnext:Ptr { enq(hd,N,hnext) };
@@ -115,7 +117,7 @@ proc unsafe_rec encloop(hd:~Ptr; N:~lint) {
     }
 };;
 
-proc mainloop(;n:~lint) {
+proc mainloop(;n:~int) {
     letc sn: LList(lint) {
         cell sn (c.nil<lint>(c))
     };
@@ -133,6 +135,6 @@ proc mainloop(;n:~lint) {
 };;
 
 proc main() {
-	mainloop(;10)
+	mainloop(;100000)
 };;
 

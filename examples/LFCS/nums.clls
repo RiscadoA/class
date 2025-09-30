@@ -3,7 +3,24 @@ proc pp(a:lint; b:~lint)
 if (b==0) { let a 1+b } { let a 2+b}
 };;
 
+proc q0(a:~int) {
+par {
+   println(a);()
+   ||
+   println(a);()
+}
+};;
+
+proc q1(x:~int) {
+   par {
+      q0(x+0)
+      ||
+      q0(x+0)
+   }
+};;
+
 proc main() {
    letc a:lint { pp(a; 99) }; 
-   println(a); ()
+   println(a);
+   q1(2)
 };;

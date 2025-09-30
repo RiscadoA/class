@@ -22,6 +22,7 @@ import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.types.ASTBangT;
 import pt.inescid.cllsj.ast.types.ASTCoAffineT;
 import pt.inescid.cllsj.ast.types.ASTCoRecT;
+import pt.inescid.cllsj.ast.types.ASTCointT;
 import pt.inescid.cllsj.ast.types.ASTIdT;
 import pt.inescid.cllsj.ast.types.ASTType;
 import pt.inescid.cllsj.ast.types.ASTUsageT;
@@ -36,7 +37,7 @@ public class ASTId extends ASTNode {
   List<ASTExpr> gexprs;
   List<String> pars;
   List<ASTType> parTypes;
-  // List<Integer> poffsets;
+
   List<String> gpars;
   List<ASTType> gparTypes;
   List<ASTType> tpars;
@@ -318,7 +319,6 @@ public class ASTId extends ASTNode {
 
       ASTType actual = pt; // .unfoldType(ep);
 
-      // System.out.println("PT = "+pt.toStr(ep));
       actual = ASTType.unfoldRecInferParameter(actual, formal, this, par, ep);
 
       if (!formal.equalst(actual, ep, true, new Trail())) {
@@ -342,7 +342,8 @@ public class ASTId extends ASTNode {
                   + actual.toStr(ep));
         }
       } else {
-        ed.upd(par, null);
+        // System.out.println("clear " + par + " " + actual.toStr(ep));
+        if (!(actual instanceof ASTCointT)) ed.upd(par, null);
         npars.add(par);
       }
 
@@ -384,8 +385,7 @@ public class ASTId extends ASTNode {
         actual = eg.find(par);
         actual = actual.unfoldType(ep);
       } catch (Exception e) {
-        // this point here is try to coerce a linear name a: coaff *** ? to the exponential context
-        // is this really needed ?
+
         actual = ed.find(par);
         actual = actual.unfoldType(ep);
 

@@ -110,13 +110,7 @@ public class ASTShare extends ASTNode {
 
   public void typecheck(Env<ASTType> ed, Env<ASTType> eg, Env<EnvEntry> ep) throws Exception {
     this.eg = eg;
-    //	this.inferUses(sh,ed,ep);
-
     ASTType ty = ed.find(sh);
-    /*
-           ty = ty.unfoldType(ep);
-           ty = ASTType.unfoldRec(ty);
-    */
     ty = ty.unfoldType(ep);
     ty = ASTType.unfoldRecInfer(ty, this, sh, ep);
 
