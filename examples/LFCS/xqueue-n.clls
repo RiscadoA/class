@@ -58,7 +58,7 @@ proc deq( hd:~Ptr, rv:pair Opt(Aint);Ptr) {
     take hd(hp);
     take hp(lh);
     case lh of {
-        |#Nil : // empty queue
+        |#Nil : 
             wait lh;
             put hp(c. nil<lint>(c));
             put hd(hp);
@@ -135,3 +135,4 @@ proc mainloop(;n:~lint) {
 proc main() {
 	mainloop(;10)
 };;
+
