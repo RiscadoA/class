@@ -459,13 +459,16 @@ public class ASTPrinter extends ASTNodeVisitor {
 
     out.print("(");
     first = true;
-    for (String par : node.getPars()) {
+    for (int i = 0; i < node.getPars().size(); ++i) {
+
       if (first) {
         first = false;
       } else {
         out.print(", ");
       }
-      out.print(par);
+      out.print(node.getPars().get(i));
+      out.print(": ");
+      node.getParTypes().get(i).accept(new ASTTypePrinter());
     }
 
     first = true;
