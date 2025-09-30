@@ -95,6 +95,11 @@ proc primesNC(primes:IntStream)
 }
  };;
 
+proc profile() {
+	letc n:!lint { scan(n) };
+	main_ss(;n)
+};;
+
 proc main() {
 	main_ss(;100000)
 };;

@@ -856,7 +856,7 @@ public class CGenerator extends IRInstructionVisitor {
   public void visit(IRFinishSession instr) {
     String session = accessSession(instr.getSessionId());
 
-    putAssign(sessionContSession(accessRemoteSession(session)), NULL);
+    putAssign(sessionContSession(accessRemoteSession(session)), remoteSessionAddress(session));
 
     putAssign(TMP_PTR1, sessionCont(session));
     if (instr.isEndPoint()) {
@@ -1019,11 +1019,7 @@ public class CGenerator extends IRInstructionVisitor {
   @Override
   public void visit(IRForwardSessions instr) {
     putAssign(TMP_SESSION, accessSession(instr.getNegId()));
-    putIf(
-        remoteSessionAddress(TMP_SESSION) + " != " + NULL,
-        () -> {
-          putAssign(accessRemoteSession(TMP_SESSION), accessSession(instr.getPosId()));
-        });
+    putAssign(accessRemoteSession(TMP_SESSION), accessSession(instr.getPosId()));
     if (instr.shouldJump()) {
       putAssign(TMP_PTR1, sessionCont(accessSession(instr.getPosId())));
       putAssign(TMP_PTR2, sessionContEnv(accessSession(instr.getPosId())));
@@ -1150,18 +1146,13 @@ public class CGenerator extends IRInstructionVisitor {
             Optional<IRLocalDataId> calledLocalDataId =
                 calledProcess.getAssociatedLocalData(arg.getTargetSessionId());
             String remoteSessionAddress = remoteSessionAddress(source);
-            putIf(
-                remoteSessionAddress + " != " + NULL,
-                () -> {
-                  String remoteSession = accessSession(remoteSessionAddress);
-                  if (calledLocalDataId.isPresent()) {
-                    putAssign(
-                        sessionContData(remoteSession),
-                        localData(calledLocalDataId.get(), arg.getDataOffset()));
-                  }
-                  putAssign(
-                      sessionContSession(remoteSession), sessionAddress(arg.getTargetSessionId()));
-                });
+            String remoteSession = accessSession(remoteSessionAddress);
+            if (calledLocalDataId.isPresent()) {
+              putAssign(
+                  sessionContData(remoteSession),
+                  localData(calledLocalDataId.get(), arg.getDataOffset()));
+            }
+            putAssign(sessionContSession(remoteSession), sessionAddress(arg.getTargetSessionId()));
           }
 
           for (IRCallProcess.DataArgument arg : instr.getTailCallDataArgumentOrder().get()) {
@@ -1316,26 +1307,22 @@ public class CGenerator extends IRInstructionVisitor {
             Optional<IRLocalDataId> calledLocalDataId =
                 calledProcess.getAssociatedLocalData(arg.getTargetSessionId());
             String remoteSessionAddress = remoteSessionAddress(source);
-            putIf(
-                remoteSessionAddress + " != " + NULL,
-                () -> {
-                  String remoteSession = accessSession(remoteSessionAddress);
-                  putAssign(sessionContEnv(remoteSession), newEnv);
-                  if (calledLocalDataId.isPresent()) {
-                    putAssign(
-                        sessionContData(remoteSession),
-                        localData(
-                            typeLayoutProvider,
-                            requisitesMet,
-                            calledLayout,
-                            newEnv,
-                            calledLocalDataId.get(),
-                            arg.getDataOffset()));
-                  }
-                  putAssign(
-                      sessionContSession(remoteSession),
-                      sessionAddress(calledLayout, newEnv, arg.getTargetSessionId()));
-                });
+            String remoteSession = accessSession(remoteSessionAddress);
+            putAssign(sessionContEnv(remoteSession), newEnv);
+            if (calledLocalDataId.isPresent()) {
+              putAssign(
+                  sessionContData(remoteSession),
+                  localData(
+                      typeLayoutProvider,
+                      requisitesMet,
+                      calledLayout,
+                      newEnv,
+                      calledLocalDataId.get(),
+                      arg.getDataOffset()));
+            }
+            putAssign(
+                sessionContSession(remoteSession),
+                sessionAddress(calledLayout, newEnv, arg.getTargetSessionId()));
           }
 
           for (IRCallProcess.DataArgument arg : instr.getDataArguments()) {

@@ -3,5 +3,7 @@ target
 .DS_Store
 .direnv
 .vscode
-comparisons/*
-!comparisons/*.hs
+profiling/*
+!profiling/*.hs
+profile.csv
+

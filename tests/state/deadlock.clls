@@ -1,0 +1,20 @@
+proc main() {
+  letc c : state int { cell c(1) };
+
+  // should not deadlock as long as tasks are LIFO
+  sshare c {
+    take c(i);
+    par {
+      ()
+      ||
+      put c(i + 1);
+      println("first: " + i);
+      release c
+    }
+    ||
+    take c(i);
+    put c(i + 1);
+    println("second: " + i);
+    release c
+  }
+};;

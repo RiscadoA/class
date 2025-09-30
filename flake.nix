@@ -16,6 +16,7 @@
           rlwrap
           haskell-language-server
           ghc
+          (python3.withPackages (ps: with ps; [ pandas matplotlib ]))
         ];
       };
     });
