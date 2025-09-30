@@ -1,5 +1,5 @@
 proc main() {
-    ccut {
+    cut {
         n->y;
         println (y);
         wait n;

@@ -88,48 +88,34 @@ proc enq(tl:~Ptr, v:~affine lint, tlo:Ptr) {
     }
 };;
 
-type corec EnqI {
-	offer of {
-	| #Enq: recv ~affine lint; EnqI
-	| #End: wait
-	}
-};;
-
-type corec DeqI {
-	offer of {
-	| #Deq: pair Opt(Aint); DeqI
-	| #End: wait
-	}
-};;
-
-proc rec enqop(enqi:EnqI,tl:~Ptr) {
-	case enqi of {
-        |#Enq:  recv enqi(item); 
-                letc tnext:Ptr {
-                    enq(tl,item,tnext)
-                };
-                enqop(enqi,tnext)
-        |#End:  wait enqi; 
-                drop tl
+proc printv(v:~Opt(Aint)) {
+    case v of {
+        | #None: println("NONE"); wait v; ()
+        | #Some: println(v); ()
     }
 };;
 
-proc rec deqop(deci:DeqI,tl:~Ptr) {
-	case deci of {
-        |#Deq:  
-		letc tnext:pair Opt(Aint); Ptr {
-		    
-                    deq(tl,tnext)
-                };
-                recv tnext (val);
-                deci <- val;
-                deqop(deci,tnext)
-        |#End:  wait deci; 
-                drop tl
+proc unsafe_rec deqloop(tl:~Ptr; N:~lint) {
+    if N==0 then {
+        drop tl
+    } else {
+        letc tnext:pair Opt(Aint);Ptr { deq(tl,tnext) };
+        recv tnext (val);
+        printv(val);
+        deqloop(tnext;N-1)    
     }
 };;
 
-proc lqueue(ienq:EnqI,ideq:DeqI) {
+proc unsafe_rec encloop(hd:~Ptr; N:~lint) {
+    if N==0 then {
+        drop hd
+    } else {
+        letc hnext:Ptr { enq(hd,N,hnext) };
+        encloop(hnext;N-1)    
+    }
+};;
+
+proc mainloop(;n:~lint) {
     letc sn: LList(lint) {
         cell sn (c.nil<lint>(c))
     };
@@ -137,49 +123,15 @@ proc lqueue(ienq:EnqI,ideq:DeqI) {
         letc hd:Ptr {
             cell hd (sn)
         };
-        deqop(ideq,hd)
+        deqloop(hd;n)
         ||
         letc tl:Ptr {
             cell tl (sn)
         };
-        enqop(ienq,tl)
+        encloop(tl;n)
     }
-};;
-
-proc unsafe_rec enq_user(cl:~EnqI;N:~lint) {
-    if N==0 then {
-        #End cl; 
-        close cl
-    } else {
-        #Enq cl;
-        cl <- N;
-        println(N);
-        enq_user(cl;N-1)
-    }
-};;
-
-proc unsafe_rec deq_user(cl:~DeqI;N:~lint) {
-    if N==0 then {
-        #End cl; 
-        close cl 
-    } else {
-        #Deq cl;
-        recv cl(ans);
-        case ans of {
-            | #None: println("NONE"); wait ans;
-                deq_user(cl;N-1)
-            | #Some: println(ans);
-                deq_user(cl;N-1)
-        }
-    }
-};;
-
-proc mainq(;n:~lint) {
-    letc cl1:~EnqI { enq_user(cl1;n)};
-    letc cl2:~DeqI { deq_user(cl2;n)};
-    lqueue(cl1,cl2)
 };;
 
 proc main() {
-	mainq(;100000)
+	mainloop(;10)
 };;

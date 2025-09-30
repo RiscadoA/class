@@ -1,3 +1,4 @@
+
 module Main where
 
 data MyList a = Empty | LCons a (MyList a)

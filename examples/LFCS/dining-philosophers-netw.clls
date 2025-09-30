@@ -309,6 +309,6 @@ proc mainN(; n:~lint, nphil:~lint)
 };;
 
 proc main() {
-	mainN(;100,4)
+	mainN(;100,5)
 };;
 

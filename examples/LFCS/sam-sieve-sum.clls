@@ -4,10 +4,6 @@ type corec IntStream {
 		|#stop: close
 	}
 };;
-
-type NextIntStream {
-	send int; IntStream
-};;
  
 proc rec integersfrom(n: IntStream, k:~int)
 {
@@ -16,6 +12,10 @@ proc rec integersfrom(n: IntStream, k:~int)
 	   	| #stop: close n
  	   }	   	   
  };;
+
+type NextIntStream {
+	send int; IntStream
+};;
 
 proc unsafe_rec filter(fouts:IntStream, fins:~IntStream, n:~int) {
 	case fouts of {
@@ -80,5 +80,5 @@ proc main_ss(np:coint)
  };;
 
 proc main() {
-	  	main_ss(150000)
+	  	main_ss(5000)
 };;

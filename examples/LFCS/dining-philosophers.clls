@@ -1,6 +1,3 @@
-
-	x <- (2+n) ; Q
-
 type corec Fork {
     affine offer of {
         |#Pick:
@@ -117,13 +114,14 @@ proc eat(s: ~ALockOrder, lh: ALockOrder; nam:colstring )
 	take s (h1: ~ALock );
 	h1 -> f;
 	case h1 of {
+
 	| #Null:
 		wait h1; 
 		println (nam+"UNREACHABLE");
 	   	put s (v:ALock.null(v,f));
 	   	fwd s lh
-	| #Next: 
 
+	| #Next: 
 		take h1 (h2:~ALock );
 		h2 -> f2;
 		print (nam+" "); #Pick f;
@@ -193,11 +191,13 @@ proc eat2(s: ~ALockOrder, lh:ALockOrder; nam:colstring)
 	take s (h1: ~ALock );
 	recv h1 (f:~AFork);
 	case h1 of {
+
 	| #Null: // never happens
 		wait h1; 
 		println (nam+"UNREACHABLE");
 	   	put s (v:ALock.null(v,f));
 	   	fwd s lh
+		
 	| #Next: 
 		letc cb : send LockOrder; AFork {
 			go2 ( h1, f, cb; nam) };
@@ -279,4 +279,3 @@ proc philosophers3(;n:~lint)
 proc main() {
 	philosophers3(;100)
 };;
-
