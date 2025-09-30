@@ -312,6 +312,7 @@ public class ASTId extends ASTNode {
         String ch = ASTType.gensym();
         genProcFromExpr(ch, expr, formalDual, ed, eg, ep);
         npars.add(ch);
+        parTypes.add(pt);
         continue;
       }
 
