@@ -114,6 +114,7 @@ proc unsafe_rec encloop(hd:~Ptr;N:~int) {
         drop hd
     } else {
         sleep 1;
+        println(0);
         letc hnext:Ptr { enq(hd,N,hnext) };
         encloop(hnext;N-1)    
     }

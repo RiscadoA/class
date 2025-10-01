@@ -58,7 +58,7 @@ producer q n = do
            else do
                 threadDelay 1000
                 enqueue q n
-                print n
+                print 0
                 producer q (n-1)
                 
 consumer ::  Queue Int -> Int -> IO ()
