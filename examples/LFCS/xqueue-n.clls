@@ -69,7 +69,8 @@ proc deq( hd:~Ptr, rv:pair Opt(Aint);Ptr) {
             rv <- { r. Some(val,r) };
             unfold lh;
             put hd(lh);
-            free(hp); fwd hd rv
+            free(hp); 
+            fwd hd rv
     }
 };;
 
