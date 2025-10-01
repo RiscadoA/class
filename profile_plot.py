@@ -13,10 +13,18 @@ if prefix:
   df["what"] = df["what"].str[len(prefix):]
   df["what"] = df["what"].str.lstrip("_- ")
 
+# Ask for user input to filter data by 'what' column exact match
+exact = input("Enter exact matches to include data by 'what' column (comma separated, leave empty for no filter): ").strip()
+if exact:
+  exact_list = [e.strip() for e in exact.split(",")]
+  df = df[df["what"].isin(exact_list)]
+
 # Ask for user input to filter out data by 'what' column (not prefix)
-pattern = input("Enter pattern to filter out 'what' column (leave empty for no filter): ").strip()
+pattern = input("Enter patterns to exclude data by 'what' column (comma separated, leave empty for no filter): ").strip()
 if pattern:
-  df = df[df["what"].str.contains(pattern) == False]
+  for p in pattern.split(","):
+    p = p.strip()
+    df = df[df["what"].str.contains(p) == False]
 
 # Ask for user input on input range to include (min and max)
 min_input = input("Enter minimum input value to include (leave empty for no minimum): ").strip()
@@ -47,17 +55,17 @@ for tag, g in df.groupby("what"):
 
 if log_scale:
   plt.yscale("log")
-plt.title("Execution Time Comparison")
+plt.title("Execution time comparison between the compiler and GHC")
 plt.xlabel("Input")
 if log_scale:
-  plt.ylabel("Execution Time (seconds, log scale)")
+  plt.ylabel("Execution time (seconds, log scale)")
 else:
-  plt.ylabel("Execution Time (seconds)")
+  plt.ylabel("Execution time (seconds)")
 plt.legend()
 plt.grid(True, linestyle="--", alpha=0.6)
 plt.tight_layout()
-plt.savefig("bin/execution_time.png")
-print(f"Saved bin/execution_time.png")
+plt.savefig("bin/execution_time.pdf")
+print(f"Saved bin/execution_time.pdf")
 
 # Memory Usage Plot
 plt.figure(figsize=(8,5))
@@ -66,7 +74,7 @@ for tag, g in df.groupby("what"):
 
 if log_scale:
   plt.yscale("log")
-plt.title("Memory Usage Comparison")
+plt.title("Memory usage comparison between the compiler and GHC")
 plt.xlabel("Input")
 if log_scale:
   plt.ylabel("Max RSS (KB, log scale)")
@@ -75,17 +83,28 @@ else:
 plt.legend()
 plt.grid(True, linestyle="--", alpha=0.6)
 plt.tight_layout()
-plt.savefig("bin/memory_usage.png")
-print(f"Saved bin/memory_usage.png")
+plt.savefig("bin/memory_usage.pdf")
+print(f"Saved bin/memory_usage.pdf")
 
 # Bar plots for each input
 for input_val, g in df.sort_values(by="exec_time").groupby("input"):
   plt.figure(figsize=(6,4))
   plt.barh(g["what"], g["exec_time"])
-  plt.title(f"Execution time for input {input_val}")
+  plt.title(f"Execution time for input {input_val} ")
   plt.xlabel("Execution time (s)")
   plt.ylabel("Configuration")
   plt.tight_layout()
-  plt.savefig(f"bin/exectime_{input_val}.png")
+  plt.savefig(f"bin/exectime_{input_val}.pdf")
   plt.close()
-  print(f"Saved exectime_{input_val}.png")
+  print(f"Saved bin/exectime_{input_val}.pdf")
+
+for input_val, g in df.sort_values(by="max_rss").groupby("input"):
+  plt.figure(figsize=(6,4))
+  plt.barh(g["what"], g["max_rss"])
+  plt.title(f"Memory usage for input {input_val} ")
+  plt.xlabel("Max RSS (KB)")
+  plt.ylabel("Configuration")
+  plt.tight_layout()
+  plt.savefig(f"bin/memusage_{input_val}.pdf")
+  plt.close()
+  print(f"Saved bin/memusage_{input_val}.pdf")

@@ -572,12 +572,16 @@ proc main() {
             |tick_out: ~Pair(Table(Cell), Table(Cell))|
             recv tick_out(final); recv tick_out(previous); wait tick_out;
             par {
-                print_board(final, done)
-                ||
                 trash_board(previous)
+                ||
+                print_board(final, done)
             }
             |done: wait|
             wait done; ()
         }
     }
+};;
+
+proc profile() {
+    main()
 };;

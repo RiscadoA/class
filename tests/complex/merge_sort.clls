@@ -188,3 +188,7 @@ proc main() {
         }
     }
 };;
+
+proc profile() {
+    main()
+};;
