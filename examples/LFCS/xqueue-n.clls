@@ -79,7 +79,7 @@ proc enq(tl:~Ptr, v:~affine lint, tlo:Ptr) {
     letc nn:LList(lint) {
         cell nn (lp)
     };
-    share nn {
+    sshare nn {
         put tn(c. cons<lint>(v,nn,c));
         drop tn
     ||
@@ -100,6 +100,7 @@ proc unsafe_rec deqloop(tl:~Ptr;N:~int) {
         println("DONE_D");
         drop tl
     } else {
+        sleep 1;
         letc tnext:pair Opt(Aint);Ptr { deq(tl,tnext) };
         recv tnext (val);
         printv(val);
@@ -112,6 +113,7 @@ proc unsafe_rec encloop(hd:~Ptr;N:~int) {
         println("DONE_E");
         drop hd
     } else {
+        sleep 1;
         letc hnext:Ptr { enq(hd,N,hnext) };
         encloop(hnext;N-1)    
     }
@@ -135,6 +137,6 @@ proc mainloop(;n:~int) {
 };;
 
 proc main() {
-	mainloop(;100000)
+	mainloop(;5000)
 };;
 

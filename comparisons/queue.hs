@@ -56,6 +56,7 @@ producer q n = do
                 print "DONE"
                 return ()
            else do
+                threadDelay 1000
                 enqueue q n
                 print n
                 producer q (n-1)
@@ -67,6 +68,7 @@ consumer q n = do
                 print "DONE"
                 return ()
            else do
+                threadDelay 1000           
                 v <- dequeue q
                 printv v
                 consumer q (n-1)
@@ -80,4 +82,4 @@ mains n =
 
 main ::  IO()
 main =
-     mains 100000
+     mains 5000
