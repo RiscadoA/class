@@ -5,7 +5,9 @@
 # The results are stored in profile.csv
 
 tests=(
-  "sieve|examples/sam/sam-sieve-sum-fast-stop-intp.clls|10000 20000 30000 40000 50000 60000 70000 80000 90000 100000"
+  # "merge-sort|tests/complex/merge_sort.clls|profiling/merge_sort_1000000.in"
+  "sieve|examples/sam/sam-sieve-sum-fast-stop-intp.clls|100000"
+  # "sieve|examples/sam/sam-sieve-sum-fast-stop-intp.clls|10000 20000 30000 40000 50000 60000 70000 80000 90000 100000"
 )
 
 flag_combinations=(
@@ -17,6 +19,11 @@ flag_combinations=(
   "locations|-O0 --analyze-ir --optimize-known-locations"
   "all|"
   "all-sequential|-Os"
+  # "no-inlining|--inlining-threshold=0 --monomorphization=off"
+  # "no-values|--optimize-send-value=off --optimize-affine-value=off"
+  # "no-endpoints|--optimize-tail-calls=off --optimize-single-endpoint=off --optimize-known-endpoints=off"
+  # "no-control-flow|--optimize-known-jumps=off --optimize-always-drop=off"
+  # "no-locations|--optimize-known-locations=off"
 )
 
 mkdir -p bin
