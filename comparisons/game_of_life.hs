@@ -1,5 +1,3 @@
-import Data.List.Extra ((!?))
-
 type Table a = [[a]]
 
 indexTable :: Table a -> Table (Int, Int, a)
@@ -10,8 +8,13 @@ mapTable :: (a -> b) -> Table a -> Table b
 mapTable _ [] = []
 mapTable f (xs : xss) = map f xs : mapTable f xss
 
+listAt :: [a] -> Int -> Maybe a
+listAt xs i
+    | i < 0 || i >= length xs = Nothing
+    | otherwise = Just (xs !! i)
+
 tableAt :: Table a -> (Int, Int) -> Maybe a
-tableAt t (i, j) = t !? i >>= \row -> row !? j 
+tableAt t (i, j) = listAt t i >>= \row -> listAt row j 
 
 -- Game of life data structures and operations
 

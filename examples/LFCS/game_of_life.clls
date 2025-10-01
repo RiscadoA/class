@@ -1,0 +1,587 @@
+type rec List(T) {
+    choice of {
+        |#nil: close
+        |#cons: send T; List(T)
+    }
+};;
+
+type rec Generator(T) {
+    offer of {
+        |#nil: close
+        |#cons: send T; Generator(T)
+    }
+};;
+
+type Pair(A, B) {
+    send A; send B; close
+};;
+
+type InOut(A) {
+    recv ~A; send A; close
+};;
+
+type Map(T, U) {
+    Generator(recv ~T; U)
+};;
+
+type Table(T) {
+    List(List(T))
+};;
+
+type Either(L, R) {
+    choice of {
+        |#left: L
+        |#right: R
+    }
+};;
+
+type Maybe(T) {
+    choice of {
+        |#just: T
+        |#nothing: close
+    }
+};;
+
+type MaybeAccess(T, D) {
+    choice of {
+        |#just: send T; recv ~T; send D; close
+        |#nothing: send D; close
+    }
+};;
+
+type Position {
+    Pair(!lint, !lint)
+};;
+
+proc rec list_map<T, U>(list: ~List(T), map: ~Map(T, U), out: Pair(Map(T, U), List(U))) {
+    case list of {
+        |#nil:
+            wait list;
+            send out(map);
+            send out(t. #nil t; close t);
+            close out
+        |#cons:
+            recv list(t);
+            #cons map; recv map(u); send u(t);
+            cut {
+                list_map<T, U>(list, map, acc)
+                |acc: ~Pair(Map(T, U), List(U))|
+                recv acc(acc_map); recv acc(acc_list); wait acc;
+                send out(acc_map);
+                send out(out_list. #cons out_list; send out_list(u); fwd acc_list out_list);
+                close out
+            }
+    }
+};;
+
+proc rec table_map<T, U>(table: ~Table(T), map: ~Map(T, U), out: Pair(Map(T, U), Table(U))) {
+    case table of {
+        |#nil:
+            wait table;
+            send out(map);
+            send out(t. #nil t; close t);
+            close out
+        |#cons:
+            recv table(t);
+            cut {
+                list_map<T, U>(t, map, mid)
+                |mid: ~Pair(Map(T, U), List(U))|
+                recv mid(mid_map); recv mid(mid_list); wait mid;
+                cut {
+                    table_map<T, U>(table, mid_map, acc)
+                    |acc: ~Pair(Map(T, U), Table(U))|
+                    recv acc(acc_map); recv acc(acc_table); wait acc;
+                    send out(acc_map); send out(out_table. #cons out_table; send out_table(mid_list); fwd acc_table out_table);
+                    close out
+                }
+            }
+    }
+};;
+
+proc rec table_positions_aux2<T>(list: ~List(T), positions: ~List(Position), out: Pair(List(Position), List(T)); x: ~lint, y: ~lint) {
+    case list of {
+        |#nil:
+            wait list;
+            send out(positions);
+            send out(l. #nil l; close l);
+            close out
+        |#cons:
+            recv list(element);
+            cut {
+                table_positions_aux2<T>(list, positions, acc; x, y + 1)
+                |acc: ~Pair(List(Position), List(T))|
+                recv acc(positions); recv acc(list); wait acc;
+                send out(l. #cons l; send l(p. send p(x); send p(y); close p); fwd positions l);
+                send out(l. #cons l; send l(element); fwd list l);
+                close out
+            }
+    }
+};;
+
+proc rec table_positions_aux1<T>(table: ~Table(T), positions: ~List(Position), out: Pair(List(Position), Table(T)); x: ~lint) {
+    case table of {
+        |#nil:
+            wait table;
+            send out(positions);
+            send out(t. #nil t; close t);
+            close out
+        |#cons:
+            recv table(column);
+            cut {
+                table_positions_aux1<T>(table, positions, acc; x + 1)
+                |acc: ~Pair(List(Position), Table(T))|
+                recv acc(positions); recv acc(table); wait acc;
+                cut {
+                    table_positions_aux2<T>(column, positions, aux; x, 0)
+                    |aux: ~Pair(List(Position), List(T))|
+                    recv aux(positions); recv aux(column); wait aux;
+                    send out(positions); send out(t. #cons t; send t(column); fwd table t); close out
+                }
+            }
+    }
+};;
+
+proc table_positions<T>(table: ~Table(T), out: Pair(List(Position), Table(T))) {
+    cut {
+        #nil positions; close positions
+        |positions: ~List(Position)|
+        table_positions_aux1<T>(table, positions, out; 0)
+    }
+};;
+
+proc rec list_at<T>(list: ~List(T), access: MaybeAccess(T, List(T)); index: ~lint) {
+    case list of {
+        |#nil:
+            wait list;
+            #nothing access;
+            send access(list. #nil list; close list);
+            close access
+        |#cons:
+            recv list(element);
+            if index == 0 {
+                #just access;
+                send access(element);
+                recv access(element);
+                send access(l. #cons l; send l(element); fwd list l);
+                close access
+            } else {
+                cut {
+                    case acc_access of {
+                        |#just:
+                            recv acc_access(acc_element);
+                            #just access; send access(acc_element); recv access(acc_element);
+                            send acc_access(acc_element); recv acc_access(list); wait acc_access;
+                            send access(l. #cons l; send l(element); fwd list l); close access
+                        |#nothing:
+                            recv acc_access(list); wait acc_access;
+                            #nothing access; send access(l. #cons l; send l(element); fwd list l); close access
+                    }
+                    |acc_access: MaybeAccess(T, List(T))|
+                    list_at<T>(list, acc_access; index - 1)
+                }
+            }
+    }
+};;
+
+proc table_at<T>(table: ~Table(T), position: ~Position, access: MaybeAccess(T, Table(T))) {
+    recv position(x); recv position(y); wait position; ?x; ?y;
+    cut {
+        list_at<List(T)>(table, table_access; x)
+        |table_access: ~MaybeAccess(List(T), Table(T))|
+        case table_access of {
+            |#just:
+                recv table_access(column);
+                cut {
+                    list_at<T>(column, column_access; y)
+                    |column_access: ~MaybeAccess(T, List(T))|
+                    case column_access of {
+                        |#just:
+                            recv column_access(cell_state);
+                            #just access; send access(cell_state); recv access(cell_state);
+                            send column_access(cell_state); recv column_access(column); wait column_access;
+                            send table_access(column); recv table_access(table); wait table_access;
+                            send access(table); close access
+                        |#nothing:
+                            recv column_access(column); wait column_access;
+                            send table_access(column); recv table_access(table); wait table_access;
+                            #nothing access; send access(table); close access
+                    }
+                }
+            |#nothing:
+                recv table_access(table); wait table_access;
+                #nothing access; send access(table); close access
+        }
+    }
+};;
+
+type Cell {
+    choice of {
+        |#live: close
+        |#dead: close
+    }
+};;
+
+proc clone3_position(position: ~Position, out: send Position; send Position; send Position; close) {
+    recv position(x); recv position(y); wait position; ?x; ?y;
+    send out(p. send p(x); send p(y); close p);
+    send out(p. send p(x); send p(y); close p);
+    send out(p. send p(x); send p(y); close p);
+    close out
+};;
+
+proc clone_cell(cell_state: ~Cell, out: Pair(Cell, Cell)) {
+    case cell_state of {
+        |#live:
+            wait cell_state; send out(c. #live c; close c); send out(c. #live c; close c); close out
+        |#dead:
+            wait cell_state; send out(c. #dead c; close c); send out(c. #dead c; close c); close out
+    }
+};;
+
+proc trash_cell(cell_state: ~Cell, out: close) {
+    case cell_state of {
+        |#live: wait cell_state; close out
+        |#dead: wait cell_state; close out
+    }
+};;
+
+proc board_get(board: ~Table(Cell), position: ~Position, out: Pair(Maybe(Cell), Table(Cell))) {
+    cut {
+        table_at<Cell>(board, position, access)
+        |access: ~MaybeAccess(Cell, Table(Cell))|
+        case access of {
+            |#just:
+                recv access(cell_state);
+                cut {
+                    clone_cell(cell_state, clone_out)
+                    |clone_out: ~Pair(Cell, Cell)|
+                    recv clone_out(cell_state1); recv clone_out(cell_state2); wait clone_out;
+                    send access(cell_state1); recv access(board); wait access;
+                    send out(c. #just c; fwd cell_state2 c); send out(board); close out
+                }
+            |#nothing:
+                recv access(board); wait access;
+                send out(c. #nothing c; close c); send out(board); close out
+        }
+    }
+};;
+
+proc board_set(board: ~Table(Cell), position: ~Position, cell_state: ~Cell, out: Table(Cell)) {
+    cut {
+        table_at<Cell>(board, position, access)
+        |access: ~MaybeAccess(Cell, Table(Cell))|
+        case access of {
+            |#just:
+                recv access(cell_state1); send access(cell_state); recv access(board); wait access;
+                cut {
+                    trash_cell(cell_state1, done)
+                    |done: wait|
+                    wait done; fwd board out
+                }
+            |#nothing:
+                recv access(board); wait access;
+                cut {
+                    trash_cell(cell_state, done)
+                    |done: wait|
+                    wait done; fwd board out
+                }
+        }
+    }
+};;
+
+proc tick_cell(prev: ~Cell, next: Cell; live_neighbors: ~lint) {
+    case prev of {
+        |#live:
+            if live_neighbors < 2 or live_neighbors > 3 {
+                #dead next; fwd prev next
+            } else {
+                #live next; fwd prev next
+            }
+        |#dead:
+            if live_neighbors == 3 {
+                #live next; fwd prev next
+            } else {
+                #dead next; fwd prev next
+            }
+    }
+};;
+
+proc count_live_cell(table: ~Table(Cell), position: ~Position, out: Pair(!lint, Table(Cell)); count: ~lint) {
+    cut {
+        table_at<Cell>(table, position, access)
+        |access: ~MaybeAccess(Cell, Table(Cell))|
+        case access of {
+            |#just:
+                recv access(cell_state);
+                case cell_state of {
+                    |#live:
+                        wait cell_state;
+                        send access(cell_state. #live cell_state; close cell_state); recv access(table); wait access;
+                        send out(count + 1); send out(table); close out
+                    |#dead:
+                        wait cell_state;
+                        send access(cell_state. #dead cell_state; close cell_state); recv access(table); wait access;
+                        send out(count); send out(table); close out
+                }
+            |#nothing:
+                recv access(table); wait access;
+                send out(count); send out(table); close out
+        }
+    }
+
+};;
+
+proc count_live_neighbors(table: ~Table(Cell), position: ~Position, out: Pair(!lint, Table(Cell))) {
+    recv position(cx); recv position(cy); wait position; ?cx; ?cy;
+    cut {
+        cut {
+            send position(cx - 1); send position(cy - 1); close position
+            |position: ~Position|
+            count_live_cell(table, position, acc1; 0)
+        }
+        |acc1: ~Pair(!lint, Table(Cell))|
+        recv acc1(count); recv acc1(table); wait acc1;
+        cut {
+            send position(cx - 1); send position(cy); close position
+            |position: ~Position|
+            count_live_cell(table, position, acc2; count)
+        }
+        |acc2: ~Pair(!lint, Table(Cell))|
+        recv acc2(count); recv acc2(table); wait acc2;
+        cut {
+            send position(cx - 1); send position(cy + 1); close position
+            |position: ~Position|
+            count_live_cell(table, position, acc3; count)
+        }
+        |acc3: ~Pair(!lint, Table(Cell))|
+        recv acc3(count); recv acc3(table); wait acc3;
+        cut {
+            send position(cx); send position(cy - 1); close position
+            |position: ~Position|
+            count_live_cell(table, position, acc4; count)
+        }
+        |acc4: ~Pair(!lint, Table(Cell))|
+        recv acc4(count); recv acc4(table); wait acc4;
+        cut {
+            send position(cx); send position(cy + 1); close position
+            |position: ~Position|
+            count_live_cell(table, position, acc5; count)
+        }
+        |acc5: ~Pair(!lint, Table(Cell))|
+        recv acc5(count); recv acc5(table); wait acc5;
+        cut {
+            send position(cx + 1); send position(cy - 1); close position
+            |position: ~Position|
+            count_live_cell(table, position, acc6; count)
+        }
+        |acc6: ~Pair(!lint, Table(Cell))|
+        recv acc6(count); recv acc6(table); wait acc6;
+        cut {
+            send position(cx + 1); send position(cy); close position
+            |position: ~Position|
+            count_live_cell(table, position, acc7; count)
+        }
+        |acc7: ~Pair(!lint, Table(Cell))|
+        recv acc7(count); recv acc7(table); wait acc7;
+        cut {
+            send position(cx + 1); send position(cy + 1); close position
+            |position: ~Position|
+            count_live_cell(table, position, out; count)
+        }
+    }
+};;
+
+proc rec tick_board_aux(positions: ~List(Position), previous: ~Table(Cell), next: ~Table(Cell), out: Pair(Table(Cell), Table(Cell))) {
+    case positions of {
+        |#nil: wait positions; send out(previous); send out(next); close out
+        |#cons:
+            recv positions(position);
+            cut {
+                clone3_position(position, clone_out)
+                |clone_out: recv ~Position; recv ~Position; recv ~Position; wait|
+                recv clone_out(position1); recv clone_out(position2); recv clone_out(position3); wait clone_out;
+                cut {
+                    count_live_neighbors(previous, position1, count_out)
+                    |count_out: ~Pair(!lint, Table(Cell))|
+                    recv count_out(count); recv count_out(previous); wait count_out; ?count;
+                    cut {
+                        board_get(previous, position2, get)
+                        |get: ~Pair(Maybe(Cell), Table(Cell))|
+                        recv get(previous_cell); recv get(previous); wait get;
+                        case previous_cell of {
+                            |#nothing:
+                                wait previous_cell;
+                                println("Error: position out of bounds");
+                                par { unreachable positions || unreachable position3 || unreachable previous || unreachable next || unreachable out }
+                            |#just:
+                                cut {
+                                    tick_cell(previous_cell, next_cell; count)
+                                    |next_cell: ~Cell|
+                                    board_set(next, position3, next_cell, next2)
+                                    |next2: ~Table(Cell)|
+                                    tick_board_aux(positions, previous, next2, out)
+                                }
+                        }
+                    }
+                }
+            }
+    }
+};;
+ 
+proc tick_board(previous: ~Table(Cell), next: ~Table(Cell), out: Pair(Table(Cell), Table(Cell))) {
+    cut {
+        table_positions<Cell>(previous, table_positions_out)
+        |table_positions_out: ~Pair(List(Position), Table(Cell))|
+        recv table_positions_out(positions); recv table_positions_out(previous); wait table_positions_out;
+        tick_board_aux(positions, previous, next, out)
+    }
+};;
+
+proc unsafe_rec tick_board_gens(previous: ~Table(Cell), next: ~Table(Cell), out: Pair(Table(Cell), Table(Cell)); gens: ~lint) {
+    if gens < 1 {
+        send out(previous); send out(next); close out
+    } else {
+        cut {
+            tick_board(previous, next, tick_out)
+            |tick_out: ~Pair(Table(Cell), Table(Cell))|
+            recv tick_out(next); recv tick_out(previous); wait tick_out;
+            tick_board_gens(previous, next, out; gens - 1)
+        }
+    }
+};;
+
+proc scan_cell(cell_state: Cell) {
+    cut {
+        scan(i)
+        |i: ~lint|
+        if i == 0 {
+            #dead cell_state; close cell_state
+        } else {
+            #live cell_state; close cell_state
+        }
+    }
+};;
+
+proc unsafe_rec scan_column(list: List(Cell); sy: ~lint) {
+    if sy < 1 {
+        #nil list; close list
+    } else {
+        #cons list; send list(c. scan_cell(c));
+        scan_column(list; sy - 1)
+    }
+};;
+
+proc unsafe_rec scan_board(table: Table(Cell); sx: ~lint, sy: ~lint) {
+    if sx < 1 {
+        #nil table; close table
+    } else {
+        #cons table; send table(c. scan_column(c; sy));
+        scan_board(table; sx - 1, sy)
+    }
+};;
+
+proc unsafe_rec empty_column(list: List(Cell); sy: ~lint) {
+    if sy < 1 {
+        #nil list; close list
+    } else {
+        #cons list; send list(c. #dead c; close c);
+        empty_column(list; sy - 1)
+    }
+};;
+
+proc unsafe_rec empty_board(table: Table(Cell); sx: ~lint, sy: ~lint) {
+    if sx < 1 {
+        #nil table; close table
+    } else {
+        #cons table; send table(c. empty_column(c; sy));
+        empty_board(table; sx - 1, sy)
+    }
+};;
+
+proc print_cell(cell_state: ~Cell, out: close) {
+    case cell_state of {
+        |#live: wait cell_state; print("1 "); close out
+        |#dead: wait cell_state; print("0 "); close out
+    }
+};;
+
+proc rec print_column(list: ~List(Cell), out: close) {
+    case list of {
+        |#nil: wait list; print("\n"); close out
+        |#cons:
+            recv list(cell_state);
+            cut {
+                print_cell(cell_state, acc)
+                |acc: wait|
+                wait acc; print_column(list, out)
+            }
+    }
+};;
+
+proc rec print_board(table: ~Table(Cell), out: close) {
+    case table of {
+        |#nil: wait table; close out
+        |#cons:
+            recv table(column);
+            cut {
+                print_column(column, acc)
+                |acc: wait|
+                wait acc; print_board(table, out)
+            }
+    }
+};;
+
+proc rec trash_column(list: ~List(Cell), out: close) {
+    case list of {
+        |#nil: wait list; close out
+        |#cons:
+            recv list(cell_state);
+            cut {
+                trash_cell(cell_state, acc)
+                |acc: wait|
+                wait acc; trash_column(list, out)
+            }
+    }
+};;
+
+proc rec trash_board(table: ~Table(Cell)) {
+    case table of {
+        |#nil: wait table; ()
+        |#cons:
+            recv table(column);
+            cut {
+                trash_column(column, acc)
+                |acc: wait|
+                wait acc; trash_board(table)
+            }
+    }
+};;
+
+proc main() {
+    cut {
+        send input(i. scan(i)); send input(i. scan(i)); send input(i. scan(i)); close input
+        |input: recv ~!lint; recv ~!lint; recv ~!lint; wait|
+        recv input(gens); recv input(sx); recv input(sy); wait input; ?gens; ?sx; ?sy;
+        cut {
+            send tables(t. scan_board(t; sx, sy));
+            send tables(t. empty_board(t; sx, sy));
+            close tables
+            |tables: ~Pair(Table(Cell), Table(Cell))|
+            recv tables(previous); recv tables(next); wait tables;
+            tick_board_gens(previous, next, tick_out; gens)
+            |tick_out: ~Pair(Table(Cell), Table(Cell))|
+            recv tick_out(final); recv tick_out(previous); wait tick_out;
+            par {
+                trash_board(previous)
+                ||
+                print_board(final, done)
+            }
+            |done: wait|
+            wait done; ()
+        }
+    }
+};;
+
+proc profile() {
+    main()
+};;
