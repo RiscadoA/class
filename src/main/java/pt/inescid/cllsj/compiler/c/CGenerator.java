@@ -123,7 +123,6 @@ public class CGenerator extends IRInstructionVisitor {
     if (compiler.allocatorLevels.get() <= 0) {
       putLine("#define managed_alloc(size) malloc(size)");
       putLine("#define managed_free(ptr) free(ptr)");
-      putLine("#define managed_realloc(ptr, size) realloc(ptr, size)");
     } else {
       putBlock(
           "void* managed_alloc(size_t size)",
@@ -188,34 +187,6 @@ public class CGenerator extends IRInstructionVisitor {
             }
           });
       putBlankLine();
-
-      putBlock(
-          "void* managed_realloc(void* ptr, size_t size)",
-          () -> {
-            putIf(
-                "ptr == NULL",
-                () -> {
-                  putStatement("return managed_alloc(size)");
-                });
-            putStatement(
-                "struct allocation* alloc = (struct allocation*)((char*)ptr - "
-                    + "sizeof(struct allocation))");
-            putStatement("int level = alloc->level");
-            putIfElse(
-                "size <= " + compiler.allocatorSizeDivisor.get() + " * (level + 1)",
-                () -> {
-                  putStatement("return alloc->data");
-                },
-                () -> {
-                  putStatement("void* new_ptr = managed_alloc(size)");
-                  putStatement(
-                      "memcpy(new_ptr, alloc->data, "
-                          + compiler.allocatorSizeDivisor.get()
-                          + " * (level + 1))");
-                  putStatement("managed_free(alloc->data)");
-                  putStatement("return new_ptr");
-                });
-          });
     }
     putBlankLine();
 
