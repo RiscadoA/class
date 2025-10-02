@@ -337,8 +337,12 @@ public class Analyzer extends IRInstructionVisitor {
 
   @Override
   public void visit(IRBranchTypeFlag instr) {
-    visit(instr.getThen().getLocation(), VisitType.BRANCH);
-    visit(instr.getOtherwise().getLocation(), VisitType.BRANCH);
+    if (instr.getRequisites().isPossible()) {
+      visit(instr.getThen().getLocation(), VisitType.BRANCH);
+    }
+    if (instr.getRequisites().canBeUnmet()) {
+      visit(instr.getOtherwise().getLocation(), VisitType.BRANCH);
+    }
   }
 
   @Override
