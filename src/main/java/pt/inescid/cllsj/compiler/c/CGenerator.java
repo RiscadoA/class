@@ -1645,8 +1645,9 @@ public class CGenerator extends IRInstructionVisitor {
   public void visit(IRDeferDrop instr) {
     CSizeBits dropBitOffset = currentProcessLayout.dropBitOffset(instr.getDropId());
     CAddress dropByteAddress = CAddress.of(ENV, dropBitOffset.getSize());
-    String dropByte = dropByteAddress.deref("unsigned char");
-    putAssign(dropByte, dropByte + " | (1 << " + dropBitOffset.getBits() + ")");
+    String dropByte =
+        dropByteAddress.deref(compiler.concurrency.get() ? "atomic_uchar" : "unsigned char");
+    putAssignSetBitAtomic(dropByte, dropBitOffset.getBits());
   }
 
   @Override
@@ -2652,8 +2653,9 @@ public class CGenerator extends IRInstructionVisitor {
       } else {
         CSizeBits dropBitOffset = processLayout.dropBitOffset(dropId);
         CAddress dropByteAddress = CAddress.of(var, dropBitOffset.getSize());
-        String dropByte = dropByteAddress.deref("unsigned char");
-        putIf(dropByte + " & (1 << " + dropBitOffset.getBits() + ")", putDrop);
+        String dropByte =
+            dropByteAddress.deref(compiler.concurrency.get() ? "atomic_uchar" : "unsigned char");
+        putIf(testBitAtomic(dropByte, dropBitOffset.getBits()), putDrop);
       }
     }
   }
@@ -2733,6 +2735,14 @@ public class CGenerator extends IRInstructionVisitor {
       return "atomic_fetch_sub(&" + var + ", 1)";
     } else {
       return var + "--";
+    }
+  }
+
+  private String testBitAtomic(String var, int bit) {
+    if (compiler.concurrency.get()) {
+      return "(atomic_load(&" + var + ") & (1 << " + bit + "))";
+    } else {
+      return "(" + var + " & (1 << " + bit + "))";
     }
   }
 
@@ -2848,6 +2858,22 @@ public class CGenerator extends IRInstructionVisitor {
       putStatement("atomic_store_max(&" + var + ", " + value + ")");
     } else {
       putStatement(var + " = MAX(" + var + ", " + value + ")");
+    }
+  }
+
+  void putAssignSetBitAtomic(String var, int bit) {
+    if (compiler.concurrency.get()) {
+      putStatement("atomic_fetch_or(&" + var + ", (1 << " + bit + "))");
+    } else {
+      putStatement(var + " |= (1 << " + bit + ")");
+    }
+  }
+
+  void putAssignClearBitAtomic(String var, int bit) {
+    if (compiler.concurrency.get()) {
+      putStatement("atomic_fetch_and(&" + var + ", ~(1 << " + bit + "))");
+    } else {
+      putStatement(var + " &= ~(1 << " + bit + ")");
     }
   }
 
