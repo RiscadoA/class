@@ -138,7 +138,7 @@ public class CGenerator extends IRInstructionVisitor {
                 () -> {
                   putStatement(
                       "struct allocation* alloc = malloc(sizeof(struct allocation) + size)");
-                  putStatement("alloc->level = " + (compiler.allocatorLevels.get() - 1));
+                  putStatement("alloc->level = -1");
                   putStatement("return alloc->data");
                 },
                 () -> {
@@ -177,14 +177,21 @@ public class CGenerator extends IRInstructionVisitor {
                 "struct allocation* alloc = (struct allocation*)((char*)ptr - "
                     + "sizeof(struct allocation))");
             putStatement("int level = alloc->level");
-            if (compiler.concurrency.get()) {
-              putMutexLock("allocator_mutex[level]");
-            }
-            putStatement("alloc->next = allocator_list[level]");
-            putStatement("allocator_list[level] = alloc");
-            if (compiler.concurrency.get()) {
-              putMutexUnlock("allocator_mutex[level]");
-            }
+            putIfElse(
+                "level == -1",
+                () -> {
+                  putStatement("free(alloc)");
+                },
+                () -> {
+                    if (compiler.concurrency.get()) {
+                      putMutexLock("allocator_mutex[level]");
+                    }
+                    putStatement("alloc->next = allocator_list[level]");
+                    putStatement("allocator_list[level] = alloc");
+                    if (compiler.concurrency.get()) {
+                      putMutexUnlock("allocator_mutex[level]");
+                    }
+                });
           });
       putBlankLine();
     }
