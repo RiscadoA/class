@@ -120,7 +120,6 @@ do
         if [ $just_failed -ne 0 ]; then
             exit 1
         else
-            success "($job_processed/$count) $file: passed"
             exit 0
         fi
     ) &
