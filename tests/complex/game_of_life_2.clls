@@ -227,3 +227,7 @@ proc main() {
     #drop final_result_board; wait final_result_board;
     ()
 };;
+
+proc profile() {
+    main()
+};;
