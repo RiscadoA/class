@@ -24,8 +24,11 @@ type Map(T, U) {
     Generator(recv ~T; U)
 };;
 
-type Table(T) {
-    List(List(T))
+type rec Table(T) {
+    choice of {
+        |#nil: close
+        |#cons: send List(T); Table(T)
+    }
 };;
 
 type Either(L, R) {
@@ -106,13 +109,13 @@ proc rec table_positions_aux2<T>(list: ~List(T), positions: ~List(Position), out
             send out(l. #nil l; close l);
             close out
         |#cons:
-            recv list(element);
+            recv list(list_element);
             cut {
                 table_positions_aux2<T>(list, positions, acc; x, y + 1)
                 |acc: ~Pair(List(Position), List(T))|
-                recv acc(positions); recv acc(list); wait acc;
-                send out(l. #cons l; send l(p. send p(x); send p(y); close p); fwd positions l);
-                send out(l. #cons l; send l(element); fwd list l);
+                recv acc(positions2); recv acc(list2); wait acc;
+                send out(l. #cons l; send l(p. send p(x); send p(y); close p); fwd positions2 l);
+                send out(l. #cons l; send l(list_element); fwd list2 l);
                 close out
             }
     }
@@ -130,12 +133,12 @@ proc rec table_positions_aux1<T>(table: ~Table(T), positions: ~List(Position), o
             cut {
                 table_positions_aux1<T>(table, positions, acc; x + 1)
                 |acc: ~Pair(List(Position), Table(T))|
-                recv acc(positions); recv acc(table); wait acc;
+                recv acc(positions2); recv acc(table2); wait acc;
                 cut {
-                    table_positions_aux2<T>(column, positions, aux; x, 0)
+                    table_positions_aux2<T>(column, positions2, aux; x, 0)
                     |aux: ~Pair(List(Position), List(T))|
-                    recv aux(positions); recv aux(column); wait aux;
-                    send out(positions); send out(t. #cons t; send t(column); fwd table t); close out
+                    recv aux(positions3); recv aux(column2); wait aux;
+                    send out(positions3); send out(t. #cons t; send t(column2); fwd table2 t); close out
                 }
             }
     }
@@ -161,20 +164,20 @@ proc rec list_at<T>(list: ~List(T), access: MaybeAccess(T, List(T)); index: ~lin
             if index == 0 {
                 #just access;
                 send access(element);
-                recv access(element);
-                send access(l. #cons l; send l(element); fwd list l);
+                recv access(element2);
+                send access(l. #cons l; send l(element2); fwd list l);
                 close access
             } else {
                 cut {
                     case acc_access of {
                         |#just:
                             recv acc_access(acc_element);
-                            #just access; send access(acc_element); recv access(acc_element);
-                            send acc_access(acc_element); recv acc_access(list); wait acc_access;
-                            send access(l. #cons l; send l(element); fwd list l); close access
+                            #just access; send access(acc_element); recv access(acc_element2);
+                            send acc_access(acc_element2); recv acc_access(list2); wait acc_access;
+                            send access(l. #cons l; send l(element); fwd list2 l); close access
                         |#nothing:
-                            recv acc_access(list); wait acc_access;
-                            #nothing access; send access(l. #cons l; send l(element); fwd list l); close access
+                            recv acc_access(list2); wait acc_access;
+                            #nothing access; send access(l. #cons l; send l(element); fwd list2 l); close access
                     }
                     |acc_access: MaybeAccess(T, List(T))|
                     list_at<T>(list, acc_access; index - 1)
@@ -183,10 +186,44 @@ proc rec list_at<T>(list: ~List(T), access: MaybeAccess(T, List(T)); index: ~lin
     }
 };;
 
+proc rec table_row_at<T>(list: ~Table(T), access: MaybeAccess(List(T), Table(T)); index: ~lint) {
+    case list of {
+        |#nil:
+            wait list;
+            #nothing access;
+            send access(list. #nil list; close list);
+            close access
+        |#cons:
+            recv list(element);
+            if index == 0 {
+                #just access;
+                send access(element);
+                recv access(element2);
+                send access(l. #cons l; send l(element2); fwd list l);
+                close access
+            } else {
+                cut {
+                    case acc_access of {
+                        |#just:
+                            recv acc_access(acc_element);
+                            #just access; send access(acc_element); recv access(acc_element2);
+                            send acc_access(acc_element2); recv acc_access(list2); wait acc_access;
+                            send access(l. #cons l; send l(element); fwd list2 l); close access
+                        |#nothing:
+                            recv acc_access(list2); wait acc_access;
+                            #nothing access; send access(l. #cons l; send l(element); fwd list2 l); close access
+                    }
+                    |acc_access: MaybeAccess(List(T), Table(T))|
+                    table_row_at<T>(list, acc_access; index - 1)
+                }
+            }
+    }
+};;
+
 proc table_at<T>(table: ~Table(T), position: ~Position, access: MaybeAccess(T, Table(T))) {
     recv position(x); recv position(y); wait position; ?x; ?y;
     cut {
-        list_at<List(T)>(table, table_access; x)
+        table_row_at<T>(table, table_access; x)
         |table_access: ~MaybeAccess(List(T), Table(T))|
         case table_access of {
             |#just:
@@ -198,18 +235,18 @@ proc table_at<T>(table: ~Table(T), position: ~Position, access: MaybeAccess(T, T
                         |#just:
                             recv column_access(cell_state);
                             #just access; send access(cell_state); recv access(cell_state);
-                            send column_access(cell_state); recv column_access(column); wait column_access;
-                            send table_access(column); recv table_access(table); wait table_access;
-                            send access(table); close access
+                            send column_access(cell_state); recv column_access(column2); wait column_access;
+                            send table_access(column2); recv table_access(table2); wait table_access;
+                            send access(table2); close access
                         |#nothing:
-                            recv column_access(column); wait column_access;
-                            send table_access(column); recv table_access(table); wait table_access;
-                            #nothing access; send access(table); close access
+                            recv column_access(column2); wait column_access;
+                            send table_access(column2); recv table_access(table2); wait table_access;
+                            #nothing access; send access(table2); close access
                     }
                 }
             |#nothing:
-                recv table_access(table); wait table_access;
-                #nothing access; send access(table); close access
+                recv table_access(table2); wait table_access;
+                #nothing access; send access(table2); close access
         }
     }
 };;
@@ -231,11 +268,11 @@ proc board_get(board: ~Table(Cell), position: ~Position, out: Pair(Maybe(Cell), 
         case access of {
             |#just:
                 recv access(cell_state);
-                send access(cell_state); recv access(board); wait access;
-                send out(c. #just c; fwd cell_state c); send out(board); close out
+                send access(cell_state); recv access(board2); wait access;
+                send out(c. #just c; fwd cell_state c); send out(board2); close out
             |#nothing:
-                recv access(board); wait access;
-                send out(c. #nothing c; close c); send out(board); close out
+                recv access(board2); wait access;
+                send out(c. #nothing c; close c); send out(board2); close out
         }
     }
 };;
@@ -246,11 +283,11 @@ proc board_set(board: ~Table(Cell), position: ~Position, cell_state: ~Cell, out:
         |access: ~MaybeAccess(Cell, Table(Cell))|
         case access of {
             |#just:
-                recv access(old_cell_state); send access(cell_state); recv access(board); wait access;
-                fwd board out
+                recv access(old_cell_state); send access(cell_state); recv access(board2); wait access;
+                fwd board2 out
             |#nothing:
-                recv access(board); wait access;
-                fwd board out
+                recv access(board2); wait access;
+                fwd board2 out
         }
     }
 };;
@@ -277,11 +314,11 @@ proc count_live_cell(table: ~Table(Cell), position: ~Position, out: Pair(!lint, 
         |access: ~MaybeAccess(Cell, Table(Cell))|
         case access of {
             |#just:
-                recv access(cell_state); send access(cell_state); recv access(table); wait access;
-                send out(count + cell_state); send out(table); close out
+                recv access(cell_state); send access(cell_state); recv access(table2); wait access;
+                send out(count + cell_state); send out(table2); close out
             |#nothing:
-                recv access(table); wait access;
-                send out(count); send out(table); close out
+                recv access(table2); wait access;
+                send out(count); send out(table2); close out
         }
     }
 
@@ -296,53 +333,53 @@ proc count_live_neighbors(table: ~Table(Cell), position: ~Position, out: Pair(!l
             count_live_cell(table, position, acc1; 0)
         }
         |acc1: ~Pair(!lint, Table(Cell))|
-        recv acc1(count); recv acc1(table); wait acc1;
+        recv acc1(count); recv acc1(table2); wait acc1;
         cut {
             send position(cx - 1); send position(cy); close position
             |position: ~Position|
-            count_live_cell(table, position, acc2; count)
+            count_live_cell(table2, position, acc2; count)
         }
         |acc2: ~Pair(!lint, Table(Cell))|
-        recv acc2(count); recv acc2(table); wait acc2;
+        recv acc2(count); recv acc2(table3); wait acc2;
         cut {
             send position(cx - 1); send position(cy + 1); close position
             |position: ~Position|
-            count_live_cell(table, position, acc3; count)
+            count_live_cell(table3, position, acc3; count)
         }
         |acc3: ~Pair(!lint, Table(Cell))|
-        recv acc3(count); recv acc3(table); wait acc3;
+        recv acc3(count); recv acc3(table4); wait acc3;
         cut {
             send position(cx); send position(cy - 1); close position
             |position: ~Position|
-            count_live_cell(table, position, acc4; count)
+            count_live_cell(table4, position, acc4; count)
         }
         |acc4: ~Pair(!lint, Table(Cell))|
-        recv acc4(count); recv acc4(table); wait acc4;
+        recv acc4(count); recv acc4(table5); wait acc4;
         cut {
             send position(cx); send position(cy + 1); close position
             |position: ~Position|
-            count_live_cell(table, position, acc5; count)
+            count_live_cell(table5, position, acc5; count)
         }
         |acc5: ~Pair(!lint, Table(Cell))|
-        recv acc5(count); recv acc5(table); wait acc5;
+        recv acc5(count); recv acc5(table6); wait acc5;
         cut {
             send position(cx + 1); send position(cy - 1); close position
             |position: ~Position|
-            count_live_cell(table, position, acc6; count)
+            count_live_cell(table6, position, acc6; count)
         }
         |acc6: ~Pair(!lint, Table(Cell))|
-        recv acc6(count); recv acc6(table); wait acc6;
+        recv acc6(count); recv acc6(table7); wait acc6;
         cut {
             send position(cx + 1); send position(cy); close position
             |position: ~Position|
-            count_live_cell(table, position, acc7; count)
+            count_live_cell(table7, position, acc7; count)
         }
         |acc7: ~Pair(!lint, Table(Cell))|
-        recv acc7(count); recv acc7(table); wait acc7;
+        recv acc7(count); recv acc7(table8); wait acc7;
         cut {
             send position(cx + 1); send position(cy + 1); close position
             |position: ~Position|
-            count_live_cell(table, position, out; count)
+            count_live_cell(table8, position, out; count)
         }
     }
 };;
@@ -359,23 +396,23 @@ proc rec tick_board_aux(positions: ~List(Position), previous: ~Table(Cell), next
                 cut {
                     count_live_neighbors(previous, position1, count_out)
                     |count_out: ~Pair(!lint, Table(Cell))|
-                    recv count_out(count); recv count_out(previous); wait count_out; ?count;
+                    recv count_out(count); recv count_out(previous2); wait count_out; ?count;
                     cut {
-                        board_get(previous, position2, get)
+                        board_get(previous2, position2, get)
                         |get: ~Pair(Maybe(Cell), Table(Cell))|
-                        recv get(previous_cell); recv get(previous); wait get;
+                        recv get(previous_cell); recv get(previous3); wait get;
                         case previous_cell of {
                             |#nothing:
                                 wait previous_cell;
                                 println("Error: position out of bounds");
-                                par { unreachable positions || unreachable position3 || unreachable previous || unreachable next || unreachable out }
+                                par { unreachable positions || unreachable position3 || unreachable previous3 || unreachable next || unreachable out }
                             |#just:
                                 cut {
                                     tick_cell(previous_cell, next_cell; count)
                                     |next_cell: ~Cell|
                                     board_set(next, position3, next_cell, next2)
                                     |next2: ~Table(Cell)|
-                                    tick_board_aux(positions, previous, next2, out)
+                                    tick_board_aux(positions, previous3, next2, out)
                                 }
                         }
                     }
@@ -388,8 +425,8 @@ proc tick_board(previous: ~Table(Cell), next: ~Table(Cell), out: Pair(Table(Cell
     cut {
         table_positions<Cell>(previous, table_positions_out)
         |table_positions_out: ~Pair(List(Position), Table(Cell))|
-        recv table_positions_out(positions); recv table_positions_out(previous); wait table_positions_out;
-        tick_board_aux(positions, previous, next, out)
+        recv table_positions_out(positions); recv table_positions_out(previous2); wait table_positions_out;
+        tick_board_aux(positions, previous2, next, out)
     }
 };;
 
@@ -400,8 +437,8 @@ proc unsafe_rec tick_board_gens(previous: ~Table(Cell), next: ~Table(Cell), out:
         cut {
             tick_board(previous, next, tick_out)
             |tick_out: ~Pair(Table(Cell), Table(Cell))|
-            recv tick_out(next); recv tick_out(previous); wait tick_out;
-            tick_board_gens(previous, next, out; gens - 1)
+            recv tick_out(next2); recv tick_out(previous2); wait tick_out;
+            tick_board_gens(previous2, next2, out; gens - 1)
         }
     }
 };;
@@ -509,9 +546,9 @@ proc main() {
             recv tables(previous); recv tables(next); wait tables;
             tick_board_gens(previous, next, tick_out; gens)
             |tick_out: ~Pair(Table(Cell), Table(Cell))|
-            recv tick_out(final); recv tick_out(previous); wait tick_out;
+            recv tick_out(final); recv tick_out(previous2); wait tick_out;
             par {
-                trash_board(previous)
+                trash_board(previous2)
                 ||
                 print_board(final, done)
             }
