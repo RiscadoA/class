@@ -77,30 +77,6 @@ proc rec list_map<T, U>(list: ~List(T), map: ~Map(T, U), out: Pair(Map(T, U), Li
     }
 };;
 
-proc rec table_map<T, U>(table: ~Table(T), map: ~Map(T, U), out: Pair(Map(T, U), Table(U))) {
-    case table of {
-        |#nil:
-            wait table;
-            send out(map);
-            send out(t. #nil t; close t);
-            close out
-        |#cons:
-            recv table(t);
-            cut {
-                list_map<T, U>(t, map, mid)
-                |mid: ~Pair(Map(T, U), List(U))|
-                recv mid(mid_map); recv mid(mid_list); wait mid;
-                cut {
-                    table_map<T, U>(table, mid_map, acc)
-                    |acc: ~Pair(Map(T, U), Table(U))|
-                    recv acc(acc_map); recv acc(acc_table); wait acc;
-                    send out(acc_map); send out(out_table. #cons out_table; send out_table(mid_list); fwd acc_table out_table);
-                    close out
-                }
-            }
-    }
-};;
-
 proc rec table_positions_aux2<T>(list: ~List(T), positions: ~List(Position), out: Pair(List(Position), List(T)); x: ~lint, y: ~lint) {
     case list of {
         |#nil:
