@@ -32,9 +32,9 @@ public class AnlLocalDataState {
     }
   }
 
-  public void markAsUnknown(Analyzer analyzer, AnlFlowState state) {
+  public void markAsUnknown(Analyzer analyzer, AnlFlowState state, boolean concurrent) {
     for (AnlSlot slot : slots.values()) {
-      slot.markAsUnknown(analyzer, state);
+      slot.markAsUnknown(analyzer, state, concurrent);
     }
     slots.clear();
   }

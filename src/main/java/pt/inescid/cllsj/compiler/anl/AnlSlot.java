@@ -49,7 +49,7 @@ public abstract class AnlSlot {
 
   public abstract AnlSlot merge(AnlSlot other);
 
-  public abstract void markAsUnknown(Analyzer analyzer, AnlFlowState state);
+  public abstract void markAsUnknown(Analyzer analyzer, AnlFlowState state, boolean concurrent);
 
   public static class Unknown extends AnlSlot {
     @Override
@@ -68,7 +68,7 @@ public abstract class AnlSlot {
     }
 
     @Override
-    public void markAsUnknown(Analyzer analyzer, AnlFlowState state) {
+    public void markAsUnknown(Analyzer analyzer, AnlFlowState state, boolean concurrent) {
       // Nothing to do, already unknown
     }
   }
@@ -106,8 +106,8 @@ public abstract class AnlSlot {
     }
 
     @Override
-    public void markAsUnknown(Analyzer analyzer, AnlFlowState state) {
-      state.session(sessionId).markAsUnknown(analyzer, state);
+    public void markAsUnknown(Analyzer analyzer, AnlFlowState state, boolean concurrent) {
+      state.session(sessionId).markAsUnknown(analyzer, state, concurrent);
     }
   }
 
@@ -139,7 +139,7 @@ public abstract class AnlSlot {
     }
 
     @Override
-    public void markAsUnknown(Analyzer analyzer, AnlFlowState state) {
+    public void markAsUnknown(Analyzer analyzer, AnlFlowState state, boolean concurrent) {
       // Nothing to do, tags do not have state
     }
 

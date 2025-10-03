@@ -79,7 +79,7 @@ public class AnlFlowState {
 
     // We're writing to an unknown location
     handleUnknownWrites(analyzer);
-    slots.forEach(s -> s.markAsUnknown(analyzer, this));
+    slots.forEach(s -> s.markAsUnknown(analyzer, this, true));
   }
 
   // Called on a data location when a reference to it is lost
@@ -87,7 +87,7 @@ public class AnlFlowState {
   public void markDataAsUnknown(Analyzer analyzer, IRDataLocation loc) {
     if (loc.isLocal()) {
       AnlLocalDataState data = localData(loc.getLocalDataId());
-      data.markAsUnknown(analyzer, this);
+      data.markAsUnknown(analyzer, this, true);
       passedLocalData.add(loc.getLocalDataId());
     } else if (loc.isRemote()) {
       AnlSessionState session = session(loc.getSessionId());
@@ -103,7 +103,7 @@ public class AnlFlowState {
     // by unknown locations as unknown
     for (IRLocalDataId id : passedLocalData) {
       if (localData.containsKey(id)) {
-        localData.get(id).markAsUnknown(analyzer, this);
+        localData.get(id).markAsUnknown(analyzer, this, true);
       }
     }
   }

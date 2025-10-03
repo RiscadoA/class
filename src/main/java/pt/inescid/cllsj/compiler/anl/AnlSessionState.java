@@ -33,9 +33,9 @@ public class AnlSessionState {
     return clone;
   }
 
-  public void markAsUnknown(Analyzer analyzer, AnlFlowState state) {
+  public void markAsUnknown(Analyzer analyzer, AnlFlowState state, boolean concurrent) {
     if (cont.isPresent()) {
-      state.pushPendingContinuation(analyzer, cont.get(), true);
+      state.pushPendingContinuation(analyzer, cont.get(), concurrent);
       cont = Optional.empty();
     }
     if (data.isPresent()) {
@@ -45,7 +45,7 @@ public class AnlSessionState {
     if (remote.isPresent()) {
       state.session(remote.get()).remote = Optional.empty();
       if (remote.isPresent()) {
-        state.session(remote.get()).markAsUnknown(analyzer, state);
+        state.session(remote.get()).markAsUnknown(analyzer, state, concurrent);
         remote = Optional.empty();
       }
     }
