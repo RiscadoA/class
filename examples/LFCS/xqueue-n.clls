@@ -101,7 +101,6 @@ proc unsafe_rec deqloop(tl:~Ptr;N:~int) {
         println("DONE_D");
         drop tl
     } else {
-        sleep 1;
         letc tnext:pair Opt(Aint);Ptr { deq(tl,tnext) };
         recv tnext (val);
         printv(val);
@@ -114,7 +113,6 @@ proc unsafe_rec encloop(hd:~Ptr;N:~int) {
         println("DONE_E");
         drop hd
     } else {
-        sleep 1;
         println(0);
         letc hnext:Ptr { enq(hd,N,hnext) };
         encloop(hnext;N-1)    
@@ -139,6 +137,6 @@ proc mainloop(;n:~int) {
 };;
 
 proc main() {
-	mainloop(;5000)
+	mainloop(;10000000)
 };;
 
