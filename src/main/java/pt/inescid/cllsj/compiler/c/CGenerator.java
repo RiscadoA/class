@@ -183,14 +183,14 @@ public class CGenerator extends IRInstructionVisitor {
                   putStatement("free(alloc)");
                 },
                 () -> {
-                    if (compiler.concurrency.get()) {
-                      putMutexLock("allocator_mutex[level]");
-                    }
-                    putStatement("alloc->next = allocator_list[level]");
-                    putStatement("allocator_list[level] = alloc");
-                    if (compiler.concurrency.get()) {
-                      putMutexUnlock("allocator_mutex[level]");
-                    }
+                  if (compiler.concurrency.get()) {
+                    putMutexLock("allocator_mutex[level]");
+                  }
+                  putStatement("alloc->next = allocator_list[level]");
+                  putStatement("allocator_list[level] = alloc");
+                  if (compiler.concurrency.get()) {
+                    putMutexUnlock("allocator_mutex[level]");
+                  }
                 });
           });
       putBlankLine();
@@ -1097,12 +1097,6 @@ public class CGenerator extends IRInstructionVisitor {
           putZeroEnvironmentDropBits(currentProcessLayout, ENV);
 
           for (IRCallProcess.SessionArgument arg : instr.getTailCallSessionArgumentOrder().get()) {
-            if (!arg.isFromLocation()
-                && arg.getSourceSessionId().equals(arg.getTargetSessionId())) {
-              // No need to do anything!
-              continue;
-            }
-
             // Get references to the source and target sessions
             String source;
             if (arg.isFromLocation()) {
@@ -1112,6 +1106,25 @@ public class CGenerator extends IRInstructionVisitor {
             }
             String target = accessSession(arg.getTargetSessionId());
 
+            // Get reference to remote session
+            String remoteSessionAddress = remoteSessionAddress(source);
+            String remoteSession = accessSession(remoteSessionAddress);
+
+            // Update the remote session's data writing location
+            Optional<IRLocalDataId> calledLocalDataId =
+                calledProcess.getAssociatedLocalData(arg.getTargetSessionId());
+            if (calledLocalDataId.isPresent()) {
+              putAssign(
+                  sessionContData(remoteSession),
+                  localData(calledLocalDataId.get(), arg.getDataOffset()));
+            }
+
+            if (!arg.isFromLocation()
+                && arg.getSourceSessionId().equals(arg.getTargetSessionId())) {
+              // No need to do anything else!
+              continue;
+            }
+
             // Copy the session data
             putAssign(target, source);
 
@@ -1119,17 +1132,6 @@ public class CGenerator extends IRInstructionVisitor {
             // This is necessary as the caller may apply an offset to the data
             putAssign(
                 sessionContData(target), offset(sessionContData(target), arg.getDataOffset()));
-
-            // Update the remote session's continuation
-            Optional<IRLocalDataId> calledLocalDataId =
-                calledProcess.getAssociatedLocalData(arg.getTargetSessionId());
-            String remoteSessionAddress = remoteSessionAddress(source);
-            String remoteSession = accessSession(remoteSessionAddress);
-            if (calledLocalDataId.isPresent()) {
-              putAssign(
-                  sessionContData(remoteSession),
-                  localData(calledLocalDataId.get(), arg.getDataOffset()));
-            }
             putAssign(sessionContSession(remoteSession), sessionAddress(arg.getTargetSessionId()));
           }
 
