@@ -18,7 +18,7 @@ proc nil<A>(l: ANode(A)) {
 };;
 
 proc cons<A>(a:~affine A, t:~LList(A), l: ANode(A)){
-    unfold t; // infer this ?
+    unfold t; 
     affine l;
     #Next l;
     l <- a;

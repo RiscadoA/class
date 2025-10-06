@@ -1,0 +1,157 @@
+// shared thread-safe mutable queue with condition variable (wait queue)
+
+include "lists.clls";;
+
+type Cont {
+    affine recv ~lint; close
+};;
+
+type WaitQ {
+    state List(Cont)
+};;
+
+type rec LList(A){
+    state Node(A)
+} and Node(A) {
+    choice of {
+        |#Nil: close
+        |#Next: pair affine A; LList(A)
+    }
+};;
+
+type ANode(A) {
+    affine Node(A)
+};;
+
+type SList(A) {
+    state Node(A)
+};;
+
+proc null<A>(l: ANode(A)) {
+    affine l; #Nil l; close l
+};;
+
+proc node<A>(a:~affine A, t:~SList(A), l: ANode(A)){
+    affine l;
+    #Next l;
+    l <- a;
+    unfold l;
+    fwd l t
+};;
+
+type Ptr { state state Node(lint) };;
+
+proc free(p:~statel Node(lint)) {
+    put p(c. null<lint>(c));
+    drop p
+};;
+
+type Aint { affine lint };;
+
+type Opt(A) {
+    affine choice of {
+        | #None : close
+        | #Some : A
+    }
+};;
+
+proc None(o:Opt(Aint)) {
+    affine o; #None o; close o
+};;
+
+proc Some(val:~Aint,o:Opt(Aint)) {
+    affine o;#Some o;fwd val o
+};;
+
+proc deqw( hd:~Ptr, wq:~WaitQ, rv:~Cont, rh:send Ptr;WaitQ) {
+
+    take hd(hp);
+    take hp(lh);
+    case lh of {
+        |#Nil : 
+            wait lh;
+            put hp(c. null<lint>(c));
+            put hd(hp);
+            take wq(hq);
+            clltype hq;
+            put wq(n. cons<Cont>(rv,hq,n));
+            send rh(hd);
+            fwd wq rh
+        |#Next : 
+            recv lh(val);
+            unfold lh;
+            put hd(lh);
+            free(hp); 
+            rv <- val; 
+            wait rv;
+            send rh(hd);
+            fwd wq rh
+    }
+};;
+
+proc enq(tl:~Ptr, v:~affine lint, tlo:Ptr) {
+    take tl(tn);
+    take tn(lp);
+    letc nn:LList(lint) {
+        cell nn (lp)
+    };
+    sshare nn {
+        put tn(c. node<lint>(v,nn,c));
+        drop tn
+    ||
+        put tl(nn);
+        forward tl tlo
+    }
+};;
+
+proc printv(v:~Opt(Aint)) {
+    case v of {
+        | #None: println("NO"); wait v; ()
+        | #Some: println(v); ()
+    }
+};;
+
+proc unsafe_rec deqloop(tl:~Ptr;N:~int) {
+    if N==0 then {
+        println("DONE_D");
+        drop tl
+    } else {
+        letc tnext:pair Opt(Aint);Ptr { deq(tl,tnext) };
+        recv tnext (val);
+        printv(val);
+        deqloop(tnext;N-1)    
+    }
+};;
+
+proc unsafe_rec encloop(hd:~Ptr;N:~int) {
+    if N==0 then {
+        println("DONE_E");
+        drop hd
+    } else {
+        println(0);
+        letc hnext:Ptr { enq(hd,N,hnext) };
+        encloop(hnext;N-1)    
+    }
+};;
+
+proc mainloop(;n:~int) {
+    letc sn: LList(lint) {
+        cell sn (c.nil<lint>(c))
+    };
+    share sn {
+        letc hd:Ptr {
+            cell hd (sn)
+        };
+        deqloop(hd;n)
+        ||
+        letc tl:Ptr {
+            cell tl (sn)
+        };
+        encloop(tl;n)
+    }
+};;
+
+proc main() {
+	mainloop(;10000000)
+};;
+
