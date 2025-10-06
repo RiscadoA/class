@@ -5,6 +5,7 @@ proc foo<A>(out: state A; a: ~A, p: send A; wait) {
     share c1 {
       fwd c1 out
       ||
+      sleep 10;
       take c1(x); call p(p1); use x; send p1(x); wait p1;
       put c1(y. affine y; call a(x); fwd x y);
       release c1

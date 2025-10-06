@@ -79,5 +79,7 @@ mains n =
             (consumer q n))
 
 main ::  IO()
-main =
-     mains 100000
+main = do
+     input <- getLine
+     let n = read input :: Int
+     mains n

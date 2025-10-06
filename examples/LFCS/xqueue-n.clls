@@ -140,3 +140,7 @@ proc main() {
 	mainloop(;10000000)
 };;
 
+proc profile() {
+    letc n:!int { scan(n) };
+    mainloop(;n)
+};;

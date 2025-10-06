@@ -123,7 +123,6 @@ public class CGenerator extends IRInstructionVisitor {
     if (compiler.allocatorLevels.get() <= 0) {
       putLine("#define managed_alloc(size) malloc(size)");
       putLine("#define managed_free(ptr) free(ptr)");
-      putLine("#define managed_realloc(ptr, size) realloc(ptr, size)");
     } else {
       putBlock(
           "void* managed_alloc(size_t size)",
@@ -139,7 +138,7 @@ public class CGenerator extends IRInstructionVisitor {
                 () -> {
                   putStatement(
                       "struct allocation* alloc = malloc(sizeof(struct allocation) + size)");
-                  putStatement("alloc->level = " + (compiler.allocatorLevels.get() - 1));
+                  putStatement("alloc->level = -1");
                   putStatement("return alloc->data");
                 },
                 () -> {
@@ -178,44 +177,23 @@ public class CGenerator extends IRInstructionVisitor {
                 "struct allocation* alloc = (struct allocation*)((char*)ptr - "
                     + "sizeof(struct allocation))");
             putStatement("int level = alloc->level");
-            if (compiler.concurrency.get()) {
-              putMutexLock("allocator_mutex[level]");
-            }
-            putStatement("alloc->next = allocator_list[level]");
-            putStatement("allocator_list[level] = alloc");
-            if (compiler.concurrency.get()) {
-              putMutexUnlock("allocator_mutex[level]");
-            }
-          });
-      putBlankLine();
-
-      putBlock(
-          "void* managed_realloc(void* ptr, size_t size)",
-          () -> {
-            putIf(
-                "ptr == NULL",
-                () -> {
-                  putStatement("return managed_alloc(size)");
-                });
-            putStatement(
-                "struct allocation* alloc = (struct allocation*)((char*)ptr - "
-                    + "sizeof(struct allocation))");
-            putStatement("int level = alloc->level");
             putIfElse(
-                "size <= " + compiler.allocatorSizeDivisor.get() + " * (level + 1)",
+                "level == -1",
                 () -> {
-                  putStatement("return alloc->data");
+                  putStatement("free(alloc)");
                 },
                 () -> {
-                  putStatement("void* new_ptr = managed_alloc(size)");
-                  putStatement(
-                      "memcpy(new_ptr, alloc->data, "
-                          + compiler.allocatorSizeDivisor.get()
-                          + " * (level + 1))");
-                  putStatement("managed_free(alloc->data)");
-                  putStatement("return new_ptr");
+                  if (compiler.concurrency.get()) {
+                    putMutexLock("allocator_mutex[level]");
+                  }
+                  putStatement("alloc->next = allocator_list[level]");
+                  putStatement("allocator_list[level] = alloc");
+                  if (compiler.concurrency.get()) {
+                    putMutexUnlock("allocator_mutex[level]");
+                  }
                 });
           });
+      putBlankLine();
     }
     putBlankLine();
 
@@ -1119,12 +1097,6 @@ public class CGenerator extends IRInstructionVisitor {
           putZeroEnvironmentDropBits(currentProcessLayout, ENV);
 
           for (IRCallProcess.SessionArgument arg : instr.getTailCallSessionArgumentOrder().get()) {
-            if (!arg.isFromLocation()
-                && arg.getSourceSessionId().equals(arg.getTargetSessionId())) {
-              // No need to do anything!
-              continue;
-            }
-
             // Get references to the source and target sessions
             String source;
             if (arg.isFromLocation()) {
@@ -1134,6 +1106,25 @@ public class CGenerator extends IRInstructionVisitor {
             }
             String target = accessSession(arg.getTargetSessionId());
 
+            // Get reference to remote session
+            String remoteSessionAddress = remoteSessionAddress(source);
+            String remoteSession = accessSession(remoteSessionAddress);
+
+            // Update the remote session's data writing location
+            Optional<IRLocalDataId> calledLocalDataId =
+                calledProcess.getAssociatedLocalData(arg.getTargetSessionId());
+            if (calledLocalDataId.isPresent()) {
+              putAssign(
+                  sessionContData(remoteSession),
+                  localData(calledLocalDataId.get(), arg.getDataOffset()));
+            }
+
+            if (!arg.isFromLocation()
+                && arg.getSourceSessionId().equals(arg.getTargetSessionId())) {
+              // No need to do anything else!
+              continue;
+            }
+
             // Copy the session data
             putAssign(target, source);
 
@@ -1141,17 +1132,6 @@ public class CGenerator extends IRInstructionVisitor {
             // This is necessary as the caller may apply an offset to the data
             putAssign(
                 sessionContData(target), offset(sessionContData(target), arg.getDataOffset()));
-
-            // Update the remote session's continuation
-            Optional<IRLocalDataId> calledLocalDataId =
-                calledProcess.getAssociatedLocalData(arg.getTargetSessionId());
-            String remoteSessionAddress = remoteSessionAddress(source);
-            String remoteSession = accessSession(remoteSessionAddress);
-            if (calledLocalDataId.isPresent()) {
-              putAssign(
-                  sessionContData(remoteSession),
-                  localData(calledLocalDataId.get(), arg.getDataOffset()));
-            }
             putAssign(sessionContSession(remoteSession), sessionAddress(arg.getTargetSessionId()));
           }
 
@@ -1645,8 +1625,9 @@ public class CGenerator extends IRInstructionVisitor {
   public void visit(IRDeferDrop instr) {
     CSizeBits dropBitOffset = currentProcessLayout.dropBitOffset(instr.getDropId());
     CAddress dropByteAddress = CAddress.of(ENV, dropBitOffset.getSize());
-    String dropByte = dropByteAddress.deref("unsigned char");
-    putAssign(dropByte, dropByte + " | (1 << " + dropBitOffset.getBits() + ")");
+    String dropByte =
+        dropByteAddress.deref(compiler.concurrency.get() ? "atomic_uchar" : "unsigned char");
+    putAssignSetBitAtomic(dropByte, dropBitOffset.getBits());
   }
 
   @Override
@@ -2652,8 +2633,9 @@ public class CGenerator extends IRInstructionVisitor {
       } else {
         CSizeBits dropBitOffset = processLayout.dropBitOffset(dropId);
         CAddress dropByteAddress = CAddress.of(var, dropBitOffset.getSize());
-        String dropByte = dropByteAddress.deref("unsigned char");
-        putIf(dropByte + " & (1 << " + dropBitOffset.getBits() + ")", putDrop);
+        String dropByte =
+            dropByteAddress.deref(compiler.concurrency.get() ? "atomic_uchar" : "unsigned char");
+        putIf(testBitAtomic(dropByte, dropBitOffset.getBits()), putDrop);
       }
     }
   }
@@ -2733,6 +2715,14 @@ public class CGenerator extends IRInstructionVisitor {
       return "atomic_fetch_sub(&" + var + ", 1)";
     } else {
       return var + "--";
+    }
+  }
+
+  private String testBitAtomic(String var, int bit) {
+    if (compiler.concurrency.get()) {
+      return "(atomic_load(&" + var + ") & (1 << " + bit + "))";
+    } else {
+      return "(" + var + " & (1 << " + bit + "))";
     }
   }
 
@@ -2848,6 +2838,22 @@ public class CGenerator extends IRInstructionVisitor {
       putStatement("atomic_store_max(&" + var + ", " + value + ")");
     } else {
       putStatement(var + " = MAX(" + var + ", " + value + ")");
+    }
+  }
+
+  void putAssignSetBitAtomic(String var, int bit) {
+    if (compiler.concurrency.get()) {
+      putStatement("atomic_fetch_or(&" + var + ", (1 << " + bit + "))");
+    } else {
+      putStatement(var + " |= (1 << " + bit + ")");
+    }
+  }
+
+  void putAssignClearBitAtomic(String var, int bit) {
+    if (compiler.concurrency.get()) {
+      putStatement("atomic_fetch_and(&" + var + ", ~(1 << " + bit + "))");
+    } else {
+      putStatement(var + " &= ~(1 << " + bit + ")");
     }
   }
 

@@ -139,7 +139,7 @@ public class Compiler {
         settings.addInt(
             "inlining-threshold",
             "Maximum number of blocks in a process to be inlined into its callers",
-            8);
+            16);
     monomorphization =
         settings.addFlag(
             "monomorphization", "Enables monomorphization of polymorphic processes", true);

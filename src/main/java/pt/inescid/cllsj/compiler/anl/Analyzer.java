@@ -261,9 +261,9 @@ public class Analyzer extends IRInstructionVisitor {
   public void visit(IRCallProcess instr) {
     for (IRCallProcess.SessionArgument arg : instr.getSessionArguments()) {
       if (arg.isFromLocation()) {
-        state.read(arg.getSourceSessionLocation(), true).markAsUnknown(this, state);
+        state.read(arg.getSourceSessionLocation(), true).markAsUnknown(this, state, false);
       } else {
-        state.session(arg.getSourceSessionId()).markAsUnknown(this, state);
+        state.session(arg.getSourceSessionId()).markAsUnknown(this, state, false);
       }
     }
     for (IRCallProcess.DataArgument arg : instr.getDataArguments()) {
@@ -305,7 +305,7 @@ public class Analyzer extends IRInstructionVisitor {
       posRemote.get().data = oldNeg.data;
       posRemote.get().remote = oldNeg.remote;
     } else {
-      oldNeg.markAsUnknown(this, state);
+      oldNeg.markAsUnknown(this, state, false);
     }
 
     if (instr.shouldJump()) {
@@ -337,8 +337,12 @@ public class Analyzer extends IRInstructionVisitor {
 
   @Override
   public void visit(IRBranchTypeFlag instr) {
-    visit(instr.getThen().getLocation(), VisitType.BRANCH);
-    visit(instr.getOtherwise().getLocation(), VisitType.BRANCH);
+    if (instr.getRequisites().isPossible()) {
+      visit(instr.getThen().getLocation(), VisitType.BRANCH);
+    }
+    if (instr.getRequisites().canBeUnmet()) {
+      visit(instr.getOtherwise().getLocation(), VisitType.BRANCH);
+    }
   }
 
   @Override

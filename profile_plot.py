@@ -37,6 +37,11 @@ if max_input:
 # Ask for user input on whether to use logarithmic scale for the y axis
 log_scale = input("Use logarithmic scale for the y axis? (y/n, default n): ").strip().lower() == 'y'
 
+# Ask for user input for the title suffix to append to the plot titles
+title_suffix = input("Enter title suffix to append to the plot titles (leave empty for no suffix): ").strip()
+if title_suffix:
+  title_suffix = " " + title_suffix
+
 # Sum user_time and sys_time into exec_time
 df = df.assign(exec_time=df["user_time"] + df["sys_time"])
 
@@ -55,7 +60,7 @@ for tag, g in df.groupby("what"):
 
 if log_scale:
   plt.yscale("log")
-plt.title("Execution time comparison between the compiler and GHC")
+plt.title(f"Execution time{title_suffix}")
 plt.xlabel("Input")
 if log_scale:
   plt.ylabel("Execution time (seconds, log scale)")
@@ -74,7 +79,7 @@ for tag, g in df.groupby("what"):
 
 if log_scale:
   plt.yscale("log")
-plt.title("Memory usage comparison between the compiler and GHC")
+plt.title(f"Memory usage{title_suffix}")
 plt.xlabel("Input")
 if log_scale:
   plt.ylabel("Max RSS (KB, log scale)")
@@ -90,7 +95,7 @@ print(f"Saved bin/memory_usage.pdf")
 for input_val, g in df.sort_values(by="exec_time").groupby("input"):
   plt.figure(figsize=(6,4))
   plt.barh(g["what"], g["exec_time"])
-  plt.title(f"Execution time for input {input_val} ")
+  plt.title(f"Execution time{title_suffix} for input {input_val} ")
   plt.xlabel("Execution time (s)")
   plt.ylabel("Configuration")
   plt.tight_layout()
@@ -101,7 +106,7 @@ for input_val, g in df.sort_values(by="exec_time").groupby("input"):
 for input_val, g in df.sort_values(by="max_rss").groupby("input"):
   plt.figure(figsize=(6,4))
   plt.barh(g["what"], g["max_rss"])
-  plt.title(f"Memory usage for input {input_val} ")
+  plt.title(f"Memory usage{title_suffix} for input {input_val} ")
   plt.xlabel("Max RSS (KB)")
   plt.ylabel("Configuration")
   plt.tight_layout()

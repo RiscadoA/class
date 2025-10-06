@@ -1,0 +1,233 @@
+// A tile state, either 1 or 0.
+// Int is used for convenience and because we can easily sum them for neighbor counting.
+type Tile { int };;
+
+// Define the game of life board and the processes which keep its state.
+type corec Board {
+    offer of {
+        |#read: recv coint; recv coint; send Tile; Board
+        |#write: recv coint; recv coint; recv ~Tile; Board
+        |#drop: close
+    }
+};;
+
+proc rec written_board(board: Board, rem_board: ~Board, x: ~int, y: ~int, tile: ~Tile) {
+    case board of {
+        |#read:
+            board -> rx; board -> ry;
+            if rx == x and ry == y {
+                board <- tile; written_board(board, rem_board, x, y, tile)
+            } else {
+                #read rem_board; rem_board <- rx; rem_board <- ry; rem_board -> rtile;
+                board <- rtile; written_board(board, rem_board, x, y, tile)
+            }
+        |#write:
+            board -> wx; board -> wy; board -> wtile;
+            if wx == x and wy == y {
+                written_board(board, rem_board, x, y, wtile)
+            } else {
+                #write rem_board; rem_board <- wx; rem_board <- wy; rem_board <- wtile;
+                written_board(board, rem_board, x, y, tile)
+            }
+        |#drop:
+            #drop rem_board; wait rem_board; close board
+    }
+};;
+
+proc unsafe_rec empty_board(board: Board) {
+    case board of {
+        |#read: board -> x; board -> y; board <- 0; empty_board(board)
+        |#write:
+            letc rem_board: Board { empty_board(rem_board) };
+            board -> x; board -> y; board -> tile;
+            if tile == 0 {
+                fwd board rem_board
+            } else {
+                written_board(board, rem_board, x, y, tile)
+            }
+        |#drop: close board
+    }
+};;
+
+// Writes an entire row of tiles to the board from the standard input
+proc unsafe_rec scan_row(board_in: ~Board, side: ~int, x: ~int, y: ~int, board_out: Board) {
+    if x < side {
+        #write board_in; board_in <- x; board_in <- y; board_in <- { t. scan(t) };
+        scan_row(board_in, side, x + 1, y, board_out)
+    } else {
+        fwd board_in board_out
+    }
+};;
+
+// Writes tiles from the standard input into a board
+proc unsafe_rec scan_board(board_in: ~Board, side: ~int, x: ~int, y: ~int, board_out: Board) {
+    if y < side {
+        cut {
+            scan_row(board_in, side, x, y, board_mid)
+            |board_mid: ~Board|
+            scan_board(board_mid, side, x, y + 1, board_out)
+        }
+    } else {
+        fwd board_in board_out
+    }
+};;
+
+// Prints an entire row of tiles from the board to the standard output
+proc unsafe_rec print_row(board_in: ~Board, side: ~int, x: ~int, y: ~int, board_out: Board) {
+    if x < side {
+        #read board_in; board_in <- x; board_in <- y; board_in -> tile;
+        print(tile); print(" ");
+        print_row(board_in, side, x + 1, y, board_out)
+    } else {
+        print("\n");
+        fwd board_in board_out
+    }
+};;
+
+// Prints tiles from the board to the standard output
+proc unsafe_rec print_board(board_in: ~Board, side: ~int, x: ~int, y: ~int, board_out: Board) {
+    if y < side {
+        cut {
+            print_row(board_in, side, x, y, board_mid)
+            |board_mid: ~Board|
+            print_board(board_mid, side, x, y + 1, board_out)
+        }
+    } else {
+        fwd board_in board_out
+    }
+};;
+
+// Updates a single tile on the next board based on the previous board
+proc tick_tile(
+    prev_board_in: ~Board, next_board_in: ~Board,
+    prev_next_board_out: send Board; send Board; close,    
+    x: ~int, y: ~int
+) {
+    // Read the previous states of the tile and its neighbors
+    #read prev_board_in; prev_board_in <- x; prev_board_in <- y; prev_board_in -> prev_tile;
+    #read prev_board_in; prev_board_in <- x - 1; prev_board_in <- y - 1; prev_board_in -> neighbor_tile1;
+    #read prev_board_in; prev_board_in <- x + 0; prev_board_in <- y - 1; prev_board_in -> neighbor_tile2;
+    #read prev_board_in; prev_board_in <- x + 1; prev_board_in <- y - 1; prev_board_in -> neighbor_tile3;
+    #read prev_board_in; prev_board_in <- x - 1; prev_board_in <- y + 0; prev_board_in -> neighbor_tile4;
+    #read prev_board_in; prev_board_in <- x + 1; prev_board_in <- y + 0; prev_board_in -> neighbor_tile5;
+    #read prev_board_in; prev_board_in <- x - 1; prev_board_in <- y + 1; prev_board_in -> neighbor_tile6;
+    #read prev_board_in; prev_board_in <- x + 0; prev_board_in <- y + 1; prev_board_in -> neighbor_tile7;
+    #read prev_board_in; prev_board_in <- x + 1; prev_board_in <- y + 1; prev_board_in -> neighbor_tile8;
+
+    // Compute the number of live neighbors
+    letc neighbor_count: int { let neighbor_count
+        neighbor_tile1 + neighbor_tile2 + neighbor_tile3 +
+        neighbor_tile4 +                  neighbor_tile5 +
+        neighbor_tile6 + neighbor_tile7 + neighbor_tile8
+    };
+
+    // Compute the next tile
+    letc next_tile: Tile {
+        if prev_tile == 0 {
+            if neighbor_count == 3 {
+                let next_tile 1
+            } else {
+                let next_tile 0
+            }
+        } else {
+            if neighbor_count < 2 or neighbor_count > 3 {
+                let next_tile 0
+            } else {
+                let next_tile 1
+            }
+        }
+    };
+
+    // Write the next tile state
+    #write next_board_in; next_board_in <- x; next_board_in <- y; next_board_in <- next_tile;
+    prev_next_board_out <- prev_board_in;
+    prev_next_board_out <- next_board_in;
+    close prev_next_board_out
+};;
+
+// Updates an entire row of tiles on the next board based on the previous board
+proc unsafe_rec tick_row(
+    prev_board_in: ~Board, next_board_in: ~Board,
+    prev_next_board_out: send Board; send Board; close,    
+    side: ~int, x: ~int, y: ~int
+) {
+    if x < side {
+        cut {
+            tick_tile(prev_board_in, next_board_in, mid, x, y)
+            |mid: recv ~Board; recv ~Board; wait|
+            mid -> prev_board_mid; mid -> next_board_mid; wait mid;
+            tick_row(prev_board_mid, next_board_mid, prev_next_board_out, side, x + 1, y)
+        }
+    } else {
+        prev_next_board_out <- prev_board_in;
+        prev_next_board_out <- next_board_in;
+        close prev_next_board_out
+    }
+};;
+
+// Updates the next board based on state of the previous board
+proc unsafe_rec tick_board(
+    prev_board_in: ~Board, next_board_in: ~Board,
+    prev_next_board_out: send Board; send Board; close,    
+    side: ~int, x: ~int, y: ~int
+) {
+    if y < side {
+        cut {
+            tick_row(prev_board_in, next_board_in, mid, side, x, y)
+            |mid: recv ~Board; recv ~Board; wait|
+            mid -> prev_board_mid; mid -> next_board_mid; wait mid;
+            tick_board(prev_board_mid, next_board_mid, prev_next_board_out, side, x, y + 1)
+        }
+    } else {
+        prev_next_board_out <- prev_board_in;
+        prev_next_board_out <- next_board_in;
+        close prev_next_board_out
+    }
+};;
+
+proc unsafe_rec tick_board_gens(
+    prev_board_in: ~Board, next_board_in: ~Board,
+    prev_next_board_out: send Board; send Board; close,    
+    side: ~int, x: ~int, y: ~int,
+    gens: ~int
+) {
+    if gens > 0 {
+        cut {
+            tick_board(prev_board_in, next_board_in, mid, side, x, y)
+            |mid: recv ~Board; recv ~Board; wait|
+            mid -> prev_board_mid; mid -> next_board_mid; wait mid;
+            tick_board_gens(next_board_mid, prev_board_mid, prev_next_board_out, side, x, y, gens - 1)
+        }
+    } else {
+        prev_next_board_out <- next_board_in;
+        prev_next_board_out <- prev_board_in;
+        close prev_next_board_out
+    }
+};;
+
+proc main() {
+    // Initialize empty boards
+    letc empty_input_board: Board { empty_board(empty_input_board) };
+    letc empty_result_board: Board { empty_board(empty_result_board) };
+
+    // Read input
+    letc gens: int { scan(gens) };
+    letc side: int { scan(side) };
+    letc input_board: Board { scan_board(empty_input_board, side, 0, 0, input_board) };
+
+    // Compute result
+    letc result: send Board; send Board; close { tick_board_gens(input_board, empty_result_board, result, side, 0, 0, gens) };
+    result -> final_input_board; result -> result_board; wait result;
+
+    // Print result
+    letc final_result_board: Board { print_board(result_board, side, 0, 0, final_result_board) };
+
+    // Drop boards
+    #drop final_input_board; wait final_input_board;
+    #drop final_result_board; wait final_result_board;
+    ()
+};;
+
+proc profile() {
+    main()
+};;
