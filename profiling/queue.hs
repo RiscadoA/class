@@ -57,7 +57,7 @@ producer q n = do
                 return ()
            else do
                 enqueue q n
-                print n
+                print 0
                 producer q (n-1)
                 
 consumer ::  Queue Int -> Int -> IO ()

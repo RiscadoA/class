@@ -1,19 +1,12 @@
-# Safe Session-Based Concurrency with Shared Linear State (Artifact)
+# CLASS
 
-This document describes the companion artifact for the paper `Safe 
-Session-Based Concurrency with Shared Linear State`. The artifact 
-consists of a type checker and an interpreter for language CLASS - 
+This repository contains the type checker, interpreter and compiler for language CLASS -
 a session-typed, higher-order, core language that supports concurrent 
 computation with shared linear state, and which is described in 
 detail in the paper.
 
-The artifact is distributed as a Docker image that bundles the source
-code, all its dependencies, all the examples from the paper and several
-other examples that showcase the expressiveness of language CLASS, 
-as well as several test suites. 
-
-Authors: Pedro Rocha and Luís Caires
-
+The source code builds on the artifact of [The Session Abstract Machine (Artifact)](https://doi.org/10.5281/zenodo.10459455).
+The compiler was developed by Ricardo Antunes for his thesis "Efficient Compilation for the Linear Language CLASS".
 
 [![CC BY 4.0][cc-by-shield]][cc-by]
 
@@ -26,60 +19,15 @@ This work is licensed under a
 [cc-by-image]: https://i.creativecommons.org/l/by/4.0/88x31.png
 [cc-by-shield]: https://img.shields.io/badge/License-CC%20BY%204.0-lightgrey.svg
 
+## Compiler Step-by-Step Instructions
 
-## Getting Started Guide 
+CLASS code can be compiled through the `./compile.sh` bash script. To pass flags to the CLASS compiler, the `CLLS_FLAGS` environment variable can be set. Flags can be passed to GCC through the `C_FLAGS` variable. To learn more about the script options, run `./compile.sh`.
+A full list of compiler options can be obtained by passing `--help` in `CLLS_FLAGS`.
 
-1. After uncompressing the supplied archive file, you should obtain a 
-directory with the following contents: 
+To validate the compiler implementation, a suite of tests was built, which can be found at `./tests`.
+The tests can be run with `./test_compiler.sh`. Extra flags can be passed through the `C_FLAGS` and `CLLS_FLAGS` environment variables.
 
-* `Dockerfile` -- Configuration file and setup script for the docker image.
-* `README.md`  --  The readme file with instructions for getting started and step-by-step 
-                   instructions to use the implementation. 
-* `LICENSE.txt` -- Creative Commons Atrribution 4.0 International License. 
-* `bin/` -- Folder containing the compiled Java .class files. 
-* `examples/pure` -- Folder containing all the examples involving only pure computations,  
-                     without shared state.  
-* `examples/state` -- Folder containing the examples involving shared state.  
-* `lib/` -- Folder containing initial definitions loaded by the artifact. 
-* `src/` -- Folder containing the Java source files. 
-* `CLLSj` -- Executable file to start the interactive REPL. 
-
-2. You should have a Docker runtime installed, installation instructions are 
-   available in https://www.docker.com. Ensure that the Docker daemon is running. 
-
-3. Run the command `docker build --tag=class .` to build a docker image tagged `class`.
-
-4. To run the docker image tagged `class`, execute the command `docker run -it class`. 
-   This will start the image and its bash shell in a directory identical to the root of
-   the artifact archive.
-
-5. To run the artifact as an interactive REPL (inside the running docker image),
-   execute `./CLLSj`. You can try the basic flag example 
-   described in the introduction of the paper (pp.4) by inputting the REPL 
-   with the command `include "examples/state/flag.clls";;` which will kind and 
-   type check all the type and process definitions included in the file. Then, you can
-   type in the REPL `main();;`, which will execute process `main()`.
-   The REPL will output either the log 
-   
-   > 1: wins.  
-   >  2: looses. 
-
-   or the log 
-   
-   > 2: wins.  
-   > 1: looses.
-
-   depending on which process wins to turn the flag on. 
-
-   For convenience, we have provided files "examples/pure/run-all.clls" and 
-   "examples/state/run-all.clls" that type check and run all the pure and stateful
-   examples, respectively. For example, to try all the stateful examples, you can execute 
-   `include "examples/state/run-all.clls";;` in the REPL, after which you should 
-   obtain a log in which all the examples are successfully defined and run. 
-   
-6. To exit the REPL execute `quit;;`. To exit the docker image, execute `exit`.
-    
-## Step-by-Step Instructions 
+## Interpreter Step-by-Step Instructions 
 
 The artifact consists of type checker and interpreter for language CLASS, 
 written in Java. It demonstrates the feasibility of our design and, pragmatically, 
