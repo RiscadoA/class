@@ -19,6 +19,11 @@ if exact:
   exact_list = [e.strip() for e in exact.split(",")]
   df = df[df["what"].isin(exact_list)]
 
+# Ask for user input to filter in data by 'what' column (not prefix)
+pattern = input("Enter patterns to include data by 'what' column (comma separated, leave empty for no filter): ").strip()
+if pattern:
+  df = df[df["what"].str.contains('|'.join([p.strip() for p in pattern.split(",")]))]
+
 # Ask for user input to filter out data by 'what' column (not prefix)
 pattern = input("Enter patterns to exclude data by 'what' column (comma separated, leave empty for no filter): ").strip()
 if pattern:
@@ -29,6 +34,9 @@ if pattern:
 # Ask for user input on input range to include (min and max)
 min_input = input("Enter minimum input value to include (leave empty for no minimum): ").strip()
 max_input = input("Enter maximum input value to include (leave empty for no maximum): ").strip()
+
+if min_input or max_input:
+  df["input"] = pd.to_numeric(df["input"], errors="coerce")
 if min_input:
   df = df[df["input"] >= float(min_input)]
 if max_input:
