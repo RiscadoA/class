@@ -3,7 +3,7 @@
 This repository contains the type checker, interpreter and compiler for language CLASS -
 a session-typed, higher-order, core language that supports concurrent 
 computation with shared linear state, and which is described in 
-detail in the paper.
+detail in Safe Session-Based Concurrency with Shared Linear State.
 
 The source code builds on the artifact of [The Session Abstract Machine (Artifact)](https://doi.org/10.5281/zenodo.10459455).
 The compiler was developed by Ricardo Antunes for his thesis "Efficient Compilation for the Linear Language CLASS".
