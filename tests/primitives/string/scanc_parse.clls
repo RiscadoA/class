@@ -1,0 +1,33 @@
+proc unsafe_rec scan_word_aux(word: !lstring; acc: ~lstring) {
+  letc c:!lstring { scanc(c) };
+  if c == "" { // EOF
+    let! word acc 
+  } else if c == "\n" or (c == "\r" or (c == " " or c == "\t")) { // Whitespace
+    if acc == "" {
+      scan_word_aux(word; acc)
+    } else {
+      let! word acc
+    }
+  } else {
+    scan_word_aux(word; acc + c)
+  }
+};;
+
+proc unsafe_rec scan_word(word: !lstring) {
+  scan_word_aux(word; "")
+};;
+
+proc main() {
+  cut {
+    send words(a. scan_word(a));
+    send words(b. scan_word(b));
+    send words(c. scan_word(c));
+    close words
+    |words: recv ~!lstring; recv ~!lstring; recv ~!lstring; wait|
+    recv words(a); recv words(b); recv words(c); wait words;
+    println("'" + a + "'");
+    println("'" + b + "'");
+    println("'" + c + "'");
+    ()
+  }
+};;
