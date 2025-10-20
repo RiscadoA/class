@@ -409,6 +409,22 @@ public class CGenerator extends IRInstructionVisitor {
         });
     putBlankLine();
 
+    putBlock(
+        "char* string_scan_char()",
+        () -> {
+          putAssign("int c", "getchar()");
+          putIfElse(
+              "c == EOF",
+              () -> {
+                putReturn("string_clone(\"\")");
+              },
+              () -> {
+                putAssign("char buffer[2]", "{ (char)c, '\\0' }");
+                putReturn("string_clone(buffer)");
+              });
+        });
+    putBlankLine();
+
     // Utility function for sleeping a given number of milliseconds.
     putBlock(
         "void sleep_msecs(int msecs)",
@@ -888,6 +904,12 @@ public class CGenerator extends IRInstructionVisitor {
     }
 
     putAssign(ref, cValue);
+  }
+
+  @Override
+  public void visit(IRWriteScanChar instr) {
+    String ref = data(instr.getLocation()).deref(cType(new IRStringS()));
+    putAssign(ref, "string_scan_char()");
   }
 
   @Override

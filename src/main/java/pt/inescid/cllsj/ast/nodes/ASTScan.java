@@ -33,10 +33,12 @@ public class ASTScan extends ASTNode {
 
   String ch;
   ASTType type;
+  boolean isScanc = false;
 
-  public ASTScan(String _ch, ASTType _type) {
+  public ASTScan(String _ch, ASTType _type, boolean scanc) {
     ch = _ch;
     type = _type;
+    isScanc = scanc;
   }
 
   public String getCh() {
@@ -49,6 +51,10 @@ public class ASTScan extends ASTNode {
 
   public ASTType getType() {
     return type;
+  }
+
+  public boolean isScanc() {
+    return isScanc;
   }
 
   public void ASTupdCont(ASTNode newCont, ASTNode caller) throws Exception {
@@ -110,6 +116,18 @@ public class ASTScan extends ASTNode {
               + type.toStr(ep)
               + ")");
     }
+
+    if (isScanc && !(t instanceof ASTLstringT)) {
+      throw new TypeError(
+          "Line "
+              + lineno
+              + " :"
+              + "SCANCHAR "
+              + ch
+              + " not of (optionally exponential) string type (found "
+              + type.toStr(ep)
+              + ")");
+    }
   }
 
   public Set<String> fn(Set<String> s) {
@@ -122,13 +140,21 @@ public class ASTScan extends ASTNode {
   }
 
   public ASTNode subst(Env<ASTType> e) {
-    return new ASTScan(ch, type == null ? null : type.subst(e));
+    return new ASTScan(ch, type == null ? null : type.subst(e), isScanc);
   }
 
   public void subs(String x, String y) { // implements x/y (substitutes y by x)
     if (ch.equals(y)) {
       ch = x; // Substitute ch by x
     }
+  }
+
+  private Value charFromStdin() throws Exception {
+    int c = System.in.read();
+    if (c == -1) {
+      return new VString("");
+    }
+    return new VString("" + (char) c);
   }
 
   private Value valueFromStdin(Env<EnvEntry> ep) throws Exception {
@@ -150,11 +176,15 @@ public class ASTScan extends ASTNode {
   public void runproc(Env<EnvEntry> ep, Env<Session> ed, Env<Server> eg, Logger logger)
       throws Exception {
     Channel channel = (Channel) ed.find(ch);
-    channel.send(valueFromStdin(ep));
+    if (isScanc) {
+      channel.send(charFromStdin());
+    } else {
+      channel.send(valueFromStdin(ep));
+    }
   }
 
   public void samL(Env<SessionField> frame, Env<EnvEntry> ep, SAMCont p_cont) throws Exception {
-    Value v = valueFromStdin(ep);
+    Value v = isScanc ? charFromStdin() : valueFromStdin(ep);
 
     SessionField sf = frame.find(ch);
 

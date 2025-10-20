@@ -13,6 +13,8 @@ public abstract class IRInstructionVisitor {
 
   public abstract void visit(IRWriteScan instr);
 
+  public abstract void visit(IRWriteScanChar instr);
+
   public abstract void visit(IRWriteSession instr);
 
   public abstract void visit(IRWriteTag instr);

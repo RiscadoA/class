@@ -201,6 +201,11 @@ public class Analyzer extends IRInstructionVisitor {
   }
 
   @Override
+  public void visit(IRWriteScanChar instr) {
+    state.write(this, instr.getLocation(), new AnlSlot.Unknown());
+  }
+
+  @Override
   public void visit(IRWriteSession instr) {
     AnlSessionState local = state.session(instr.getSessionId());
 

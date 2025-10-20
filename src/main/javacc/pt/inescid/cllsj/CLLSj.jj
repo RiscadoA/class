@@ -384,6 +384,8 @@ TOKEN :
   |
   < SCAN: "scan" >
   |
+  < SCANC: "scanc" >
+  |
   < UNREACHABLE: "unreachable" >
   |
   < INFO: "info" >
@@ -1142,7 +1144,17 @@ boolean b;
     (<COL> t=Type()) ?
     <RPAR>
     {
-      p = new ASTScan(c2.image,t);
+      p = new ASTScan(c2.image,t,false);
+      p.lineno = c1.beginLine; 
+    }
+    |
+    c1 = <SCANC>
+    <LPAR>
+    c2=<Id>
+    (<COL> t=Type()) ?
+    <RPAR>
+    {
+      p = new ASTScan(c2.image,t,true);
       p.lineno = c1.beginLine; 
     }
     |
