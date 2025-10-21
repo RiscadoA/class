@@ -18,7 +18,7 @@ proc isSpace(c:~!lstring,r:lbool) {
 
 proc isDigit(c:~!lstring,r:digit) {
     if (c >= "0") and (c <= "9" ) {
-        #Digit r; let! r ord(c)
+        #Digit r; let! r (ord(c)-ord("0"))
     } else {
         #None r; close r
     }
@@ -46,10 +46,10 @@ proc print_tok(tok:~token)
 {
     case tok of {
         | #Id: println("Id('"+tok+"')"); ()
-        | #Num: println("Num('"+tok+"')"); ()
+        | #Num: println("Num("+tok+")"); ()
         | #Lpar: println("Tok(LPAR)"); wait tok; ()
         | #Rpar: println("Tok(RPAR)"); wait tok; ()
-        | #Error: println("Tok(ERROR)"); wait tok; ()
+        | #Error: println("Error()"); wait tok; ()
     }
 };;
 
@@ -87,9 +87,8 @@ proc unsafe_rec scan_token_aux(
                             | #None:
                                 wait a;
                                 tok <- {t. #Error t; close t};     
-                                let! tok c 
-                        }
-                         
+                                let! tok "EOF!"  
+                        }                         
                 }
             }
         }            
@@ -98,21 +97,24 @@ proc unsafe_rec scan_token_aux(
         letc cy:!lstring { scanc(cy) };
         ?cy;
         case r of {
-            | #Digit : scan_token_aux(tok; cy, acc,v*10+r,1) 
+            | #Digit : scan_token_aux(tok; cy, acc, v*10+r, 1) 
             | #None:    
                 wait r;  
+                println("v="+v); 
                 tok <- {t. #Num t; let! t v};     
-                let! tok c       
+                let! tok cy       
         }
     } else { // stat = 2
-        if c == "a" {
-            letc ck:!lstring { scanc(ck) };
-            ?ck;
-            scan_token_aux(tok;ck,acc+c,0,2)  
-        } else {
-            tok <- {t. #Id t; let! t acc};     
-                let! tok c       
-        }
+            letc a:alpha { isAlpha(c,a) };
+            letc cx:!lstring { scanc(cx) };
+            ?cx;
+            case a of {
+                | #Alpha: scan_token_aux(tok;cx,acc+a,0,2) 
+                | #None:
+                    wait a;
+                    tok <- {t. #Id t; let! t acc};     
+                    let! tok cx       
+            }
     }
 };;
 
@@ -126,14 +128,20 @@ proc init_token(tok: send token;!lstring) {
     scan_token_aux(tok;c,"",0,0)
 };;
 
-proc main() {
-    letc t0: send token;!lstring { init_token(t0) };
+proc unsafe_rec gettok(t0:~send token;!lstring)
+{
     t0 -> a;
-    ?t0;
-    print_tok(a);
-    letc t1: send token;!lstring { scan_token(t1;t0) };
-    t1 -> b;
-    ?t1; // should infer
-    print_tok(b);
-    ()
+    if (t0 == "EOF!") {
+        print_tok(a)
+    } else {
+        print_tok(a);
+        letc t1: send token;!lstring { scan_token(t1;t0) };
+        gettok(t1)
+    }
+};;
+
+proc main()
+{
+    letc t0: send token;!lstring { init_token(t0) };
+    gettok(t0)
 };;

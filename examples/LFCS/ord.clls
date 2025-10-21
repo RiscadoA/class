@@ -1,0 +1,9 @@
+proc x(;n:~lint)
+{
+    letc v:!lint { let! v n};
+    println(v);()
+};;
+
+proc main() {
+    x(;20)
+};;
