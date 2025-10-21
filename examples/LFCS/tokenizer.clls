@@ -76,7 +76,7 @@ proc unsafe_rec scan_token_aux(
             } else {
                 letc r:digit { isDigit(c,r) };
                 letc cx:!lstring { scanc(cx) };
-                // ?cx; // not inferred !
+                ?cx; // not inferred !
                 case r of {
                     | #Digit : scan_token_aux(tok;cx,acc,r,1) 
                     | #None:  
@@ -96,7 +96,7 @@ proc unsafe_rec scan_token_aux(
     } else if stat==1 {
         letc r:digit { isDigit(c,r) };
         letc cy:!lstring { scanc(cy) };
-        //?cy;
+        ?cy;
         case r of {
             | #Digit : scan_token_aux(tok; cy, acc,v*10+r,1) 
             | #None:    
@@ -107,7 +107,7 @@ proc unsafe_rec scan_token_aux(
     } else { // stat = 2
         if c == "a" {
             letc ck:!lstring { scanc(ck) };
-            // ?ck;
+            ?ck;
             scan_token_aux(tok;ck,acc+c,0,2)  
         } else {
             tok <- {t. #Id t; let! t acc};     
@@ -129,11 +129,11 @@ proc init_token(tok: send token;!lstring) {
 proc main() {
     letc t0: send token;!lstring { init_token(t0) };
     t0 -> a;
-    // ?t0;
+    ?t0;
     print_tok(a);
     letc t1: send token;!lstring { scan_token(t1;t0) };
     t1 -> b;
-    // ?t1; // should infer
+    ?t1; // should infer
     print_tok(b);
     ()
 };;
