@@ -1,0 +1,6 @@
+proc main() {
+    println(ord(""));
+    println(ord("A"));
+    println(ord("B"));
+    ()
+};;

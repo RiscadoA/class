@@ -349,13 +349,25 @@ public class CGenerator extends IRInstructionVisitor {
     putBlankLine();
 
     putBlock(
-        "int string_equal(char* str1, char* str2)",
+        "int string_cmp(char* str1, char* str2)",
         () -> {
-          putAssign("int result", "strcmp(str1, str2) == 0");
+          putAssign("int result", "strcmp(str1, str2)");
           putFree("str1");
           putFree("str2");
           if (compiler.profiling.get()) {
             putIncrementAtomic("string_frees");
+            putIncrementAtomic("string_frees");
+          }
+          putReturn("result");
+        });
+    putBlankLine();
+
+    putBlock(
+        "int string_ord(char* str)",
+        () -> {
+          putAssign("int result", "(int)str[0]");
+          putFree("str");
+          if (compiler.profiling.get()) {
             putIncrementAtomic("string_frees");
           }
           putReturn("result");

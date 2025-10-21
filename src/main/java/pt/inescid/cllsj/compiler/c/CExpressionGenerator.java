@@ -5,6 +5,7 @@ import pt.inescid.cllsj.compiler.ir.expression.IRClone;
 import pt.inescid.cllsj.compiler.ir.expression.IRExpression;
 import pt.inescid.cllsj.compiler.ir.expression.IRExpressionVisitor;
 import pt.inescid.cllsj.compiler.ir.expression.IRMove;
+import pt.inescid.cllsj.compiler.ir.expression.IROrdinal;
 import pt.inescid.cllsj.compiler.ir.expression.arithmetic.IRAdd;
 import pt.inescid.cllsj.compiler.ir.expression.arithmetic.IRDivide;
 import pt.inescid.cllsj.compiler.ir.expression.arithmetic.IRModulo;
@@ -130,11 +131,11 @@ public class CExpressionGenerator extends IRExpressionVisitor {
   @Override
   public void visit(IREqual eq) {
     if (eq.getLhs().getSlot() instanceof IRStringS || eq.getRhs().getSlot() instanceof IRStringS) {
-      code.append("string_equal(");
+      code.append("(string_cmp(");
       code.append(recurseToString(eq.getLhs()));
       code.append(", ");
       code.append(recurseToString(eq.getRhs()));
-      code.append(")");
+      code.append(") == 0)");
     } else {
       binary("==", eq.getLhs(), eq.getRhs());
     }
@@ -142,12 +143,28 @@ public class CExpressionGenerator extends IRExpressionVisitor {
 
   @Override
   public void visit(IRLessThan lt) {
-    binary("<", lt.getLhs(), lt.getRhs());
+    if (lt.getLhs().getSlot() instanceof IRStringS || lt.getRhs().getSlot() instanceof IRStringS) {
+      code.append("(string_cmp(");
+      code.append(recurseToString(lt.getLhs()));
+      code.append(", ");
+      code.append(recurseToString(lt.getRhs()));
+      code.append(") < 0)");
+    } else {
+      binary("<", lt.getLhs(), lt.getRhs());
+    }
   }
 
   @Override
   public void visit(IRGreaterThan gt) {
-    binary(">", gt.getLhs(), gt.getRhs());
+    if (gt.getLhs().getSlot() instanceof IRStringS || gt.getRhs().getSlot() instanceof IRStringS) {
+      code.append("(string_cmp(");
+      code.append(recurseToString(gt.getLhs()));
+      code.append(", ");
+      code.append(recurseToString(gt.getRhs()));
+      code.append(") > 0)");
+    } else {
+      binary(">", gt.getLhs(), gt.getRhs());
+    }
   }
 
   @Override
@@ -164,6 +181,13 @@ public class CExpressionGenerator extends IRExpressionVisitor {
   public void visit(IRNot not) {
     code.append("(!");
     not.getInner().accept(this);
+    code.append(")");
+  }
+
+  @Override
+  public void visit(IROrdinal index) {
+    code.append("string_ord(");
+    index.getInner().accept(this);
     code.append(")");
   }
 }

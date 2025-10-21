@@ -38,4 +38,6 @@ public abstract class IRExpressionVisitor {
   public abstract void visit(IRBoolLiteral lit);
 
   public abstract void visit(IRStringLiteral lit);
+
+  public abstract void visit(IROrdinal index);
 }
