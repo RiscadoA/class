@@ -213,7 +213,7 @@ public class ASTCase extends ASTNode {
                   + ty.toStr(ep));
       }
 
-      Env<ASTType> eb = ed.dup();
+      Env<ASTType> eb = ed;
 
       // linear var of type ?x erased by inference in case branch
       // gets eroneously restored here in ed.dup()

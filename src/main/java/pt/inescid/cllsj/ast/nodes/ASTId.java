@@ -275,7 +275,7 @@ public class ASTId extends ASTNode {
 
       ASTType formalDual = formal.dual(ep);
 
-      System.out.println("expr=" + gexpr);
+      // System.out.println("expr=" + gexpr);
 
       if (!(gexpr instanceof ASTVId)) {
         String ch = ASTType.gensym(); // generate fresh name
@@ -288,7 +288,7 @@ public class ASTId extends ASTNode {
         // add type to linear type environment
         ed = ed.assoc(ch, new ASTWhyT(formal));
       } else {
-        System.out.println("pg = " + ((ASTVId) gexpr).ch);
+        // System.out.println("pg = " + ((ASTVId) gexpr).ch);
         gpars.add(((ASTVId) gexpr).ch);
       }
       gparTypes.add(formal);
@@ -330,8 +330,8 @@ public class ASTId extends ASTNode {
       actual = ASTType.unfoldRecInferParameter(actual, formal, this, par, ep);
 
       if (!formal.equalst(actual, ep, true, new Trail())) {
-        System.out.println("formal=" + formal.toStr(ep));
-        System.out.println("actual=" + actual.toStr(ep));
+        // System.out.println("formal=" + formal.toStr(ep));
+        // System.out.println("actual=" + actual.toStr(ep));
 
         try {
           String ch = ASTType.gensym();
@@ -403,8 +403,8 @@ public class ASTId extends ASTNode {
         actual = ed.find(par);
         actual = actual.unfoldType(ep);
 
-        System.out.println("formal=" + par + " " + formal.toStr(ep));
-        System.out.println("actual=" + actual.toStr(ep));
+        // System.out.println("formal=" + par + " " + formal.toStr(ep));
+        // System.out.println("actual=" + actual.toStr(ep));
 
         while (!formal.equalst(actual, ep, true, new Trail()) && (actual instanceof ASTCoAffineT)) {
 
@@ -426,7 +426,7 @@ public class ASTId extends ASTNode {
           actual = t.getin();
           actual = actual.unfoldType(ep);
 
-          System.out.println(id + " ASTInsertWhyNot=" + par);
+          // System.out.println(id + " ASTInsertWhyNot=" + par);
 
           this.getanc().ASTInsertWhyNot(par, actual, this);
           ed.upd(par, null);
