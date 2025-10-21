@@ -1,0 +1,139 @@
+type digit {
+    case of {
+        |#Digit: !lint
+        |#None : close
+    }
+};;
+
+type alpha {
+    case of {
+        |#Alpha: !lstring
+        |#None : close
+    }
+};;
+
+proc isSpace(c:~!lstring,r:lbool) {
+    let r (c == "\n" or (c == "\r" or (c == " " or c == "\t")))
+};;
+
+proc isDigit(c:~!lstring,r:digit) {
+    if (c >= "0") and (c <= "9" ) {
+        #Digit r; let! r ord(c)
+    } else {
+        #None r; close r
+    }
+};;
+
+proc isAlpha(c:~!lstring,r:alpha) {
+    if (c >= "a") and (c <= "z" ) {
+        #Alpha r; let! r c
+    } else {
+        #None r; close r
+    }
+};;
+
+type token {
+    case of {
+        | #Id: !lstring
+        | #Num: !lint
+        | #Lpar: close
+        | #Rpar: close
+        | #Error: close
+    }
+};;
+
+proc print_tok(tok:~token)
+{
+    case tok of {
+        | #Id: println("Id('"+tok+"')"); ()
+        | #Num: println("Num('"+tok+"')"); ()
+        | #Lpar: println("Tok(LPAR)"); wait tok; ()
+        | #Rpar: println("Tok(RPAR)"); wait tok; ()
+        | #Error: println("Tok(ERROR)"); wait tok; ()
+    }
+};;
+
+proc unsafe_rec scan_token_aux(
+        tok:pair token;!lstring; // returns token and lookahead char
+        c:~lstring, // last char read
+        acc:~lstring, // current token image
+        v:~lint, // current int val (if tokenizing num)
+        stat:~lint) { // automaton state
+    if (stat==0) { // automaton initial state
+        if c == "(" {
+            letc c:!lstring { scanc(c) };
+            tok <- {t.#Lpar t; close t};     
+            let! tok c       
+        } else if c == ")" {
+            letc c:!lstring { scanc(c) };
+            tok <- {t.#Rpar t; close t};     
+            let! tok c       
+        } else {
+            letc s:lbool { isSpace(c,s)};
+            if (s) { 
+                letc cn:!lstring { scanc(cn) };
+                scan_token_aux(tok;cn,acc,v,0)
+            } else {
+                letc r:digit { isDigit(c,r) };
+                letc cx:!lstring { scanc(cx) };
+                // ?cx; // not inferred !
+                case r of {
+                    | #Digit : scan_token_aux(tok;cx,acc,r,1) 
+                    | #None:  
+                        wait r;  
+                        letc a:alpha { isAlpha(c,a) };
+                        case a of {
+                            | #Alpha: scan_token_aux(tok;cx,acc+a,0,2) 
+                            | #None:
+                                wait a;
+                                tok <- {t. #Error t; close t};     
+                                let! tok c 
+                        }
+                         
+                }
+            }
+        }            
+    } else if stat==1 {
+        letc r:digit { isDigit(c,r) };
+        letc cy:!lstring { scanc(cy) };
+        //?cy;
+        case r of {
+            | #Digit : scan_token_aux(tok; cy, acc,v*10+r,1) 
+            | #None:    
+                wait r;  
+                tok <- {t. #Num t; let! t v};     
+                let! tok c       
+        }
+    } else { // stat = 2
+        if c == "a" {
+            letc ck:!lstring { scanc(ck) };
+            // ?ck;
+            scan_token_aux(tok;ck,acc+c,0,2)  
+        } else {
+            tok <- {t. #Id t; let! t acc};     
+                let! tok c       
+        }
+    }
+};;
+
+proc scan_token(tok: send token;!lstring;c:~lstring) {
+    scan_token_aux(tok;c,"",0,0)
+};;
+
+proc init_token(tok: send token;!lstring) {
+    letc c:!lstring { scanc(c) };
+    ?c;
+    scan_token_aux(tok;c,"",0,0)
+};;
+
+proc main() {
+    letc t0: send token;!lstring { init_token(t0) };
+    t0 -> a;
+    // ?t0;
+    print_tok(a);
+    letc t1: send token;!lstring { scan_token(t1;t0) };
+    t1 -> b;
+    // ?t1; // should infer
+    print_tok(b);
+    ()
+};;

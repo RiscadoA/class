@@ -126,10 +126,28 @@ public class ASTPrinter extends ASTNodeVisitor {
     }
 
     @Override
+    public void visit(ASTLeq expr) {
+      out.print("(");
+      expr.getLhs().accept(this);
+      out.print(" <= ");
+      expr.getRhs().accept(this);
+      out.print(")");
+    }
+
+    @Override
     public void visit(ASTGt expr) {
       out.print("(");
       expr.getLhs().accept(this);
       out.print(" > ");
+      expr.getRhs().accept(this);
+      out.print(")");
+    }
+
+    @Override
+    public void visit(ASTGeq expr) {
+      out.print("(");
+      expr.getLhs().accept(this);
+      out.print(" >= ");
       expr.getRhs().accept(this);
       out.print(")");
     }
@@ -156,6 +174,13 @@ public class ASTPrinter extends ASTNodeVisitor {
     public void visit(ASTNot expr) {
       out.print("!");
       expr.getExpr().accept(this);
+    }
+
+    @Override
+    public void visit(ASTOrd expr) {
+      out.print("ord(");
+      expr.getExpr().accept(this);
+      out.print(")");
     }
   }
 

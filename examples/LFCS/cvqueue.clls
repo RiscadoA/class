@@ -73,8 +73,8 @@ proc deqw( hd:~Ptr, wq:~WaitQ, rv:~Cont, rh:send Ptr;WaitQ) {
             put hp(c. null<lint>(c));
             put hd(hp);
             take wq(hq);
-            clltype hq;
-            put wq(n. cons<Cont>(rv,hq,n));
+            put wq(n. affine n;cons<Cont>(rv,hq,n));
+            println("on wait");
             send rh(hd);
             fwd wq rh
         |#Next : 
@@ -111,15 +111,21 @@ proc printv(v:~Opt(Aint)) {
     }
 };;
 
-proc unsafe_rec deqloop(tl:~Ptr;N:~int) {
+proc unsafe_rec deqloop(tl:~Ptr,wq:~WaitQ;N:~int) {
     if N==0 then {
         println("DONE_D");
-        drop tl
+        drop tl;
+        drop wq
     } else {
-        letc tnext:pair Opt(Aint);Ptr { deq(tl,tnext) };
-        recv tnext (val);
-        printv(val);
-        deqloop(tnext;N-1)    
+        letc rv:Cont {
+            affine rv;
+            recv rv(val); println(val); close rv
+        };
+        letc rstate: send Ptr;WaitQ { 
+            deqw(tl,wq,rv,rstate)
+        };
+        recv rstate(tnext);
+        deqloop(tnext,rstate;N-1)    
     }
 };;
 
@@ -128,7 +134,7 @@ proc unsafe_rec encloop(hd:~Ptr;N:~int) {
         println("DONE_E");
         drop hd
     } else {
-        println(0);
+        println(N);
         letc hnext:Ptr { enq(hd,N,hnext) };
         encloop(hnext;N-1)    
     }
@@ -136,13 +142,16 @@ proc unsafe_rec encloop(hd:~Ptr;N:~int) {
 
 proc mainloop(;n:~int) {
     letc sn: LList(lint) {
-        cell sn (c.nil<lint>(c))
+        cell sn (c.null<lint>(c))
+    };
+    letc wq: WaitQ {
+        cell wq (c.affine c;nil<Cont>(c))
     };
     share sn {
         letc hd:Ptr {
             cell hd (sn)
         };
-        deqloop(hd;n)
+        deqloop(hd,wq;n)
         ||
         letc tl:Ptr {
             cell tl (sn)

@@ -190,7 +190,7 @@ public class ASTVId extends ASTExpr {
         // System.out.println("VID-recv "+ch+"="+sessionc);
         v = (Value) sessionc.receive();
         return v;
-      } catch (Exception _) { // copyable value (int)
+      } catch (Exception exc) { // copyable value (int)
         // System.out.println("VID-val "+ch+"="+session);
         return (Value) session;
       }

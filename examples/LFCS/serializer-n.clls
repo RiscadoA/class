@@ -1,0 +1,124 @@
+type rec treeInt {
+    choice of {
+        |#Leaf: lint
+        |#Node: send treeInt; treeInt
+    }
+};;
+
+proc rec dispose(t:~treeInt)
+{
+    case t of {
+        | #Leaf: println(t);()
+        | #Node: t -> l; dispose(l); dispose(t)
+    }
+};;
+
+proc aTree(t:treeInt){
+    #Node t;
+    t <- { tleft. #Leaf tleft; let tleft 1 };
+    #Leaf t; let t 2
+};;
+
+proc aTree2(t:treeInt){
+    #Node t;
+    t <- { tleft. #Leaf tleft; let tleft 1 };
+    #Node t;
+    t <- { tleft2. #Leaf tleft2; let tleft2 2 };
+    #Leaf t; let t 3
+};;
+
+type rec stream {
+    choice of {
+        |#End: close
+        |#Str: send lstring; stream
+    }
+};;
+
+proc rec serializeAux(tin:~treeInt, s:stream, sin:~stream){
+    case tin of {
+        |#Leaf: 
+            #Str s; 
+            s <- "Leaf:"+tin;
+            fwd s sin
+        |#Node: #Str s;
+            s <- "Node(";
+            tin -> left;
+            letc so:~stream { serializeAux(left, s, so) };
+            #Str so;
+            so <- ")(";
+            letc si:~stream { serializeAux(tin, so, si) };
+            #Str si; 
+            si <- ")";
+            fwd si sin
+    }
+};;
+
+proc serialize(tin:~treeInt, s:stream) {
+    letc done:~stream { serializeAux(tin,s,done ) };
+    #End done;
+    close done
+};;
+
+proc rec printstream(s:~stream)
+{
+    case s of {
+        | #End:
+            wait s;()
+        | #Str:
+            s -> n;
+            print (n);
+            printstream(s)
+    }
+};;
+
+proc test_stream(){
+    letc t: treeInt { aTree2(t) };
+    letc s: stream { serialize(t,s) };
+    printstream(s);
+    println();
+    ()
+};;
+
+proc unsafe_rec parser(s:treeInt)
+{
+    letc tok0:!lstring { scan(tok0)};
+    if (tok0=="Node(") {
+        letc lhs:treeInt { parser(lhs) };
+        letc rhs:treeInt { parser(rhs) };
+        letc tok1:lstring { scan(tok1)};
+        if (tok1 == ")") {
+            #Node s; 
+            s <- lhs;
+            fwd rhs s
+        } else {
+            println("Syntax Error");
+            dispose(lhs);
+            dispose(rhs);
+            #Leaf s;
+            let s 0
+        }
+    } else {
+        if (tok0 == "Leaf") {
+            letc tok2:lint { scan(tok2)};
+            #Leaf s;
+            fwd tok2 s
+        } else {
+            println("Syntax Error");
+            #Leaf s;
+            let s 0
+        }
+    }
+};;
+
+proc main0() 
+{
+    test_stream()
+};;
+
+proc main(){
+    letc t: treeInt { parser(t) };
+    letc s: stream { serialize(t,s) };
+    printstream(s);
+    println();
+    ()
+};;

@@ -77,7 +77,19 @@ public class ASTSessionRenamer extends ASTNodeVisitor {
     }
 
     @Override
+    public void visit(ASTLeq expr) {
+      expr.getLhs().accept(this);
+      expr.getRhs().accept(this);
+    }
+
+    @Override
     public void visit(ASTGt expr) {
+      expr.getLhs().accept(this);
+      expr.getRhs().accept(this);
+    }
+
+    @Override
+    public void visit(ASTGeq expr) {
       expr.getLhs().accept(this);
       expr.getRhs().accept(this);
     }
@@ -96,6 +108,11 @@ public class ASTSessionRenamer extends ASTNodeVisitor {
 
     @Override
     public void visit(ASTNot expr) {
+      expr.getExpr().accept(this);
+    }
+
+    @Override
+    public void visit(ASTOrd expr) {
       expr.getExpr().accept(this);
     }
 

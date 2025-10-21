@@ -4,6 +4,7 @@ import pt.inescid.cllsj.ast.nodes.ASTTypeDef;
 import pt.inescid.cllsj.ast.types.ASTCoBasicType;
 import pt.inescid.cllsj.ast.types.ASTIdT;
 import pt.inescid.cllsj.ast.types.ASTType;
+import pt.inescid.cllsj.ast.types.ASTWhyT;
 
 public class Env<X> {
 
@@ -65,7 +66,9 @@ public class Env<X> {
     // System.out.println("assoc " + assoc + " " + e0.assoc);
     return (assoc == e0.assoc)
         || (e0.assoc instanceof ASTCoBasicType)
-        || (assoc instanceof ASTCoBasicType);
+        || (assoc instanceof ASTCoBasicType)
+        || (e0.assoc instanceof ASTWhyT)
+        || (assoc instanceof ASTWhyT);
   }
 
   public synchronized String findI(SessionRecord _it) throws Exception {

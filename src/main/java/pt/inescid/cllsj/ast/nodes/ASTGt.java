@@ -9,6 +9,7 @@ import pt.inescid.cllsj.SessionField;
 import pt.inescid.cllsj.TypeError;
 import pt.inescid.cllsj.VBool;
 import pt.inescid.cllsj.VInt;
+import pt.inescid.cllsj.VString;
 import pt.inescid.cllsj.Value;
 import pt.inescid.cllsj.ast.ASTExprVisitor;
 import pt.inescid.cllsj.ast.types.ASTBotT;
@@ -83,15 +84,23 @@ public class ASTGt extends ASTExpr {
   }
 
   public Value eval(Env<Session> ed, Env<Server> eg) throws Exception {
-    VInt vleft = (VInt) lhs.eval(ed, eg);
-    VInt vright = (VInt) rhs.eval(ed, eg);
-    return new VBool(vleft.get() > vright.get());
+    Value vleft = lhs.eval(ed, eg);
+    Value vright = rhs.eval(ed, eg);
+    if (vleft instanceof VInt) {
+      return new VBool(((VInt) vleft).get() > ((VInt) vright).get());
+    } else if (vleft instanceof VString) {
+      return new VBool(((VString) vleft).get().compareTo(((VString) vright).get()) > 0);
+    } else throw new TypeError("< : unexpected types");
   }
 
   public Value sameval(Env<SessionField> ed) throws Exception {
-    VInt vleft = (VInt) lhs.sameval(ed);
-    VInt vright = (VInt) rhs.sameval(ed);
-    return new VBool(vleft.get() > vright.get());
+    Value vleft = lhs.sameval(ed);
+    Value vright = rhs.sameval(ed);
+    if (vleft instanceof VInt) {
+      return new VBool(((VInt) vleft).get() > ((VInt) vright).get());
+    } else if (vleft instanceof VString) {
+      return new VBool(((VString) vleft).get().compareTo(((VString) vright).get()) > 0);
+    } else throw new TypeError("< : unexpected types");
   }
 
   @Override

@@ -528,6 +528,8 @@ TOKEN :
   | 
   < MOD : "%">
   | 
+  < ORD : "ord">
+  | 
   < lab: "#"( ["A"-"Z", "a"-"z","_","0"-"9"] )+ >
   |
   < Id: ["A"-"Z", "a"-"z"] ( ["A"-"Z", "a"-"z","_", "0"-"9"] )* >
@@ -566,11 +568,11 @@ TOKEN :
   |
   <RBRA : "}" >
   |
-  <LE : "<=" >
+  <LEQ : "<=" >
   |
   <IMP : "=>" >
   |
-  <GE : ">=" >
+  <GEQ : ">=" >
   |
   <LT : "<" >
   |
@@ -942,9 +944,9 @@ Token c1,c2;
 {
 	p1=CExpr()
 	(
-	c1 = <AND> p2=CExpr() { p = new ASTAnd(p1,p2); p.lineno = c1.beginLine; p1.setanc(p); p2.setanc(p); p1 = p;}
+	c1 = <AND> p2=Expr() { p = new ASTAnd(p1,p2); p.lineno = c1.beginLine; p1.setanc(p); p2.setanc(p); p1 = p;}
 	|
-	c1 = <OR> p2=CExpr() { p = new ASTOr(p1,p2); p.lineno = c1.beginLine; p1.setanc(p); p2.setanc(p); p1 = p;}
+	c1 = <OR> p2=Expr() { p = new ASTOr(p1,p2); p.lineno = c1.beginLine; p1.setanc(p); p2.setanc(p); p1 = p;}
 	)?
 	{ return p1; }
 }
@@ -967,6 +969,10 @@ Token c1,c2;
 	c1 = <LT> p2=AExpr() { p = new ASTLt(p1,p2); p.lineno = c1.beginLine; p1.setanc(p); p2.setanc(p); p1 = p; }
 	|
 	c1 = <GT> p2=AExpr() { p = new ASTGt(p1,p2); p.lineno = c1.beginLine; p1.setanc(p); p2.setanc(p); p1 = p; }
+	|
+	c1 = <LEQ> p2=AExpr() { p = new ASTLeq(p1,p2); p.lineno = c1.beginLine; p1.setanc(p); p2.setanc(p); p1 = p; }
+	|
+	c1 = <GEQ> p2=AExpr() { p = new ASTGeq(p1,p2); p.lineno = c1.beginLine; p1.setanc(p); p2.setanc(p); p1 = p; }
 	)?
 	{ return p1; }
 }
@@ -1032,6 +1038,8 @@ Token c1,c2;
 	c1 = <MINUS> p = Fact() { p1 = new ASTSub(new ASTInt(0),p); p1.lineno = c1.beginLine; p.setanc(p1); p = p1; }
 	|
 	c1 = <BANG> p = Fact() { p1 = new ASTNot(p); p1.lineno = c1.beginLine; p.setanc(p1); p = p1; }
+	|
+	c1 = <ORD> <LPAR> p = Expr() <RPAR> { p1 = new ASTOrd(p); p1.lineno = c1.beginLine; p.setanc(p1); p = p1; }
 )
 	{ return p; }
 }
@@ -1218,16 +1226,16 @@ boolean b;
         <DOT>
          p1=Proc() <RBRA> <SEMIC> p2=Proc()
         {
-	p = new ASTSend(c1.image,c2.image,t,p1,p2);
-        p.lineno = c1.beginLine; 
-	p1.setanc(p); p2.setanc(p);
-	}
+          p = new ASTSend(c1.image,c2.image,t,p1,p2);
+                p.lineno = c1.beginLine; 
+          p1.setanc(p); p2.setanc(p);
+	      }
     	|
     	pe = Expr() <SEMIC> p2=Proc()
     	{
-	p = new ASTSend(c1.image,ASTType.gensym(),null,pe,p2);
-	p.lineno = c1.beginLine; 
-	pe.setanc(p); p2.setanc(p); 
+        p = new ASTSend(c1.image,ASTType.gensym(),null,pe,p2);
+        p.lineno = c1.beginLine; 
+        pe.setanc(p); p2.setanc(p); 
     	}
 	)
     	|

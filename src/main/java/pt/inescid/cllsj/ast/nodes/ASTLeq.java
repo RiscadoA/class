@@ -19,11 +19,11 @@ import pt.inescid.cllsj.ast.types.ASTCointT;
 import pt.inescid.cllsj.ast.types.ASTLCointT;
 import pt.inescid.cllsj.ast.types.ASTType;
 
-public class ASTLt extends ASTExpr {
+public class ASTLeq extends ASTExpr {
 
   ASTExpr lhs, rhs;
 
-  public ASTLt(ASTExpr _lhs, ASTExpr _rhs) {
+  public ASTLeq(ASTExpr _lhs, ASTExpr _rhs) {
     lhs = _lhs;
     rhs = _rhs;
   }
@@ -87,9 +87,9 @@ public class ASTLt extends ASTExpr {
     Value vleft = lhs.eval(ed, eg);
     Value vright = rhs.eval(ed, eg);
     if (vleft instanceof VInt) {
-      return new VBool(((VInt) vleft).get() < ((VInt) vright).get());
+      return new VBool(((VInt) vleft).get() <= ((VInt) vright).get());
     } else if (vleft instanceof VString) {
-      return new VBool(((VString) vleft).get().compareTo(((VString) vright).get()) < 0);
+      return new VBool(((VString) vleft).get().compareTo(((VString) vright).get()) <= 0);
     } else throw new TypeError("< : unexpected types");
   }
 
@@ -97,10 +97,10 @@ public class ASTLt extends ASTExpr {
     Value vleft = lhs.sameval(ed);
     Value vright = rhs.sameval(ed);
     if (vleft instanceof VInt) {
-      return new VBool(((VInt) vleft).get() < ((VInt) vright).get());
+      return new VBool(((VInt) vleft).get() <= ((VInt) vright).get());
     } else if (vleft instanceof VString) {
-      return new VBool(((VString) vleft).get().compareTo(((VString) vright).get()) < 0);
-    } else throw new TypeError("< : unexpected types");
+      return new VBool(((VString) vleft).get().compareTo(((VString) vright).get()) <= 0);
+    } else throw new TypeError("<= : unexpected types");
   }
 
   @Override

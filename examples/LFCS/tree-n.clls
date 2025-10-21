@@ -1,0 +1,157 @@
+type rec treeInt {
+    choice of {
+        |#Leaf: lint
+        |#Node: send treeInt; treeInt
+    }
+};;
+
+proc rec mapDouble(tin:~treeInt, tout:treeInt) {
+    case tin of {
+        |#Leaf: #Leaf tout;
+                let tout 2*tin
+        |#Node: tin -> left;
+                #Node tout;
+                tout <- { x. mapDouble(left, x) };
+                mapDouble(tin,tout)
+    }
+};;
+
+proc rec printAux(tin:~treeInt, x:close){
+    case tin of {
+        |#Leaf: print("X"); print("Leaf " + tin); close x
+        |#Node: print("Node (");
+                recv tin(left:~treeInt);
+                cut{
+                    printAux(left, y)
+                    |y:wait|
+                    wait y;
+                    print(") (");
+                    cut{
+                        printAux(tin, z)
+                        |z:wait|
+                        wait z;
+                        print(")");
+                        close x
+                    }
+                }
+    }
+};;
+
+type rec stream {
+    choice of {
+        |#End: close
+        |#Str: send lstring; stream
+    }
+};;
+
+proc rec serializeAux(tin:~treeInt, s:stream, sin:~stream){
+    case tin of {
+        |#Leaf: 
+            #Str s; 
+            s <- ""+tin;
+            fwd s sin
+        |#Node: #Str s;
+            s <- "Node(";
+            tin -> left;
+            letc so:~stream { serializeAux(left, s, so) };
+            #Str so;
+            so <- ")(";
+            letc si:~stream { serializeAux(tin, so, si) };
+            #Str si; 
+            si <- ")";
+            fwd si sin
+    }
+};;
+
+proc serialize(tin:~treeInt, s:stream){
+    cut{
+        serializeAux(tin,s,done )
+        |done:stream|
+        #End done;
+        close done
+    }
+};;
+
+proc rec printstream(s:~stream)
+{
+    case s of {
+        | #End:
+            wait s;()
+        | #Str:
+            s -> n;
+            print (n);
+            printstream(s)
+    }
+};;
+
+
+proc printTree(tin:~treeInt){
+    cut{
+        printAux(tin, x)
+        |x:wait|
+        wait x;
+        println(" ");
+        ()
+    }
+};;
+
+proc aTree(t:treeInt){
+    #Node t;
+    send t(tleft:treeInt. #Leaf tleft; let tleft 1);
+    #Leaf t; let t 2
+};;
+
+proc aTree2(t:treeInt){
+    #Node t;
+    send t(tleft:treeInt. #Leaf tleft; let tleft 1);
+    #Node t;
+    send t(tleft2:treeInt. #Leaf tleft2; let tleft2 2);
+    #Leaf t; let t 3
+};;
+
+proc test_tree(){
+    cut{
+        aTree2(t)
+        |t:~treeInt|
+        printTree(t)
+    }
+};;
+
+proc test_tree2(){
+    cut{
+        aTree2(t)
+        |t:~treeInt|
+        mapDouble(t,t2)
+        |t2:~treeInt|
+        printTree(t2)
+    }
+};;
+
+proc rec mirrorTree(tin:~treeInt, tout:treeInt){
+    case tin of {
+        |#Leaf: #Leaf tout;
+                let tout tin
+        |#Node: tin -> left;
+                #Node tout;
+                tout <- { x. mirrorTree(tin, x)};
+                mirrorTree(left,tout)
+    }
+};;
+
+proc test_tree3(){
+    letc t: treeInt { aTree2(t) };
+    letc t2: treeInt { mirrorTree(t,t2) };
+    printTree(t2)
+};;
+
+proc test_stream(){
+    letc t: treeInt { aTree2(t) };
+    letc s: stream { serialize(t,s) };
+    printstream(s)
+};;
+
+
+proc main() 
+{
+    test_stream()
+};;

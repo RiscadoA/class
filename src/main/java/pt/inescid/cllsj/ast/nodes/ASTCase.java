@@ -215,11 +215,21 @@ public class ASTCase extends ASTNode {
 
       Env<ASTType> eb = ed.dup();
 
+      // linear var of type ?x erased by inference in case branch
+      // gets eroneously restored here in ed.dup()
+
       Env<ASTType> last = null;
+      boolean init = true;
 
       for (Iterator<String> is = tcase.keySet().iterator(); is.hasNext(); ) {
+
         String lab = is.next();
         ASTType t1 = tcase.get(lab).unfoldType(ep);
+
+        if (init) {
+          eb = ed.dup();
+          init = false;
+        }
 
         casetypes.put(lab, t1);
 
@@ -245,7 +255,7 @@ public class ASTCase extends ASTNode {
               "Line " + lineno + " :" + "OFFER " + ch + ": unbalanced linear contexts");
         last = ed;
         if (is.hasNext()) {
-          ed = eb.dup();
+          ed = eb.dup(); // rollbacking changes in branch
           // eg = egg.dupe();
         }
       }

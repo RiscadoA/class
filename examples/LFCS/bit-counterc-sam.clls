@@ -55,10 +55,10 @@ proc rec node(n:CImpl, x:~CImpl; b:colint){
     case n of {
         |#val:  #val x;
                 recv n(m);
-		?m;
+		// ?m;
                 send x(2*(m+b));
                 recv x(v);
-		?v;
+		// ?v;
                 send n(v);
                 node(n,x ;b)
         |#inc:  #inc x;
@@ -90,17 +90,17 @@ proc rec node(n:CImpl, x:~CImpl; b:colint){
 
 proc rec coord(z:Counter,x:~CImpl){
     case z of {
-        |#val:      #val x;
-                    send x(0);
-                    recv x(n);
-		    ?n;
-                    send z(n);
-                    coord(z,x)
+        |#val:  #val x;
+                send x(0);
+                recv x(n);
+                // ?n;
+                send z(n);
+                coord(z,x)
 
         |#inc:      #inc x;
                     case x of {
                         |#carry:
-			        ccut{
+			            cut{
                                         node(n,x;1)
                                         |n:~CImpl|
                                         coord(z,n)
@@ -122,13 +122,12 @@ proc rec coord(z:Counter,x:~CImpl){
 proc rec least(x:CImpl;b:colint){
     case x of {
         |#val:  recv x(v);
-	       ?v;
+	       // ?v;
                if(b == 0)
                 {
                     send x(v);
                     least(x;b)
-                }
-                {   
+                } else {   
                     send x(v+1);
                     least(x;b)
                 }
@@ -137,8 +136,7 @@ proc rec least(x:CImpl;b:colint){
                 {
                     #done x;
                     least(x;1)
-                }
-                {
+                } else  {
                     #carry x;
                     least(x;0)
                 }
@@ -166,7 +164,7 @@ proc test(){
         #print c;
         #val c;
         recv c(v0:?colint);
-        ?v0;
+        // ?v0;
         println("Current Value :" + v0);
         println("Incrementing");
         #inc c;
@@ -174,7 +172,7 @@ proc test(){
         #print c;
         #val c;
         recv c(v1:?colint);
-        ?v1;
+        // ?v1;
         println("Current Value :" + v1);
         println("Incrementing");
         #inc c;
@@ -182,7 +180,7 @@ proc test(){
         #print c;
         #val c;
         recv c(v2:?colint);
-        ?v2;
+        // ?v2;
         println("Current Value :" + v2);
         println("Incrementing");
         #inc c;
@@ -190,7 +188,7 @@ proc test(){
         #print c;
         #val c;
         recv c(v3:?colint);
-        ?v3;
+        // ?v3;
         println("Current Value :" + v3);
         println("Incrementing");
         #inc c;
@@ -198,7 +196,7 @@ proc test(){
         #print c;
         #val c;
         recv c(v4:?colint);
-        ?v4;
+        // ?v4;
         println("Current Value :" + v4);
         print("Halting...");
         #halt c;
@@ -226,12 +224,11 @@ proc unsafe_rec test_loop(c:~Counter;n:colint)
      if (n==0) {
         #print c;
      	#halt c;
-	wait c;
+	    wait c;
      	println ("done!");()
-	}
-	{
-	#inc c;
-	test_loop(c;n-1)
+	} else {
+        #inc c;
+        test_loop(c;n-1)
 	}
 };;
 

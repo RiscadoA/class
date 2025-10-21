@@ -253,7 +253,9 @@ public class ASTId extends ASTNode {
         // add type to linear type environment
         ed = ed.assoc(ch, formal);
 
-      } else pars.add(((ASTVId) expr).ch);
+      } else {
+        pars.add(((ASTVId) expr).ch);
+      }
     }
 
     procGParTypes = new ArrayList<ASTType>();
@@ -267,10 +269,14 @@ public class ASTId extends ASTNode {
       ASTType formal = itgargt.next();
 
       procGParTypes.add(ASTType.unfoldRec(formal.unfoldType(keepIdsEp)));
+
       formal = formal.unfoldType(ep);
-      formal = ASTType.unfoldRec(formal); // was commented away
+      formal = ASTType.unfoldRec(formal); // comment
 
       ASTType formalDual = formal.dual(ep);
+
+      System.out.println("expr=" + gexpr);
+
       if (!(gexpr instanceof ASTVId)) {
         String ch = ASTType.gensym(); // generate fresh name
 
@@ -281,8 +287,10 @@ public class ASTId extends ASTNode {
         gpars.add(ch);
         // add type to linear type environment
         ed = ed.assoc(ch, new ASTWhyT(formal));
-      } else gpars.add(((ASTVId) gexpr).ch);
-
+      } else {
+        System.out.println("pg = " + ((ASTVId) gexpr).ch);
+        gpars.add(((ASTVId) gexpr).ch);
+      }
       gparTypes.add(formal);
     }
 
@@ -322,6 +330,9 @@ public class ASTId extends ASTNode {
       actual = ASTType.unfoldRecInferParameter(actual, formal, this, par, ep);
 
       if (!formal.equalst(actual, ep, true, new Trail())) {
+        System.out.println("formal=" + formal.toStr(ep));
+        System.out.println("actual=" + actual.toStr(ep));
+
         try {
           String ch = ASTType.gensym();
           genProcFromExpr(ch, expr, formalDual, ed, eg, ep);
@@ -367,7 +378,7 @@ public class ASTId extends ASTNode {
       }
     }
 
-    // System.out.println("TC ID " + id + " S 3");
+    // process exponential parameters
 
     if (gpars.size() != pe.gargs.size())
       throw new TypeError(
@@ -376,24 +387,31 @@ public class ASTId extends ASTNode {
               + " :"
               + id
               + ": lengths of unrestricted argument and parameter list do not match.");
+
     Iterator<ASTType> itgs = pe.gargtypes.iterator();
     for (String par : gpars) {
       ASTType actual;
       ASTType formal = itgs.next().unfoldType(ep);
 
       try {
+
         actual = eg.find(par);
         actual = actual.unfoldType(ep);
+
       } catch (Exception e) {
 
         actual = ed.find(par);
         actual = actual.unfoldType(ep);
 
+        System.out.println("formal=" + par + " " + formal.toStr(ep));
+        System.out.println("actual=" + actual.toStr(ep));
+
         while (!formal.equalst(actual, ep, true, new Trail()) && (actual instanceof ASTCoAffineT)) {
+
           ASTCoAffineT tyco = (ASTCoAffineT) actual;
           actual = tyco.getin();
           actual = actual.unfoldType(ep);
-          // actual = ASTType.unfoldRec(actual);
+
           ed.upd(par, actual);
 
           Boolean disposableCont =
@@ -407,7 +425,9 @@ public class ASTId extends ASTNode {
           ASTWhyT t = (ASTWhyT) actual;
           actual = t.getin();
           actual = actual.unfoldType(ep);
-          // actual = ASTType.unfoldRec(actual);
+
+          System.out.println(id + " ASTInsertWhyNot=" + par);
+
           this.getanc().ASTInsertWhyNot(par, actual, this);
           ed.upd(par, null);
         } else

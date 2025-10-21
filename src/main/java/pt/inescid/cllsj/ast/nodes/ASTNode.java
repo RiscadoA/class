@@ -96,7 +96,7 @@ public abstract class ASTNode {
   public abstract void subs(String x, String y); // Substitutes name x by y in this ASTNode
 
   public void linclose(Env<ASTType> ed, Env<EnvEntry> ep) throws Exception {
-    Set<String> s1 = fn(new HashSet<String>());
+    Set<String> s1 = this.fn(new HashSet<String>());
     Iterator<String> it = s1.iterator();
     while (it.hasNext()) {
       String id = it.next();
@@ -107,8 +107,10 @@ public abstract class ASTNode {
       }
       if (def) {
         ASTType te = ed.find(id);
-        if (!(te instanceof ASTCointT)) // NON-LIN-INT
-        throw new TypeError(
+        // NON-LIN-INT
+        // residuals of linear type ASTWhy will be weakened-infer
+        if (!((te instanceof ASTCointT) || (te instanceof ASTWhyT)))
+          throw new TypeError(
               "Line " + lineno + " :" + "for " + id + " type pending = " + te.toStr(ep));
       }
     }
@@ -256,7 +258,7 @@ public abstract class ASTNode {
       ASTType gen = ed.find(_ch);
       boolean exp = gen instanceof ASTWhyT;
       if (exp || gen instanceof ASTCoAffineT) {
-        // System.out.println("Weakening inferred: "+weakop(exp) + _ch);
+        // System.out.println("Weakening inferred: " + weakop(exp) + _ch);
         return node.ASTweakeningOnLeaf(_ch, gen, exp);
         // lhs.show();;
       } else throw e;
@@ -289,7 +291,7 @@ public abstract class ASTNode {
 
   public ASTNode compileFwd(String x1, String x2, ASTType t1, ASTType t2, Env<EnvEntry> ep)
       throws Exception {
-    // TODO: deal wiht bang and use this for send and cell, besides put
+    // TODO: deal with bang and use this for send and cell, besides put
     t1 = t1.unfoldType(ep);
     t1 = ASTType.unfoldRec(t1);
 

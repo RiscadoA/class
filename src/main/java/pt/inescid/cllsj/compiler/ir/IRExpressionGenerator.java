@@ -95,8 +95,18 @@ public class IRExpressionGenerator extends ASTExprVisitor {
   }
 
   @Override
+  public void visit(ASTLeq expr) {
+    // tbd
+  }
+
+  @Override
   public void visit(ASTGt expr) {
     ir = new IRGreaterThan(recurse(expr.getLhs()), recurse(expr.getRhs()));
+  }
+
+  @Override
+  public void visit(ASTGeq expr) {
+    // tbd
   }
 
   @Override
@@ -112,5 +122,10 @@ public class IRExpressionGenerator extends ASTExprVisitor {
   @Override
   public void visit(ASTNot expr) {
     ir = new IRNot(recurse(expr.getExpr()));
+  }
+
+  @Override
+  public void visit(ASTOrd expr) {
+    // tbd
   }
 }
