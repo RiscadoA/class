@@ -100,7 +100,7 @@ proc unsafe_rec scan_token_aux(
             | #Digit : scan_token_aux(tok; cy, acc, v*10+r, 1) 
             | #None:    
                 wait r;  
-                println("v="+v); 
+                println(v);
                 tok <- {t. #Num t; let! t v};     
                 let! tok cy       
         }
