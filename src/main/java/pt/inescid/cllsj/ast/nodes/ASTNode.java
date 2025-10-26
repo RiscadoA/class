@@ -17,12 +17,8 @@ import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.types.ASTAffineT;
 import pt.inescid.cllsj.ast.types.ASTBangT;
 import pt.inescid.cllsj.ast.types.ASTBasicType;
-import pt.inescid.cllsj.ast.types.ASTBotT;
 import pt.inescid.cllsj.ast.types.ASTCoAffineT;
 import pt.inescid.cllsj.ast.types.ASTCointT;
-import pt.inescid.cllsj.ast.types.ASTNotT;
-import pt.inescid.cllsj.ast.types.ASTRecvT;
-import pt.inescid.cllsj.ast.types.ASTSendT;
 import pt.inescid.cllsj.ast.types.ASTType;
 import pt.inescid.cllsj.ast.types.ASTUsageT;
 import pt.inescid.cllsj.ast.types.ASTWhyT;
@@ -126,7 +122,7 @@ public abstract class ASTNode {
 
     if (def) {
       ASTType te = ed.find(id);
-      // System.out.println("lin-close " + id + " " + te);
+      System.out.println("\n\n *** Lin-close " + id + " " + te);
       if (!(te instanceof ASTCointT)) // NON-LIN-INT
       throw new TypeError(
             "Line " + lineno + " :" + "for " + id + " type pending = " + te.toStr(ep));
@@ -162,6 +158,7 @@ public abstract class ASTNode {
     }
   }
 
+  /*
   public static ASTNode ForMacroFactory(
       String c1, ASTType t, String c2, String c3, String c4, String c5, ASTNode body) {
 
@@ -185,6 +182,7 @@ public abstract class ASTNode {
     ast = new ASTCut(loop, tc, ast, ast2);
     return ast;
   }
+  */
 
   public void inferUses(String chs, Env<ASTType> ed, Env<EnvEntry> ep) throws Exception {
     ASTType ty = ed.find(chs);
@@ -208,8 +206,8 @@ public abstract class ASTNode {
     throw new TypeError("toStr not implemented");
   }
 
-  public ASTNode ASTInsertWhy(String _ch) {
-    ASTNode push = new ASTWhy(_ch, this);
+  public ASTNode ASTInsertWhy(String _ch, ASTType t) {
+    ASTNode push = new ASTWhy(_ch, t, this);
     this.setanc(push);
     push.setanc(anc);
     return push;
@@ -226,7 +224,6 @@ public abstract class ASTNode {
   }
 
   public ASTNode ASTweakeningHere(String _ch, ASTType t, boolean exp) {
-    // System.out.println("ASTweakeningHere ");
     if (exp) {
       ASTNode push = new ASTWhy(_ch, t, this);
       this.setanc(push);
@@ -237,12 +234,11 @@ public abstract class ASTNode {
     }
   }
 
-  public ASTNode ASTweakeningTerm(String _ch, boolean exp) throws Exception {
+  public ASTNode ASTweakeningTerm(String _ch, ASTType t, boolean exp) throws Exception {
     if (exp) {
-      // System.out.println("ASTInsertWhy "+exp);
-      return this.ASTInsertWhy(_ch);
+      ASTNode ret = this.ASTInsertWhy(_ch, t);
+      return ret;
     } else {
-      // System.out.println("ASTInsertMixDiscard "+exp);
       return this.ASTInsertMixDiscard(_ch);
     }
   }
@@ -250,18 +246,16 @@ public abstract class ASTNode {
   /* this called at the end of scope of _ch */
   public ASTNode ASTInferLinClose(ASTNode node, String _ch, Env<ASTType> ed, Env<EnvEntry> ep)
       throws Exception {
-
     try {
       node.linclose(_ch, ed, ep);
       return node;
     } catch (Exception e) {
       ASTType gen = ed.find(_ch);
-      boolean exp = gen instanceof ASTWhyT;
-      if (exp || gen instanceof ASTCoAffineT) {
-        // System.out.println("Weakening inferred: " + weakop(exp) + _ch);
-        return node.ASTweakeningOnLeaf(_ch, gen, exp);
-        // lhs.show();;
-      } else throw e;
+      if (gen instanceof ASTWhyT)
+        return node.ASTweakeningOnLeaf(_ch, ((ASTWhyT) gen).getin(), true);
+      if (gen instanceof ASTCoAffineT)
+        return node.ASTweakeningOnLeaf(_ch, ((ASTCoAffineT) gen).getin(), false);
+      else throw e;
     }
   }
 

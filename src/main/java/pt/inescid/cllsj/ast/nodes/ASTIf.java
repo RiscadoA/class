@@ -113,7 +113,6 @@ public class ASTIf extends ASTNode {
       lin = true;
       et = expr.etypecheck(ed, eg, ep, lin);
     } catch (Exception ee) {
-      ee.printStackTrace(System.out);
       lin = false;
       et = expr.etypecheck(ed, eg, ep, lin);
     }

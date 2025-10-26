@@ -12,11 +12,11 @@ type alpha {
     }
 };;
 
-proc isSpace(c:~!lstring,r:lbool) {
+proc isSpace(r:lbool;c:~lstring) {
     let r (c == "\n" or (c == "\r" or (c == " " or c == "\t")))
 };;
 
-proc isDigit(c:~!lstring,r:digit) {
+proc isDigit(r:digit;c:~lstring) {
     if (c >= "0") and (c <= "9" ) {
         #Digit r; let! r (ord(c)-ord("0"))
     } else {
@@ -24,7 +24,7 @@ proc isDigit(c:~!lstring,r:digit) {
     }
 };;
 
-proc isAlpha(c:~!lstring,r:alpha) {
+proc isAlpha(r:alpha;c:~lstring) {
     if (c >= "a") and (c <= "z" ) {
         #Alpha r; let! r c
     } else {
@@ -69,19 +69,19 @@ proc unsafe_rec scan_token_aux(
             tok <- {t.#Rpar t; close t};     
             let! tok c       
         } else {
-            letc s:lbool { isSpace(c,s)};
+            letc s:lbool { isSpace(s;c)};
             if (s) { 
                 letc cn:!lstring { scanc(cn) };
                 scan_token_aux(tok;cn,acc,v,0)
             } else {
-                letc r:digit { isDigit(c,r) };
+                letc r:digit { isDigit(r;c) };
                 letc cx:!lstring { scanc(cx) };
-                ?cx; // not inferred !
+                // ?cx; // not inferred ! 
                 case r of {
                     | #Digit : scan_token_aux(tok;cx,acc,r,1) 
                     | #None:  
                         wait r;  
-                        letc a:alpha { isAlpha(c,a) };
+                        letc a:alpha { isAlpha(a;c) };
                         case a of {
                             | #Alpha: scan_token_aux(tok;cx,acc+a,0,2) 
                             | #None:
@@ -93,9 +93,9 @@ proc unsafe_rec scan_token_aux(
             }
         }            
     } else if stat==1 {
-        letc r:digit { isDigit(c,r) };
+        letc r:digit { isDigit(r;c) };
         letc cy:!lstring { scanc(cy) };
-        ?cy;
+        //?cy;
         case r of {
             | #Digit : scan_token_aux(tok; cy, acc, v*10+r, 1) 
             | #None:    
@@ -105,9 +105,9 @@ proc unsafe_rec scan_token_aux(
                 let! tok cy       
         }
     } else { // stat = 2
-            letc a:alpha { isAlpha(c,a) };
+            letc a:alpha { isAlpha(a;c) };
             letc cx:!lstring { scanc(cx) };
-            ?cx;
+            //?cx;
             case a of {
                 | #Alpha: scan_token_aux(tok;cx,acc+a,0,2) 
                 | #None:

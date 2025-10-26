@@ -147,6 +147,7 @@ public class ASTCase extends ASTNode {
   }
 
   public void ASTInsertWhyNot(String _ch, ASTType _t, ASTNode here) throws Exception {
+    //    System.out.println("ASTInsertWhyNot:" + this + " " + this.anc);
     if (_ch.equals(ch)) {
       for (Iterator<String> itCases = cases.keySet().iterator(); itCases.hasNext(); ) {
         String lab = itCases.next();
@@ -174,12 +175,9 @@ public class ASTCase extends ASTNode {
   }
 
   public void typecheck(Env<ASTType> ed, Env<ASTType> eg, Env<EnvEntry> ep) throws Exception {
-    this.eg = eg;
 
-    // this.inferUses(ch,ed,ep);
-
+    this.eg = eg; // link AST to exponential environment
     ASTType ty = ed.find(ch);
-
     ty = ty.unfoldType(ep);
     ty = ASTType.unfoldRecInfer(ty, this, ch, ep);
     if (ty instanceof ASTOfferT) {
@@ -213,52 +211,40 @@ public class ASTCase extends ASTNode {
                   + ty.toStr(ep));
       }
 
-      Env<ASTType> eb = ed;
-
-      // linear var of type ?x erased by inference in case branch
-      // gets eroneously restored here in ed.dup()
-
-      Env<ASTType> last = null;
-      boolean init = true;
+      Env<ASTType> eb = ed.dup();
+      Env<ASTType> last = eb;
 
       for (Iterator<String> is = tcase.keySet().iterator(); is.hasNext(); ) {
 
         String lab = is.next();
         ASTType t1 = tcase.get(lab).unfoldType(ep);
 
-        if (init) {
-          eb = ed.dup();
-          init = false;
-        }
-
         casetypes.put(lab, t1);
 
-        // System.out.println("TC CASE "+lab);
-
         ASTNode p1 = cases.get(lab);
-        ed.upd(ch, t1);
-        // System.out.println("ED before TC "); ed.crawl();
+
+        // System.out.println("EB before TC ");
+        // eb.crawl();
+
+        eb.upd(ch, t1);
 
         Env<ASTType> egg = eg.assoc("$DUMMY", new ASTBotT());
-        p1.typecheck(ed, egg, ep);
+        p1.typecheck(eb, egg, ep);
+        this.linclose(eb, ep);
 
-        // System.out.println("ED after TC"); ed.crawl();
-        ed.updmove(eb);
-        // System.out.println("ED "); ed.crawl();
-        // System.out.println("EB "); eb.crawl();
+        // consolidate new moved linear names in eb to ed
+        eb.updmove(ed);
 
-        // System.out.println("GO TO LINCLOSE "+lab);
-        this.linclose(ed, ep);
-
-        if (last != null && !last.eqlin(ed))
+        if (last != null && !last.eqlin(eb))
           throw new TypeError(
               "Line " + lineno + " :" + "OFFER " + ch + ": unbalanced linear contexts");
-        last = ed;
+        last = eb;
         if (is.hasNext()) {
-          ed = eb.dup(); // rollbacking changes in branch
-          // eg = egg.dupe();
+          eb = ed.dup();
         }
       }
+      eb.resetlinears(ed);
+      //      System.out.println("ed after all cases " + ch);
     } else
       throw new TypeError(
           "Line "
@@ -293,6 +279,7 @@ public class ASTCase extends ASTNode {
 
   public ASTNode subst(Env<ASTType> e) {
     ASTCase ts = new ASTCase(ch);
+    ts.lineno = lineno;
     for (Iterator<String> is = cases.keySet().iterator(); is.hasNext(); ) {
       String lab1 = is.next();
       ASTNode t1 = cases.get(lab1);

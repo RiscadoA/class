@@ -79,5 +79,8 @@ proc main_ss(;np:colint)
 };;
 
 proc main() {
-	  	main_ss(;10000)
+	  	main_ss(;100000)
 };;
+
+// 121.53s (ghc -O2)
+// 37.07s  (class)

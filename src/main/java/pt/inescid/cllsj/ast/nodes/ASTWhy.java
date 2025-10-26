@@ -100,10 +100,16 @@ public class ASTWhy extends ASTNode {
   public void typecheck(Env<ASTType> ed, Env<ASTType> eg, Env<EnvEntry> ep) throws Exception {
     this.eg = eg;
 
-    this.inferUses(ch, ed, ep);
+    /* this.inferUses(ch, ed, ep);
     ASTType ty = ed.find(ch);
     ty = ty.unfoldType(ep);
     ty = ASTType.unfoldRec(ty);
+    */
+
+    ASTType ty = ed.find(ch);
+    ty = ty.unfoldType(ep);
+    ty = ASTType.unfoldRecInfer(ty, this, ch, ep);
+
     if (ty instanceof ASTWhyT) {
       ASTWhyT tyr = (ASTWhyT) ty;
       ed.upd(ch, null);
@@ -112,6 +118,7 @@ public class ASTWhy extends ASTNode {
       eg = eg.assoc(ch, __type);
       rhs.typecheck(ed, eg, ep);
     } else if (ty instanceof ASTCoBasicType) {
+      int _i = 8 / 0;
       ASTCoBasicType tyr = (ASTCoBasicType) ty;
       ed.upd(ch, null);
       __type = tyr.lift();
@@ -135,7 +142,7 @@ public class ASTWhy extends ASTNode {
   }
 
   public ASTNode subst(Env<ASTType> e) {
-    ASTWhy p = new ASTWhy(ch, rhs.subst(e));
+    ASTWhy p = new ASTWhy(ch, __type, rhs.subst(e));
     p.rhs.setanc(p);
     return p;
   }

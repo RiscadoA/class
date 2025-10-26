@@ -117,6 +117,7 @@ public class ASTCoClose extends ASTNode {
   public ASTNode subst(Env<ASTType> e) {
     ASTCoClose p = new ASTCoClose(ch, rhs.subst(e));
     p.rhs.setanc(p);
+    p.lineno = this.lineno;
     return p;
   }
 

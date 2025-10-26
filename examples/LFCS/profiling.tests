@@ -1,0 +1,13 @@
+CLLS_FLAGS="--concurrency=off --no-custom-allocator" ./compile.sh -O examples/LFCS/bit-counterc-sam.clls
+
+CLLS_FLAGS="--concurrency=off --no-custom-allocator" ./compile.sh -O examples/LFCS/linear-system-f.clls
+
+CLLS_FLAGS="--concurrency=on --no-custom-allocator" ./compile.sh -O examples/LFCS/squeue-n.clls
+
+CLLS_FLAGS="--optimize-send-value=off --no-inlining --concurrency=off --no-custom-allocator" ./compile.sh -O examples/LFCS/tokenizer.clls
+
+CLLS_FLAGS="--no-inlining --concurrency=off --no-custom-allocator" ./compile.sh -O examples/LFCS/tokenizer.clls
+
+CLLS_FLAGS="--no-inlining --concurrency=on --no-custom-allocator" ./compile.sh -O examples/LFCS/dining-philosophers.clls
+
+CLLS_FLAGS="--no-inlining --concurrency=on --no-custom-allocator" ./compile.sh -O examples/LFCS/dining-philosophers-netw.clls

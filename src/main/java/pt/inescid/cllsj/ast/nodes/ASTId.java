@@ -20,32 +20,32 @@ import pt.inescid.cllsj.TypeEntry;
 import pt.inescid.cllsj.TypeError;
 import pt.inescid.cllsj.ast.ASTNodeVisitor;
 import pt.inescid.cllsj.ast.types.ASTBangT;
-import pt.inescid.cllsj.ast.types.ASTCoAffineT;
 import pt.inescid.cllsj.ast.types.ASTCoRecT;
 import pt.inescid.cllsj.ast.types.ASTCointT;
 import pt.inescid.cllsj.ast.types.ASTIdT;
 import pt.inescid.cllsj.ast.types.ASTType;
-import pt.inescid.cllsj.ast.types.ASTUsageT;
 import pt.inescid.cllsj.ast.types.ASTWhyT;
-
-// unfolded
 
 public class ASTId extends ASTNode {
 
   String id;
   List<ASTExpr> exprs;
   List<ASTExpr> gexprs;
-  List<String> pars;
+
+  List<String> pars; // these are generated from exprs, during type-checking
   List<ASTType> parTypes;
 
-  List<String> gpars;
+  List<String> gpars; // these are generated from gexprs, during type-checking
   List<ASTType> gparTypes;
+
   List<ASTType> tpars;
   List<ASTType> tparsGen;
 
   List<String> procTParIds;
   List<ASTType> procParTypes;
   List<ASTType> procGParTypes;
+
+  boolean elaborated = false;
 
   public ASTId(String _id) {
 
@@ -153,7 +153,7 @@ public class ASTId extends ASTNode {
     gpars.add(id);
   }
 
-  public void genProcFromExpr(
+  public ASTNode genProcFromExpr(
       String ch,
       ASTExpr expr,
       ASTType formalDual,
@@ -161,13 +161,14 @@ public class ASTId extends ASTNode {
       Env<ASTType> eg,
       Env<EnvEntry> ep)
       throws Exception {
-    ASTNode compProc = compileExpr(ch, expr, formalDual, ep); // compile process from expression
-
+    // compile process from expression
+    ASTNode compProc = compileExpr(ch, expr, formalDual, ep);
     // produce cut between compiled process and process id
     ASTCut cutp = new ASTCut(ch, formalDual, this, compProc);
     cutp.eg = this.eg;
-    cutp.sessionSize = 1; // enough to store a !A/?A value
 
+    // SAM stuff
+    cutp.sessionSize = 1; // enough to store a !A/?A expression value
     // upd ancestor continuation with newly created cut
     this.getanc().ASTupdCont(cutp, this);
 
@@ -175,193 +176,61 @@ public class ASTId extends ASTNode {
     cutp.setanc(this.getanc());
     this.setanc(cutp);
     compProc.setanc(cutp);
-
     // typecheck compiled process
     Env<ASTType> er = ed.assoc(ch, formalDual);
     compProc.typecheck(er, eg, ep);
     compProc.linclose(er, ep);
     compProc = ASTInferLinClose(compProc, ch, er, ep);
+    return cutp;
   }
 
-  public void typecheck(Env<ASTType> ed, Env<ASTType> eg, Env<EnvEntry> ep) throws Exception {
-    this.eg = eg;
+  public void typecheck2(Env<ASTType> ed, Env<ASTType> eg, Env<EnvEntry> ep) throws Exception {
+    // elaboration phase terminated, now build and type check if call code
+    // now type check process with all inferred parts in place
+    // all parameters have been generated (no expressions except ASTVId nodes x,y,z)
+    // We have something like cut {P |x| cut { ... |z| id(x,y,z,...)}}
+    // type inference will normally apply from outermost generated CUT
+
     EnvEntry tc = ep.find(id);
     ASTProcDef pe = (ASTProcDef) ((ProcEntry) tc).getProc();
-
-    if (tpars.size() != pe.targs.size())
-      throw new TypeError(
-          "Line "
-              + lineno
-              + " :"
-              + id
-              + ": lengths of type argument and parameter list do not match.");
-
-    for (ASTType targ : tpars) {
-      targ.kindcheck(ep);
-    }
-
-    // System.out.println("TC ID " + id + " S 1");
-
-    tparsGen = new ArrayList<ASTType>();
-    procTParIds = new ArrayList<String>();
-
-    Iterator<String> itt = pe.targs.iterator();
-    Env<EnvEntry> keepIdsEp = ep;
-    for (ASTType param : tpars) {
-      ASTType actual = param.unfoldType(ep);
-      tparsGen.add(actual);
-      String formal = itt.next();
-      procTParIds.add(formal);
-      ep = ep.assoc(formal, new TypeEntry(actual));
-      keepIdsEp = ep.assoc(formal, new TypeEntry(new ASTIdT(formal)));
-      // System.out.println("type bindings = " + formal + "->" + actual.toStr(ep));
-
-    }
-    if (!(tc instanceof ProcEntry))
-      throw new TypeError("Line " + lineno + " :" + " " + id + " not a process id.");
-
-    if (exprs.size() != pe.args.size())
-      throw new TypeError(
-          "Line "
-              + lineno
-              + " :"
-              + id
-              + ": lengths of linear argument and parameter list do not match."
-              + exprs.size()
-              + " "
-              + pe.args.size());
-
-    // elaboration phase from argument expressions !!!! ATTN INFER InferRec !!!!
-
-    procParTypes = new ArrayList<ASTType>();
-
-    Iterator<ASTType> itargt = pe.argtypes.iterator();
-    for (ASTExpr expr : exprs) {
-      ASTType formal = itargt.next();
-      procParTypes.add(formal.unfoldType(keepIdsEp));
-      formal = formal.unfoldType(ep);
-      ASTType formalDual = formal.dual(ep);
-
-      if (!(expr instanceof ASTVId)) {
-        String ch = ASTType.gensym(); // generate fresh name
-
-        // generate process from expression
-        genProcFromExpr(ch, expr, formalDual, ed, eg, ep);
-
-        // add fresh channel to parameters list
-        pars.add(ch);
-        // add type to linear type environment
-        ed = ed.assoc(ch, formal);
-
-      } else {
-        pars.add(((ASTVId) expr).ch);
-      }
-    }
-
-    procGParTypes = new ArrayList<ASTType>();
-
-    Iterator<ASTType> itgargt = pe.gargtypes.iterator();
-    for (ASTExpr gexpr : gexprs) {
-
-      if (!itgargt.hasNext())
-        throw new TypeError("number of unrestricted parameters mismatch in call to " + id);
-
-      ASTType formal = itgargt.next();
-
-      procGParTypes.add(ASTType.unfoldRec(formal.unfoldType(keepIdsEp)));
-
-      formal = formal.unfoldType(ep);
-      formal = ASTType.unfoldRec(formal); // comment
-
-      ASTType formalDual = formal.dual(ep);
-
-      // System.out.println("expr=" + gexpr);
-
-      if (!(gexpr instanceof ASTVId)) {
-        String ch = ASTType.gensym(); // generate fresh name
-
-        // generate process from expression
-        genProcFromExpr(ch, gexpr, new ASTBangT(formalDual), ed, eg, ep);
-
-        // add fresh channel to parameters list
-        gpars.add(ch);
-        // add type to linear type environment
-        ed = ed.assoc(ch, new ASTWhyT(formal));
-      } else {
-        // System.out.println("pg = " + ((ASTVId) gexpr).ch);
-        gpars.add(((ASTVId) gexpr).ch);
-      }
-      gparTypes.add(formal);
-    }
-
-    // System.out.println("TC ID " + id + " S 2");
-    //	tpars = ntpars;
-
     Iterator<ASTType> its = pe.argtypes.iterator();
     Iterator<ASTExpr> itse = exprs.iterator();
-
-    List<String> npars = new ArrayList<String>();
 
     // process linear parameters
 
     for (String par : pars) {
 
+      System.out.println("linear parameter " + id + " = " + par);
+
       ASTType formal0 = its.next();
       ASTType formal = formal0.unfoldType(ep);
+      ASTType actual = null;
 
-      ASTType formalDual = formal.dual(ep);
-      ASTExpr expr = itse.next();
-
-      ASTType pt;
-
-      try {
-        pt = ed.find(par);
-      } catch (Exception e) {
-        pt = eg.find(par);
-        String ch = ASTType.gensym();
-        genProcFromExpr(ch, expr, formalDual, ed, eg, ep);
-        npars.add(ch);
-        parTypes.add(pt);
-        continue;
-      }
-
-      ASTType actual = pt; // .unfoldType(ep);
-
+      actual = ed.find(par);
       actual = ASTType.unfoldRecInferParameter(actual, formal, this, par, ep);
 
       if (!formal.equalst(actual, ep, true, new Trail())) {
         // System.out.println("formal=" + formal.toStr(ep));
         // System.out.println("actual=" + actual.toStr(ep));
+        throw new TypeError(
+            "Line "
+                + lineno
+                + " :"
+                + "Type for linear arg "
+                + par
+                + " of "
+                + id
+                + "\n "
+                + "declared="
+                + formal.toStr(ep)
+                + "\n found="
+                + actual.toStr(ep));
 
-        try {
-          String ch = ASTType.gensym();
-          genProcFromExpr(ch, expr, formalDual, ed, eg, ep);
-          npars.add(ch);
-        } catch (Exception e) {
-          throw new TypeError(
-              "Line "
-                  + lineno
-                  + " :"
-                  + "Type for linear arg "
-                  + par
-                  + " of "
-                  + id
-                  + "\n "
-                  + "declared="
-                  + formal.toStr(ep)
-                  + "\n found="
-                  + actual.toStr(ep));
-        }
       } else {
-        // System.out.println("clear " + par + " " + actual.toStr(ep));
         if (!(actual instanceof ASTCointT)) ed.upd(par, null);
-        npars.add(par);
       }
-
       parTypes.add(actual);
     }
-
-    pars = npars;
 
     if (pe.rCall) {
       try {
@@ -379,15 +248,58 @@ public class ASTId extends ASTNode {
     }
 
     // process exponential parameters
+    Iterator<ASTType> itgs = pe.gargtypes.iterator();
+    for (String par : gpars) {
+      System.out.println("Unrestricted parameter " + id + " = " + par);
+      ASTType formal0 = itgs.next();
+      ASTType formal = formal0.unfoldType(ep);
+      // check presence in exponential environment
+      ASTType actual = null;
+      try {
+        actual = eg.find(par);
+        // check type compatibility below
+      } catch (Exception _e_) {
+        // check presence in exponential environment
+        actual = ed.find(par);
+        // System.out.println("formal=" + par + " " + formal.toStr(ep));
+        // System.out.println("actual=" + par + " " + actual.toStr(ep));
+        actual = actual.unfoldType(ep);
+        if (actual instanceof ASTWhyT) {
+          ASTWhyT t = (ASTWhyT) actual;
+          actual = t.getin();
+          // System.out.println(
+          //    "ASTInsertWhyNot=" + par + " " + actual.toStr(ep) + " " + this.getanc());
+          this.getanc().ASTInsertWhyNot(par, actual, this);
+          // System.out.println(
+          //    "ASTInsertWhyNotDONE=" + par + " " + actual.toStr(ep) + " " + this.getanc());
+          ed.updmove(par);
+        }
+      }
+      // type must match now, otherwise ...
+      if (!formal.equalst(actual, ep, true, new Trail())) {
+        // System.out.println("formal=" + formal.toStr(ep));
+        // System.out.println("actual=" + actual.toStr(ep));
+        throw new TypeError(
+            "Line "
+                + lineno
+                + " :"
+                + "Type for unrestricted arg "
+                + par
+                + " of "
+                + id
+                + "\n "
+                + "declared="
+                + formal.toStr(ep)
+                + "\n found="
+                + actual.toStr(ep));
+      }
+      ;
+      // parTypes.add(actual);
+    }
+    exprs.clear();
+    gexprs.clear();
 
-    if (gpars.size() != pe.gargs.size())
-      throw new TypeError(
-          "Line "
-              + lineno
-              + " :"
-              + id
-              + ": lengths of unrestricted argument and parameter list do not match.");
-
+    /*
     Iterator<ASTType> itgs = pe.gargtypes.iterator();
     for (String par : gpars) {
       ASTType actual;
@@ -426,7 +338,7 @@ public class ASTId extends ASTNode {
           actual = t.getin();
           actual = actual.unfoldType(ep);
 
-          // System.out.println(id + " ASTInsertWhyNot=" + par);
+          System.out.println(id + " ASTInsertWhyNot=" + par);
 
           this.getanc().ASTInsertWhyNot(par, actual, this);
           ed.upd(par, null);
@@ -457,6 +369,151 @@ public class ASTId extends ASTNode {
     }
     exprs.clear();
     gexprs.clear();
+
+    */
+
+  }
+
+  public void typecheck(Env<ASTType> ed, Env<ASTType> eg, Env<EnvEntry> ep) throws Exception {
+
+    System.out.println("ID TC =" + id + " line:" + lineno);
+
+    if (elaborated) {
+      typecheck2(ed, eg, ep);
+    } else { // elaboration phase, expand expressions into processes
+      this.eg = eg;
+      EnvEntry tc = ep.find(id);
+
+      ASTNode parent = null; // trivial case if no generated
+
+      if (!(tc instanceof ProcEntry))
+        throw new TypeError("Line " + lineno + " :" + " " + id + " not a process id.");
+
+      ASTProcDef pe = (ASTProcDef) ((ProcEntry) tc).getProc();
+
+      // match number of type arguments with type parameters
+
+      if (tpars.size() != pe.targs.size())
+        throw new TypeError(
+            "Line "
+                + lineno
+                + " :"
+                + id
+                + ": lengths of type argument and parameter list do not match.");
+
+      // kind check type arguments
+
+      for (ASTType targ : tpars) {
+        targ.kindcheck(ep);
+      }
+
+      tparsGen = new ArrayList<ASTType>();
+      procTParIds = new ArrayList<String>();
+
+      // bind type arguments to type parameters
+
+      Iterator<String> itt = pe.targs.iterator();
+      Env<EnvEntry> keepIdsEp = ep;
+      for (ASTType param : tpars) {
+        ASTType actual = param.unfoldType(ep);
+        tparsGen.add(actual);
+        String formal = itt.next();
+        procTParIds.add(formal);
+        ep = ep.assoc(formal, new TypeEntry(actual));
+        keepIdsEp = ep.assoc(formal, new TypeEntry(new ASTIdT(formal)));
+      }
+
+      // match number of linear arguments with linear parameters
+
+      if (exprs.size() != pe.args.size())
+        throw new TypeError(
+            "Line "
+                + lineno
+                + " :"
+                + id
+                + ": number of linear arguments and parameters do not match."
+                + exprs.size()
+                + " "
+                + pe.args.size());
+
+      // elaboration phase from argument expressions to linear parameters
+
+      procParTypes = new ArrayList<ASTType>();
+      Iterator<ASTType> itargt = pe.argtypes.iterator();
+
+      for (ASTExpr expr : exprs) {
+
+        ASTType formal = itargt.next();
+        procParTypes.add(formal.unfoldType(keepIdsEp));
+        formal = formal.unfoldType(ep);
+        ASTType formalDual = formal.dual(ep);
+
+        if (!(expr instanceof ASTVId)) {
+          // generate fresh ch to bind expression "session" value
+          String ch = ASTType.gensym();
+          // generate and type-check local process from expression
+          ASTNode prefix = genProcFromExpr(ch, expr, formalDual, ed, eg, ep);
+          if (prefix != null) {
+            parent = prefix; // this marks root of inserted cuts
+          }
+          ;
+          // add fresh channel to parameters list
+          pars.add(ch);
+          // add type of fresh ch to linear type environment
+          ed = ed.assoc(ch, formal);
+        } else { // expressin is just an id, use the id as it is
+          pars.add(((ASTVId) expr).ch);
+        }
+      }
+
+      // match number of linear arguments with unrestricted parameters
+
+      if (gexprs.size() != pe.gargs.size())
+        throw new TypeError(
+            "Line "
+                + lineno
+                + " :"
+                + id
+                + ": number of unrestricted arguments and parameters do not match."
+                + exprs.size()
+                + " != "
+                + pe.args.size());
+
+      // elaboration phase from argument expressions to unrestricted parameters
+
+      procGParTypes = new ArrayList<ASTType>();
+      Iterator<ASTType> itgargt = pe.gargtypes.iterator();
+      for (ASTExpr gexpr : gexprs) {
+
+        ASTType formal = itgargt.next();
+        procGParTypes.add(formal.unfoldType(keepIdsEp));
+        formal = formal.unfoldType(ep);
+        ASTType formalDual = formal.dual(ep);
+
+        if (!(gexpr instanceof ASTVId)) {
+          // generate fresh name ch
+          String ch = ASTType.gensym();
+          // generate and type-check local process from expression
+          ASTNode prefix = genProcFromExpr(ch, gexpr, new ASTBangT(formalDual), ed, eg, ep);
+          if (prefix != null) {
+            parent = prefix;
+          }
+          ;
+          // add fresh channel to parameters list
+          gpars.add(ch);
+          // add type ?formal of fresh ch to linear type environment
+          ed = ed.assoc(ch, new ASTWhyT(formal));
+        } else {
+          gpars.add(((ASTVId) gexpr).ch);
+        }
+        gparTypes.add(formal);
+      }
+
+      elaborated = true;
+      // parent should be immediate link
+      if (parent != null) parent.typecheck(ed, eg, ep);
+      else this.typecheck(ed, eg, ep);
+    }
   }
 
   public Set<String> fn(Set<String> s) {
@@ -470,6 +527,309 @@ public class ASTId extends ASTNode {
 
     return s;
   }
+
+  /*
+    public void typecheck(Env<ASTType> ed, Env<ASTType> eg, Env<EnvEntry> ep) throws Exception {
+      this.eg = eg;
+      EnvEntry tc = ep.find(id);
+
+      if (!(tc instanceof ProcEntry))
+        throw new TypeError("Line " + lineno + " :" + " " + id + " not a process id.");
+
+      ASTProcDef pe = (ASTProcDef) ((ProcEntry) tc).getProc();
+
+      // match number of type arguments with type parameters
+
+      if (tpars.size() != pe.targs.size())
+        throw new TypeError(
+            "Line "
+                + lineno
+                + " :"
+                + id
+                + ": lengths of type argument and parameter list do not match.");
+
+      // kind check type arguments
+
+      for (ASTType targ : tpars) {
+        targ.kindcheck(ep);
+      }
+
+      tparsGen = new ArrayList<ASTType>();
+      procTParIds = new ArrayList<String>();
+
+      // bind type arguments to type parameters
+
+      Iterator<String> itt = pe.targs.iterator();
+      Env<EnvEntry> keepIdsEp = ep;
+      for (ASTType param : tpars) {
+        ASTType actual = param.unfoldType(ep);
+        tparsGen.add(actual);
+        String formal = itt.next();
+        procTParIds.add(formal);
+        ep = ep.assoc(formal, new TypeEntry(actual));
+        keepIdsEp = ep.assoc(formal, new TypeEntry(new ASTIdT(formal)));
+      }
+
+      // match number of linear arguments with linear parameters
+
+      if (exprs.size() != pe.args.size())
+        throw new TypeError(
+            "Line "
+                + lineno
+                + " :"
+                + id
+                + ": number of linear arguments and parameters do not match."
+                + exprs.size()
+                + " "
+                + pe.args.size());
+
+      // elaboration phase from argument expressions to linear parameters
+
+      procParTypes = new ArrayList<ASTType>();
+      Iterator<ASTType> itargt = pe.argtypes.iterator();
+
+      for (ASTExpr expr : exprs) {
+        ASTType formal = itargt.next();
+        procParTypes.add(formal.unfoldType(keepIdsEp));
+        formal = formal.unfoldType(ep);
+        ASTType formalDual = formal.dual(ep);
+        if (!(expr instanceof ASTVId)) {
+          // generate fresh ch to bind expression "session" value
+          String ch = ASTType.gensym();
+          // generate process from expression
+          genProcFromExpr(ch, expr, formalDual, ed, eg, ep);
+          // add fresh channel to parameters list
+          pars.add(ch);
+          // add type of fresh ch to linear type environment
+          ed = ed.assoc(ch, formal);
+        } else { // expressin is just an id, use the id as it is
+          pars.add(((ASTVId) expr).ch);
+        }
+      }
+
+      if (gexprs.size() != pe.gargs.size())
+        throw new TypeError(
+            "Line "
+                + lineno
+                + " :"
+                + id
+                + ": number of unrestricted arguments and parameters do not match."
+                + exprs.size()
+                + " != "
+                + pe.args.size());
+
+      // elaboration phase from argument expressions to unrestricted parameters
+
+      procGParTypes = new ArrayList<ASTType>();
+      Iterator<ASTType> itgargt = pe.gargtypes.iterator();
+      for (ASTExpr gexpr : gexprs) {
+
+        ASTType formal = itgargt.next();
+
+        procGParTypes.add(ASTType.unfoldRec(formal.unfoldType(keepIdsEp)));
+
+        formal = formal.unfoldType(ep);
+        formal = ASTType.unfoldRec(formal); // comment
+
+        ASTType formalDual = formal.dual(ep);
+
+        // System.out.println("expr=" + gexpr);
+
+        if (!(gexpr instanceof ASTVId)) {
+          String ch = ASTType.gensym(); // generate fresh name
+
+          // generate process from expression
+          genProcFromExpr(ch, gexpr, new ASTBangT(formalDual), ed, eg, ep);
+
+          // add fresh channel to parameters list
+          gpars.add(ch);
+          // add type to linear type environment
+          ed = ed.assoc(ch, new ASTWhyT(formal));
+        } else {
+          // System.out.println("pg = " + ((ASTVId) gexpr).ch);
+          gpars.add(((ASTVId) gexpr).ch);
+        }
+        gparTypes.add(formal);
+      }
+
+      // System.out.println("TC ID " + id + " S 2");
+      //	tpars = ntpars;
+
+      Iterator<ASTType> its = pe.argtypes.iterator();
+      Iterator<ASTExpr> itse = exprs.iterator();
+
+      List<String> npars = new ArrayList<String>();
+
+      // process linear parameters
+
+      for (String par : pars) {
+
+        ASTType formal0 = its.next();
+        ASTType formal = formal0.unfoldType(ep);
+
+        ASTType formalDual = formal.dual(ep);
+        ASTExpr expr = itse.next();
+
+        ASTType pt;
+
+        try {
+          pt = ed.find(par);
+        } catch (Exception e) {
+          pt = eg.find(par);
+          String ch = ASTType.gensym();
+          genProcFromExpr(ch, expr, formalDual, ed, eg, ep);
+          npars.add(ch);
+          parTypes.add(pt);
+          continue;
+        }
+
+        ASTType actual = pt; // .unfoldType(ep);
+
+        actual = ASTType.unfoldRecInferParameter(actual, formal, this, par, ep);
+
+        if (!formal.equalst(actual, ep, true, new Trail())) {
+          // System.out.println("formal=" + formal.toStr(ep));
+          // System.out.println("actual=" + actual.toStr(ep));
+
+          try {
+            String ch = ASTType.gensym();
+            genProcFromExpr(ch, expr, formalDual, ed, eg, ep);
+            npars.add(ch);
+          } catch (Exception e) {
+            throw new TypeError(
+                "Line "
+                    + lineno
+                    + " :"
+                    + "Type for linear arg "
+                    + par
+                    + " of "
+                    + id
+                    + "\n "
+                    + "declared="
+                    + formal.toStr(ep)
+                    + "\n found="
+                    + actual.toStr(ep));
+          }
+        } else {
+          // System.out.println("clear " + par + " " + actual.toStr(ep));
+          if (!(actual instanceof ASTCointT)) ed.upd(par, null);
+          npars.add(par);
+        }
+
+        parTypes.add(actual);
+      }
+
+      pars = npars;
+
+      if (pe.rCall) {
+        try {
+          RVarEntry r = (RVarEntry) ep.find(pars.get(0));
+        } catch (Exception e) {
+          throw new TypeError(
+              "Line "
+                  + lineno
+                  + " :"
+                  + id
+                  + ": recursive call not decreasing, invalid argument "
+                  + pars.get(0)
+                  + " found.");
+        }
+      }
+
+      // process exponential parameters
+
+      if (gpars.size() != pe.gargs.size())
+        throw new TypeError(
+            "Line "
+                + lineno
+                + " :"
+                + id
+                + ": lengths of unrestricted argument and parameter list do not match.");
+
+      Iterator<ASTType> itgs = pe.gargtypes.iterator();
+      for (String par : gpars) {
+        ASTType actual;
+        ASTType formal = itgs.next().unfoldType(ep);
+
+        try {
+
+          actual = eg.find(par);
+          actual = actual.unfoldType(ep);
+
+        } catch (Exception e) {
+
+          actual = ed.find(par);
+          actual = actual.unfoldType(ep);
+
+          // System.out.println("formal=" + par + " " + formal.toStr(ep));
+          // System.out.println("actual=" + actual.toStr(ep));
+
+          while (!formal.equalst(actual, ep, true, new Trail()) && (actual instanceof ASTCoAffineT)) {
+
+            ASTCoAffineT tyco = (ASTCoAffineT) actual;
+            actual = tyco.getin();
+            actual = actual.unfoldType(ep);
+
+            ed.upd(par, actual);
+
+            Boolean disposableCont =
+                (actual instanceof ASTUsageT)
+                    || (actual instanceof ASTCoAffineT)
+                    || (actual instanceof ASTWhyT);
+            this.getanc().ASTInsertUse(par, actual, this, disposableCont);
+          }
+
+          if (actual instanceof ASTWhyT) {
+            ASTWhyT t = (ASTWhyT) actual;
+            actual = t.getin();
+            actual = actual.unfoldType(ep);
+
+            System.out.println(id + " ASTInsertWhyNot=" + par);
+
+            this.getanc().ASTInsertWhyNot(par, actual, this);
+            ed.upd(par, null);
+          } else
+            throw new TypeError(
+                "Line "
+                    + lineno
+                    + " :"
+                    + "ID: "
+                    + par
+                    + " is neither unrestricted nor does it type linearly with ?");
+        }
+
+        if (!formal.equalst(actual, ep, true, new Trail())) {
+          throw new TypeError(
+              "Line "
+                  + lineno
+                  + " :"
+                  + "Type for unrestricted arg "
+                  + par
+                  + " of "
+                  + id
+                  + "\n declared="
+                  + formal.toStr(ep)
+                  + "\n found="
+                  + actual.toStr(ep));
+        }
+      }
+      exprs.clear();
+      gexprs.clear();
+    }
+
+    public Set<String> fn(Set<String> s) {
+      Iterator<ASTExpr> its = exprs.iterator();
+      while (its.hasNext()) s = its.next().fn(s);
+      s.addAll(pars);
+
+      Iterator<ASTExpr> itsG = gexprs.iterator();
+      while (itsG.hasNext()) s = itsG.next().fn(s);
+      s.addAll(gpars);
+
+      return s;
+    }
+
+  */
 
   public Set<String> fnLinear(Set<String> s) {
     Iterator<ASTExpr> its = exprs.iterator();

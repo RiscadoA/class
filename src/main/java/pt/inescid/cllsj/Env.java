@@ -42,7 +42,6 @@ public class Env<X> {
   }
 
   public synchronized Env<X> dup() {
-    // System.out.println("dup "+this);
     Env<X> de = new Env<X>(id, assoc, assocs, (anc == null) ? null : anc.dup(), moved);
     return de;
   }
@@ -140,6 +139,14 @@ public class Env<X> {
       moved = false;
     }
     if (anc != null) anc.updmove(env2);
+  }
+
+  public synchronized void resetlinears(Env<X> env2) throws Exception {
+    // System.out.print("resetlinears");
+    if (assoc == null) {
+      env2.upd(id, null);
+    }
+    if (anc != null) anc.resetlinears(env2);
   }
 
   public synchronized void crawl() {

@@ -114,7 +114,7 @@ public class ASTBang extends ASTNode {
   }
 
   public ASTNode ASTweakeningOnLeaf(String _ch, ASTType typ, boolean exp) throws Exception {
-    return this.ASTweakeningTerm(_ch, exp);
+    return this.ASTweakeningTerm(_ch, typ, exp);
   }
 
   public void typecheck(Env<ASTType> ed, Env<ASTType> eg, Env<EnvEntry> ep) throws Exception {

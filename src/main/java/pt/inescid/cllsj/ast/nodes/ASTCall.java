@@ -127,17 +127,12 @@ public class ASTCall extends ASTNode {
       ty = ty.unfoldType(ep);
     } catch (Exception e) {
       this.inferUses(chr, ed, ep);
-
-      // System.out.println("Look on ed "+chr);
       ty = ed.find(chr);
-      // System.out.println("found on ed "+chr);
       ty = ty.unfoldType(ep);
-
       if (ty instanceof ASTWhyT) {
         ASTWhyT t = (ASTWhyT) ty;
         ty = t.getin();
         this.getanc().ASTInsertWhyNot(chr, ty, this);
-        // eg.crawl();
         ed.updmove(chr);
       } else
         throw new TypeError(
@@ -170,11 +165,8 @@ public class ASTCall extends ASTNode {
               + ty.toStr(ep));
 
     type = ty;
-
     ed = ed.assoc(chi, ty);
-
     ep = ASTNode.propagateRVar(ep, chr, chi);
-
     rhs.typecheck(ed, eg, ep);
     rhs.linclose(ed, ep);
     rhs.linclose(chi, ed, ep);

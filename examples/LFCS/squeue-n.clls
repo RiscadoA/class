@@ -153,7 +153,7 @@ proc unsafe_rec enq_user(cl:~EnqI;N:~lint) {
     } else {
         #Enq cl;
         cl <- N;
-        println(N);
+        println("W "+N);
         enq_user(cl;N-1)
     }
 };;
@@ -168,7 +168,7 @@ proc unsafe_rec deq_user(cl:~DeqI;N:~lint) {
         case ans of {
             | #None: println("NONE"); wait ans;
                 deq_user(cl;N-1)
-            | #Some: println(ans);
+            | #Some: println("R "+ans);
                 deq_user(cl;N-1)
         }
     }
@@ -181,5 +181,5 @@ proc mainq(;n:~lint) {
 };;
 
 proc main() {
-	mainq(;100000)
+	mainq(;100)
 };;

@@ -874,7 +874,8 @@ ASTProcDef Proc1D(boolean rec) throws Exception:
 ASTProcDef p = new ASTProcDef();}
 {
      c1 = <Id>
-     { p.setId(c1.image); }
+     { p.setId(c1.image); 
+       p.lineno = c1.beginLine;}
      (<LT> TParamList(p) <GT>)?
      <LPAR> ParamList(p) <RPAR> <LBRA>
          p1 = Proc()
@@ -1403,25 +1404,9 @@ boolean b;
         { p = new ASTWhy(c1.image,p1); p.lineno = c3.beginLine;  p1.setanc(p) ;
             //p = p1;
         }
-    |
-    <FOR> c1=<Id> <COL> t=Type() <TO> c2=<Id>
-    	  <LPAR>
-    	   c3=<Id>
-	<COMMA>
-	    c4=<Id>
-	<SEMIC>
-    	   c5=<Id>
-	<RPAR>
-	<LBRA>
-    	  p1=Proc()
-	<RBRA>
-        { p = ASTNode.ForMacroFactory(c1.image,t,c2.image,c3.image,c4.image,c5.image, p1);
-	   p1.setanc(p);  // provisional
-	}
     )
     { return p;}
 }
-
 
 void ProcCase(ASTCase lt) throws Exception:
 {Token s; ASTNode t;}
@@ -1430,5 +1415,6 @@ void ProcCase(ASTCase lt) throws Exception:
    lt.addCase(s.image,t);
    t.setanc(lt);
 }
+
 }
 

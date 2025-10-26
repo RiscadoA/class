@@ -124,7 +124,6 @@ public class ASTCut extends ASTNode {
   }
 
   public void ASTInsertWhyNot(String _ch, ASTType _t, ASTNode here) throws Exception {
-
     if (_ch.equals(id)) {
       ASTNode pushWhy = new ASTWhy(_ch, _t, here);
       pushWhy.eg = eg;
@@ -136,7 +135,9 @@ public class ASTCut extends ASTNode {
       } else {
         rhs = pushWhy;
       }
-    } else anc.ASTInsertWhyNot(_ch, _t, this);
+    } else {
+      anc.ASTInsertWhyNot(_ch, _t, this);
+    }
   }
 
   public void ASTupdCont(ASTNode newCont, ASTNode caller) throws Exception {
@@ -169,11 +170,13 @@ public class ASTCut extends ASTNode {
     Env<ASTType> eglhs = eg.assoc("$DUMMY", new ASTBotT());
     lhs.typecheck(el, eglhs, ep);
     lhs.linclose(el, ep);
+
     lhs = ASTInferLinClose(lhs, id, el, ep);
 
     Env<ASTType> egrhs = eg.assoc("$DUMMY", new ASTBotT());
     rhs.typecheck(er, egrhs, ep);
     rhs.linclose(er, ep);
+
     rhs = ASTInferLinClose(rhs, id, er, ep);
   }
 

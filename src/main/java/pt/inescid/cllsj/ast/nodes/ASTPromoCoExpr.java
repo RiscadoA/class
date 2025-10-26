@@ -65,7 +65,7 @@ public class ASTPromoCoExpr extends ASTNode {
   }
 
   public ASTNode ASTweakeningOnLeaf(String _ch, ASTType t, boolean exp) throws Exception {
-    return this.ASTweakeningTerm(_ch, exp);
+    return this.ASTweakeningTerm(_ch, t, exp);
   }
 
   public void ASTInsertPipe(Function<ASTNode, ASTNode> f, ASTNode from) throws Exception {
