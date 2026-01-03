@@ -169,6 +169,7 @@ public class ASTIf extends ASTNode {
     p.thenp.setanc(p);
     p.elsep.setanc(p);
     p.expr.setanc(p);
+    p.lineno = lineno;
     return p;
   }
 

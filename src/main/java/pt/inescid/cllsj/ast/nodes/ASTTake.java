@@ -98,7 +98,7 @@ public class ASTTake extends ASTNode {
         if (exp) {
           return this.ASTweakeningHere(_ch, typ, exp);
         } else {
-          return this.ASTInsertMixDiscard(_ch);
+          return this.ASTInsertMixDiscard(_ch, typ);
         }
       }
       throw new TypeError(

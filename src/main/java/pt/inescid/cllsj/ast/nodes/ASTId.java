@@ -64,8 +64,16 @@ public class ASTId extends ASTNode {
     return exprs;
   }
 
+  public void setExprs(List<ASTExpr> exp) {
+    exprs = exp;
+  }
+
   public List<ASTExpr> getGExprs() {
     return gexprs;
+  }
+
+  public void setGExprs(List<ASTExpr> exp) {
+    gexprs = exp;
   }
 
   public List<String> getPars() {
@@ -86,6 +94,10 @@ public class ASTId extends ASTNode {
 
   public List<ASTType> getTPars() {
     return tpars;
+  }
+
+  public void setTPars(List<ASTType> tp) {
+    tpars = tp;
   }
 
   public List<String> getProcTParIds() {
@@ -194,13 +206,13 @@ public class ASTId extends ASTNode {
     EnvEntry tc = ep.find(id);
     ASTProcDef pe = (ASTProcDef) ((ProcEntry) tc).getProc();
     Iterator<ASTType> its = pe.argtypes.iterator();
-    Iterator<ASTExpr> itse = exprs.iterator();
+    // Iterator<ASTExpr> itse = exprs.iterator();
 
     // process linear parameters
 
     for (String par : pars) {
 
-      System.out.println("linear parameter " + id + " = " + par);
+      // System.out.println("linear parameter " + id + " = " + par);
 
       ASTType formal0 = its.next();
       ASTType formal = formal0.unfoldType(ep);
@@ -227,7 +239,10 @@ public class ASTId extends ASTNode {
                 + actual.toStr(ep));
 
       } else {
-        if (!(actual instanceof ASTCointT)) ed.upd(par, null);
+        if (!(actual instanceof ASTCointT)) {
+          // System.out.println("consume linear " + par);
+          ed.upd(par, null);
+        }
       }
       parTypes.add(actual);
     }
@@ -250,7 +265,7 @@ public class ASTId extends ASTNode {
     // process exponential parameters
     Iterator<ASTType> itgs = pe.gargtypes.iterator();
     for (String par : gpars) {
-      System.out.println("Unrestricted parameter " + id + " = " + par);
+      // System.out.println("Unrestricted parameter " + id + " = " + par);
       ASTType formal0 = itgs.next();
       ASTType formal = formal0.unfoldType(ep);
       // check presence in exponential environment
@@ -376,7 +391,7 @@ public class ASTId extends ASTNode {
 
   public void typecheck(Env<ASTType> ed, Env<ASTType> eg, Env<EnvEntry> ep) throws Exception {
 
-    System.out.println("ID TC =" + id + " line:" + lineno);
+    // System.out.println("ID TC =" + id + " line:" + lineno);
 
     if (elaborated) {
       typecheck2(ed, eg, ep);
@@ -461,12 +476,13 @@ public class ASTId extends ASTNode {
           pars.add(ch);
           // add type of fresh ch to linear type environment
           ed = ed.assoc(ch, formal);
-        } else { // expressin is just an id, use the id as it is
+        } else { // expression is id, use the id as it is
+          // System.out.println("linear parameter plain" + ((ASTVId) expr).ch);
           pars.add(((ASTVId) expr).ch);
         }
       }
 
-      // match number of linear arguments with unrestricted parameters
+      // match number of unrestricted arguments with unrestricted parameters
 
       if (gexprs.size() != pe.gargs.size())
         throw new TypeError(

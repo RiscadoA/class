@@ -39,11 +39,12 @@ public class ASTEmpty extends ASTNode {
 
   public ASTNode ASTweakeningOnLeaf(String _ch, ASTType t, boolean exp) throws Exception {
     if (exp) {
-      ASTNode push = new ASTWhy(_ch, this);
+      ASTNode push = new ASTWhy(_ch, t, this);
       this.setanc(push);
       return push;
     } else {
       ASTNode push = new ASTDiscard(_ch);
+      push.lineno = this.lineno;
       push.setanc(anc);
       return push;
     }

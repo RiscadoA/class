@@ -6,7 +6,7 @@ CLLS_FLAGS="--concurrency=on --no-custom-allocator" ./compile.sh -O examples/LFC
 
 CLLS_FLAGS="--optimize-send-value=off --no-inlining --concurrency=off --no-custom-allocator" ./compile.sh -O examples/LFCS/tokenizer.clls
 
-CLLS_FLAGS="--no-inlining --concurrency=off --no-custom-allocator" ./compile.sh -O examples/LFCS/tokenizer.clls
+CLLS_FLAGS="--optimize-send-value=off --no-inlining --concurrency=off --no-custom-allocator" ./compile.sh -O examples/LFCS/tokenizer.clls
 
 CLLS_FLAGS="--no-inlining --concurrency=on --no-custom-allocator" ./compile.sh -O examples/LFCS/dining-philosophers.clls
 

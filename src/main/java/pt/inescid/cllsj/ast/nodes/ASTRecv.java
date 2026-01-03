@@ -195,7 +195,7 @@ public class ASTRecv extends ASTNode {
       p = new ASTRecv(chr, chi, type.subst(e), rhs.subst(e));
       p.typesam = typesam;
     }
-
+    p.lineno = lineno;
     p.rhs.setanc(p);
     return p;
   }

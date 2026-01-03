@@ -211,8 +211,10 @@ public class ASTSend extends ASTNode {
             try { // check if the free output is of a linear or unrestricted name
               ed.find(choo);
               lhs = new ASTFwd(cho, choo);
+              lhs.lineno = pe.lineno;
             } catch (Exception ex) {
               lhs = new ASTFwdB(cho, choo);
+              lhs.lineno = pe.lineno;
             }
           } else
             throw new TypeError(

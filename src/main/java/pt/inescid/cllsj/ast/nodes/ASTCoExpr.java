@@ -91,7 +91,16 @@ public class ASTCoExpr extends ASTNode {
                 + " expected="
                 + idtt.toStr(ep));
       ed.upd(ch, null);
-    } else throw new TypeError("Line " + lineno + " :" + "LET " + ch + " not of basic type");
+    } else
+      throw new TypeError(
+          "Line "
+              + lineno
+              + " :"
+              + "LET "
+              + ch
+              + " not of basic type ("
+              + bt.toStr(ep)
+              + ") found");
   }
 
   public Set<String> fn(Set<String> s) {

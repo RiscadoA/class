@@ -142,8 +142,9 @@ public class Env<X> {
   }
 
   public synchronized void resetlinears(Env<X> env2) throws Exception {
-    // System.out.print("resetlinears");
     if (assoc == null) {
+      // System.out.print("ASTCase: resetlinears " + id + " - ");
+      // System.out.println();
       env2.upd(id, null);
     }
     if (anc != null) anc.resetlinears(env2);

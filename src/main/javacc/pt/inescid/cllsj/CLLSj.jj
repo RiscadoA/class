@@ -494,7 +494,7 @@ TOKEN :
   |
   < SLEEP: "sleep" >
   |
-  < CALL: "call" >
+  < CALL: "call" | "copy">
   |
   < OR : "or" >
   |
@@ -1314,7 +1314,8 @@ boolean b;
     |
     c3 = <CASE> c1=<Id> <OF> <LBRA>
     { ASTCase tc = new ASTCase(c1.image);
-    }  (ProcCase(tc))+ <RBRA> { p = tc; p.lineno = c3.beginLine;  }
+      tc.lineno = c3.beginLine;
+    }  (ProcCase(tc))+ <RBRA> { p = tc;   }
     |
     c1=<lab> c2=<Id> <SEMIC> p1=Proc()
     { p = new ASTSelect(c2.image, c1.image, p1); p.lineno = c1.beginLine; 
@@ -1347,7 +1348,10 @@ boolean b;
     |
     c2 = <DISCARD> { p2 = null; } c1=<Id> (<SEMIC> p2 = Proc())?
     { p1 = new ASTDiscard(c1.image); 
-      if (p2!=null) {  p = new ASTMix(false,p1,p2); p1.setanc(p); p2.setanc(p); } else p = p1;
+      p1.lineno = c2.beginLine;
+      if (p2!=null) {  p = new ASTMix(false,p1,p2); 
+                      p1.setanc(p); p2.setanc(p); }
+      else p = p1;
       p.lineno = c2.beginLine;
     }
     |
@@ -1409,12 +1413,25 @@ boolean b;
 }
 
 void ProcCase(ASTCase lt) throws Exception:
-{Token s; ASTNode t;}
 {
-<VBAR> s=<lab> <COL> t=Proc() {
-   lt.addCase(s.image,t);
-   t.setanc(lt);
-}
-
+    Token s; 
+    ASTNode t;
+    ArrayList<String> labset ;
+} 
+{
+<VBAR> { labset = new ArrayList<String>();}
+        s=<lab> { labset.add(s.image); }
+        ( <COMMA> s=<lab> { labset.add(s.image); } )* <COL>
+        t=Proc()
+    {
+        ASTNodeCloneVisitor cv = new ASTNodeCloneVisitor();
+        for (Iterator<String> itCases = labset.iterator(); itCases.hasNext(); ) {
+            String lab = itCases.next();
+              t.accept(cv);
+              lt.addCase(lab,t);
+              t = cv.getResult();
+              t.setanc(lt);
+          }
+    }
 }
 

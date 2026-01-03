@@ -208,6 +208,7 @@ public class ASTBang extends ASTNode {
     ASTType ts = type == null ? null : type.subst(e);
     ASTBang p = new ASTBang(chr, chi, ts, rhs.subst(e));
     p.rhs.setanc(p);
+    p.lineno = this.lineno;
     return p;
   }
 

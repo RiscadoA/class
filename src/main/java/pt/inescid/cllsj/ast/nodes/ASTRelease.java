@@ -80,7 +80,14 @@ public class ASTRelease extends ASTNode {
       ed.upd(chr, null);
     } else
       throw new TypeError(
-          "Line " + lineno + " :" + "RELEASE: " + chr + " is neither of USAGE nor of USAGE! type.");
+          "Line "
+              + lineno
+              + " :"
+              + "release: "
+              + chr
+              + " is not of USAGE type (found "
+              + ty.toStr(ep)
+              + ")");
   }
 
   public Set<String> fn(Set<String> s) {

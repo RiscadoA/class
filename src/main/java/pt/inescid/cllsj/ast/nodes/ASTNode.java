@@ -122,7 +122,7 @@ public abstract class ASTNode {
 
     if (def) {
       ASTType te = ed.find(id);
-      System.out.println("\n\n *** Lin-close " + id + " " + te);
+      // System.out.println("\n\n *** Lin-close " + id + " " + te);
       if (!(te instanceof ASTCointT)) // NON-LIN-INT
       throw new TypeError(
             "Line " + lineno + " :" + "for " + id + " type pending = " + te.toStr(ep));
@@ -213,10 +213,12 @@ public abstract class ASTNode {
     return push;
   }
 
-  public ASTNode ASTInsertMixDiscard(String _ch) {
+  public ASTNode ASTInsertMixDiscard(String _ch, ASTType t) {
     // System.out.println("ASTInsertMixDiscard "+this);
-    ASTNode push = new ASTDiscard(_ch);
+    ASTNode push = new ASTDiscard(_ch, t);
+    push.lineno = this.lineno;
     ASTNode mix = new ASTMix(false, push, this);
+    mix.lineno = this.lineno;
     mix.setanc(anc);
     this.setanc(mix);
     push.setanc(mix);
@@ -230,7 +232,7 @@ public abstract class ASTNode {
       push.setanc(anc);
       return push;
     } else {
-      return this.ASTInsertMixDiscard(_ch);
+      return this.ASTInsertMixDiscard(_ch, t);
     }
   }
 
@@ -239,7 +241,7 @@ public abstract class ASTNode {
       ASTNode ret = this.ASTInsertWhy(_ch, t);
       return ret;
     } else {
-      return this.ASTInsertMixDiscard(_ch);
+      return this.ASTInsertMixDiscard(_ch, t);
     }
   }
 

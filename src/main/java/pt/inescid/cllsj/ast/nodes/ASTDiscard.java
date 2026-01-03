@@ -25,9 +25,15 @@ import pt.inescid.cllsj.ast.types.ASTType;
 public class ASTDiscard extends ASTNode {
   String chr;
   ASTCoAffineT coAffineT;
+  ASTType __type;
 
   public ASTDiscard(String _chr) {
     chr = _chr;
+  }
+
+  public ASTDiscard(String _chr, ASTType t) {
+    chr = _chr;
+    __type = t;
   }
 
   public String getCh() {
@@ -70,6 +76,7 @@ public class ASTDiscard extends ASTNode {
     ASTType ty = ed.find(chr);
     ty = ty.unfoldType(ep);
     ty = ASTType.unfoldRecInfer(ty, this, chr, ep);
+    __type = ty;
     if (ty instanceof ASTCoAffineT) {
       coAffineT = (ASTCoAffineT) ty;
       ed.upd(chr, null);

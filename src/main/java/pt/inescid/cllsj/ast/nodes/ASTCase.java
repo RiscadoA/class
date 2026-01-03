@@ -42,7 +42,8 @@ public class ASTCase extends ASTNode {
   }
 
   public void addCase(String id, ASTNode t) throws Exception {
-    if (cases.putIfAbsent(id, t) != null) throw new SyntaxError("Duplicate Label in CASE");
+    if (cases.putIfAbsent(id, t) != null)
+      throw new SyntaxError("Line:" + lineno + " Duplicate Label in case (" + id + ")");
   }
 
   @Override
@@ -229,6 +230,7 @@ public class ASTCase extends ASTNode {
         eb.upd(ch, t1);
 
         Env<ASTType> egg = eg.assoc("$DUMMY", new ASTBotT());
+
         p1.typecheck(eb, egg, ep);
         this.linclose(eb, ep);
 
@@ -239,12 +241,16 @@ public class ASTCase extends ASTNode {
           throw new TypeError(
               "Line " + lineno + " :" + "OFFER " + ch + ": unbalanced linear contexts");
         last = eb;
+        // System.out.println("LAB " + lab);
+        // eb.crawl();
+
         if (is.hasNext()) {
           eb = ed.dup();
         }
       }
+      // System.out.println("ed after all cases " + ch);
+      // ed.crawl();
       eb.resetlinears(ed);
-      //      System.out.println("ed after all cases " + ch);
     } else
       throw new TypeError(
           "Line "
