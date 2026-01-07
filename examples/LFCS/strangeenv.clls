@@ -1,0 +1,161 @@
+type rec asTree {
+    !
+    case of {
+        | #Num: !lint
+        | #Mul:  pair asTree; asTree
+        | #Plus: pair asTree; asTree
+        | #App:  pair asTree; asTree
+        | #Lam:  pair !lstring; asTree
+        | #Id : !lstring
+    }
+};;
+
+type rec value {
+    !
+    case of {
+        | #None: close
+        | #Num: !lint
+        | #Clos: pair !lstring; pair env; asTree
+    }
+} and env { 
+    !
+    case of {
+        | #Empty: close
+        | #Entry: pair !lstring; pair value; env
+    }
+};;
+
+type evalue {
+    case of {
+        | #None: close
+        | #Num: !lint
+        | #Clos: pair !lstring; pair env; asTree
+    }
+};;
+
+type eenv {
+    case of {
+            | #Empty: close
+            | #Entry: pair !lstring; pair value; env
+        }    
+};;
+
+type venv {
+    pair env; value
+};;
+
+
+proc print_val(;val:~evalue){
+    copy val(v);
+    case v of {
+        | #None: println("Undefined"); wait v;()
+        | #Num: println(v);()
+        | #Clos:
+            v -> id; v -> env; unfold env; unfold v; 
+            println("Clos<"+id+":->");()
+    }
+
+};;
+
+proc mk_Empty(ctx:env) {
+    unfold ctx;
+    !ctx (e); #Empty e; close e
+};;
+
+proc mk_Num(n:~!lint,v:value)
+{
+    unfold v;
+    !v(n0);
+    #Num n0; 
+    let! n0 n
+};;
+
+proc mk_Assoc(e:env,v:~value;id:~lstring,ctx:~eenv)
+{
+    unfold v;
+    ?v;
+    unfold e;
+    !e(en);
+    println("write #Entry");
+    #Entry en;
+    en <- id;
+    en <- { v00. unfold v00; fwd! v00 v};
+    unfold en;
+    fwd! en ctx
+};;
+
+
+proc mk_None(v:value)
+{
+    unfold v;
+    !v(n0);
+    #None n0; 
+    close n0
+};;
+
+proc unsafe_rec print_env(;ctx:~eenv)
+{   
+    copy ctx(e0);
+    case e0 of {
+        | #Entry: 
+            e0 -> ide;
+            e0 -> val;
+            clltype e0;
+            unfold e0;
+            println("XX");
+            ?e0;
+            println("XXX");
+            ?val;
+            print(ide+"->->");
+            print_val(;val);
+            print_env(;e0)
+        | #Empty:
+            wait e0;
+            println(" _");()
+    }
+};;
+
+proc unsafe_rec find_env(r:value;id:~lstring,ctxe:~eenv)
+{   
+    copy ctxe(e0);
+    case e0 of {
+        | #Empty:
+            wait e0;
+            println("#Empty");
+            mk_None(r)
+        | #Entry: 
+            println("#Entry");
+            e0 -> ide;
+            e0 -> val;
+            ?ide;
+            call ide(i1);
+            call id(i0);
+            clltype e0;
+            unfold e0;
+            if (i1 == i0) {
+                ?e0;
+                fwd val r
+            } else {
+                ?e0;
+                ?val;
+                find_env(r;id,e0)
+            }
+    }
+};;
+
+
+proc main() {
+    letc id:!lstring {let! id "x"};
+    ?id;
+    letc e0:env { mk_Empty(e0 )};
+    letc v1:value { mk_Num(99,v1)};
+    ?e0;
+    letc e1:env { mk_Assoc(e1,v1;id,e0) };
+    ?e1;
+    println("print_env:");
+    print_env(;e1);
+    println("find_env:");
+    letc v:value { find_env(v;id,e1) };
+    ?v;
+    print_val(;v)
+};;

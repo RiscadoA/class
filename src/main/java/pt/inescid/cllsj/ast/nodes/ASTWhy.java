@@ -144,6 +144,7 @@ public class ASTWhy extends ASTNode {
   public ASTNode subst(Env<ASTType> e) {
     ASTWhy p = new ASTWhy(ch, __type, rhs.subst(e));
     p.rhs.setanc(p);
+    p.lineno = lineno;
     return p;
   }
 

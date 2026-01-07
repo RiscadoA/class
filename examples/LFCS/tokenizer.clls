@@ -460,3 +460,79 @@ def isDigit(c:lstring) -> (r:digit):
 
 
 */
+
+
+
+proc unsafe_rec scan_token_aux(
+        tok:pair token;!lstring; // returns token and lookahead char
+        c:~lstring, // last char read
+        acc:~lstring, // current token image
+        v:~lint, // current int val (if tokenizing num)
+        stat:~lint) { // automaton state
+    if (stat==0) { // automaton initial state
+        if c == "(" {
+            letc c:!lstring { scanc(c) };
+            tok <- {t.affine t; #Lpar t; close t};     
+            let! tok c       
+        } else if c == ")" {
+            letc c:!lstring { scanc(c) };
+            tok <- {t.affine t; #Rpar t; close t};     
+            let! tok c       
+        } else if c == "+" {
+            letc c:!lstring { scanc(c) };
+            tok <- {t.affine t; #PlusTok t; close t};     
+            let! tok c       
+        } else if c == "*" {
+            letc c:!lstring { scanc(c) };
+            tok <- {t.affine t; #MulTok t; close t};     
+            let! tok c       
+        } else {
+            letc isspace:lbool { isSpace(isspace;c)};
+            if (isspace) { 
+                letc cn:!lstring { scanc(cn) };
+                scan_token_aux(tok;cn,acc,v,0)
+            } else {
+                letc r:digit { isDigit(r;c) };
+                letc cx:!lstring { scanc(cx) };
+                case r of {
+                    | #Digit : scan_token_aux(tok;cx,acc,r,1) 
+                    | #None:  
+                        wait r;  
+                        letc a:alpha { isAlpha(a;c) };
+                        case a of {
+                            | #Alpha: scan_token_aux(tok;cx,acc+a,0,2) 
+                            | #None:
+                                wait a;
+                                tok <- {t. affine t; #Error t; close t};     
+                                let! tok "EOF!"  
+                        }                         
+                }
+            }
+        }            
+    } else if stat==1 {
+        letc r:digit { isDigit(r;c) };
+        letc cy:!lstring { scanc(cy) };
+        case r of {
+            | #Digit : scan_token_aux(tok; cy, acc, v*10+r, 1) 
+            | #None:    
+                wait r;  
+                tok <- {t. affine t; #Num t; let! t v}; 
+                let! tok cy       
+        }
+    } else { // stat = 2
+            letc a:alpha { isAlpha(a;c) };
+            letc cx:!lstring { scanc(cx) };
+            case a of {
+                | #Alpha: scan_token_aux(tok;cx,acc+a,0,2) 
+                | #None:
+                    wait a;
+                    if acc == "lambda" {
+                        tok <- {t. affine t; #LamTok t; close t};     
+                        let! tok cx   
+                    } else {
+                    tok <- {t. affine t; #Id t; let! t acc};     
+                    let! tok cx   
+                    }    
+            }
+    }
+};;

@@ -1,2 +1,2 @@
-( lambda x ( 2 + 2 ) ) ( 3 )
+(lambda x (x*x)) (9)
 

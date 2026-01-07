@@ -2,9 +2,9 @@ CLLS_FLAGS="--concurrency=off --no-custom-allocator" ./compile.sh -O examples/LF
 
 CLLS_FLAGS="--concurrency=off --no-custom-allocator" ./compile.sh -O examples/LFCS/linear-system-f.clls
 
-CLLS_FLAGS="--concurrency=on --no-custom-allocator" ./compile.sh -O examples/LFCS/squeue-n.clls
+CLLS_FLAGS="--concurrency=off --no-custom-allocator" ./compile.sh -O examples/LFCS/sam-sieve-sum-fast-stop.clls
 
-CLLS_FLAGS="--optimize-send-value=off --no-inlining --concurrency=off --no-custom-allocator" ./compile.sh -O examples/LFCS/tokenizer.clls
+CLLS_FLAGS="--concurrency=on --no-custom-allocator" ./compile.sh -O examples/LFCS/squeue-n.clls
 
 CLLS_FLAGS="--optimize-send-value=off --no-inlining --concurrency=off --no-custom-allocator" ./compile.sh -O examples/LFCS/tokenizer.clls
 
