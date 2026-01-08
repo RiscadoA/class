@@ -1,0 +1,742 @@
+type digit {
+    affine
+    case of {
+        |#Digit: !lint
+        |#None : close
+    }
+};;
+
+type alpha {
+    affine
+    case of {
+        |#Alpha: !lstring
+        |#None : close
+    }
+};;
+
+proc isSpace(r:lbool;c:~lstring) {
+    let r (c == "\n" or (c == "\r" or (c == " " or c == "\t")))
+};;
+
+proc isDigit(r:digit;c:~lstring) {
+    if (c >= "0") and (c <= "9" ) {
+        affine r; #Digit r; let! r (ord(c)-ord("0"))
+    } else {
+        affine r; #None r; close r
+    }
+};;
+
+proc isAlpha(r:alpha;c:~lstring) {
+    if (c >= "a") and (c <= "z" ) {
+        affine r; #Alpha r; let! r c
+    } else {
+        affine r; #None r; close r
+    }
+};;
+
+type token {
+    affine
+    case of {
+        | #Id: !lstring
+        | #Num: !lint
+        | #PlusTok: close
+        | #MulTok: close
+        | #Lpar: close
+        | #Rpar: close
+        | #LamTok : close
+        | #Error: close
+    }
+};;
+
+proc print_tok(tok:~token)
+{
+    case tok of {
+        | #Id: println("Id('"+tok+"')"); ()
+        | #Num: println("Num("+tok+")"); ()
+        | #LamTok: println("Tok(LAM)"); wait tok; ()
+        | #PlusTok: println("Tok(+)"); wait tok; ()
+        | #MulTok: println("Tok(*)"); wait tok; ()
+        | #Lpar: println("Tok(LPAR)"); wait tok; ()
+        | #Rpar: println("Tok(RPAR)"); wait tok; ()
+        | #Error: println("Error()"); wait tok; ()
+    }
+};;
+
+proc free_tok(tok:~token)
+{
+    case tok of {
+        | #Id:  ()
+        | #Num:  ()
+        | #PlusTok, #MulTok, #Lpar, #Rpar, #LamTok, #Error: wait tok; ()
+    }
+};;
+
+proc unsafe_rec scan_token_aux(
+        tok:pair token;!lstring; // returns token and lookahead char
+        c:~lstring, // last char read
+        acc:~lstring, // current token image
+        v:~lint, // current int val (if tokenizing num)
+        stat:~lint) { // automaton state
+    if (stat==0) { // automaton initial state
+        if c == "(" {
+            letc c:!lstring { scanc(c) };
+            tok <- {t.affine t; #Lpar t; close t};     
+            let! tok c       
+        } else if c == ")" {
+            letc c:!lstring { scanc(c) };
+            tok <- {t.affine t; #Rpar t; close t};     
+            let! tok c       
+        } else if c == "+" {
+            letc c:!lstring { scanc(c) };
+            tok <- {t.affine t; #PlusTok t; close t};     
+            let! tok c       
+        } else if c == "*" {
+            letc c:!lstring { scanc(c) };
+            tok <- {t.affine t; #MulTok t; close t};     
+            let! tok c       
+        } else {
+            letc isspace:lbool { isSpace(isspace;c)};
+            if (isspace) { 
+                letc cn:!lstring { scanc(cn) };
+                scan_token_aux(tok;cn,acc,v,0)
+            } else {
+                letc r:digit { isDigit(r;c) };
+                letc cx:!lstring { scanc(cx) };
+                case r of {
+                    | #Digit : scan_token_aux(tok;cx,acc,r,1) 
+                    | #None:  
+                        wait r;  
+                        letc a:alpha { isAlpha(a;c) };
+                        case a of {
+                            | #Alpha: scan_token_aux(tok;cx,acc+a,0,2) 
+                            | #None:
+                                wait a;
+                                tok <- {t. affine t; #Error t; close t};     
+                                let! tok "EOF!"  
+                        }                         
+                }
+            }
+        }            
+    } else if stat==1 {
+        letc r:digit { isDigit(r;c) };
+        case r of {
+            | #Digit :
+                letc cy:!lstring { scanc(cy) };
+                scan_token_aux(tok; cy, acc, v*10+r, 1) 
+            | #None:    
+                wait r;  
+                tok <- {t. affine t; #Num t; let! t v}; 
+                let! tok c       
+        }
+    } else { // stat = 2
+            letc a:alpha { isAlpha(a;c) };
+            case a of {
+                |#Alpha:
+                    letc cx:!lstring { scanc(cx) };
+                    scan_token_aux(tok;cx,acc+a,0,2) 
+                | #None:
+                    wait a;
+                    if acc == "lambda" {
+                        tok <- {t. affine t; #LamTok t; close t};     
+                        let! tok c   
+                    } else {
+                    tok <- {t. affine t; #Id t; let! t acc};     
+                    let! tok c   
+                    }    
+            }
+    }
+};;
+
+proc scan_token(tok: send token;!lstring;c:~lstring) {
+    scan_token_aux(tok;c,"",0,0)
+};;
+
+proc init_token(tok: send token;!lstring) {
+    letc c:!lstring { scanc(c) };
+    ?c;
+    scan_token_aux(tok;c,"",0,0)
+};;
+
+proc unsafe_rec gettok(t0:~send token;!lstring)
+{
+    t0 -> a;
+    if (t0 == "EOF!") {
+        print_tok(a)
+    } else {
+        print_tok(a);
+        letc t1: send token;!lstring { scan_token(t1;t0) };
+        gettok(t1)
+    }
+};;
+
+type rec tokStream {
+    affine send token;tokStream
+};;
+
+proc unsafe_rec readTokensAux(last:~send token;!lstring,tout:tokStream)
+{
+        last -> tok;
+        affine tout;
+        tout <- tok;
+        letc t1: send token;!lstring { scan_token(t1;last) };
+        readTokensAux(t1,tout)
+};;
+
+proc readTokens(tout:tokStream)
+{
+    letc t0: send token;!lstring { init_token(t0) };
+    readTokensAux(t0,tout)
+};;
+
+type rec asTree {
+    !
+    case of {
+        | #Num: !lint
+        | #Mul:  pair asTree; asTree
+        | #Plus: pair asTree; asTree
+        | #App:  pair asTree; asTree
+        | #Lam:  pair !lstring; asTree
+        | #Id : !lstring
+    }
+};;
+
+type easTree {
+    case of {
+        | #Num: !lint
+        | #Mul:  pair asTree; asTree
+        | #Plus: pair asTree; asTree
+        | #App:  pair asTree; asTree
+        | #Lam:  pair !lstring; asTree
+        | #Id : !lstring
+    }
+};;
+
+proc mk_astMul(ast:asTree;a0:~easTree,a1:~easTree)
+{
+    unfold ast;
+    !ast(astmul);
+    #Mul astmul; 
+    astmul <- { at0. unfold at0; fwd! at0 a0 };
+    unfold astmul;
+    fwd! astmul a1
+};;
+
+proc mk_astPlus(t:asTree;a0:~easTree,a1:~easTree)
+{
+    unfold t;
+    !t(t0);
+    #Plus t0; 
+    t0 <- { at0. unfold at0; fwd! at0 a0 };
+    unfold t0;
+    fwd! t0 a1
+};;
+
+proc mk_astLam(t:asTree;id:~lstring,a0:~easTree)
+{
+    unfold t;
+    !t(l0);
+    #Lam l0; 
+    l0 <- { id0. fwd! id0 id };
+    unfold l0;
+    fwd! l0 a0
+};;
+
+proc mk_astApp(ast:asTree;a0:~easTree,a1:~easTree)
+{
+    unfold ast;
+    !ast(astmul);
+    #App astmul; 
+    astmul <- { at0. unfold at0; fwd! at0 a0 };
+    unfold astmul;
+    fwd! astmul a1
+};;
+
+type rec value {
+    !
+    case of {
+        | #None: close
+        | #Num: !lint
+        | #Clos: pair !lstring; pair env; asTree
+    }
+} and env { 
+    !
+    case of {
+        | #Empty: close
+        | #Entry: pair !lstring; pair value; env
+    }
+};;
+
+type evalue {
+    case of {
+        | #None: close
+        | #Num: !lint
+        | #Clos: pair !lstring; pair env; asTree
+    }
+};;
+
+type eenv {
+    case of {
+            | #Empty: close
+            | #Entry: pair !lstring; pair value; env
+        }    
+};;
+
+type venv {
+    pair env; value
+};;
+
+
+proc print_val(;val:~evalue){
+    copy val(v);
+    case v of {
+        | #None: println("Undefined"); wait v;()
+        | #Num: println(v);()
+        | #Clos:
+            v -> id; v -> env; unfold env; unfold v; 
+            println("Clos<"+id+":->");()
+    }
+};;
+
+proc mk_Empty(ctx:env) {
+    unfold ctx;
+    !ctx (e); #Empty e; close e
+};;
+
+proc mk_Num(n:~!lint,v:value)
+{
+    unfold v;
+    !v(n0);
+    #Num n0; 
+    let! n0 n
+};;
+
+proc mk_None(v:value)
+{
+    unfold v;
+    !v(n0);
+    #None n0; 
+    close n0
+};;
+
+
+proc mk_Clos(id:~!lstring,ast:~asTree,v:value;ctx:~eenv)
+{
+    unfold ast;
+    ?ast;
+    unfold v;
+    !v(n0);
+    #Clos n0; 
+    n0 <- id;
+    n0 <- {s. unfold s; fwd! s ctx};
+    unfold n0;
+    fwd! n0 ast 
+};;
+
+proc mk_Assoc(e:env,v:~value;id:~lstring,ctx:~eenv)
+{
+    unfold v;
+    ?v;
+    unfold e;
+    !e(en);
+    #Entry en;
+    en <- id;
+    en <- { v00. unfold v00; fwd! v00 v};
+    unfold en;
+    fwd! en ctx
+};;
+
+
+proc drop_Clos(c:~pair !lstring; pair env; asTree)
+{
+    recv c(s);
+    recv c(e);
+    unfold c;
+    unfold e;
+    ()
+};;
+
+proc unsafe_rec print_env(;ctx:~eenv)
+{   
+    copy ctx(e0);
+    case e0 of {
+        | #Entry: 
+            e0 -> ide;
+            e0 -> val;
+            unfold e0;
+            ?e0;
+            ?val;
+            print(ide+"->");
+            print_val(;val);
+            print_env(;e0)
+        | #Empty:
+            wait e0;
+            println("");()
+    }
+};;
+
+proc unsafe_rec find_env(r:value;id:~lstring,ctxe:~eenv)
+{   
+    copy ctxe(e0);
+    case e0 of {
+        | #Empty:
+            wait e0;
+            mk_None(r)
+        | #Entry: 
+            e0 -> ide;
+            e0 -> val;
+            ?ide;
+            if (id == ide) {
+                unfold e0;
+                ?e0;
+                fwd val r
+            } else {
+                unfold e0;
+                ?e0;
+                ?val;
+                find_env(r;id,e0)
+            }
+    }
+};;
+
+
+proc unsafe_rec print_ast(ast:~asTree) {
+    unfold ast;
+    ?ast;
+    copy ast(t);
+    case t of {
+        | #App: 
+                println("#App(");
+                t -> lhs;
+                print_ast(lhs);
+                print(",");
+                print_ast(t);
+                print(")");()
+        | #Lam: 
+                println("#Lam(");
+                t->id;
+                print(id+"."); 
+                print_ast(t);
+                print(")"); 
+                ()
+        | #Num:
+                println("#Num(");
+                print(t+")");()
+        | #Id:
+                print("#Id(");
+                print(t+")");()
+        | #Plus: 
+                println("#Plus(");
+                t -> lhs;
+                print_ast(lhs);
+                print(",");
+                print_ast(t);
+                print(")");()
+        | #Mul: 
+                println("#Mul(");
+                t -> lhs;
+                print_ast(lhs);
+                print(",");
+                print_ast(t);
+                print(")");()
+    }
+};;
+
+proc demoast(ast:asTree)
+{
+    unfold ast;
+    !ast(t0);
+        #Num t0;
+        let! t0 23
+};;
+
+proc unsafe_rec evaltree(ast:~asTree,v:value;ctx:~eenv) {
+    unfold ast;
+    ?ast;
+    copy ast(t);
+    case t of {
+        | #App: 
+                t -> lhs;
+                letc v0:value { evaltree(lhs,v0;ctx) };
+                letc v1:value { evaltree(t,v1;ctx) };
+                unfold v0;
+                ?v0;
+                copy v0(v00);
+                case v00 of {
+                    | #Clos: 
+                        v00 -> id0;
+                        ?id0;
+                        v00 -> ctxe;
+                        unfold ctxe;
+                        ?ctxe;
+                        letc nenc:env { mk_Assoc(nenc,v1;id0,ctxe) };
+                        unfold nenc;
+                        ?nenc;
+                        letc v2:value { evaltree(v00,v2; nenc)};
+                        fwd v2 v
+                    | #Num : ?v00; fwd v1 v
+                    | #None :  wait v00; fwd v1 v
+                }
+
+        | #Lam: 
+//                println("#Lam");
+                t->id;
+//                println("mk_Clos");
+                mk_Clos(id,t,v;ctx)
+        | #Num:
+//                println("#Num");
+                mk_Num(t,v)
+        | #Id:
+//                println("#Id");
+//                print_env(;ctx);
+                ?t;
+                find_env(v;t,ctx)
+        | #Plus: 
+//                println("#Plus ");
+                t -> lhs;
+                letc v0:value { evaltree(lhs,v0;ctx) };
+                letc v1:value { evaltree(t,v1;ctx) };
+                unfold v0;
+                unfold v1;
+                copy v0(n0);
+                case n0 of {
+                | #Num: 
+                        copy v1(n1);
+                        case n1 of {
+                              | #Num : mk_Num(n0+n1,v)
+                              | #Clos: drop_Clos(n1); mk_None(v)
+                              | #None: wait n1; mk_None(v)
+                            }
+                    | #Clos: ?v1; drop_Clos(n0); mk_None(v)
+                    | #None: wait n0; mk_None(v)
+                 }
+        | #Mul: 
+//                println("#Mul ");
+                t -> lhs;
+                letc v0:value { evaltree(lhs,v0;ctx) };
+                letc v1:value { evaltree(t,v1;ctx) };
+                unfold v0;
+                unfold v1;
+                copy v0(n0);
+                case n0 of {
+                | #Num: 
+                    copy v1(n1);
+                    case n1 of {
+                            | #Num : mk_Num(n0*n1,v)
+                            | #Clos: drop_Clos(n1); mk_None(v)
+                            | #None: wait n1; mk_None(v)
+                        }
+                | #Clos: ?v1; drop_Clos(n0); mk_None(v)
+                | #None: wait n0; mk_None(v)
+                }
+    }
+};;
+
+// returns AST and remainder of token stream (#Some) or closes (#None)
+type OptionAST {
+    case of {
+        | #Some: pair asTree; tokStream
+        | #None: close
+    }
+};;
+
+proc pushfollow(tok:~token, ast0:~asTree,ast:OptionAST,cont1:~tokStream) {
+    #Some ast; ast <- ast0;
+    unfold cont1;
+    affine ast;
+    ast <- tok;
+    fwd cont1 ast
+};;
+
+proc abort(ast: OptionAST, toks:~tokStream)
+{
+    #None ast; close ast; discard toks
+};;
+
+proc unsafe_rec expr(tokens: ~tokStream, ast: OptionAST) {
+    letc cont1:OptionAST { term(tokens,cont1) };
+    case cont1 of {
+        | #None:
+            wait cont1; #None ast; close ast
+        | #Some:
+            cont1 -> ast0;
+            cont1 -> tok;
+            case tok of {
+                | #PlusTok:
+                    wait tok;
+                    letc cont2:OptionAST { expr(cont1,cont2) };
+                    case cont2 of {
+                        | #None: wait cont2; unfold ast0; #None ast; close ast
+                        | #Some:
+                            cont2 -> ast1;
+                            unfold ast1;
+                            ?ast1;
+                            unfold ast0;
+                            ?ast0;
+                            letc t:asTree {
+                                mk_astPlus(t;ast0,ast1)
+                            };
+//                            println("AST #Plus");
+                            #Some ast; ast <- t; fwd cont2 ast
+                    }
+                | #Id, #Num: unfold ast0; abort(ast,cont1)
+                | #Rpar: 
+                    wait tok; 
+                    letc pt:token { affine pt; #Rpar pt; close pt};
+                    pushfollow(pt, ast0, ast, cont1)
+
+                | #Error: 
+                    wait tok; #Some ast; ast <- ast0; fwd cont1 ast
+                | #MulTok, #LamTok, #Lpar: wait tok; unfold ast0; abort(ast,cont1)
+                }
+    }
+} and term(tokens: ~tokStream, ast: OptionAST) {
+    letc cont1:OptionAST { factor(tokens,cont1) };
+    case cont1 of {
+        | #None:
+            wait cont1; #None ast; close ast
+        | #Some:
+            cont1 -> ast0;
+            cont1 -> tok;
+            case tok of {
+                | #MulTok:
+                    wait tok;
+                    letc cont2:OptionAST { term(cont1,cont2) };
+                    case cont2 of {
+                        | #None: wait cont2; unfold ast0; #None ast; close ast
+                        | #Some:
+                            cont2 -> ast1;
+                            unfold ast0;
+                            unfold ast1;
+                            ?ast0;
+                            ?ast1;
+                            letc t:asTree {
+                                mk_astMul(t;ast0,ast1)
+                            };
+//                            println("AST #Mul");
+                            #Some ast; ast <- t;
+                            fwd cont2 ast
+                    }
+
+                | #Id, #Num: unfold ast0 ; abort(ast,cont1)
+
+                | #PlusTok: 
+                    wait tok; 
+                    letc pt:token { affine pt; #PlusTok pt; close pt};
+                    pushfollow(pt, ast0, ast, cont1)
+
+                | #Lpar: 
+                    wait tok;
+                    letc cont2:OptionAST { expr(cont1,cont2) };
+                    case cont2 of {
+                        | #None: wait cont2; unfold ast0; #None ast; close ast
+                        | #Some:
+                            cont2 -> ast1;
+                            cont2 -> tok2;
+                            case tok2 of {
+                            | #Rpar: 
+                                wait tok2; 
+                                unfold ast1;
+                                unfold ast0;
+                                ?ast0;
+                                ?ast1;
+                                letc t:asTree {
+                                    mk_astApp(t;ast0,ast1)
+                                };
+//                                println("AST #App");
+                                #Some ast; ast <- t;
+                                fwd cont2 ast
+
+                            | #Id, #Num: unfold ast1; unfold ast0; abort(ast,cont2)
+                            | #PlusTok,#MulTok,#Lpar,#LamTok,
+                                #Error: wait tok2; unfold ast1; 
+                                    unfold ast0; abort(ast,cont2)
+                            }
+                    }
+
+                | #LamTok: wait tok; unfold ast0; abort(ast,cont1)
+
+                | #Rpar: 
+                    wait tok; 
+                    letc pt:token { affine pt; #Rpar pt; close pt};
+                    pushfollow(pt, ast0, ast, cont1)
+
+                | #Error: 
+                    wait tok; #Some ast; ast <- ast0; fwd cont1 ast
+                }
+    }
+} and factor(tokens: ~tokStream, ast: OptionAST) {
+    tokens -> tok1;
+    case tok1 of {
+    | #Lpar: 
+        wait tok1;
+        letc cont2 : OptionAST { expr(tokens,cont2) };
+        case cont2 of {
+            | #None : wait cont2; #None ast; close ast
+            | #Some :
+                cont2 -> ast1;
+                cont2 -> tok2;
+                case tok2 of {
+                    | #Rpar: wait tok2; #Some ast; ast <- ast1; fwd cont2 ast     
+                    | #Id, #Num: unfold ast1; abort(ast,cont2)
+                    | #PlusTok,#MulTok,#Lpar,#LamTok,
+                        #Error: wait tok2; unfold ast1; abort(ast,cont2)
+                } 
+        }
+    | #Rpar: wait tok1;  abort(ast,tokens)
+
+    | #Id: #Some ast; 
+            ast <- { t. unfold t; ! t (astid); #Id astid; let! astid tok1 };
+            fwd tokens ast
+
+    | #Num: #Some ast;
+            ast <- { t. unfold t; ! t (astnum); #Num astnum; let! astnum tok1 };
+            fwd tokens ast
+
+    | #LamTok:
+            wait tok1;
+            tokens -> id; 
+            case id of {
+            | #Id :
+                letc cont2 : OptionAST { factor(tokens,cont2) };
+                case cont2 of {
+                    | #Some :
+                        cont2 -> astbody;
+                        unfold astbody;
+                        letc t:asTree {
+                            mk_astLam(t;id,astbody)
+                        };
+//                        println("AST #Lam");
+                        #Some ast; ast <- t;
+                        fwd cont2 ast
+                    | #None : wait cont2; #None ast; close ast
+                }
+            | #Lpar, #Rpar, #LamTok, #MulTok, 
+              #PlusTok,#Error: wait id; abort(ast,tokens)
+            | #Num : abort(ast,tokens)
+           }
+
+    | #PlusTok, #MulTok, #Error: wait tok1; abort(ast,tokens)
+
+    }
+};;
+
+
+proc main()
+{
+    letc t0: tokStream { readTokens(t0) };
+    letc ans: OptionAST { expr(t0,ans) };
+    case ans of {
+        | #None: println("Syntax Error!"); wait ans; ()
+        | #Some: 
+                ans->ast;
+                println("Parsed.");
+                letc ectx: env { unfold ectx; !ectx (e); #Empty e; close e};
+                ?ectx;
+                letc v:value { evaltree(ast,v;ectx) };
+                ?v;
+                print_val(;v);
+                unfold ans;
+                discard ans
+    }
+};;
+
