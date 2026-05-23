@@ -1,0 +1,202 @@
+/*
+    Implements the Ackermann function with Church Numerals
+    (https://en.wikipedia.org/wiki/Ackermann_function),
+    more specifically its definition as an iterated 1-ary function:
+    A_0(n)     = n+1
+    A_{m+1}(n) = A_m^{n+1}(1)
+*/
+
+type rec Nat{
+    choice of {
+        |#Z: close      //zero
+        |#S: Nat        //successor
+    }
+};;
+
+proc rec dispose(n:~Nat, x:close) {
+    case n of {
+        |#Z: wait n; close x
+        |#S: cut{ dispose(n, y) |y:wait| wait y; close x}
+    }
+};;
+
+proc rec disposeX(n:~Nat) {
+    case n of {
+        |#Z: wait n; ()
+        |#S: disposeX(n)
+    }
+};;
+
+proc rec tolint(n:~Nat, s: lint){
+    case n of {
+        |#Z: wait n; let s 0
+        |#S: cut{
+                tolint(n,x)
+                |x:~lint|
+                let s (x+1)
+                }
+    }
+};;
+
+proc printNat(n:~Nat) {
+  cut {
+	tolint(n,s)
+        | s:~lint |
+        println(s);()
+  }
+};;
+
+//Encoding of naturals zero, one and two
+
+proc zero(n:Nat){ #Z n; close n };;
+
+proc one(n:Nat){ #S n; #Z n; close n };;
+
+proc two(n:Nat){#S n; #S n; #Z n; close n};;
+
+
+//Computes the successor of n on m
+proc succ(n:~Nat, m:Nat){ #S m; fwd n m};;
+
+//The natural three is the sucessor of two
+
+proc three(m:Nat){
+    cut{
+        two(n)
+        |n:~Nat|
+        succ(n,m)
+    }
+};;
+
+proc four(m:Nat){
+    cut{
+        three(n)
+        |n:~Nat|
+        succ(n,m)
+    }
+};;
+
+proc five(m:Nat){
+    cut{
+        four(n)
+        |n:~Nat|
+        succ(n,m)
+    }
+};;
+
+
+proc six(m:Nat){
+    cut{
+        five(n)
+        |n:~Nat|
+        succ(n,m)
+    }
+};;
+
+
+proc idx(f:recv ~Nat; send Nat; close){
+    recv f(x);
+    send f(x);
+    close f
+};;
+
+proc rec iter_(n:~Nat, g:recv ~Nat; send Nat; close ; f: ~ recv ~Nat; send Nat; close){
+    case n of {
+        |#Z: wait n;idx(g)
+        |#S: cut{
+                iter_(n,h; f)
+                |h:send Nat;recv ~Nat; wait|
+                recv g(x);
+                send h(x);
+                call f(f0);
+		recv h(hx);
+        send f0(hx);
+		recv f0(hy);
+		wait f0;
+		wait h;
+		send g(hy);
+		close g
+        }
+    }
+};;
+
+
+/*
+A_0(n) = n +1
+A_{m+1}(n)  = A_m^{n+1}(1)
+*/
+
+proc rec ackerAux(m:~Nat, f:!recv ~Nat; send Nat; close) {
+    case m of {
+        |#Z:    wait m;
+                !f(f0);
+                recv f0(n);
+		        send f0(f0a. 
+                #S f0a;
+                fwd f0a n);
+		close f0
+
+        |#S:    cut {
+                    ackerAux(m,g)
+                    |g:?send Nat; recv ~Nat; wait|
+                    !f(f0);
+                    recv f0(n);
+                    cut{
+                        #S k; fwd k n
+                        |k:~Nat|
+                        iter_(k,h;g)
+                        |h:send Nat;recv ~Nat; wait|
+                        send h(x.one(x));
+			recv h(xn);
+			wait h;
+			send f0(xn);
+			close f0
+			}
+                 }
+        }
+};;
+
+proc acker(m:~Nat, n:~Nat, r:Nat){
+    cut {
+        ackerAux(m,f)
+        |f:?send Nat;recv ~Nat; wait|
+        ?f;
+        call f(f0b);
+        send f0b(n);
+        recv f0b(r0);
+        wait f0b;
+        unfold r;
+        unfold r0;
+        clltype r;
+        clltype r0;
+        fwd r0 r
+    }
+};;
+
+
+
+
+proc test0() {
+  cut {
+     six(n1)
+     |n1:~Nat|
+     three(m1)
+     |m1:~Nat|
+     acker(m1,n1,r1)
+     |r1:~Nat|
+     printNat(r1)
+     }
+};;
+
+proc test1() {
+  cut {
+     one(n)
+     |n:~Nat|
+     one(m)
+     |m:~Nat|
+     acker(m,n,r)
+     |r:~Nat|
+     printNat(r)
+     }
+};;
+

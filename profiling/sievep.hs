@@ -5,22 +5,28 @@ import Prelude hiding (filter, map, concatMap, reverse, append, take)
 data List a = Nil | Cons a (List a)
     deriving Show
 
-natsFrom :: Int -> List Int
-natsFrom n = Cons n (natsFrom (n+1))
-
 filter :: (a -> Bool) -> List a -> List a
 filter _ Nil = Nil
 filter p (Cons x xs)
   | p x       = Cons x (filter p xs)
   | otherwise = filter p xs
 
-sieve :: List Int -> List Int
-sieve (Cons x xs) = 
-  Cons x (sieve 
-    (filter (\y -> rem y x > 0) xs))
+map :: (a -> b) -> List a -> List b
+map _ Nil = Nil
+map f (Cons x xs) = Cons (f x) (map f xs)
 
+sieve :: List Int -> List Int
+sieve (Cons x xs) = Cons x (sieve (filter (\y -> rem y x > 0) xs))
+
+natsFrom2 :: List Int
+natsFrom2 = Cons 2 (map (+1) natsFrom2)
 primes :: List Int
-primes = sieve (natsFrom 2)
+primes = sieve natsFrom2
+
+take :: Int -> List a -> List a
+take 0 _ = Nil
+take _ Nil = Nil
+take n (Cons x xs) = Cons x (take (n - 1) xs)
 
 printAllp xs k   =
           if (k==0)
@@ -34,4 +40,7 @@ printAllp xs k   =
                                printAllp xs (k-1)
 
 main :: IO ()
-main = printAllp (primes) 100000
+main = do
+  input <- getLine
+  let n = read input :: Int
+  printAllp primes n

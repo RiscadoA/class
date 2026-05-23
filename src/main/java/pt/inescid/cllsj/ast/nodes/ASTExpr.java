@@ -1,8 +1,6 @@
 package pt.inescid.cllsj.ast.nodes;
 
-import java.util.*;
 import java.util.function.*;
-import java.util.logging.*;
 import pt.inescid.cllsj.Env;
 import pt.inescid.cllsj.EnvEntry;
 import pt.inescid.cllsj.Server;

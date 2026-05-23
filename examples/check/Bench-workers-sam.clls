@@ -1,0 +1,51 @@
+include "ackermann-sam.clls";;
+
+proc test00(c:close) {
+  cut {
+    one(n)
+    |n:~Nat|
+    one(m)
+    |m:~Nat|
+    acker(m,n,r)
+    |r:~Nat|
+    dispose(r,c)
+    }
+};;
+
+proc unsafe_rec load(;x:~lint)
+{
+    if (x==0) {
+        ()
+    } else {
+    letc c:close { test00(c) };
+    wait c;
+    load(;x-1)
+    }
+};;
+
+proc unsafe_rec testP(;n:~lint,v:~lint){
+    if (n==0) {
+        ()
+    } else {
+        par { load(;v) || testP(;n-1,v) }
+    }
+};;
+
+proc unsafe_rec testC(;n:~lint,v:~lint){
+    if (n==0) {
+        ()
+    } else {
+        cpar { load(;v) || testC(;n-1,v) }
+    }
+};;
+
+//println("Running: sam testP(;8,4);;");();;
+//sam 6 testP(;8,4);;
+println("Running: sam testC(;8,4);;");();;
+sam testC(;2,1);;
+//println("Running: repeat testP(;8,4);;");();;
+//repeat 6 testP(;8,4);;
+//println("Running: repeat testC(;8,4);;");();;
+//repeat 6 testC(;8,4);;
+quit;;
+

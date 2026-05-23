@@ -1,13 +1,13 @@
 type corec Fork {
     affine offer of {
         |#Pick:
-	offer of {
-        |#Drop: Fork
+		offer of {
+        	|#Drop: Fork
     }
     }
 };;
 
-type AFork { // unfolded
+type AFork { 
     affine offer of {
         |#Pick:
 	offer of {
@@ -27,7 +27,7 @@ type rec LockOrder {
     }
 };;
 
-type ALockOrder { // unfolded
+type ALockOrder { 
 	state Lock
 };;
 

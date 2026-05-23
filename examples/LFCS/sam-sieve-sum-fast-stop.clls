@@ -1,15 +1,13 @@
-type corec IntStream {
+type corec Stream(A) {
 	offer of   {
-		|#next: send !lint; IntStream
+		|#next: send A; Stream(A)
 		|#stop: close
 	}
 };;
-
-type NextIntStream {
-	send !lint; IntStream
-};;
+type IntStream { Stream(!lint) };;
+type NextIntStream { send !lint; IntStream};;
  
-proc rec integersfrom(n: IntStream; k:~lint)
+proc rec integersfrom(n: IntStream(); k:~lint)
 {
     case n of   {
       	| #next: send n(k); integersfrom(n;k+1)
@@ -19,22 +17,15 @@ proc rec integersfrom(n: IntStream; k:~lint)
 
 proc unsafe_rec filter(fouts:IntStream, fins:~IntStream; n:~lint) {
 	case fouts of {
-		|#next:
-			filter_next(fouts, fins; n)
-		|#stop:
-			#stop fins; wait fins; close fouts
+		|#next: filter_next(fouts, fins; n)
+		|#stop: #stop fins; wait fins; close fouts
 	}
 } and filter_next(fouts:NextIntStream, fins:~IntStream; n:~lint) {
 	#next fins;
 	fins -> v;
-	if ((v / n)*n == v) {
-		filter_next(fouts, fins; n)
-	} else {
-		fouts <- v;
-		filter(fouts, fins; n)
-	}
+	if ((v / n)*n == v) { filter_next(fouts, fins; n)
+	} else { fouts <- v; filter(fouts, fins; n) }
 };;
-
 
 proc rec sieve(souts:IntStream, sins:~IntStream)
  {
@@ -43,9 +34,7 @@ proc rec sieve(souts:IntStream, sins:~IntStream)
 			#next sins;
 			sins -> p;
 			souts <-p;
-			letc outp:IntStream {
-				filter(outp,sins;p)
-			};
+			letc outp:IntStream { filter(outp,sins;p) };
 			sieve(souts, outp)
 		|#stop:
 			#stop sins; wait sins; close souts
@@ -81,6 +70,3 @@ proc main_ss(;np:colint)
 proc main() {
 	  	main_ss(;100000)
 };;
-
-// 121.53s (ghc -O2)
-// 37.07s  (class)
